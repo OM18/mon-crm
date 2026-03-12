@@ -791,7 +791,7 @@ const DerivDecimalsEditor = ({ config, updateField }) => {
 // ─── DERIV BUSINESS UNITS EDITOR ─────────────────────────────
 const DerivAutocomplete = ({ form, setForm }) => {
   const [open, setOpen] = useState(false);
-  const allProds = JSON.parse(localStorage.getItem("crm_deriv_products") || "[]");
+  const allProds = JSON.parse(localStorage.getItem("crm_deriv_products") || "[]"); // sera géré plus tard
   // Filtrer par instrument type si renseigné
   const derivProds = form.type
     ? allProds.filter(p => !p.instrumentType || p.instrumentType.toUpperCase() === form.type.toUpperCase())
@@ -1091,7 +1091,15 @@ const DerivSelectField = ({ label, field, options, form, setForm }) => (
 );
 
 const DerivProductEditor = ({ config }) => {
-  const [products, setProducts] = useState(() => { try { return JSON.parse(localStorage.getItem("crm_deriv_products") || "[]"); } catch { return []; } });
+  const [products, setProducts] = useState([]);
+
+useEffect(() => {
+  async function loadProducts() {
+    const { data } = await supabase.from('deriv_products').select('data');
+    if (data?.length) setProducts(data.map(r => r.data));
+  }
+  loadProducts();
+}, []);
   const [form, setForm] = useState(EMPTY_PROD);
   const [instrumentType, setInstrumentType] = useState("");
   const [editId, setEditId] = useState(null);
@@ -1100,15 +1108,17 @@ const DerivProductEditor = ({ config }) => {
 
   const isValid = () => form.label.trim() !== "" && form.stoxxExchange !== "" && form.instrumentType !== "" && form.derivType !== "" && form.underlyingCategory !== "" && form.underlying !== "" && form.underlyingOrigin !== "" && String(form.volumeSizePerLot).trim() !== "" && form.volumeUnit !== "" && form.currency !== "" && form.firstNoticeDay !== "" && form.lastTradingDate !== "" && (form.instrumentType?.toLowerCase() !== "option" || form.expiryDate !== "");
 
-  const save = () => {
+  const save = async () => {
     if (!isValid()) return;
     const updated = editId ? products.map(p => p.id === editId ? { ...form, id: editId } : p) : [...products, { ...form, id: Date.now() }];
     setProducts(updated);
-    localStorage.setItem("crm_deriv_products", JSON.stringify(updated));
+    await supabase.from('deriv_products').delete().neq('id', 0);
+for (const p of updated) await supabase.from('deriv_products').insert({ data: p });
     setForm(EMPTY_PROD); setInstrumentType(""); setEditId(null); setShowForm(false);
   };
 
-  const remove = (id) => { const u = products.filter(p => p.id !== id); setProducts(u); localStorage.setItem("crm_deriv_products", JSON.stringify(u)); };
+  const remove = async (id) => { const u = products.filter(p => p.id !== id); setProducts(u); await supabase.from('deriv_products').delete().neq('id', 0);
+for (const p of u) await supabase.from('deriv_products').insert({ data: p }); };
 
   return (
     <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
@@ -4315,7 +4325,7 @@ const Derivatives = ({ companies }) => {
 
             {/* Price — adapté selon le format décimal de l'instrument */}
             {(() => {
-              const derivProds = JSON.parse(localStorage.getItem("crm_deriv_products") || "[]");
+              const derivProds = products;
               const instrument = derivProds.find(p => p.label === form.underlying);
               const decimalsFormat = instrument?.decimals || "decimal";
               const decConfig = (config.derivDecimals || []).find(d => d.value === decimalsFormat);

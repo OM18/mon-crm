@@ -219,12 +219,10 @@ const ConfigProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    console.log('save config triggered, loaded:', loaded, 'config:', config);
+
     if (loaded) {
       async function saveConfig() {
-        console.log('saving to supabase...');
-        const { error } = await supabase.from('config').upsert({ key: 'admin-config', data: config }, { onConflict: 'key' });
-        console.log('save result:', error ? error.message : 'OK');
+        
       }
       saveConfig();
     }

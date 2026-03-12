@@ -220,7 +220,11 @@ const ConfigProvider = ({ children }) => {
 
   useEffect(() => {
     if (loaded) {
-      supabase.from('config').upsert({ key: 'admin-config', data: config }, { onConflict: 'key' });
+      async function saveConfig() {
+        const { error } = await supabase.from('config').upsert({ key: 'admin-config', data: config }, { onConflict: 'key' });
+        if (error) console.error('Erreur sauvegarde config:', error.message);
+      }
+      saveConfig();
     }
   }, [config, loaded]);
 

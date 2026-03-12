@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
-
+import { supabase } from './supabase';
 // ─── COLORS ───────────────────────────────────────────────────
 const COLORS = {
   bg: "#0B0B0B",
@@ -210,16 +210,17 @@ const ConfigProvider = ({ children }) => {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("crm-admin-config");
-      if (saved) setConfig(JSON.parse(saved));
-    } catch {}
-    setLoaded(true);
+    async function loadConfig() {
+      const { data } = await supabase.from('config').select('data').eq('key', 'admin-config').single();
+      if (data) setConfig(data.data);
+      setLoaded(true);
+    }
+    loadConfig();
   }, []);
 
   useEffect(() => {
     if (loaded) {
-      try { localStorage.setItem("crm-admin-config", JSON.stringify(config)); } catch {}
+      supabase.from('config').upsert({ key: 'admin-config', data: config }, { onConflict: 'key' });
     }
   }, [config, loaded]);
 
@@ -4689,11 +4690,14 @@ export default function CRM() {
   const [page, setPage] = useState("dashboard");
 
   useEffect(() => {
-  const existing = JSON.parse(localStorage.getItem("crm_employees") || "[]");
-  if (existing.length === 0) {
-    const defaultAdmin = [{ id: 1, firstName: "Admin", name: "", email: "admin@orbit.com", password: "admin123", role: "admin", status: "active" }];
-    localStorage.setItem("crm_employees", JSON.stringify(defaultAdmin));
+  async function initEmployees() {
+    const { data: e } = await supabase.from('employees').select('data');
+    if (!e || e.length === 0) {
+      const defaultAdmin = { id: 1, firstName: "Admin", name: "", email: "admin@orbit.com", password: "admin123", role: "admin", status: "active" };
+      await supabase.from('employees').insert({ data: defaultAdmin });
+    }
   }
+  initEmployees();
 }, []);
 
   const handleLogin = (emp) => { setCurrentUser(emp); localStorage.setItem("crm_current_user", JSON.stringify(emp)); };
@@ -4702,14 +4706,42 @@ export default function CRM() {
 
 
   useEffect(() => {
-    try { const r = localStorage.getItem("crm-contacts"); if (r) setContacts(JSON.parse(r)); } catch {}
-    try { const r = localStorage.getItem("crm-tasks"); if (r) setTasks(JSON.parse(r)); } catch {}
-    try { const r = localStorage.getItem("crm-companies"); if (r) setCompanies(JSON.parse(r)); } catch {}
+    async function loadData() {
+      const { data: c } = await supabase.from('contacts').select('data');
+      if (c?.length) setContacts(c.map(r => r.data));
+
+      const { data: co } = await supabase.from('companies').select('data');
+      if (co?.length) setCompanies(co.map(r => r.data));
+
+      const { data: t } = await supabase.from('tasks').select('data');
+      if (t?.length) setTasks(t.map(r => r.data));
+    }
+    loadData();
   }, []);
 
-  useEffect(() => { try { localStorage.setItem("crm-contacts", JSON.stringify(contacts)); } catch {} }, [contacts]);
-  useEffect(() => { try { localStorage.setItem("crm-tasks", JSON.stringify(tasks)); } catch {} }, [tasks]);
-  useEffect(() => { try { localStorage.setItem("crm-companies", JSON.stringify(companies)); } catch {} }, [companies]);
+  useEffect(() => {
+    async function saveContacts() {
+      await supabase.from('contacts').delete().neq('id', 0);
+      for (const c of contacts) await supabase.from('contacts').insert({ data: c });
+    }
+    saveContacts();
+  }, [contacts]);
+
+  useEffect(() => {
+    async function saveCompanies() {
+      await supabase.from('companies').delete().neq('id', 0);
+      for (const c of companies) await supabase.from('companies').insert({ data: c });
+    }
+    saveCompanies();
+  }, [companies]);
+
+  useEffect(() => {
+    async function saveTasks() {
+      await supabase.from('tasks').delete().neq('id', 0);
+      for (const t of tasks) await supabase.from('tasks').insert({ data: t });
+    }
+    saveTasks();
+  }, [tasks]);
 
   const NavItem = ({ n, isAdmin = false }) => (
     <div onClick={() => setPage(n.id)} style={{

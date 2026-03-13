@@ -1320,7 +1320,15 @@ const AdminPanel = () => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [adminTab, setAdminTab] = useState("fields");
-  const [employees, setEmployees] = useState(() => { try { return JSON.parse(localStorage.getItem("crm_employees") || "[]"); } catch { return []; } });
+  const [employees, setEmployees] = useState([]);
+
+useEffect(() => {
+  async function loadEmployees() {
+    const { data } = await supabase.from('employees').select('data');
+    if (data?.length) setEmployees(data.map(r => r.data));
+  }
+  loadEmployees();
+}, []);
   const [empForm, setEmpForm] = useState({ firstName: "", name: "", phone: "", email: "", status: "active", role: "user", password: "" });
   const [editEmpId, setEditEmpId] = useState(null);
   const [showEmpForm, setShowEmpForm] = useState(false);
@@ -1370,7 +1378,8 @@ for (const a of updated) await supabase.from('deriv_accounts').insert({ data: a 
   const saveEmployee = () => {
     const updated = editEmpId ? employees.map(e => e.id === editEmpId ? { ...empForm, id: editEmpId } : e) : [...employees, { ...empForm, id: Date.now() }];
     setEmployees(updated);
-    localStorage.setItem("crm_employees", JSON.stringify(updated));
+    await supabase.from('employees').delete().neq('id', 0);
+for (const e of updated) await supabase.from('employees').insert({ data: e });
     setEmpForm({ firstName: "", name: "", phone: "", email: "", status: "active" });
     setEditEmpId(null);
     setShowEmpForm(false);
@@ -1379,7 +1388,8 @@ for (const a of updated) await supabase.from('deriv_accounts').insert({ data: a 
   const deleteEmployee = (id) => {
     const updated = employees.filter(e => e.id !== id);
     setEmployees(updated);
-    localStorage.setItem("crm_employees", JSON.stringify(updated));
+    await supabase.from('employees').delete().neq('id', 0);
+for (const e of updated) await supabase.from('employees').insert({ data: e });
   };
 
   const resetToDefaults = () => {
@@ -2676,8 +2686,9 @@ const LoginPage = ({ onLogin }) => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleLogin = () => {
-    const employees = JSON.parse(localStorage.getItem("crm_employees") || "[]");
+  const handleLogin = async () => {
+    const { data } = await supabase.from('employees').select('data');
+    const employees = data ? data.map(r => r.data) : [];
     const emp = employees.find(e => e.email === email && e.password === password && e.status === "active");
     if (emp) { onLogin(emp); }
     else { setError("Email ou mot de passe incorrect."); }

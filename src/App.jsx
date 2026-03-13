@@ -1327,7 +1327,15 @@ const AdminPanel = () => {
 
   // ── Deriv Accounts state ──
   const EMPTY_ACC = { accountNumber: "", businessUnit: "", currency: "EUR", initialAmount: "", isActive: true };
-  const [derivAccounts, setDerivAccounts] = useState(() => { try { return JSON.parse(localStorage.getItem("crm_deriv_accounts") || "[]"); } catch { return []; } });
+  const [derivAccounts, setDerivAccounts] = useState([]);
+
+useEffect(() => {
+  async function loadAccounts() {
+    const { data } = await supabase.from('deriv_accounts').select('data');
+    if (data?.length) setDerivAccounts(data.map(r => r.data));
+  }
+  loadAccounts();
+}, []);
   const [accForm, setAccForm] = useState(EMPTY_ACC);
   const [editAccId, setEditAccId] = useState(null);
   const [showAccForm, setShowAccForm] = useState(false);
@@ -1339,22 +1347,24 @@ const AdminPanel = () => {
     accForm.currency !== "" &&
     String(accForm.initialAmount).trim() !== "";
 
-  const saveAccount = () => {
+  const saveAccount = async () => {
     if (!isAccFormValid()) return;
     const updated = editAccId
       ? derivAccounts.map(a => a.id === editAccId ? { ...accForm, id: editAccId } : a)
       : [...derivAccounts, { ...accForm, id: Date.now() }];
     setDerivAccounts(updated);
-    localStorage.setItem("crm_deriv_accounts", JSON.stringify(updated));
+    await supabase.from('deriv_accounts').delete().neq('id', 0);
+for (const a of updated) await supabase.from('deriv_accounts').insert({ data: a });
     setAccForm(EMPTY_ACC);
     setEditAccId(null);
     setShowAccForm(false);
   };
 
-  const deleteAccount = (id) => {
+  const deleteAccount = async (id) => {
     const updated = derivAccounts.filter(a => a.id !== id);
     setDerivAccounts(updated);
-    localStorage.setItem("crm_deriv_accounts", JSON.stringify(updated));
+    await supabase.from('deriv_accounts').delete().neq('id', 0);
+for (const a of updated) await supabase.from('deriv_accounts').insert({ data: a });
   };
 
   const saveEmployee = () => {
@@ -1484,7 +1494,7 @@ const AdminPanel = () => {
                           {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>}
                         </div>
                       </div>
-                      <div onClick={() => { const updated = derivAccounts.map(x => x.id === a.id ? { ...x, isActive: !x.isActive } : x); setDerivAccounts(updated); localStorage.setItem("crm_deriv_accounts", JSON.stringify(updated)); }}
+                      <div onClick={() => { const updated = derivAccounts.map(x => x.id === a.id ? { ...x, isActive: !x.isActive } : x); setDerivAccounts(updated); supabase.from('deriv_accounts').delete().neq('id', 0).then(() => updated.forEach(a => supabase.from('deriv_accounts').insert({ data: a })));
                         style={{ width: 40, height: 22, borderRadius: 11, background: a.isActive ? COLORS.green : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
                         <div style={{ position: "absolute", top: 3, left: a.isActive ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                       </div>
@@ -3940,8 +3950,22 @@ const Derivatives = ({ companies }) => {
     status: (() => { const def = config.derivOpStatusDefault; const found = (config.derivOpStatuses || []).find(s => s.value === def); return found ? found.label.toUpperCase() : (config.derivOpStatuses?.[0]?.label?.toUpperCase() || "TRADED"); })(), notes: "", internalDeal: false,
   });
 
-  const [ops, setOpsRaw] = useState(() => { try { return JSON.parse(localStorage.getItem("crm_derivatives") || "[]"); } catch { return []; } });
-  const setOps = (val) => { const next = typeof val === "function" ? val(ops) : val; setOpsRaw(next); try { localStorage.setItem("crm_derivatives", JSON.stringify(next)); } catch {} };
+  const [ops, setOpsRaw] = useState([]);
+
+useEffect(() => {
+  async function loadOps() {
+    const { data } = await supabase.from('derivatives').select('data');
+    if (data?.length) setOpsRaw(data.map(r => r.data));
+  }
+  loadOps();
+}, []);
+
+const setOps = async (val) => {
+  const next = typeof val === "function" ? val(ops) : val;
+  setOpsRaw(next);
+  await supabase.from('derivatives').delete().neq('id', 0);
+  for (const d of next) await supabase.from('derivatives').insert({ data: d });
+};
   const [showForm, setShowForm]   = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [editOp, setEditOp]       = useState(null);
@@ -4401,7 +4425,9 @@ const Derivatives = ({ companies }) => {
               <select value={form.account} onChange={e => setForm(f => ({ ...f, account: e.target.value }))}
                 style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
                 <option value="">— Select —</option>
-                {JSON.parse(localStorage.getItem("crm_deriv_accounts") || "[]")
+                {derivAccounts
+  .filter(a => a.isActive !== false)
+  .map(a => <option key={a.id} value={a.accountNumber}>{a.accountNumber.toUpperCase()}</option>)}
                   .filter(a => a.isActive !== false)
                   .map(a => <option key={a.id} value={a.accountNumber}>{a.accountNumber.toUpperCase()}</option>)}
               </select>

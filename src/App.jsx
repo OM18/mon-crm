@@ -3941,6 +3941,15 @@ const MultiToggle = ({ label, options, values, onChange }) => (
 
 const Derivatives = ({ companies }) => {
   const { config } = useConfig();
+  const [products, setProducts] = useState([]);
+
+useEffect(() => {
+  async function loadProducts() {
+    const { data } = await supabase.from('deriv_products').select('data');
+    if (data?.length) setProducts(data.map(r => r.data));
+  }
+  loadProducts();
+}, []);
   const INSTRUMENT_TYPES = ["Future", "Option"];
   const SIDES = ["BUY", "SELL"];
   const OP_TYPES = ["Hedging", "Rolling", "Trade"];

@@ -1500,11 +1500,11 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                         <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{a.accountNumber}</div>
                         <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2, display: "flex", gap: 10, flexWrap: "wrap" }}>
                           {bu && <span style={{ color: bu.color || COLORS.textSub }}>◈ {bu.label}</span>}
-                          <span>💱 {a.currency}</span>
+                          <span>💱 {a.currency}</span><div onClick={() => { const updated = derivAccounts.map(x => x.id === a.id ? { ...x, isActive: !x.isActive } : x); setDerivAccounts(updated); supabase.from('deriv_accounts').delete().neq('id', 0).then(() => updated.forEach(a => supabase.from('deriv_accounts').insert({ data: a }))); }}
                           {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>}
                         </div>
                       </div>
-                      <div onClick={() => { const updated = derivAccounts.map(x => x.id === a.id ? { ...x, isActive: !x.isActive } : x); setDerivAccounts(updated); supabase.from('deriv_accounts').delete().neq('id', 0).then(() => updated.forEach(a => supabase.from('deriv_accounts').insert({ data: a })));
+                      <div onClick={() => { const updated = derivAccounts.map(x => x.id === a.id ? { ...x, isActive: !x.isActive } : x); setDerivAccounts(updated); supabase.from('deriv_accounts').delete().neq('id', 0).then(() => updated.forEach(a => supabase.from('deriv_accounts').insert({ data: a }))); }}
                         style={{ width: 40, height: 22, borderRadius: 11, background: a.isActive ? COLORS.green : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
                         <div style={{ position: "absolute", top: 3, left: a.isActive ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                       </div>

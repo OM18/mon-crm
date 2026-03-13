@@ -2687,9 +2687,13 @@ const LoginPage = ({ onLogin }) => {
   const [error, setError] = useState("");
 
   const handleLogin = async () => {
-    const { data } = await supabase.from('employees').select('data');
+    const { data, error } = await supabase.from('employees').select('data');
+    console.log('employees data:', data, 'error:', error);
     const employees = data ? data.map(r => r.data) : [];
+    console.log('employees:', employees);
+    console.log('trying login with:', email, password);
     const emp = employees.find(e => e.email === email && e.password === password && e.status === "active");
+    console.log('found emp:', emp);
     if (emp) { onLogin(emp); }
     else { setError("Email ou mot de passe incorrect."); }
   };

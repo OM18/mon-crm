@@ -219,10 +219,9 @@ const ConfigProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-
     if (loaded) {
       async function saveConfig() {
-        
+        await supabase.from('config').upsert({ key: 'admin-config', data: config }, { onConflict: 'key' });
       }
       saveConfig();
     }

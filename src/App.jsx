@@ -1375,7 +1375,7 @@ for (const a of updated) await supabase.from('deriv_accounts').insert({ data: a 
 for (const a of updated) await supabase.from('deriv_accounts').insert({ data: a });
   };
 
-  const saveEmployee = () => {
+  const saveEmployee = async () => {
     const updated = editEmpId ? employees.map(e => e.id === editEmpId ? { ...empForm, id: editEmpId } : e) : [...employees, { ...empForm, id: Date.now() }];
     setEmployees(updated);
     await supabase.from('employees').delete().neq('id', 0);

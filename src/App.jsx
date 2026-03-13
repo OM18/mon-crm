@@ -3950,6 +3950,16 @@ useEffect(() => {
   }
   loadProducts();
 }, []);
+
+const [derivAccounts, setDerivAccounts] = useState([]);
+
+useEffect(() => {
+  async function loadDerivAccounts() {
+    const { data } = await supabase.from('deriv_accounts').select('data');
+    if (data?.length) setDerivAccounts(data.map(r => r.data));
+  }
+  loadDerivAccounts();
+}, []);
   const INSTRUMENT_TYPES = ["Future", "Option"];
   const SIDES = ["BUY", "SELL"];
   const OP_TYPES = ["Hedging", "Rolling", "Trade"];

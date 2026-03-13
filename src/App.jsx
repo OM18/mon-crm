@@ -1385,7 +1385,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
     setShowEmpForm(false);
   };
 
-  const deleteEmployee = (id) => {
+  const deleteEmployee = async (id) => {
     const updated = employees.filter(e => e.id !== id);
     setEmployees(updated);
     await supabase.from('employees').delete().neq('id', 0);

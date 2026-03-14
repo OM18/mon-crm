@@ -199,15 +199,6 @@ const DEFAULT_CONFIG = {
     { value: "rice", label: "Rice" },
     { value: "barley", label: "Barley" },
   ],
-  derivUnderlyings: [
-    { value: "wheat", label: "Wheat" },
-    { value: "corn", label: "Corn" },
-    { value: "soybean", label: "Soybean" },
-    { value: "rapeseed", label: "Rapeseed" },
-    { value: "sunflower", label: "Sunflower" },
-    { value: "barley", label: "Barley" },
-    { value: "sugar", label: "Sugar" },
-  ],
   derivUnderlyingOrigins: ["FRANCE", "UKRAINE", "MOROCCO", "BRAZIL", "ARGENTINA", "UNITED STATES", "AUSTRALIA"],
 };
 
@@ -447,7 +438,6 @@ const DERIV_FIELD_DEFINITIONS = [
   { key: "derivVolumeUnits", label: "Volume Units", icon: "📦", description: "Unités de volume utilisées dans les opérations sur dérivés", hasColor: false, hasValue: true },
   { key: "derivCurrencies", label: "Currencies", icon: "💱", description: "Devises disponibles dans le module Derivatives", hasColor: true, hasValue: true },
   { key: "derivCommodities", label: "Underlying", icon: "🌽", description: "Sous-jacents disponibles avec leur catégorie (Commodity / FX)", hasColor: false, hasValue: true },
-  { key: "derivUnderlyings", label: "Underlying", icon: "🌾", description: "Valeurs du champ Underlying dans la modale New Operation", hasColor: false, hasValue: false },
   { key: "derivUnderlyingOrigins", label: "Underlying Origin", icon: "🌍", description: "Origines géographiques du sous-jacent", hasColor: false, hasValue: false },
   { key: "derivTarifTypes", label: "Tarifs Types", icon: "🏷", description: "Liste des tarifs types de référence pour les opérations sur dérivés", hasColor: false, hasValue: false },
   { key: "derivOrderTransmissionTypes", label: "Order Transmission Types", icon: "📡", description: "Modes de transmission des ordres (Electronic, Manual…)", hasColor: false, hasValue: true },
@@ -1669,7 +1659,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                         <select value={lsForm.underlying} onChange={e => setLsForm(f => ({ ...f, underlying: e.target.value }))}
                           style={{ background: COLORS.bg, border: `1px solid ${lsForm.underlying ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: lsForm.underlying ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
                           <option value="">— Sélectionner —</option>
-                          {(config.derivUnderlyings || []).map(u => (
+                          {(config.derivCommodities || []).map(u => (
                             <option key={u.value || u} value={u.value || u}>{u.label || u}</option>
                           ))}
                         </select>

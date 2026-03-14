@@ -78,6 +78,7 @@ const DEFAULT_CONFIG = {
     { value: "Buyer", label: "Buyer", color: COLORS.green },
     { value: "Exporter", label: "Exporter", color: COLORS.blue },
     { value: "Broker", label: "Broker", color: COLORS.orange },
+    { value: "Financial Broker", label: "Financial Broker", color: COLORS.blue },
     { value: "Customs broker", label: "Customs broker", color: COLORS.gold },
     { value: "Surveyor", label: "Surveyor", color: COLORS.purple },
     { value: "Insurer", label: "Insurer", color: COLORS.red },
@@ -1562,7 +1563,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           {/* Financial Brokers — lecture seule, alimenté par Companies */}
           {(() => {
             const financialBrokers = companies.filter(c =>
-              (c.roles || []).some(r => r.toLowerCase() === "broker")
+              (c.roles || []).some(r => r.toLowerCase().includes("financial") && r.toLowerCase().includes("broker"))
             );
             return (
               <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
@@ -4542,7 +4543,7 @@ const setOps = async (val) => {
             {/* Broker — alimenté par les sociétés ayant le rôle "Broker" */}
             {(() => {
               const brokerCompanies = (companies || []).filter(c =>
-                (c.roles || []).some(r => r.toLowerCase() === "broker")
+                (c.roles || []).some(r => r.toLowerCase().includes("financial") && r.toLowerCase().includes("broker"))
               );
               return (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

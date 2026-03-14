@@ -4370,7 +4370,7 @@ const setOps = async (val) => {
 
             {/* Business Unit — filtrée sur les BUs actives dans l'admin panel Derivatives */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4, border: formErrors.businessUnit ? `1.5px solid ${COLORS.red}` : "1.5px solid transparent", borderRadius: 10, padding: formErrors.businessUnit ? "6px 8px" : 0 }}>
-              <ToggleGroup label={<>BUSINESS UNIT <span style={{ color: COLORS.red }}>*</span></>}
+              <ToggleGroup label="BUSINESS UNIT *"
                 options={(config.businessUnit || []).filter(bu => (config.derivBusinessUnits || []).includes(bu.value)).map(bu => bu.value)}
                 value={form.businessUnit}
                 onChange={v => { setForm(f => ({ ...f, businessUnit: v })); setFormErrors(e => ({ ...e, businessUnit: undefined })); }}
@@ -4382,7 +4382,7 @@ const setOps = async (val) => {
 
             {/* Type instrument */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4, border: formErrors.type ? `1.5px solid ${COLORS.red}` : "1.5px solid transparent", borderRadius: 10, padding: formErrors.type ? "6px 8px" : 0 }}>
-              <ToggleGroup label={<>INSTRUMENT TYPE <span style={{ color: COLORS.red }}>*</span></>} options={(config.derivInstrumentTypes || []).map(o => o.label)} value={form.type} onChange={v => {
+              <ToggleGroup label="INSTRUMENT TYPE *" options={(config.derivInstrumentTypes || []).map(o => o.label)} value={form.type} onChange={v => {
                 const allProds = JSON.parse(localStorage.getItem("crm_deriv_products") || "[]");
                 const stillValid = allProds.some(p => p.label.toUpperCase() === (form.underlying || "").toUpperCase() && (!p.instrumentType || p.instrumentType.toUpperCase() === v.toUpperCase()));
                 setForm(f => ({ ...f, type: v, underlying: stillValid ? f.underlying : "", exchange: stillValid ? f.exchange : "" }));
@@ -4393,14 +4393,14 @@ const setOps = async (val) => {
 
             {/* Operation Type */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4, border: formErrors.opType ? `1.5px solid ${COLORS.red}` : "1.5px solid transparent", borderRadius: 10, padding: formErrors.opType ? "6px 8px" : 0 }}>
-              <ToggleGroup label={<>OPERATION TYPE <span style={{ color: COLORS.red }}>*</span></>} options={(config.derivOpTypes || []).map(o => o.label)} value={form.opType} onChange={v => { setForm(f => ({ ...f, opType: v })); setFormErrors(e => ({ ...e, opType: undefined })); }}
+              <ToggleGroup label="OPERATION TYPE *" options={(config.derivOpTypes || []).map(o => o.label)} value={form.opType} onChange={v => { setForm(f => ({ ...f, opType: v })); setFormErrors(e => ({ ...e, opType: undefined })); }}
                 colorFn={() => COLORS.accent} />
               {formErrors.opType && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.opType}</span>}
             </div>
 
             {/* Side */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4, border: formErrors.side ? `1.5px solid ${COLORS.red}` : "1.5px solid transparent", borderRadius: 10, padding: formErrors.side ? "6px 8px" : 0 }}>
-              <ToggleGroup label={<>SIDE <span style={{ color: COLORS.red }}>*</span></>} options={SIDES} value={form.side} onChange={v => { setForm(f => ({ ...f, side: v })); setFormErrors(e => ({ ...e, side: undefined })); }}
+              <ToggleGroup label="SIDE *" options={SIDES} value={form.side} onChange={v => { setForm(f => ({ ...f, side: v })); setFormErrors(e => ({ ...e, side: undefined })); }}
                 colorFn={v => v === "BUY" ? COLORS.green : COLORS.red} />
               {formErrors.side && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.side}</span>}
             </div>
@@ -4479,8 +4479,9 @@ const setOps = async (val) => {
 
             {/* Dates */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <Input label={<>TRADE DATE <span style={{ color: COLORS.red }}>*</span></>} type="date" value={form.tradeDate} onChange={v => { setForm(f => ({ ...f, tradeDate: v })); setFormErrors(e => ({ ...e, tradeDate: undefined })); }}
-                style={{ border: `1px solid ${formErrors.tradeDate ? COLORS.red : COLORS.border}` }} />
+              <label style={{ fontSize: 12, color: formErrors.tradeDate ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>TRADE DATE *</label>
+              <input type="date" value={form.tradeDate} onChange={e => { setForm(f => ({ ...f, tradeDate: e.target.value })); setFormErrors(er => ({ ...er, tradeDate: undefined })); }}
+                style={{ background: COLORS.bg, border: `1px solid ${formErrors.tradeDate ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
               {formErrors.tradeDate && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.tradeDate}</span>}
             </div>
             {form.type?.toLowerCase() === "option" && (
@@ -4494,8 +4495,9 @@ const setOps = async (val) => {
 
             {/* Broker + Exchange (auto-rempli) */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <Input label={<>BROKER <span style={{ color: COLORS.red }}>*</span></>} value={form.broker} onChange={v => { setForm(f => ({ ...f, broker: v })); setFormErrors(e => ({ ...e, broker: undefined })); }} placeholder="Broker name"
-                style={{ border: `1px solid ${formErrors.broker ? COLORS.red : COLORS.border}` }} />
+              <label style={{ fontSize: 12, color: formErrors.broker ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>BROKER *</label>
+              <input value={form.broker} onChange={e => { setForm(f => ({ ...f, broker: e.target.value })); setFormErrors(er => ({ ...er, broker: undefined })); }} placeholder="Broker name"
+                style={{ background: COLORS.bg, border: `1px solid ${formErrors.broker ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
               {formErrors.broker && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.broker}</span>}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

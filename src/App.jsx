@@ -1316,7 +1316,7 @@ const UnderlyingOriginEditor = ({ config, updateField, setAdminTab }) => {
   );
 };
 
-const AdminPanel = () => {
+const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [adminTab, setAdminTab] = useState("fields");
@@ -1558,6 +1558,53 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           </div>
 
           <UnderlyingOriginEditor config={config} updateField={updateField} setAdminTab={setAdminTab} />
+
+          {/* Financial Brokers — lecture seule, alimenté par Companies */}
+          {(() => {
+            const financialBrokers = companies.filter(c =>
+              (c.roles || []).some(r => r.toLowerCase() === "broker")
+            );
+            return (
+              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ padding: "18px 24px", borderBottom: `1px solid ${COLORS.border}`, background: `${COLORS.orange}08`, display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.orange}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏦</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Financial Brokers</div>
+                    <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>
+                      Sociétés ayant le rôle <span style={{ color: COLORS.orange, fontWeight: 700 }}>Broker</span> — gérez-les dans la section <span style={{ color: COLORS.accent, fontWeight: 600 }}>Companies</span>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+                    {financialBrokers.length} broker{financialBrokers.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div style={{ padding: "16px 24px" }}>
+                  {financialBrokers.length === 0 ? (
+                    <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "24px 0", fontSize: 13 }}>
+                      Aucune société avec le rôle "Broker" — assignez ce rôle dans <strong>Companies</strong>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {financialBrokers.map(c => (
+                        <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 16px" }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: `${COLORS.orange}18`, border: `1px solid ${COLORS.orange}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🏦</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
+                            {c.country && <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 1 }}>{c.country}</div>}
+                          </div>
+                          {(Array.isArray(c.businessUnit) ? c.businessUnit : (c.businessUnit ? [c.businessUnit] : [])).map(bu => {
+                            const buCfg = (config.businessUnit || []).find(b => b.value === bu);
+                            return buCfg ? <span key={bu} style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${buCfg.color}22`, color: buCfg.color, border: `1px solid ${buCfg.color}40` }}>{buCfg.label.toUpperCase()}</span> : null;
+                          })}
+                          <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>lecture seule</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
         </div>
       )}
@@ -4492,13 +4539,33 @@ const setOps = async (val) => {
             )}
             {form.type?.toLowerCase() === "future" && <div />}
 
-            {/* Broker + Exchange (auto-rempli) */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 12, color: formErrors.broker ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>BROKER *</label>
-              <input value={form.broker} onChange={e => { setForm(f => ({ ...f, broker: e.target.value })); setFormErrors(er => ({ ...er, broker: undefined })); }} placeholder="Broker name"
-                style={{ background: COLORS.bg, border: `1px solid ${formErrors.broker ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
-              {formErrors.broker && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.broker}</span>}
-            </div>
+            {/* Broker — alimenté par les sociétés ayant le rôle "Broker" */}
+            {(() => {
+              const brokerCompanies = (companies || []).filter(c =>
+                (c.roles || []).some(r => r.toLowerCase() === "broker")
+              );
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 12, color: formErrors.broker ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>FINANCIAL BROKER *</label>
+                  {brokerCompanies.length > 0 ? (
+                    <select value={form.broker} onChange={e => { setForm(f => ({ ...f, broker: e.target.value })); setFormErrors(er => ({ ...er, broker: undefined })); }}
+                      style={{ background: COLORS.bg, border: `1px solid ${formErrors.broker ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.broker ? COLORS.text : COLORS.textMuted, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
+                      <option value="">— Sélectionner un broker —</option>
+                      {brokerCompanies.map(c => (
+                        <option key={c.id} value={c.name}>{c.name}{c.country ? ` (${c.country})` : ""}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <input value={form.broker} onChange={e => { setForm(f => ({ ...f, broker: e.target.value })); setFormErrors(er => ({ ...er, broker: undefined })); }} placeholder="Broker name"
+                        style={{ background: COLORS.bg, border: `1px solid ${formErrors.broker ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+                      <span style={{ fontSize: 11, color: COLORS.textMuted }}>💡 Aucune société avec le rôle "Broker" — ajoutez-en dans Companies</span>
+                    </div>
+                  )}
+                  {formErrors.broker && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.broker}</span>}
+                </div>
+              );
+            })()}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>EXCHANGE <span style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 400 }}>(auto)</span></label>
               <input value={form.exchange ? form.exchange.toUpperCase() : ""} readOnly
@@ -4963,7 +5030,7 @@ export default function CRM() {
           {page === "pipeline" && <Pipeline contacts={contacts} setContacts={setContacts} companies={companies} setCompanies={setCompanies} />}
           {page === "companies-dashboard" && <CompaniesDashboard companies={companies} setCompanies={setCompanies} />}
           {page === "derivatives" && <Derivatives companies={companies} />}
-          {page === "admin" && <AdminPanel />}
+          {page === "admin" && <AdminPanel companies={companies} />}
         </div>
       </div>
     </ConfigProvider>

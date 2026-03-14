@@ -1666,8 +1666,13 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>UNDERLYING <span style={{ color: COLORS.red }}>*</span></label>
-                        <input value={lsForm.underlying} onChange={e => setLsForm(f => ({ ...f, underlying: e.target.value }))} placeholder="ex: Wheat"
-                          style={{ background: COLORS.bg, border: `1px solid ${lsForm.underlying.trim() ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                        <select value={lsForm.underlying} onChange={e => setLsForm(f => ({ ...f, underlying: e.target.value }))}
+                          style={{ background: COLORS.bg, border: `1px solid ${lsForm.underlying ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: lsForm.underlying ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                          <option value="">— Sélectionner —</option>
+                          {(config.derivUnderlyings || []).map(u => (
+                            <option key={u.value || u} value={u.value || u}>{u.label || u}</option>
+                          ))}
+                        </select>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>QUANTITY <span style={{ color: COLORS.red }}>*</span></label>

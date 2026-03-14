@@ -1358,6 +1358,8 @@ useEffect(() => {
   const [editAccId, setEditAccId] = useState(null);
   const [showAccForm, setShowAccForm] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState(false);
+  const [expandedOrderTransmission, setExpandedOrderTransmission] = useState(false);
+  const [expandedFinancialBrokers, setExpandedFinancialBrokers] = useState(false);
 
   const isAccFormValid = () =>
     accForm.accountNumber.trim() !== "" &&
@@ -1579,41 +1581,46 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             const currentDefault = config.derivOrderTransmissionDefault || "";
             return (
               <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
-                <div style={{ padding: "18px 24px", borderBottom: `1px solid ${COLORS.border}`, background: `${COLORS.blue}08`, display: "flex", alignItems: "center", gap: 14 }}>
+                <div onClick={() => setExpandedOrderTransmission(v => !v)}
+                  style={{ padding: "18px 24px", borderBottom: expandedOrderTransmission ? `1px solid ${COLORS.border}` : "none", background: `${COLORS.blue}08`, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", userSelect: "none" }}
+                  onMouseOver={e => e.currentTarget.style.background = `${COLORS.blue}14`}
+                  onMouseOut={e => e.currentTarget.style.background = `${COLORS.blue}08`}>
                   <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📡</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Order Transmission Types</div>
                     <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Modes de transmission des ordres — définissez les valeurs et la valeur par défaut</div>
                   </div>
+                  {currentDefault && <span style={{ fontSize: 11, color: COLORS.blue, background: `${COLORS.blue}15`, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.blue}30`, fontWeight: 600 }}>★ {items.find(i => i.value === currentDefault)?.label || currentDefault}</span>}
+                  <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expandedOrderTransmission ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
                 </div>
-                <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
-                  {/* FieldEditor pour gérer la liste */}
-                  <FieldEditor
-                    fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivOrderTransmissionTypes")}
-                    values={items}
-                    onUpdate={updateField}
-                  />
-                  {/* Sélecteur valeur par défaut */}
-                  {items.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, background: `${COLORS.blue}08`, border: `1px solid ${COLORS.blue}30`, borderRadius: 10, padding: "12px 16px" }}>
-                      <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 700, letterSpacing: 0.5 }}>VALEUR PAR DÉFAUT</label>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {items.map(item => {
-                          const isDefault = item.value === currentDefault || item.label === currentDefault;
-                          return (
-                            <div key={item.value} onClick={() => updateField("derivOrderTransmissionDefault", item.value)}
-                              style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 16px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${isDefault ? COLORS.blue : COLORS.border}`, background: isDefault ? `${COLORS.blue}15` : COLORS.bg, transition: "all 0.15s", userSelect: "none" }}>
-                              <div style={{ width: 10, height: 10, borderRadius: "50%", border: `2px solid ${isDefault ? COLORS.blue : COLORS.textMuted}`, background: isDefault ? COLORS.blue : "transparent", flexShrink: 0 }} />
-                              <span style={{ fontSize: 13, fontWeight: 700, color: isDefault ? COLORS.blue : COLORS.textSub, letterSpacing: 0.5 }}>{item.label}</span>
-                              {isDefault && <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.blue, background: `${COLORS.blue}20`, padding: "1px 7px", borderRadius: 5, border: `1px solid ${COLORS.blue}40` }}>DÉFAUT</span>}
-                            </div>
-                          );
-                        })}
+                {expandedOrderTransmission && (
+                  <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                    <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivOrderTransmissionTypes")} values={items} onUpdate={updateField} />
+                    {items.length > 0 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, background: `${COLORS.accent}08`, border: `1px solid ${COLORS.accent}30`, borderRadius: 10, padding: "12px 16px" }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 700, letterSpacing: 0.5 }}>VALEUR PAR DÉFAUT</label>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {items.map(item => {
+                            const isDefault = item.value === currentDefault || item.label === currentDefault;
+                            return (
+                              <div key={item.value} onClick={() => updateField("derivOrderTransmissionDefault", item.value)}
+                                style={{ display: "flex", alignItems: "center", gap: 12, background: isDefault ? `${COLORS.accent}08` : COLORS.bg, border: `1px solid ${isDefault ? COLORS.accent + "50" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", cursor: "pointer", transition: "all 0.15s" }}
+                                onMouseOver={e => { if (!isDefault) e.currentTarget.style.background = `${COLORS.accent}05`; }}
+                                onMouseOut={e => { if (!isDefault) e.currentTarget.style.background = isDefault ? `${COLORS.accent}08` : COLORS.bg; }}>
+                                <div style={{ width: 32, height: 32, borderRadius: 8, background: `${COLORS.blue}18`, border: `1px solid ${COLORS.blue}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>📡</div>
+                                <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: COLORS.text }}>{item.label}</div>
+                                {isDefault
+                                  ? <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.accent, background: `${COLORS.accent}18`, padding: "2px 10px", borderRadius: 6, border: `1px solid ${COLORS.accent}40`, flexShrink: 0 }}>★ Défaut</span>
+                                  : <span style={{ fontSize: 11, color: COLORS.textMuted, flexShrink: 0 }}>Cliquer pour définir par défaut</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <span style={{ fontSize: 11, color: COLORS.green }}>✓ Pré-sélectionné automatiquement à la création d'une opération</span>
                       </div>
-                      <div style={{ fontSize: 11, color: COLORS.textMuted }}>💡 Cliquez sur une valeur pour la définir comme défaut</div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -1627,7 +1634,10 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             const defaultStillValid = financialBrokers.some(c => c.name === currentDefault);
             return (
               <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
-                <div style={{ padding: "18px 24px", borderBottom: `1px solid ${COLORS.border}`, background: `${COLORS.orange}08`, display: "flex", alignItems: "center", gap: 14 }}>
+                <div onClick={() => setExpandedFinancialBrokers(v => !v)}
+                  style={{ padding: "18px 24px", borderBottom: expandedFinancialBrokers ? `1px solid ${COLORS.border}` : "none", background: `${COLORS.orange}08`, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", userSelect: "none" }}
+                  onMouseOver={e => e.currentTarget.style.background = `${COLORS.orange}14`}
+                  onMouseOut={e => e.currentTarget.style.background = `${COLORS.orange}08`}>
                   <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.orange}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏦</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Financial Brokers</div>
@@ -1635,57 +1645,52 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       Sociétés ayant le rôle <span style={{ color: COLORS.orange, fontWeight: 700 }}>Financial Broker</span> — gérez-les dans la section <span style={{ color: COLORS.accent, fontWeight: 600 }}>Companies</span>
                     </div>
                   </div>
-                  <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 4 }}>
                     {financialBrokers.length} broker{financialBrokers.length !== 1 ? "s" : ""}
                   </span>
+                  <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expandedFinancialBrokers ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
                 </div>
-                <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
-
-                  {/* Sélecteur valeur par défaut */}
-                  {financialBrokers.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, background: `${COLORS.accent}08`, border: `1px solid ${COLORS.accent}30`, borderRadius: 10, padding: "12px 16px" }}>
-                      <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 700, letterSpacing: 0.5 }}>BROKER PAR DÉFAUT</label>
-                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                        <select
-                          value={currentDefault}
-                          onChange={e => updateField("derivDefaultBroker", e.target.value)}
-                          style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 14px", color: currentDefault ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
-                          <option value="">— Aucun broker par défaut —</option>
-                          {financialBrokers.map(c => (
-                            <option key={c.id} value={c.name}>{c.name}{c.country ? ` (${c.country})` : ""}</option>
-                          ))}
-                        </select>
-                        {currentDefault && (
-                          <button onClick={() => updateField("derivDefaultBroker", "")}
-                            style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: 8, color: COLORS.textMuted, cursor: "pointer", fontSize: 12, padding: "8px 12px", fontFamily: "inherit" }}
-                            onMouseOver={e => e.currentTarget.style.color = COLORS.red}
-                            onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>
-                            ✕ Effacer
-                          </button>
-                        )}
+                {expandedFinancialBrokers && (
+                  <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                    {financialBrokers.length > 0 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, background: `${COLORS.accent}08`, border: `1px solid ${COLORS.accent}30`, borderRadius: 10, padding: "12px 16px" }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 700, letterSpacing: 0.5 }}>BROKER PAR DÉFAUT</label>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {financialBrokers.map(c => {
+                            const isDefault = c.name === currentDefault;
+                            return (
+                              <div key={c.id} onClick={() => updateField("derivDefaultBroker", isDefault ? "" : c.name)}
+                                style={{ display: "flex", alignItems: "center", gap: 12, background: isDefault ? `${COLORS.accent}08` : COLORS.bg, border: `1px solid ${isDefault ? COLORS.accent + "50" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", cursor: "pointer", transition: "all 0.15s" }}
+                                onMouseOver={e => { if (!isDefault) e.currentTarget.style.background = `${COLORS.accent}05`; }}
+                                onMouseOut={e => { if (!isDefault) e.currentTarget.style.background = isDefault ? `${COLORS.accent}08` : COLORS.bg; }}>
+                                <div style={{ width: 32, height: 32, borderRadius: 8, background: `${COLORS.orange}18`, border: `1px solid ${COLORS.orange}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🏦</div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
+                                  {c.country && <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 1 }}>{c.country}</div>}
+                                </div>
+                                {(Array.isArray(c.businessUnit) ? c.businessUnit : (c.businessUnit ? [c.businessUnit] : [])).map(bu => {
+                                  const buCfg = (config.businessUnit || []).find(b => b.value === bu);
+                                  return buCfg ? <span key={bu} style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${buCfg.color}22`, color: buCfg.color, border: `1px solid ${buCfg.color}40` }}>{buCfg.label.toUpperCase()}</span> : null;
+                                })}
+                                {isDefault
+                                  ? <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.accent, background: `${COLORS.accent}18`, padding: "2px 10px", borderRadius: 6, border: `1px solid ${COLORS.accent}40`, flexShrink: 0 }}>★ Défaut</span>
+                                  : <span style={{ fontSize: 11, color: COLORS.textMuted, flexShrink: 0 }}>Cliquer pour définir par défaut</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {currentDefault && !defaultStillValid && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ Cette société n'existe plus — veuillez resélectionner</span>}
+                        {currentDefault && defaultStillValid && <span style={{ fontSize: 11, color: COLORS.green }}>✓ Pré-sélectionné automatiquement à la création d'une opération</span>}
                       </div>
-                      {currentDefault && !defaultStillValid && (
-                        <span style={{ fontSize: 11, color: COLORS.red }}>⚠ Cette société n'existe plus — veuillez resélectionner</span>
-                      )}
-                      {currentDefault && defaultStillValid && (
-                        <span style={{ fontSize: 11, color: COLORS.green }}>✓ Pré-sélectionné automatiquement à la création d'une opération</span>
-                      )}
-                    </div>
-                  )}
-
-                  {financialBrokers.length === 0 ? (
-                    <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "24px 0", fontSize: 13 }}>
-                      Aucune société avec le rôle "Financial Broker" — assignez ce rôle dans <strong>Companies</strong>
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {financialBrokers.map(c => {
-                        const isDefault = c.name === currentDefault;
-                        return (
-                          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, background: isDefault ? `${COLORS.accent}08` : COLORS.bg, border: `1px solid ${isDefault ? COLORS.accent + "50" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", cursor: "pointer", transition: "all 0.15s" }}
-                            onClick={() => updateField("derivDefaultBroker", isDefault ? "" : c.name)}
-                            onMouseOver={e => { if (!isDefault) e.currentTarget.style.background = `${COLORS.accent}05`; }}
-                            onMouseOut={e => { if (!isDefault) e.currentTarget.style.background = COLORS.bg; }}>
+                    )}
+                    {financialBrokers.length === 0 ? (
+                      <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "24px 0", fontSize: 13 }}>
+                        Aucune société avec le rôle "Financial Broker" — assignez ce rôle dans <strong>Companies</strong>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {financialBrokers.map(c => (
+                          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 16px" }}>
                             <div style={{ width: 32, height: 32, borderRadius: 8, background: `${COLORS.orange}18`, border: `1px solid ${COLORS.orange}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🏦</div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
@@ -1695,16 +1700,12 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                               const buCfg = (config.businessUnit || []).find(b => b.value === bu);
                               return buCfg ? <span key={bu} style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${buCfg.color}22`, color: buCfg.color, border: `1px solid ${buCfg.color}40` }}>{buCfg.label.toUpperCase()}</span> : null;
                             })}
-                            {isDefault
-                              ? <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.accent, background: `${COLORS.accent}18`, padding: "2px 10px", borderRadius: 6, border: `1px solid ${COLORS.accent}40`, flexShrink: 0 }}>★ Défaut</span>
-                              : <span style={{ fontSize: 11, color: COLORS.textMuted, flexShrink: 0 }}>Cliquer pour définir par défaut</span>
-                            }
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })()}

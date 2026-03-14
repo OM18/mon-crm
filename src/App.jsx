@@ -167,6 +167,11 @@ const DEFAULT_CONFIG = {
   derivBusinessUnitDefault: "",
   derivDefaultBroker: "",
   derivTarifTypes: [],
+  derivOrderTransmissionTypes: [
+    { value: "electronic", label: "ELECTRONIC" },
+    { value: "manual", label: "MANUAL" },
+  ],
+  derivOrderTransmissionDefault: "electronic",
   derivCommodities: [
     { value: "corn", label: "Corn", underlyingCategory: "commodity" },
     { value: "soybean", label: "Soybean", underlyingCategory: "commodity" },
@@ -441,6 +446,7 @@ const DERIV_FIELD_DEFINITIONS = [
   { key: "derivUnderlyings", label: "Underlying", icon: "🌾", description: "Valeurs du champ Underlying dans la modale New Operation", hasColor: false, hasValue: false },
   { key: "derivUnderlyingOrigins", label: "Underlying Origin", icon: "🌍", description: "Origines géographiques du sous-jacent", hasColor: false, hasValue: false },
   { key: "derivTarifTypes", label: "Tarifs Types", icon: "🏷", description: "Liste des tarifs types de référence pour les opérations sur dérivés", hasColor: false, hasValue: false },
+  { key: "derivOrderTransmissionTypes", label: "Order Transmission Types", icon: "📡", description: "Modes de transmission des ordres (Electronic, Manual…)", hasColor: false, hasValue: true },
 ];
 
 const FieldEditor = ({ fieldDef, values, onUpdate }) => {
@@ -1566,6 +1572,41 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivTarifTypes")} values={config["derivTarifTypes"] || []} onUpdate={updateField} />
           </div>
+
+          {/* Order Transmission Types */}
+          {(() => {
+            const items = config.derivOrderTransmissionTypes || [];
+            const currentDefault = config.derivOrderTransmissionDefault || "";
+            return (
+              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ padding: "18px 24px", borderBottom: `1px solid ${COLORS.border}`, background: `${COLORS.blue}08`, display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📡</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Order Transmission Types</div>
+                    <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Modes de transmission des ordres — définissez la valeur par défaut</div>
+                  </div>
+                </div>
+                <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {items.map(item => {
+                      const isDefault = item.value === currentDefault;
+                      return (
+                        <div key={item.value} onClick={() => updateField("derivOrderTransmissionDefault", item.value)}
+                          style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: 10, cursor: "pointer", border: `1.5px solid ${isDefault ? COLORS.blue : COLORS.border}`, background: isDefault ? `${COLORS.blue}15` : COLORS.bg, transition: "all 0.15s", userSelect: "none" }}>
+                          <div style={{ width: 10, height: 10, borderRadius: "50%", border: `2px solid ${isDefault ? COLORS.blue : COLORS.textMuted}`, background: isDefault ? COLORS.blue : "transparent", flexShrink: 0, transition: "all 0.15s" }} />
+                          <span style={{ fontSize: 13, fontWeight: 700, color: isDefault ? COLORS.blue : COLORS.textSub, letterSpacing: 0.5 }}>{item.label}</span>
+                          {isDefault && <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.blue, background: `${COLORS.blue}20`, padding: "1px 7px", borderRadius: 5, border: `1px solid ${COLORS.blue}40` }}>DÉFAUT</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 11, color: COLORS.textMuted }}>
+                    💡 Cliquez sur une valeur pour la définir comme défaut — pré-sélectionnée à la création d'une opération
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Financial Brokers — lecture seule, alimenté par Companies */}
           {(() => {

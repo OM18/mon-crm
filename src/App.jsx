@@ -1597,26 +1597,23 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                   <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
                     <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivOrderTransmissionTypes")} values={items} onUpdate={updateField} />
                     {items.length > 0 && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8, background: `${COLORS.accent}08`, border: `1px solid ${COLORS.accent}30`, borderRadius: 10, padding: "12px 16px" }}>
-                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 700, letterSpacing: 0.5 }}>VALEUR PAR DÉFAUT</label>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          {items.map(item => {
-                            const isDefault = item.value === currentDefault || item.label === currentDefault;
-                            return (
-                              <div key={item.value} onClick={() => updateField("derivOrderTransmissionDefault", item.value)}
-                                style={{ display: "flex", alignItems: "center", gap: 12, background: isDefault ? `${COLORS.accent}08` : COLORS.bg, border: `1px solid ${isDefault ? COLORS.accent + "50" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", cursor: "pointer", transition: "all 0.15s" }}
-                                onMouseOver={e => { if (!isDefault) e.currentTarget.style.background = `${COLORS.accent}05`; }}
-                                onMouseOut={e => { if (!isDefault) e.currentTarget.style.background = isDefault ? `${COLORS.accent}08` : COLORS.bg; }}>
-                                <div style={{ width: 32, height: 32, borderRadius: 8, background: `${COLORS.blue}18`, border: `1px solid ${COLORS.blue}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>📡</div>
-                                <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: COLORS.text }}>{item.label}</div>
-                                {isDefault
-                                  ? <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.accent, background: `${COLORS.accent}18`, padding: "2px 10px", borderRadius: 6, border: `1px solid ${COLORS.accent}40`, flexShrink: 0 }}>★ Défaut</span>
-                                  : <span style={{ fontSize: 11, color: COLORS.textMuted, flexShrink: 0 }}>Cliquer pour définir par défaut</span>}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted }}>☆ Cliquez sur l'étoile pour définir la valeur par défaut</div>
+                        {items.map(item => {
+                          const isDefault = item.value === currentDefault || item.label === currentDefault;
+                          return (
+                            <div key={item.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                              <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: COLORS.text }}>{item.label}</div>
+                              <div onClick={() => updateField("derivOrderTransmissionDefault", isDefault ? "" : item.value)}
+                                title="Définir comme valeur par défaut"
+                                style={{ fontSize: 18, color: isDefault ? COLORS.gold : COLORS.textMuted, cursor: "pointer", transition: "color 0.15s" }}
+                                onMouseOver={e => e.currentTarget.style.color = COLORS.gold}
+                                onMouseOut={e => e.currentTarget.style.color = isDefault ? COLORS.gold : COLORS.textMuted}>
+                                {isDefault ? "★" : "☆"}
                               </div>
-                            );
-                          })}
-                        </div>
-                        <span style={{ fontSize: 11, color: COLORS.green }}>✓ Pré-sélectionné automatiquement à la création d'une opération</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -1653,55 +1650,37 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                 {expandedFinancialBrokers && (
                   <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
                     {financialBrokers.length > 0 && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8, background: `${COLORS.accent}08`, border: `1px solid ${COLORS.accent}30`, borderRadius: 10, padding: "12px 16px" }}>
-                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 700, letterSpacing: 0.5 }}>BROKER PAR DÉFAUT</label>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          {financialBrokers.map(c => {
-                            const isDefault = c.name === currentDefault;
-                            return (
-                              <div key={c.id} onClick={() => updateField("derivDefaultBroker", isDefault ? "" : c.name)}
-                                style={{ display: "flex", alignItems: "center", gap: 12, background: isDefault ? `${COLORS.accent}08` : COLORS.bg, border: `1px solid ${isDefault ? COLORS.accent + "50" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", cursor: "pointer", transition: "all 0.15s" }}
-                                onMouseOver={e => { if (!isDefault) e.currentTarget.style.background = `${COLORS.accent}05`; }}
-                                onMouseOut={e => { if (!isDefault) e.currentTarget.style.background = isDefault ? `${COLORS.accent}08` : COLORS.bg; }}>
-                                <div style={{ width: 32, height: 32, borderRadius: 8, background: `${COLORS.orange}18`, border: `1px solid ${COLORS.orange}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🏦</div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
-                                  {c.country && <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 1 }}>{c.country}</div>}
-                                </div>
-                                {(Array.isArray(c.businessUnit) ? c.businessUnit : (c.businessUnit ? [c.businessUnit] : [])).map(bu => {
-                                  const buCfg = (config.businessUnit || []).find(b => b.value === bu);
-                                  return buCfg ? <span key={bu} style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${buCfg.color}22`, color: buCfg.color, border: `1px solid ${buCfg.color}40` }}>{buCfg.label.toUpperCase()}</span> : null;
-                                })}
-                                {isDefault
-                                  ? <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.accent, background: `${COLORS.accent}18`, padding: "2px 10px", borderRadius: 6, border: `1px solid ${COLORS.accent}40`, flexShrink: 0 }}>★ Défaut</span>
-                                  : <span style={{ fontSize: 11, color: COLORS.textMuted, flexShrink: 0 }}>Cliquer pour définir par défaut</span>}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted }}>☆ Cliquez sur l'étoile pour définir le broker par défaut</div>
+                        {financialBrokers.map(c => {
+                          const isDefault = c.name === currentDefault;
+                          return (
+                            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                              <div style={{ width: 12, height: 12, borderRadius: "50%", background: COLORS.orange, flexShrink: 0 }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
+                                {c.country && <div style={{ fontSize: 11, color: COLORS.textSub }}>{c.country}</div>}
                               </div>
-                            );
-                          })}
-                        </div>
+                              {(Array.isArray(c.businessUnit) ? c.businessUnit : (c.businessUnit ? [c.businessUnit] : [])).map(bu => {
+                                const buCfg = (config.businessUnit || []).find(b => b.value === bu);
+                                return buCfg ? <span key={bu} style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${buCfg.color}22`, color: buCfg.color, border: `1px solid ${buCfg.color}40` }}>{buCfg.label.toUpperCase()}</span> : null;
+                              })}
+                              <div onClick={() => updateField("derivDefaultBroker", isDefault ? "" : c.name)}
+                                title="Définir comme broker par défaut"
+                                style={{ fontSize: 18, color: isDefault ? COLORS.gold : COLORS.textMuted, cursor: "pointer", transition: "color 0.15s" }}
+                                onMouseOver={e => e.currentTarget.style.color = COLORS.gold}
+                                onMouseOut={e => e.currentTarget.style.color = isDefault ? COLORS.gold : COLORS.textMuted}>
+                                {isDefault ? "★" : "☆"}
+                              </div>
+                            </div>
+                          );
+                        })}
                         {currentDefault && !defaultStillValid && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ Cette société n'existe plus — veuillez resélectionner</span>}
-                        {currentDefault && defaultStillValid && <span style={{ fontSize: 11, color: COLORS.green }}>✓ Pré-sélectionné automatiquement à la création d'une opération</span>}
                       </div>
                     )}
-                    {financialBrokers.length === 0 ? (
+                    {financialBrokers.length === 0 && (
                       <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "24px 0", fontSize: 13 }}>
                         Aucune société avec le rôle "Financial Broker" — assignez ce rôle dans <strong>Companies</strong>
-                      </div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {financialBrokers.map(c => (
-                          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 16px" }}>
-                            <div style={{ width: 32, height: 32, borderRadius: 8, background: `${COLORS.orange}18`, border: `1px solid ${COLORS.orange}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🏦</div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
-                              {c.country && <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 1 }}>{c.country}</div>}
-                            </div>
-                            {(Array.isArray(c.businessUnit) ? c.businessUnit : (c.businessUnit ? [c.businessUnit] : [])).map(bu => {
-                              const buCfg = (config.businessUnit || []).find(b => b.value === bu);
-                              return buCfg ? <span key={bu} style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${buCfg.color}22`, color: buCfg.color, border: `1px solid ${buCfg.color}40` }}>{buCfg.label.toUpperCase()}</span> : null;
-                            })}
-                          </div>
-                        ))}
                       </div>
                     )}
                   </div>

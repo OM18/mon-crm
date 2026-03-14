@@ -788,7 +788,7 @@ const DerivDecimalsEditor = ({ config, updateField }) => {
 };
 
 // ─── DERIV BUSINESS UNITS EDITOR ─────────────────────────────
-const DerivAutocomplete = ({ form, setForm }) => {
+const DerivAutocomplete = ({ form, setForm, requiredError }) => {
   const [open, setOpen] = useState(false);
   const allProds = JSON.parse(localStorage.getItem("crm_deriv_products") || "[]"); // sera géré plus tard
   // Filtrer par instrument type si renseigné
@@ -808,8 +808,8 @@ const DerivAutocomplete = ({ form, setForm }) => {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, position: "relative" }}>
-      <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
-        INSTRUMENT
+      <label style={{ fontSize: 11, color: requiredError ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
+        INSTRUMENT <span style={{ color: COLORS.red }}>*</span>
         {form.type && <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.blue, fontWeight: 400 }}>filtré: {form.type}</span>}
       </label>
       <input
@@ -824,7 +824,7 @@ const DerivAutocomplete = ({ form, setForm }) => {
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder={form.type ? `Instruments de type ${form.type}…` : "Tapez pour chercher…"}
         autoComplete="off"
-        style={{ background: COLORS.bg, border: `1px solid ${query && !isValid ? COLORS.red + "80" : isValid ? COLORS.green + "60" : COLORS.border}`, borderRadius: open && suggestions.length > 0 ? "8px 8px 0 0" : 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }}
+        style={{ background: COLORS.bg, border: `1px solid ${requiredError && !query ? COLORS.red : query && !isValid ? COLORS.red + "80" : isValid ? COLORS.green + "60" : COLORS.border}`, borderRadius: open && suggestions.length > 0 ? "8px 8px 0 0" : 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }}
       />
       {open && suggestions.length > 0 && (
         <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderTop: "none", borderRadius: "0 0 8px 8px", boxShadow: "0 8px 24px #00000060", overflow: "hidden" }}>
@@ -844,6 +844,7 @@ const DerivAutocomplete = ({ form, setForm }) => {
           <span style={{ fontSize: 12, color: COLORS.textMuted }}>Aucun instrument de type {form.type}</span>
         </div>
       )}
+      {requiredError && !query && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {requiredError}</span>}
       {query && !isValid && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ Valeur non reconnue</span>}
     </div>
   );
@@ -4028,11 +4029,37 @@ const setOps = async (val) => {
     { key: "notes",      label: "Notes",        type: "text" },
   ];
 
-  const openNew  = () => { setForm({ ...makeEmpty(), ref: genRef() }); setEditOp(null); setShowForm(true); };
-  const openEdit = (op) => { setForm({ ...op }); setEditOp(op); setShowForm(true); };
+  const [formErrors, setFormErrors] = useState({});
+
+  const openNew  = () => { setForm({ ...makeEmpty(), ref: genRef() }); setEditOp(null); setFormErrors({}); setShowForm(true); };
+  const openEdit = (op) => { setForm({ ...op }); setEditOp(op); setFormErrors({}); setShowForm(true); };
   const del      = (id) => { setOps(ops.filter(o => o.id !== id)); setSelected(null); };
 
+  const REQUIRED_FIELDS = [
+    { key: "businessUnit", label: "Business Unit" },
+    { key: "type",         label: "Instrument Type" },
+    { key: "opType",       label: "Operation Type" },
+    { key: "quantity",     label: "Number of Lots" },
+    { key: "price",        label: "Price" },
+    { key: "tradeDate",    label: "Trade Date" },
+    { key: "underlying",   label: "Instrument" },
+    { key: "account",      label: "Account" },
+    { key: "side",         label: "Side" },
+    { key: "broker",       label: "Broker" },
+  ];
+
   const save = () => {
+    const errors = {};
+    REQUIRED_FIELDS.forEach(({ key, label }) => {
+      const val = form[key];
+      const isEmpty = val === null || val === undefined || val === "" || (Array.isArray(val) && val.length === 0);
+      if (isEmpty) errors[key] = `${label} est obligatoire`;
+    });
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
     const data = { ...form, id: editOp ? editOp.id : Date.now() };
     if (editOp) setOps(ops.map(o => o.id === editOp.id ? data : o));
     else        setOps([...ops, data]);
@@ -4342,28 +4369,41 @@ const setOps = async (val) => {
             </div>
 
             {/* Business Unit — filtrée sur les BUs actives dans l'admin panel Derivatives */}
-            <ToggleGroup label="BUSINESS UNIT"
-              options={(config.businessUnit || []).filter(bu => (config.derivBusinessUnits || []).includes(bu.value)).map(bu => bu.value)}
-              value={form.businessUnit}
-              onChange={v => setForm(f => ({ ...f, businessUnit: v }))}
-              colorFn={v => (config.businessUnit || []).find(bu => bu.value === v)?.color || COLORS.accent}
-              labelFn={v => (config.businessUnit || []).find(bu => bu.value === v)?.label?.toUpperCase() || v.toUpperCase()}
-            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, border: formErrors.businessUnit ? `1.5px solid ${COLORS.red}` : "1.5px solid transparent", borderRadius: 10, padding: formErrors.businessUnit ? "6px 8px" : 0 }}>
+              <ToggleGroup label={<>BUSINESS UNIT <span style={{ color: COLORS.red }}>*</span></>}
+                options={(config.businessUnit || []).filter(bu => (config.derivBusinessUnits || []).includes(bu.value)).map(bu => bu.value)}
+                value={form.businessUnit}
+                onChange={v => { setForm(f => ({ ...f, businessUnit: v })); setFormErrors(e => ({ ...e, businessUnit: undefined })); }}
+                colorFn={v => (config.businessUnit || []).find(bu => bu.value === v)?.color || COLORS.accent}
+                labelFn={v => (config.businessUnit || []).find(bu => bu.value === v)?.label?.toUpperCase() || v.toUpperCase()}
+              />
+              {formErrors.businessUnit && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.businessUnit}</span>}
+            </div>
 
             {/* Type instrument */}
-            <ToggleGroup label="INSTRUMENT TYPE" options={(config.derivInstrumentTypes || []).map(o => o.label)} value={form.type} onChange={v => {
-              const allProds = JSON.parse(localStorage.getItem("crm_deriv_products") || "[]");
-              const stillValid = allProds.some(p => p.label.toUpperCase() === (form.underlying || "").toUpperCase() && (!p.instrumentType || p.instrumentType.toUpperCase() === v.toUpperCase()));
-              setForm(f => ({ ...f, type: v, underlying: stillValid ? f.underlying : "", exchange: stillValid ? f.exchange : "" }));
-            }} colorFn={v => v === "Option" ? COLORS.purple : COLORS.blue} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, border: formErrors.type ? `1.5px solid ${COLORS.red}` : "1.5px solid transparent", borderRadius: 10, padding: formErrors.type ? "6px 8px" : 0 }}>
+              <ToggleGroup label={<>INSTRUMENT TYPE <span style={{ color: COLORS.red }}>*</span></>} options={(config.derivInstrumentTypes || []).map(o => o.label)} value={form.type} onChange={v => {
+                const allProds = JSON.parse(localStorage.getItem("crm_deriv_products") || "[]");
+                const stillValid = allProds.some(p => p.label.toUpperCase() === (form.underlying || "").toUpperCase() && (!p.instrumentType || p.instrumentType.toUpperCase() === v.toUpperCase()));
+                setForm(f => ({ ...f, type: v, underlying: stillValid ? f.underlying : "", exchange: stillValid ? f.exchange : "" }));
+                setFormErrors(e => ({ ...e, type: undefined }));
+              }} colorFn={v => v === "Option" ? COLORS.purple : COLORS.blue} />
+              {formErrors.type && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.type}</span>}
+            </div>
 
             {/* Operation Type */}
-            <ToggleGroup label="OPERATION TYPE" options={(config.derivOpTypes || []).map(o => o.label)} value={form.opType} onChange={v => setForm(f => ({ ...f, opType: v }))}
-              colorFn={() => COLORS.accent} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, border: formErrors.opType ? `1.5px solid ${COLORS.red}` : "1.5px solid transparent", borderRadius: 10, padding: formErrors.opType ? "6px 8px" : 0 }}>
+              <ToggleGroup label={<>OPERATION TYPE <span style={{ color: COLORS.red }}>*</span></>} options={(config.derivOpTypes || []).map(o => o.label)} value={form.opType} onChange={v => { setForm(f => ({ ...f, opType: v })); setFormErrors(e => ({ ...e, opType: undefined })); }}
+                colorFn={() => COLORS.accent} />
+              {formErrors.opType && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.opType}</span>}
+            </div>
 
             {/* Side */}
-            <ToggleGroup label="SIDE" options={SIDES} value={form.side} onChange={v => setForm(f => ({ ...f, side: v }))}
-              colorFn={v => v === "BUY" ? COLORS.green : COLORS.red} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, border: formErrors.side ? `1.5px solid ${COLORS.red}` : "1.5px solid transparent", borderRadius: 10, padding: formErrors.side ? "6px 8px" : 0 }}>
+              <ToggleGroup label={<>SIDE <span style={{ color: COLORS.red }}>*</span></>} options={SIDES} value={form.side} onChange={v => { setForm(f => ({ ...f, side: v })); setFormErrors(e => ({ ...e, side: undefined })); }}
+                colorFn={v => v === "BUY" ? COLORS.green : COLORS.red} />
+              {formErrors.side && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.side}</span>}
+            </div>
 
             {/* Option type si Option */}
             {form.type?.toLowerCase() === "option"
@@ -4371,13 +4411,16 @@ const setOps = async (val) => {
               : <div />}
 
             {/* Derivatives — autocomplétion depuis l'admin panel */}
-            <DerivAutocomplete form={form} setForm={setForm} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <DerivAutocomplete form={form} setForm={(val) => { setForm(val); setFormErrors(e => ({ ...e, underlying: undefined })); }} requiredError={formErrors.underlying} />
+            </div>
 
             {/* Number of Lots */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>NUMBER OF LOTS</label>
-              <input value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} placeholder="0"
-                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+              <label style={{ fontSize: 11, color: formErrors.quantity ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>NUMBER OF LOTS <span style={{ color: COLORS.red }}>*</span></label>
+              <input value={form.quantity} onChange={e => { setForm(f => ({ ...f, quantity: e.target.value })); setFormErrors(er => ({ ...er, quantity: undefined })); }} placeholder="0"
+                style={{ background: COLORS.bg, border: `1px solid ${formErrors.quantity ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+              {formErrors.quantity && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.quantity}</span>}
             </div>
 
             {/* Price — adapté selon le format décimal de l'instrument */}
@@ -4401,20 +4444,20 @@ const setOps = async (val) => {
 
               return (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
-                    PRICE
+                  <label style={{ fontSize: 11, color: formErrors.price ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
+                    PRICE <span style={{ color: COLORS.red }}>*</span>
                     {decConfig && <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.blue, fontWeight: 400, fontFamily: "'DM Mono', monospace" }}>format: {decConfig.example}</span>}
                   </label>
                   {!isFraction ? (
-                    <input value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00"
-                      style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+                    <input value={form.price} onChange={e => { setForm(f => ({ ...f, price: e.target.value })); setFormErrors(er => ({ ...er, price: undefined })); }} placeholder="0.00"
+                      style={{ background: COLORS.bg, border: `1px solid ${formErrors.price ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
                   ) : (
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <input value={intPart} onChange={e => setForm(f => ({ ...f, price: e.target.value + (fracPart ? ` ${fracPart}` : "") }))}
+                      <input value={intPart} onChange={e => { setForm(f => ({ ...f, price: e.target.value + (fracPart ? ` ${fracPart}` : "") })); setFormErrors(er => ({ ...er, price: undefined })); }}
                         placeholder="200" type="number"
-                        style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "'DM Mono', monospace" }} />
-                      <select value={fracPart || ""} onChange={e => setForm(f => ({ ...f, price: (intPart || "0") + (e.target.value ? ` ${e.target.value}` : "") }))}
-                        style={{ width: 90, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 10px", color: fracPart ? COLORS.text : COLORS.textMuted, fontSize: 14, outline: "none", fontFamily: "'DM Mono', monospace" }}>
+                        style={{ flex: 1, background: COLORS.bg, border: `1px solid ${formErrors.price ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "'DM Mono', monospace" }} />
+                      <select value={fracPart || ""} onChange={e => { setForm(f => ({ ...f, price: (intPart || "0") + (e.target.value ? ` ${e.target.value}` : "") })); setFormErrors(er => ({ ...er, price: undefined })); }}
+                        style={{ width: 90, background: COLORS.bg, border: `1px solid ${formErrors.price ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 10px", color: fracPart ? COLORS.text : COLORS.textMuted, fontSize: 14, outline: "none", fontFamily: "'DM Mono', monospace" }}>
                         <option value="">— frac —</option>
                         {(() => {
                           const den = parseInt(decimalsFormat.split("/")[1]);
@@ -4426,6 +4469,7 @@ const setOps = async (val) => {
                       </select>
                     </div>
                   )}
+                  {formErrors.price && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.price}</span>}
                 </div>
               );
             })()}
@@ -4434,7 +4478,11 @@ const setOps = async (val) => {
             {form.type?.toLowerCase() === "option" && <Input label="Strike" value={form.strike} onChange={v => setForm(f => ({ ...f, strike: v }))} placeholder="0.00" />}
 
             {/* Dates */}
-            <Input label="Trade Date" type="date" value={form.tradeDate} onChange={v => setForm(f => ({ ...f, tradeDate: v }))} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <Input label={<>TRADE DATE <span style={{ color: COLORS.red }}>*</span></>} type="date" value={form.tradeDate} onChange={v => { setForm(f => ({ ...f, tradeDate: v })); setFormErrors(e => ({ ...e, tradeDate: undefined })); }}
+                style={{ border: `1px solid ${formErrors.tradeDate ? COLORS.red : COLORS.border}` }} />
+              {formErrors.tradeDate && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.tradeDate}</span>}
+            </div>
             {form.type?.toLowerCase() === "option" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>EXPIRY DATE <span style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 400 }}>(auto)</span></label>
@@ -4445,7 +4493,11 @@ const setOps = async (val) => {
             {form.type?.toLowerCase() === "future" && <div />}
 
             {/* Broker + Exchange (auto-rempli) */}
-            <Input label="Broker" value={form.broker} onChange={v => setForm(f => ({ ...f, broker: v }))} placeholder="Broker name" />
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <Input label={<>BROKER <span style={{ color: COLORS.red }}>*</span></>} value={form.broker} onChange={v => { setForm(f => ({ ...f, broker: v })); setFormErrors(e => ({ ...e, broker: undefined })); }} placeholder="Broker name"
+                style={{ border: `1px solid ${formErrors.broker ? COLORS.red : COLORS.border}` }} />
+              {formErrors.broker && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.broker}</span>}
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>EXCHANGE <span style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 400 }}>(auto)</span></label>
               <input value={form.exchange ? form.exchange.toUpperCase() : ""} readOnly
@@ -4454,15 +4506,15 @@ const setOps = async (val) => {
 
             {/* Account — relié à crm_deriv_accounts (admin panel Derivatives) */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ACCOUNT</label>
-              <select value={form.account} onChange={e => setForm(f => ({ ...f, account: e.target.value }))}
-                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
+              <label style={{ fontSize: 11, color: formErrors.account ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ACCOUNT <span style={{ color: COLORS.red }}>*</span></label>
+              <select value={form.account} onChange={e => { setForm(f => ({ ...f, account: e.target.value })); setFormErrors(er => ({ ...er, account: undefined })); }}
+                style={{ background: COLORS.bg, border: `1px solid ${formErrors.account ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
                 <option value="">— Select —</option>
                 {derivAccounts
   .filter(a => a.isActive !== false)
   .map(a => <option key={a.id} value={a.accountNumber}>{a.accountNumber.toUpperCase()}</option>)}
-                  
               </select>
+              {formErrors.account && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.account}</span>}
             </div>
 
             {/* Contract + Trade */}
@@ -4491,7 +4543,22 @@ const setOps = async (val) => {
                 style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, resize: "vertical", fontFamily: "inherit", outline: "none", width: "100%", boxSizing: "border-box" }} />
             </div>
           </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end" }}>
+          {Object.keys(formErrors).filter(k => formErrors[k]).length > 0 && (
+            <div style={{ marginTop: 16, background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}50`, borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }}>⚠</span>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.red, marginBottom: 6 }}>Champs obligatoires manquants :</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {Object.entries(formErrors).filter(([, v]) => v).map(([k, v]) => (
+                    <span key={k} style={{ fontSize: 11, background: `${COLORS.red}25`, color: COLORS.red, borderRadius: 6, padding: "2px 8px", fontWeight: 600 }}>
+                      {v.replace(" est obligatoire", "")}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
             <Btn variant="secondary" onClick={() => setShowForm(false)}>Annuler</Btn>
             <Btn onClick={save}>Enregistrer</Btn>
           </div>

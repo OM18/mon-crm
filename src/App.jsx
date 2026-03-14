@@ -218,6 +218,7 @@ const useConfig = () => useContext(ConfigContext);
 const ConfigProvider = ({ children }) => {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [loaded, setLoaded] = useState(false);
+  const [userModified, setUserModified] = useState(false);
 
   useEffect(() => {
     async function loadConfig() {
@@ -229,15 +230,16 @@ const ConfigProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded && userModified) {
       async function saveConfig() {
         await supabase.from('config').upsert({ key: 'admin-config', data: config }, { onConflict: 'key' });
       }
       saveConfig();
     }
-  }, [config, loaded]);
+  }, [config, loaded, userModified]);
 
   const updateField = (fieldKey, newValues) => {
+    setUserModified(true);
     setConfig(prev => ({ ...prev, [fieldKey]: newValues }));
   };
 

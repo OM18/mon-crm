@@ -172,6 +172,8 @@ const DEFAULT_CONFIG = {
     { value: "manual", label: "MANUAL" },
   ],
   derivOrderTransmissionDefault: "electronic",
+  derivOpTypeDefault: "",
+  derivInstrumentTypeDefault: "",
   derivCommodities: [
     { value: "corn", label: "Corn", underlyingCategory: "commodity" },
     { value: "soybean", label: "Soybean", underlyingCategory: "commodity" },
@@ -1545,11 +1547,11 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           </div>
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-            <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivInstrumentTypes")} values={config["derivInstrumentTypes"] || []} onUpdate={updateField} />
+            <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivInstrumentTypes")} values={config["derivInstrumentTypes"] || []} onUpdate={updateField} defaultValue={config.derivInstrumentTypeDefault || ""} onSetDefault={v => updateField("derivInstrumentTypeDefault", v)} />
           </div>
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-            <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivOpTypes")} values={config["derivOpTypes"] || []} onUpdate={updateField} />
+            <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivOpTypes")} values={config["derivOpTypes"] || []} onUpdate={updateField} defaultValue={config.derivOpTypeDefault || ""} onSetDefault={v => updateField("derivOpTypeDefault", v)} />
           </div>
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
@@ -4084,7 +4086,7 @@ useEffect(() => {
   const genRef = () => `DRV-${Date.now().toString(36).toUpperCase().slice(-6)}`;
 
   const makeEmpty = () => ({
-    id: null, ref: "", type: (config.derivInstrumentTypes?.[0]?.label || "Future"), opType: (config.derivOpTypes?.[0]?.label || "Trade"), underlying: "",
+    id: null, ref: "", type: (config.derivInstrumentTypeDefault || config.derivInstrumentTypes?.[0]?.label || "Future"), opType: (config.derivOpTypeDefault || config.derivOpTypes?.[0]?.label || "Trade"), underlying: "",
     side: "BUY", quantity: "", price: "",
     strike: "", optionType: "Call",
     tradeDate: new Date().toISOString().slice(0, 10), expiryDate: "",

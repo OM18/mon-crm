@@ -455,6 +455,7 @@ const FieldEditor = ({ fieldDef, values, onUpdate, defaultValue, onSetDefault })
   useEffect(() => { setItems(values); setDirty(false); }, [values]);
 
   const markDirty = (updated) => { setItems(updated); setDirty(true); };
+  const markDirtyAndSave = (updated) => { setItems(updated); setDirty(false); onUpdate(fieldDef.key, updated); };
 
   const addItem = () => {
     if (!newLabel.trim()) return;
@@ -462,13 +463,13 @@ const FieldEditor = ({ fieldDef, values, onUpdate, defaultValue, onSetDefault })
 const val = fieldDef.hasValue ? (newValue.trim() || newLabel.toLowerCase().replace(/\s+/g, "_")) : isCountry ? newLabel.toUpperCase() : newLabel;
 const item = { value: isCountry ? newLabel.toUpperCase() : val, label: isCountry ? newLabel.toUpperCase() : newLabel.trim() };
     if (fieldDef.hasColor) item.color = newColor;
-    markDirty([...items, item]);
+    markDirtyAndSave([...items, item]);
     setNewLabel(""); setNewValue(""); setNewColor(COLORS.accent);
   };
 
-  const removeItem = (idx) => markDirty(items.filter((_, i) => i !== idx));
-  const moveUp = (idx) => { if (idx === 0) return; const a = [...items]; [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; markDirty(a); };
-  const moveDown = (idx) => { if (idx === items.length - 1) return; const a = [...items]; [a[idx], a[idx + 1]] = [a[idx + 1], a[idx]]; markDirty(a); };
+  const removeItem = (idx) => markDirtyAndSave(items.filter((_, i) => i !== idx));
+  const moveUp = (idx) => { if (idx === 0) return; const a = [...items]; [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; markDirtyAndSave(a); };
+  const moveDown = (idx) => { if (idx === items.length - 1) return; const a = [...items]; [a[idx], a[idx + 1]] = [a[idx + 1], a[idx]]; markDirtyAndSave(a); };
   const updateItem = (idx, key, val) => markDirty(items.map((item, i) => i === idx ? { ...item, [key]: val } : item));
 
   return (

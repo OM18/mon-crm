@@ -220,7 +220,7 @@ const ConfigProvider = ({ children }) => {
   useEffect(() => {
     async function loadConfig() {
       const { data } = await supabase.from('config').select('data').eq('key', 'admin-config').single();
-      if (data) setConfig(data.data);
+      if (data) setConfig({ ...DEFAULT_CONFIG, ...data.data });
       setLoaded(true);
     }
     loadConfig();
@@ -1583,26 +1583,36 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                   <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📡</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Order Transmission Types</div>
-                    <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Modes de transmission des ordres — définissez la valeur par défaut</div>
+                    <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Modes de transmission des ordres — définissez les valeurs et la valeur par défaut</div>
                   </div>
                 </div>
-                <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {items.map(item => {
-                      const isDefault = item.value === currentDefault;
-                      return (
-                        <div key={item.value} onClick={() => updateField("derivOrderTransmissionDefault", item.value)}
-                          style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: 10, cursor: "pointer", border: `1.5px solid ${isDefault ? COLORS.blue : COLORS.border}`, background: isDefault ? `${COLORS.blue}15` : COLORS.bg, transition: "all 0.15s", userSelect: "none" }}>
-                          <div style={{ width: 10, height: 10, borderRadius: "50%", border: `2px solid ${isDefault ? COLORS.blue : COLORS.textMuted}`, background: isDefault ? COLORS.blue : "transparent", flexShrink: 0, transition: "all 0.15s" }} />
-                          <span style={{ fontSize: 13, fontWeight: 700, color: isDefault ? COLORS.blue : COLORS.textSub, letterSpacing: 0.5 }}>{item.label}</span>
-                          {isDefault && <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.blue, background: `${COLORS.blue}20`, padding: "1px 7px", borderRadius: 5, border: `1px solid ${COLORS.blue}40` }}>DÉFAUT</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{ fontSize: 11, color: COLORS.textMuted }}>
-                    💡 Cliquez sur une valeur pour la définir comme défaut — pré-sélectionnée à la création d'une opération
-                  </div>
+                <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                  {/* FieldEditor pour gérer la liste */}
+                  <FieldEditor
+                    fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivOrderTransmissionTypes")}
+                    values={items}
+                    onUpdate={updateField}
+                  />
+                  {/* Sélecteur valeur par défaut */}
+                  {items.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, background: `${COLORS.blue}08`, border: `1px solid ${COLORS.blue}30`, borderRadius: 10, padding: "12px 16px" }}>
+                      <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 700, letterSpacing: 0.5 }}>VALEUR PAR DÉFAUT</label>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {items.map(item => {
+                          const isDefault = item.value === currentDefault || item.label === currentDefault;
+                          return (
+                            <div key={item.value} onClick={() => updateField("derivOrderTransmissionDefault", item.value)}
+                              style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 16px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${isDefault ? COLORS.blue : COLORS.border}`, background: isDefault ? `${COLORS.blue}15` : COLORS.bg, transition: "all 0.15s", userSelect: "none" }}>
+                              <div style={{ width: 10, height: 10, borderRadius: "50%", border: `2px solid ${isDefault ? COLORS.blue : COLORS.textMuted}`, background: isDefault ? COLORS.blue : "transparent", flexShrink: 0 }} />
+                              <span style={{ fontSize: 13, fontWeight: 700, color: isDefault ? COLORS.blue : COLORS.textSub, letterSpacing: 0.5 }}>{item.label}</span>
+                              {isDefault && <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.blue, background: `${COLORS.blue}20`, padding: "1px 7px", borderRadius: 5, border: `1px solid ${COLORS.blue}40` }}>DÉFAUT</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ fontSize: 11, color: COLORS.textMuted }}>💡 Cliquez sur une valeur pour la définir comme défaut</div>
+                    </div>
+                  )}
                 </div>
               </div>
             );

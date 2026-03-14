@@ -788,9 +788,9 @@ const DerivDecimalsEditor = ({ config, updateField }) => {
 };
 
 // ─── DERIV BUSINESS UNITS EDITOR ─────────────────────────────
-const DerivAutocomplete = ({ form, setForm, requiredError }) => {
+const DerivAutocomplete = ({ form, setForm, requiredError, products = [] }) => {
   const [open, setOpen] = useState(false);
-  const allProds = JSON.parse(localStorage.getItem("crm_deriv_products") || "[]"); // sera géré plus tard
+  const allProds = products.length > 0 ? products : JSON.parse(localStorage.getItem("crm_deriv_products") || "[]");
   // Filtrer par instrument type si renseigné
   const derivProds = form.type
     ? allProds.filter(p => !p.instrumentType || p.instrumentType.toUpperCase() === form.type.toUpperCase())
@@ -4383,8 +4383,7 @@ const setOps = async (val) => {
             {/* Type instrument */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4, border: formErrors.type ? `1.5px solid ${COLORS.red}` : "1.5px solid transparent", borderRadius: 10, padding: formErrors.type ? "6px 8px" : 0 }}>
               <ToggleGroup label="INSTRUMENT TYPE *" options={(config.derivInstrumentTypes || []).map(o => o.label)} value={form.type} onChange={v => {
-                const allProds = JSON.parse(localStorage.getItem("crm_deriv_products") || "[]");
-                const stillValid = allProds.some(p => p.label.toUpperCase() === (form.underlying || "").toUpperCase() && (!p.instrumentType || p.instrumentType.toUpperCase() === v.toUpperCase()));
+                const stillValid = products.some(p => p.label.toUpperCase() === (form.underlying || "").toUpperCase() && (!p.instrumentType || p.instrumentType.toUpperCase() === v.toUpperCase()));
                 setForm(f => ({ ...f, type: v, underlying: stillValid ? f.underlying : "", exchange: stillValid ? f.exchange : "" }));
                 setFormErrors(e => ({ ...e, type: undefined }));
               }} colorFn={v => v === "Option" ? COLORS.purple : COLORS.blue} />
@@ -4412,7 +4411,7 @@ const setOps = async (val) => {
 
             {/* Derivatives — autocomplétion depuis l'admin panel */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <DerivAutocomplete form={form} setForm={(val) => { setForm(val); setFormErrors(e => ({ ...e, underlying: undefined })); }} requiredError={formErrors.underlying} />
+              <DerivAutocomplete form={form} setForm={(val) => { setForm(val); setFormErrors(e => ({ ...e, underlying: undefined })); }} requiredError={formErrors.underlying} products={products} />
             </div>
 
             {/* Number of Lots */}

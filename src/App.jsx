@@ -4450,15 +4450,29 @@ useEffect(() => {
 
   const genRef = () => `DRV-${Date.now().toString(36).toUpperCase().slice(-6)}`;
 
-  const makeEmpty = () => ({
-    id: null, ref: "", type: (config.derivInstrumentTypeDefault || config.derivInstrumentTypes?.[0]?.label || "Future"), opType: (config.derivOpTypeDefault || config.derivOpTypes?.[0]?.label || "Trade"), underlying: "",
-    side: "BUY", quantity: "", price: "",
-    strike: "", optionType: "Call",
-    tradeDate: new Date().toISOString().slice(0, 10), expiryDate: "",
-    businessUnit: config.derivBusinessUnitDefault || "", broker: config.derivDefaultBroker || "", exchange: "", account: "",
-    contract: "", trade: "", lotSize: "",
-    status: (() => { const def = config.derivOpStatusDefault; const found = (config.derivOpStatuses || []).find(s => s.value === def); return found ? found.label.toUpperCase() : (config.derivOpStatuses?.[0]?.label?.toUpperCase() || "TRADED"); })(), notes: "", internalDeal: false,
-  });
+  const makeEmpty = () => {
+    const instrDefault = config.derivInstrumentTypeDefault;
+    const instrItem = (config.derivInstrumentTypes || []).find(t => t.value === instrDefault || t.label === instrDefault);
+    const instrVal = instrItem?.label || (config.derivInstrumentTypes?.[0]?.label) || "Future";
+
+    const opDefault = config.derivOpTypeDefault;
+    const opItem = (config.derivOpTypes || []).find(t => t.value === opDefault || t.label === opDefault);
+    const opVal = opItem?.label || (config.derivOpTypes?.[0]?.label) || "Trade";
+
+    const transDefault = config.derivOrderTransmissionDefault;
+    const transItem = (config.derivOrderTransmissionTypes || []).find(t => t.value === transDefault || t.label === transDefault);
+    const transVal = transItem?.value || transDefault || "";
+
+    return {
+      id: null, ref: "", type: instrVal, opType: opVal, underlying: "",
+      side: "BUY", quantity: "", price: "",
+      strike: "", optionType: "Call",
+      tradeDate: new Date().toISOString().slice(0, 10), expiryDate: "",
+      businessUnit: config.derivBusinessUnitDefault || "", broker: config.derivDefaultBroker || "", exchange: "", account: "",
+      contract: "", trade: "", lotSize: "", orderTransmissionType: transVal,
+      status: (() => { const def = config.derivOpStatusDefault; const found = (config.derivOpStatuses || []).find(s => s.value === def); return found ? found.label.toUpperCase() : (config.derivOpStatuses?.[0]?.label?.toUpperCase() || "TRADED"); })(), notes: "", internalDeal: false,
+    };
+  };
 
   const [ops, setOpsRaw] = useState([]);
 
@@ -5048,6 +5062,17 @@ const setOps = async (val) => {
             {/* Contract + Trade */}
             <Input label="Contract" value={form.contract} onChange={v => setForm(f => ({ ...f, contract: v }))} placeholder="À définir" />
             <Input label="Trade" value={form.trade} onChange={v => setForm(f => ({ ...f, trade: v }))} placeholder="À définir" />
+
+            {/* Order Transmission Type */}
+            {(config.derivOrderTransmissionTypes || []).length > 0 && (
+              <ToggleGroup label="ORDER TRANSMISSION TYPE"
+                options={(config.derivOrderTransmissionTypes || []).map(t => t.value)}
+                value={form.orderTransmissionType}
+                onChange={v => setForm(f => ({ ...f, orderTransmissionType: v }))}
+                colorFn={() => COLORS.blue}
+                labelFn={v => (config.derivOrderTransmissionTypes || []).find(t => t.value === v)?.label || v}
+              />
+            )}
 
             {/* Status */}
             <ToggleGroup label="OPERATION STATUS" options={(config.derivOpStatuses || []).map(s => s.label.toUpperCase())} value={form.status?.toUpperCase()} onChange={v => setForm(f => ({ ...f, status: v }))}

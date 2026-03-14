@@ -1407,6 +1407,50 @@ useEffect(() => {
     for (const l of updated) await supabase.from('deriv_lot_sizes').insert({ data: l });
   };
 
+  // ── Exchange Tarifs state ──
+  const EMPTY_ET = { financialBroker: "", exchange: "", tarifType: "", orderTransmissionType: "", tarif: "", currency: "", validFrom: "", validTo: "", isActive: true };
+  const [exchangeTarifs, setExchangeTarifs] = useState([]);
+  const [etForm, setEtForm] = useState(EMPTY_ET);
+  const [editEtId, setEditEtId] = useState(null);
+  const [showEtForm, setShowEtForm] = useState(false);
+  const [expandedExchangeTarifs, setExpandedExchangeTarifs] = useState(false);
+
+  useEffect(() => {
+    async function loadExchangeTarifs() {
+      const { data } = await supabase.from('deriv_exchange_tarifs').select('data');
+      if (data?.length) setExchangeTarifs(data.map(r => r.data));
+    }
+    loadExchangeTarifs();
+  }, []);
+
+  const isEtFormValid = () =>
+    etForm.financialBroker !== "" &&
+    etForm.exchange !== "" &&
+    etForm.tarifType !== "" &&
+    etForm.orderTransmissionType !== "" &&
+    etForm.tarif.trim() !== "" &&
+    etForm.currency !== "";
+
+  const saveExchangeTarif = async () => {
+    if (!isEtFormValid()) return;
+    const updated = editEtId
+      ? exchangeTarifs.map(e => e.id === editEtId ? { ...etForm, id: editEtId } : e)
+      : [...exchangeTarifs, { ...etForm, id: Date.now() }];
+    setExchangeTarifs(updated);
+    await supabase.from('deriv_exchange_tarifs').delete().neq('id', 0);
+    for (const e of updated) await supabase.from('deriv_exchange_tarifs').insert({ data: e });
+    setEtForm(EMPTY_ET);
+    setEditEtId(null);
+    setShowEtForm(false);
+  };
+
+  const deleteExchangeTarif = async (id) => {
+    const updated = exchangeTarifs.filter(e => e.id !== id);
+    setExchangeTarifs(updated);
+    await supabase.from('deriv_exchange_tarifs').delete().neq('id', 0);
+    for (const e of updated) await supabase.from('deriv_exchange_tarifs').insert({ data: e });
+  };
+
   const isAccFormValid = () =>
     accForm.accountNumber.trim() !== "" &&
     accForm.businessUnit !== "" &&
@@ -1708,6 +1752,185 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                             <button onClick={() => { setLsForm({ ...l }); setEditLsId(l.id); setShowLsForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
                             <button onClick={() => deleteLotSize(l.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Exchange Tarifs */}
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+            <div onClick={() => setExpandedExchangeTarifs(v => !v)}
+              style={{ padding: "18px 24px", borderBottom: expandedExchangeTarifs ? `1px solid ${COLORS.border}` : "none", background: `${COLORS.purple}08`, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", userSelect: "none" }}
+              onMouseOver={e => e.currentTarget.style.background = `${COLORS.purple}14`}
+              onMouseOut={e => e.currentTarget.style.background = `${COLORS.purple}08`}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.purple}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>💱</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Exchange Tarifs</div>
+                <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Tarifs par broker, exchange et type de transmission</div>
+              </div>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 4 }}>
+                {exchangeTarifs.length} tarif{exchangeTarifs.length !== 1 ? "s" : ""}
+              </span>
+              <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expandedExchangeTarifs ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+            </div>
+
+            {expandedExchangeTarifs && (
+              <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+                {!showEtForm && (
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Btn onClick={() => { setEtForm(EMPTY_ET); setEditEtId(null); setShowEtForm(true); }}>+ Ajouter</Btn>
+                  </div>
+                )}
+
+                {showEtForm && (
+                  <div style={{ background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 12, padding: "16px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+
+                      {/* Financial Broker */}
+                      {(() => {
+                        const brokers = companies.filter(c => (c.roles || []).some(r => r.toLowerCase().includes("financial") && r.toLowerCase().includes("broker")));
+                        return (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>FINANCIAL BROKER <span style={{ color: COLORS.red }}>*</span></label>
+                            <select value={etForm.financialBroker} onChange={e => setEtForm(f => ({ ...f, financialBroker: e.target.value }))}
+                              style={{ background: COLORS.bg, border: `1px solid ${etForm.financialBroker ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: etForm.financialBroker ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                              <option value="">— Sélectionner —</option>
+                              {brokers.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </select>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Exchange */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>EXCHANGE <span style={{ color: COLORS.red }}>*</span></label>
+                        <select value={etForm.exchange} onChange={e => setEtForm(f => ({ ...f, exchange: e.target.value }))}
+                          style={{ background: COLORS.bg, border: `1px solid ${etForm.exchange ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: etForm.exchange ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                          <option value="">— Sélectionner —</option>
+                          {(config.derivExchanges || []).map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Tarif Type */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>TARIF TYPE <span style={{ color: COLORS.red }}>*</span></label>
+                        <select value={etForm.tarifType} onChange={e => setEtForm(f => ({ ...f, tarifType: e.target.value }))}
+                          style={{ background: COLORS.bg, border: `1px solid ${etForm.tarifType ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: etForm.tarifType ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                          <option value="">— Sélectionner —</option>
+                          {(config.derivTarifTypes || []).map(t => <option key={t.value || t.label} value={t.value || t.label}>{t.label}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Order Transmission Type */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ORDER TRANSMISSION TYPE <span style={{ color: COLORS.red }}>*</span></label>
+                        <select value={etForm.orderTransmissionType} onChange={e => setEtForm(f => ({ ...f, orderTransmissionType: e.target.value }))}
+                          style={{ background: COLORS.bg, border: `1px solid ${etForm.orderTransmissionType ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: etForm.orderTransmissionType ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                          <option value="">— Sélectionner —</option>
+                          {(config.derivOrderTransmissionTypes || []).map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Tarif (saisie libre) */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>TARIF <span style={{ color: COLORS.red }}>*</span></label>
+                        <input value={etForm.tarif} onChange={e => setEtForm(f => ({ ...f, tarif: e.target.value }))} placeholder="ex: 2.50"
+                          style={{ background: COLORS.bg, border: `1px solid ${etForm.tarif.trim() ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                      </div>
+
+                      {/* Currency */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>CURRENCY <span style={{ color: COLORS.red }}>*</span></label>
+                        <select value={etForm.currency} onChange={e => setEtForm(f => ({ ...f, currency: e.target.value }))}
+                          style={{ background: COLORS.bg, border: `1px solid ${etForm.currency ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: etForm.currency ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                          <option value="">— Sélectionner —</option>
+                          {(config.derivCurrencies || []).map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Valid From */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>VALID FROM <span style={{ fontSize: 10, fontWeight: 400, color: COLORS.textMuted }}>(optionnel)</span></label>
+                        <input type="date" value={etForm.validFrom || ""} onChange={e => setEtForm(f => ({ ...f, validFrom: e.target.value }))}
+                          style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 14px", color: etForm.validFrom ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                      </div>
+
+                      {/* Valid To */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>VALID TO <span style={{ fontSize: 10, fontWeight: 400, color: COLORS.textMuted }}>(optionnel)</span></label>
+                        <input type="date" value={etForm.validTo || ""} onChange={e => setEtForm(f => ({ ...f, validTo: e.target.value }))}
+                          min={etForm.validFrom || undefined}
+                          style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 14px", color: etForm.validTo ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                      </div>
+
+                      {/* Active toggle */}
+                      <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", background: etForm.isActive ? `${COLORS.green}10` : COLORS.bg, border: `1px solid ${etForm.isActive ? COLORS.green + "50" : COLORS.border}`, borderRadius: 10, cursor: "pointer", transition: "all 0.15s", userSelect: "none" }}
+                        onClick={() => setEtForm(f => ({ ...f, isActive: !f.isActive }))}>
+                        <div style={{ width: 38, height: 22, borderRadius: 11, background: etForm.isActive ? COLORS.green : COLORS.border, position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+                          <div style={{ position: "absolute", top: 3, left: etForm.isActive ? 18 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: etForm.isActive ? COLORS.green : COLORS.textSub, letterSpacing: 0.5 }}>ACTIF</div>
+                          <div style={{ fontSize: 11, color: COLORS.textMuted }}>{etForm.isActive ? "Tarif actif — visible dans le formulaire" : "Tarif inactif — masqué dans le formulaire"}</div>
+                        </div>
+                      </div>
+
+                    </div>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      <Btn variant="secondary" onClick={() => { setShowEtForm(false); setEtForm(EMPTY_ET); setEditEtId(null); }}>Annuler</Btn>
+                      <Btn onClick={saveExchangeTarif} disabled={!isEtFormValid()}>Enregistrer</Btn>
+                    </div>
+                  </div>
+                )}
+
+                {/* Liste */}
+                {exchangeTarifs.length === 0 && !showEtForm ? (
+                  <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "24px 0", fontSize: 13 }}>Aucun tarif — cliquez sur "+ Ajouter" pour commencer</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {exchangeTarifs.length > 0 && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 70px 55px 80px 55px 50px", gap: 8, padding: "4px 12px" }}>
+                        {["BROKER", "EXCHANGE", "TARIF TYPE", "TRANSMISSION", "TARIF", "CUR.", "VALIDITÉ", "STATUT", ""].map(h => (
+                          <span key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.5 }}>{h}</span>
+                        ))}
+                      </div>
+                    )}
+                    {exchangeTarifs.map(et => {
+                      const exchCfg = (config.derivExchanges || []).find(e => e.value === et.exchange);
+                      const transCfg = (config.derivOrderTransmissionTypes || []).find(t => t.value === et.orderTransmissionType);
+                      const tarifTypeCfg = (config.derivTarifTypes || []).find(t => (t.value || t.label) === et.tarifType);
+                      const today = new Date().toISOString().slice(0, 10);
+                      const expired = et.validTo && et.validTo < today;
+                      const notYet = et.validFrom && et.validFrom > today;
+                      return (
+                        <div key={et.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 70px 55px 80px 55px 50px", gap: 8, alignItems: "center", background: !et.isActive ? `${COLORS.border}30` : COLORS.bg, border: `1px solid ${expired || !et.isActive ? COLORS.border : COLORS.border}`, borderRadius: 10, padding: "10px 12px", opacity: !et.isActive ? 0.6 : 1 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.orange, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{et.financialBroker}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.blue }}>{exchCfg?.label || et.exchange}</span>
+                          <span style={{ fontSize: 12, color: COLORS.text }}>{tarifTypeCfg?.label || et.tarifType}</span>
+                          <span style={{ fontSize: 12, color: COLORS.textSub }}>{transCfg?.label || et.orderTransmissionType}</span>
+                          <span style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.green, fontWeight: 700 }}>{et.tarif}</span>
+                          <span style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600 }}>{et.currency}</span>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            {et.validFrom && <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>↦ {et.validFrom}</span>}
+                            {et.validTo && <span style={{ fontSize: 10, color: expired ? COLORS.red : COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>↤ {et.validTo}</span>}
+                            {!et.validFrom && !et.validTo && <span style={{ fontSize: 10, color: COLORS.textMuted }}>—</span>}
+                          </div>
+                          <div onClick={async () => {
+                            const updated = exchangeTarifs.map(x => x.id === et.id ? { ...x, isActive: !x.isActive } : x);
+                            setExchangeTarifs(updated);
+                            await supabase.from('deriv_exchange_tarifs').delete().neq('id', 0);
+                            for (const e of updated) await supabase.from('deriv_exchange_tarifs').insert({ data: e });
+                          }} style={{ width: 38, height: 22, borderRadius: 11, background: et.isActive ? COLORS.green : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+                            <div style={{ position: "absolute", top: 3, left: et.isActive ? 18 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
+                          </div>
+                          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                            <button onClick={() => { setEtForm({ ...et }); setEditEtId(et.id); setShowEtForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                            <button onClick={() => deleteExchangeTarif(et.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
                           </div>
                         </div>
                       );

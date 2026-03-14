@@ -1580,42 +1580,26 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             const items = config.derivOrderTransmissionTypes || [];
             const currentDefault = config.derivOrderTransmissionDefault || "";
             return (
-              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
-                <div onClick={() => setExpandedOrderTransmission(v => !v)}
-                  style={{ padding: "18px 24px", borderBottom: expandedOrderTransmission ? `1px solid ${COLORS.border}` : "none", background: `${COLORS.blue}08`, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", userSelect: "none" }}
-                  onMouseOver={e => e.currentTarget.style.background = `${COLORS.blue}14`}
-                  onMouseOut={e => e.currentTarget.style.background = `${COLORS.blue}08`}>
-                  <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📡</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Order Transmission Types</div>
-                    <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Modes de transmission des ordres — définissez les valeurs et la valeur par défaut</div>
-                  </div>
-                  {currentDefault && <span style={{ fontSize: 11, color: COLORS.blue, background: `${COLORS.blue}15`, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.blue}30`, fontWeight: 600 }}>★ {items.find(i => i.value === currentDefault)?.label || currentDefault}</span>}
-                  <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expandedOrderTransmission ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
-                </div>
-                {expandedOrderTransmission && (
-                  <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
-                    <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivOrderTransmissionTypes")} values={items} onUpdate={updateField} />
-                    {items.length > 0 && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        <div style={{ fontSize: 11, color: COLORS.textMuted }}>☆ Cliquez sur l'étoile pour définir la valeur par défaut</div>
-                        {items.map(item => {
-                          const isDefault = item.value === currentDefault || item.label === currentDefault;
-                          return (
-                            <div key={item.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
-                              <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: COLORS.text }}>{item.label}</div>
-                              <div onClick={() => updateField("derivOrderTransmissionDefault", isDefault ? "" : item.value)}
-                                title="Définir comme valeur par défaut"
-                                style={{ fontSize: 18, color: isDefault ? COLORS.gold : COLORS.textMuted, cursor: "pointer", transition: "color 0.15s" }}
-                                onMouseOver={e => e.currentTarget.style.color = COLORS.gold}
-                                onMouseOut={e => e.currentTarget.style.color = isDefault ? COLORS.gold : COLORS.textMuted}>
-                                {isDefault ? "★" : "☆"}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+                <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivOrderTransmissionTypes")} values={items} onUpdate={updateField} />
+                {items.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 4 }}>
+                    <div style={{ fontSize: 11, color: COLORS.textMuted }}>☆ Cliquez sur l'étoile pour définir la valeur par défaut</div>
+                    {items.map(item => {
+                      const isDefault = item.value === currentDefault || item.label === currentDefault;
+                      return (
+                        <div key={item.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                          <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: COLORS.text }}>{item.label}</div>
+                          <div onClick={() => updateField("derivOrderTransmissionDefault", isDefault ? "" : item.value)}
+                            title="Définir comme valeur par défaut"
+                            style={{ fontSize: 18, color: isDefault ? COLORS.gold : COLORS.textMuted, cursor: "pointer", transition: "color 0.15s" }}
+                            onMouseOver={e => e.currentTarget.style.color = COLORS.gold}
+                            onMouseOut={e => e.currentTarget.style.color = isDefault ? COLORS.gold : COLORS.textMuted}>
+                            {isDefault ? "★" : "☆"}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

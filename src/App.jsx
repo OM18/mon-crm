@@ -166,6 +166,7 @@ const DEFAULT_CONFIG = {
   derivBusinessUnits: [],
   derivBusinessUnitDefault: "",
   derivDefaultBroker: "",
+  derivTarifTypes: [],
   derivCommodities: [
     { value: "corn", label: "Corn", underlyingCategory: "commodity" },
     { value: "soybean", label: "Soybean", underlyingCategory: "commodity" },
@@ -439,6 +440,7 @@ const DERIV_FIELD_DEFINITIONS = [
   { key: "derivCommodities", label: "Underlying", icon: "🌽", description: "Sous-jacents disponibles avec leur catégorie (Commodity / FX)", hasColor: false, hasValue: true },
   { key: "derivUnderlyings", label: "Underlying", icon: "🌾", description: "Valeurs du champ Underlying dans la modale New Operation", hasColor: false, hasValue: false },
   { key: "derivUnderlyingOrigins", label: "Underlying Origin", icon: "🌍", description: "Origines géographiques du sous-jacent", hasColor: false, hasValue: false },
+  { key: "derivTarifTypes", label: "Tarifs Types", icon: "🏷", description: "Liste des tarifs types de référence pour les opérations sur dérivés", hasColor: false, hasValue: false },
 ];
 
 const FieldEditor = ({ fieldDef, values, onUpdate }) => {
@@ -1560,6 +1562,10 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           </div>
 
           <UnderlyingOriginEditor config={config} updateField={updateField} setAdminTab={setAdminTab} />
+
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
+            <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivTarifTypes")} values={config["derivTarifTypes"] || []} onUpdate={updateField} />
+          </div>
 
           {/* Financial Brokers — lecture seule, alimenté par Companies */}
           {(() => {

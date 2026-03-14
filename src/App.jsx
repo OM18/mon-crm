@@ -1106,6 +1106,7 @@ const DerivSelectField = ({ label, field, options, form, setForm }) => (
 
 const DerivProductEditor = ({ config }) => {
   const [products, setProducts] = useState([]);
+  const [lotSizes, setLotSizes] = useState([]);
 
 useEffect(() => {
   async function loadProducts() {
@@ -1113,6 +1114,14 @@ useEffect(() => {
     if (data?.length) setProducts(data.map(r => r.data));
   }
   loadProducts();
+}, []);
+
+useEffect(() => {
+  async function loadLotSizes() {
+    const { data } = await supabase.from('deriv_lot_sizes').select('data');
+    if (data?.length) setLotSizes(data.map(r => r.data));
+  }
+  loadLotSizes();
 }, []);
   const [form, setForm] = useState(EMPTY_PROD);
   const [instrumentType, setInstrumentType] = useState("");
@@ -1176,8 +1185,33 @@ for (const p of u) await supabase.from('deriv_products').insert({ data: p }); };
                   })}
                 </select>
               </div>
-              <DerivFormField label="Volume Size Per Lot" field="volumeSizePerLot" type="number" placeholder="ex: 50" form={form} setForm={setForm} />
-              <DerivSelectField label="Volume Unit" field="volumeUnit" options={(config.derivVolumeUnits || []).map(u => ({ value: u.value, label: u.label }))} form={form} setForm={setForm} />
+              {/* Volume Size Per Lot — auto depuis Lot Sizes */}
+              {(() => {
+                const match = lotSizes.find(l =>
+                  l.exchange === form.stoxxExchange &&
+                  l.underlying?.toLowerCase() === (config.derivCommodities || []).find(c => c.value === form.underlying)?.label?.toLowerCase()
+                ) || lotSizes.find(l => l.exchange === form.stoxxExchange);
+                const autoQty = match?.quantity || "";
+                const autoUnit = match?.volumeUnit || "";
+                if (autoQty && form.volumeSizePerLot !== String(autoQty)) setTimeout(() => setForm(f => ({ ...f, volumeSizePerLot: String(autoQty), volumeUnit: autoUnit })), 0);
+                const unitLabel = (config.derivVolumeUnits || []).find(u => u.value === autoUnit)?.label || autoUnit;
+                return (
+                  <>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>VOLUME SIZE PER LOT</label>
+                      <input value={autoQty || form.volumeSizePerLot || ""} readOnly
+                        style={{ background: autoQty ? `${COLORS.green}10` : COLORS.bg, border: `1px solid ${autoQty ? COLORS.green + "50" : COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: autoQty ? COLORS.green : COLORS.textMuted, fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none", fontWeight: autoQty ? 700 : 400 }} />
+                      {!autoQty && <span style={{ fontSize: 10, color: COLORS.textMuted }}>Définir un Lot Size pour cet exchange</span>}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>VOLUME UNIT</label>
+                      <input value={unitLabel || form.volumeUnit || ""} readOnly
+                        style={{ background: autoUnit ? `${COLORS.green}10` : COLORS.bg, border: `1px solid ${autoUnit ? COLORS.green + "50" : COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: autoUnit ? COLORS.green : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none", fontWeight: autoUnit ? 700 : 400 }} />
+                      {!autoUnit && <span style={{ fontSize: 10, color: COLORS.textMuted }}>Définir un Lot Size pour cet exchange</span>}
+                    </div>
+                  </>
+                );
+              })()}
               <DerivSelectField label="Currency" field="currency" options={(config.derivCurrencies || []).map(c => ({ value: c.value, label: c.label }))} form={form} setForm={setForm} />
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DECIMALS <span style={{ color: COLORS.red }}>*</span></label>
@@ -4911,37 +4945,6 @@ const setOps = async (val) => {
                 style={{ background: COLORS.bg, border: `1px solid ${formErrors.quantity ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
               {formErrors.quantity && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.quantity}</span>}
             </div>
-
-            {/* Lot Size */}
-            {(() => {
-              const relevantLotSizes = lotSizes.filter(l =>
-                (!form.exchange || l.exchange === form.exchange) &&
-                (!form.underlying || l.underlying?.toLowerCase() === form.underlying?.toLowerCase())
-              );
-              const allLotSizes = relevantLotSizes.length > 0 ? relevantLotSizes : lotSizes;
-              if (lotSizes.length === 0) return null;
-              return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
-                    LOT SIZE
-                    {relevantLotSizes.length > 0 && form.exchange && <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.blue, fontWeight: 400 }}>filtré par exchange/underlying</span>}
-                  </label>
-                  <select value={form.lotSize || ""} onChange={e => setForm(f => ({ ...f, lotSize: e.target.value }))}
-                    style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.lotSize ? COLORS.text : COLORS.textMuted, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
-                    <option value="">— Sélectionner —</option>
-                    {allLotSizes.map(l => {
-                      const exchCfg = (config.derivExchanges || []).find(e => e.value === l.exchange);
-                      const unitCfg = (config.derivVolumeUnits || []).find(u => u.value === l.volumeUnit);
-                      return (
-                        <option key={l.id} value={l.id}>
-                          {exchCfg?.label || l.exchange} — {l.underlying} — {l.quantity} {unitCfg?.label || l.volumeUnit}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              );
-            })()}
 
             {/* Price — adapté selon le format décimal de l'instrument */}
             {(() => {

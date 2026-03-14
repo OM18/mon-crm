@@ -1373,6 +1373,48 @@ useEffect(() => {
   const [expandedAccounts, setExpandedAccounts] = useState(false);
   const [expandedOrderTransmission, setExpandedOrderTransmission] = useState(false);
   const [expandedFinancialBrokers, setExpandedFinancialBrokers] = useState(false);
+  const [expandedLotSizes, setExpandedLotSizes] = useState(false);
+
+  // ── Lot Sizes state ──
+  const EMPTY_LS = { exchange: "", underlying: "", quantity: "", volumeUnit: "" };
+  const [lotSizes, setLotSizes] = useState([]);
+  const [lsForm, setLsForm] = useState(EMPTY_LS);
+  const [editLsId, setEditLsId] = useState(null);
+  const [showLsForm, setShowLsForm] = useState(false);
+
+  useEffect(() => {
+    async function loadLotSizes() {
+      const { data } = await supabase.from('deriv_lot_sizes').select('data');
+      if (data?.length) setLotSizes(data.map(r => r.data));
+    }
+    loadLotSizes();
+  }, []);
+
+  const isLsFormValid = () =>
+    lsForm.exchange.trim() !== "" &&
+    lsForm.underlying.trim() !== "" &&
+    String(lsForm.quantity).trim() !== "" &&
+    lsForm.volumeUnit !== "";
+
+  const saveLotSize = async () => {
+    if (!isLsFormValid()) return;
+    const updated = editLsId
+      ? lotSizes.map(l => l.id === editLsId ? { ...lsForm, id: editLsId } : l)
+      : [...lotSizes, { ...lsForm, id: Date.now() }];
+    setLotSizes(updated);
+    await supabase.from('deriv_lot_sizes').delete().neq('id', 0);
+    for (const l of updated) await supabase.from('deriv_lot_sizes').insert({ data: l });
+    setLsForm(EMPTY_LS);
+    setEditLsId(null);
+    setShowLsForm(false);
+  };
+
+  const deleteLotSize = async (id) => {
+    const updated = lotSizes.filter(l => l.id !== id);
+    setLotSizes(updated);
+    await supabase.from('deriv_lot_sizes').delete().neq('id', 0);
+    for (const l of updated) await supabase.from('deriv_lot_sizes').insert({ data: l });
+  };
 
   const isAccFormValid = () =>
     accForm.accountNumber.trim() !== "" &&
@@ -1586,6 +1628,98 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivTarifTypes")} values={config["derivTarifTypes"] || []} onUpdate={updateField} />
+          </div>
+
+          {/* Lot Sizes */}
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+            <div onClick={() => setExpandedLotSizes(v => !v)}
+              style={{ padding: "18px 24px", borderBottom: expandedLotSizes ? `1px solid ${COLORS.border}` : "none", background: `${COLORS.green}08`, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", userSelect: "none" }}
+              onMouseOver={e => e.currentTarget.style.background = `${COLORS.green}14`}
+              onMouseOut={e => e.currentTarget.style.background = `${COLORS.green}08`}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.green}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📦</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Lot Sizes</div>
+                <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Taille de lot par exchange et underlying</div>
+              </div>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 4 }}>
+                {lotSizes.length} entrée{lotSizes.length !== 1 ? "s" : ""}
+              </span>
+              <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expandedLotSizes ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+            </div>
+            {expandedLotSizes && (
+              <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+                {!showLsForm && (
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Btn onClick={() => { setLsForm(EMPTY_LS); setEditLsId(null); setShowLsForm(true); }}>+ Ajouter</Btn>
+                  </div>
+                )}
+                {showLsForm && (
+                  <div style={{ background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 12, padding: "16px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>EXCHANGE <span style={{ color: COLORS.red }}>*</span></label>
+                        <select value={lsForm.exchange} onChange={e => setLsForm(f => ({ ...f, exchange: e.target.value }))}
+                          style={{ background: COLORS.bg, border: `1px solid ${lsForm.exchange ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: lsForm.exchange ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                          <option value="">— Sélectionner —</option>
+                          {(config.derivExchanges || []).map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>UNDERLYING <span style={{ color: COLORS.red }}>*</span></label>
+                        <input value={lsForm.underlying} onChange={e => setLsForm(f => ({ ...f, underlying: e.target.value }))} placeholder="ex: Wheat"
+                          style={{ background: COLORS.bg, border: `1px solid ${lsForm.underlying.trim() ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>QUANTITY <span style={{ color: COLORS.red }}>*</span></label>
+                        <input type="number" value={lsForm.quantity} onChange={e => setLsForm(f => ({ ...f, quantity: e.target.value }))} placeholder="ex: 50"
+                          style={{ background: COLORS.bg, border: `1px solid ${String(lsForm.quantity).trim() ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>VOLUME UNIT <span style={{ color: COLORS.red }}>*</span></label>
+                        <select value={lsForm.volumeUnit} onChange={e => setLsForm(f => ({ ...f, volumeUnit: e.target.value }))}
+                          style={{ background: COLORS.bg, border: `1px solid ${lsForm.volumeUnit ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: lsForm.volumeUnit ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                          <option value="">— Sélectionner —</option>
+                          {(config.derivVolumeUnits || []).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      <Btn variant="secondary" onClick={() => { setShowLsForm(false); setLsForm(EMPTY_LS); setEditLsId(null); }}>Annuler</Btn>
+                      <Btn onClick={saveLotSize} disabled={!isLsFormValid()}>Enregistrer</Btn>
+                    </div>
+                  </div>
+                )}
+                {lotSizes.length === 0 && !showLsForm ? (
+                  <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "24px 0", fontSize: 13 }}>Aucun lot size — cliquez sur "+ Ajouter" pour commencer</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {lotSizes.length > 0 && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px 80px 60px", gap: 8, padding: "4px 12px" }}>
+                        {["EXCHANGE", "UNDERLYING", "QTY", "UNIT", ""].map(h => (
+                          <span key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.5 }}>{h}</span>
+                        ))}
+                      </div>
+                    )}
+                    {lotSizes.map(l => {
+                      const exchCfg = (config.derivExchanges || []).find(e => e.value === l.exchange);
+                      const unitCfg = (config.derivVolumeUnits || []).find(u => u.value === l.volumeUnit);
+                      return (
+                        <div key={l.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px 80px 60px", gap: 8, alignItems: "center", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 12px" }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.blue }}>{exchCfg?.label || l.exchange}</span>
+                          <span style={{ fontSize: 13, color: COLORS.text }}>{l.underlying}</span>
+                          <span style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.green }}>{l.quantity}</span>
+                          <span style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600 }}>{unitCfg?.label || l.volumeUnit}</span>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <button onClick={() => { setLsForm({ ...l }); setEditLsId(l.id); setShowLsForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                            <button onClick={() => deleteLotSize(l.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Order Transmission Types */}
@@ -4073,6 +4207,16 @@ useEffect(() => {
   }
   loadDerivAccounts();
 }, []);
+
+const [lotSizes, setLotSizes] = useState([]);
+
+useEffect(() => {
+  async function loadLotSizes() {
+    const { data } = await supabase.from('deriv_lot_sizes').select('data');
+    if (data?.length) setLotSizes(data.map(r => r.data));
+  }
+  loadLotSizes();
+}, []);
   const INSTRUMENT_TYPES = ["Future", "Option"];
   const SIDES = ["BUY", "SELL"];
   const OP_TYPES = ["Hedging", "Rolling", "Trade"];
@@ -4093,7 +4237,7 @@ useEffect(() => {
     strike: "", optionType: "Call",
     tradeDate: new Date().toISOString().slice(0, 10), expiryDate: "",
     businessUnit: config.derivBusinessUnitDefault || "", broker: config.derivDefaultBroker || "", exchange: "", account: "",
-    contract: "", trade: "",
+    contract: "", trade: "", lotSize: "",
     status: (() => { const def = config.derivOpStatusDefault; const found = (config.derivOpStatuses || []).find(s => s.value === def); return found ? found.label.toUpperCase() : (config.derivOpStatuses?.[0]?.label?.toUpperCase() || "TRADED"); })(), notes: "", internalDeal: false,
   });
 
@@ -4534,6 +4678,37 @@ const setOps = async (val) => {
                 style={{ background: COLORS.bg, border: `1px solid ${formErrors.quantity ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
               {formErrors.quantity && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.quantity}</span>}
             </div>
+
+            {/* Lot Size */}
+            {(() => {
+              const relevantLotSizes = lotSizes.filter(l =>
+                (!form.exchange || l.exchange === form.exchange) &&
+                (!form.underlying || l.underlying?.toLowerCase() === form.underlying?.toLowerCase())
+              );
+              const allLotSizes = relevantLotSizes.length > 0 ? relevantLotSizes : lotSizes;
+              if (lotSizes.length === 0) return null;
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
+                    LOT SIZE
+                    {relevantLotSizes.length > 0 && form.exchange && <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.blue, fontWeight: 400 }}>filtré par exchange/underlying</span>}
+                  </label>
+                  <select value={form.lotSize || ""} onChange={e => setForm(f => ({ ...f, lotSize: e.target.value }))}
+                    style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.lotSize ? COLORS.text : COLORS.textMuted, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
+                    <option value="">— Sélectionner —</option>
+                    {allLotSizes.map(l => {
+                      const exchCfg = (config.derivExchanges || []).find(e => e.value === l.exchange);
+                      const unitCfg = (config.derivVolumeUnits || []).find(u => u.value === l.volumeUnit);
+                      return (
+                        <option key={l.id} value={l.id}>
+                          {exchCfg?.label || l.exchange} — {l.underlying} — {l.quantity} {unitCfg?.label || l.volumeUnit}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              );
+            })()}
 
             {/* Price — adapté selon le format décimal de l'instrument */}
             {(() => {

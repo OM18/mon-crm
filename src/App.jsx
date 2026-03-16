@@ -2007,7 +2007,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {exchangeTarifs.length > 0 && (
-                      <div style={{ display: "grid", gridTemplateColumns: "90px 80px 80px 90px 140px 70px 55px 80px 55px 80px", gap: 8, padding: "4px 12px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(100px,2fr) minmax(80px,1fr) minmax(80px,1fr) minmax(80px,1.5fr) minmax(100px,1.5fr) 70px 50px 80px 50px 80px", gap: 8, padding: "4px 12px" }}>
                         {["BROKER", "EXCHANGE", "TARIF TYPE", "OP TYPE", "TRANSMISSION", "TARIF", "CUR.", "VALIDITÉ", "STATUT", ""].map(h => (
                           <span key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.5 }}>{h}</span>
                         ))}
@@ -2031,13 +2031,13 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       const expired = et.validTo && et.validTo < today;
                       const notYet = et.validFrom && et.validFrom > today;
                       return (
-                        <div key={et.id} style={{ display: "grid", gridTemplateColumns: "90px 80px 80px 90px 140px 70px 55px 80px 55px 80px", gap: 8, alignItems: "center", background: !et.isActive ? `${COLORS.border}30` : COLORS.bg, border: `1px solid ${expired || !et.isActive ? COLORS.border : COLORS.border}`, borderRadius: 10, padding: "10px 12px", opacity: !et.isActive ? 0.6 : 1 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.orange, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {Array.isArray(et.financialBroker) ? et.financialBroker.join(" OR ") : (et.financialBroker || "—")}
+                        <div key={et.id} style={{ display: "grid", gridTemplateColumns: "minmax(100px,2fr) minmax(80px,1fr) minmax(80px,1fr) minmax(80px,1.5fr) minmax(100px,1.5fr) 70px 50px 80px 50px 80px", gap: 8, alignItems: "center", background: !et.isActive ? `${COLORS.border}30` : COLORS.bg, border: `1px solid ${expired || !et.isActive ? COLORS.border : COLORS.border}`, borderRadius: 10, padding: "10px 12px", opacity: !et.isActive ? 0.6 : 1 }}>
+                          <span title={Array.isArray(et.financialBroker) ? et.financialBroker.join(" OR ") : (et.financialBroker || "—")} style={{ fontSize: 12, fontWeight: 700, color: COLORS.orange, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
+                            {Array.isArray(et.financialBroker) ? et.financialBroker.join(" / ") : (et.financialBroker || "—")}
                           </span>
                           <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.blue }}>{exchCfg?.label || et.exchange}</span>
                           <span style={{ fontSize: 12, color: COLORS.text }}>{tarifTypeCfg?.label || et.tarifType}</span>
-                          <span style={{ fontSize: 11, color: COLORS.accent, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={Array.isArray(et.opType) ? et.opType.join(" OR ") : (et.opType || "—")}>
+                          <span title={Array.isArray(et.opType) ? et.opType.join(" OR ") : (et.opType || "—")} style={{ fontSize: 11, color: COLORS.accent, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
                             {Array.isArray(et.opType) && et.opType.length > 0 ? et.opType.join(" / ") : (et.opType || "—")}
                           </span>
                           <span style={{ fontSize: 11, color: COLORS.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={Array.isArray(et.orderTransmissionType) ? et.orderTransmissionType.map(v => (config.derivOrderTransmissionTypes || []).find(t => t.value === v)?.label || v).join(" OR ") : (transCfg?.label || et.orderTransmissionType || "—")}>

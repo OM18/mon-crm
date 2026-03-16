@@ -1442,7 +1442,7 @@ useEffect(() => {
   };
 
   // ── Exchange Tarifs state ──
-  const EMPTY_ET = { financialBroker: "", exchange: "", tarifType: "", orderTransmissionType: "", tarif: "", currency: "", validFrom: "", validTo: "", isActive: true };
+  const EMPTY_ET = { financialBroker: "", exchange: "", tarifType: "", orderTransmissionType: [], tarif: "", currency: "", validFrom: "", validTo: "", isActive: true };
   const [exchangeTarifs, setExchangeTarifs] = useState([]);
   const [etForm, setEtForm] = useState(EMPTY_ET);
   const [editEtId, setEditEtId] = useState(null);
@@ -1461,7 +1461,7 @@ useEffect(() => {
     etForm.financialBroker !== "" &&
     etForm.exchange !== "" &&
     etForm.tarifType !== "" &&
-    etForm.orderTransmissionType !== "" &&
+    (etForm.orderTransmissionType || []).length > 0 &&
     etForm.tarif.trim() !== "" &&
     etForm.currency !== "";
 
@@ -1860,14 +1860,33 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                         </select>
                       </div>
 
-                      {/* Order Transmission Type */}
+                      {/* Order Transmission Type — multi-select toggle (OR logic) */}
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ORDER TRANSMISSION TYPE <span style={{ color: COLORS.red }}>*</span></label>
-                        <select value={etForm.orderTransmissionType} onChange={e => setEtForm(f => ({ ...f, orderTransmissionType: e.target.value }))}
-                          style={{ background: COLORS.bg, border: `1px solid ${etForm.orderTransmissionType ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: etForm.orderTransmissionType ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
-                          <option value="">— Sélectionner —</option>
-                          {(config.derivOrderTransmissionTypes || []).map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                        </select>
+                        <label style={{ fontSize: 11, color: (etForm.orderTransmissionType || []).length === 0 ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
+                          ORDER TRANSMISSION TYPE <span style={{ color: COLORS.red }}>*</span>
+                          {(etForm.orderTransmissionType || []).length > 1 && (
+                            <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.blue, fontWeight: 400 }}>OR</span>
+                          )}
+                        </label>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {(config.derivOrderTransmissionTypes || []).map(t => {
+                            const selected = (etForm.orderTransmissionType || []).includes(t.value);
+                            return (
+                              <div key={t.value} onClick={() => {
+                                const current = etForm.orderTransmissionType || [];
+                                const next = selected
+                                  ? current.filter(v => v !== t.value)
+                                  : [...current, t.value];
+                                setEtForm(f => ({ ...f, orderTransmissionType: next }));
+                              }} style={{ flex: 1, textAlign: "center", padding: "9px 6px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 12, transition: "all 0.15s", border: `1.5px solid ${selected ? COLORS.blue : (etForm.orderTransmissionType || []).length === 0 ? COLORS.red + "60" : COLORS.border}`, background: selected ? `${COLORS.blue}18` : COLORS.bg, color: selected ? COLORS.blue : COLORS.textSub, userSelect: "none" }}>
+                                {t.label}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {(etForm.orderTransmissionType || []).length === 0 && (
+                          <span style={{ fontSize: 11, color: COLORS.red }}>⚠ Sélectionnez au moins un type</span>
+                        )}
                       </div>
 
                       {/* Tarif (saisie libre) */}
@@ -1946,7 +1965,11 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                           <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.orange, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{et.financialBroker}</span>
                           <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.blue }}>{exchCfg?.label || et.exchange}</span>
                           <span style={{ fontSize: 12, color: COLORS.text }}>{tarifTypeCfg?.label || et.tarifType}</span>
-                          <span style={{ fontSize: 12, color: COLORS.textSub }}>{transCfg?.label || et.orderTransmissionType}</span>
+                          <span style={{ fontSize: 12, color: COLORS.textSub }}>
+                            {Array.isArray(et.orderTransmissionType)
+                              ? et.orderTransmissionType.map(v => (config.derivOrderTransmissionTypes || []).find(t => t.value === v)?.label || v).join(" OR ")
+                              : (transCfg?.label || et.orderTransmissionType || "—")}
+                          </span>
                           <span style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.green, fontWeight: 700 }}>{et.tarif}</span>
                           <span style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600 }}>{et.currency}</span>
                           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1963,7 +1986,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                             <div style={{ position: "absolute", top: 3, left: et.isActive ? 18 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                           </div>
                           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                            <button onClick={() => { setEtForm({ ...et }); setEditEtId(et.id); setShowEtForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                            <button onClick={() => { const ott = et.orderTransmissionType; setEtForm({ ...et, orderTransmissionType: Array.isArray(ott) ? ott : (ott ? [ott] : []) }); setEditEtId(et.id); setShowEtForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
                             <button onClick={() => deleteExchangeTarif(et.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
                           </div>
                         </div>

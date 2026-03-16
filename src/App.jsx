@@ -1407,6 +1407,110 @@ const UnderlyingOriginEditor = ({ config, updateField, setAdminTab }) => {
 
 
 
+// ─── GENERIC DERIV PILLS EDITOR ──────────────────────────────
+// Reusable pill-style editor for any config list field
+// Pills are white/neutral by default (no color)
+const DerivPillsEditor = ({ configKey, label, icon, description, config, updateField, defaultKey, defaultValue, onSetDefault }) => {
+  const rawItems = config[configKey];
+  const items = Array.isArray(rawItems) ? rawItems : [];
+  const [localItems, setLocalItems] = useState(items);
+  const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+
+  useEffect(() => {
+    const raw = config[configKey];
+    setLocalItems(Array.isArray(raw) ? raw : []);
+    setDirty(false);
+  }, [config[configKey]]);
+
+  const mark = (next) => { setLocalItems(next); setDirty(true); };
+
+  const add = () => {
+    if (!newLabel.trim()) return;
+    mark([...localItems, { value: newLabel.trim().toLowerCase().replace(/\s+/g, "_"), label: newLabel.trim() }]);
+    setNewLabel("");
+  };
+
+  const save = (e) => {
+    e.stopPropagation();
+    updateField(configKey, localItems);
+    if (defaultKey && onSetDefault) {
+      // keep default unchanged
+    }
+    setDirty(false);
+  };
+
+  const currentDefault = defaultKey ? (config[defaultKey] || "") : "";
+
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
+      <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
+        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>{icon}</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>{label}</div>
+            {description && <div style={{ fontSize: 11, color: COLORS.textMuted }}>{description}</div>}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 400 }}>
+            {localItems.map(s => (
+              <span key={s.value} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: COLORS.card, color: COLORS.text, border: `1px solid ${COLORS.border}` }}>
+                {s.label}{defaultKey && currentDefault === s.value ? " ★" : ""}
+              </span>
+            ))}
+          </div>
+          {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>✓ Sauvegarder</div>}
+          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
+          {defaultKey && <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 10 }}>☆ Cliquez sur l'étoile pour définir la valeur par défaut</div>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+            {localItems.map((s, idx) => {
+              const isDefault = defaultKey && currentDefault === s.value;
+              return (
+                <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
+                  <input value={s.label} onChange={e => { const v = e.target.value; mark(localItems.map((x, i) => i === idx ? { ...x, label: v } : x)); }}
+                    style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
+                  {defaultKey && onSetDefault && (
+                    <div onClick={e => { e.stopPropagation(); onSetDefault(isDefault ? "" : s.value); }}
+                      title="Définir comme valeur par défaut"
+                      style={{ fontSize: 17, color: isDefault ? COLORS.gold : COLORS.textMuted, cursor: "pointer", transition: "color 0.15s" }}
+                      onMouseOver={e => e.currentTarget.style.color = COLORS.gold}
+                      onMouseOut={e => e.currentTarget.style.color = isDefault ? COLORS.gold : COLORS.textMuted}>
+                      {isDefault ? "★" : "☆"}
+                    </div>
+                  )}
+                  <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
+                    style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                    onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                    onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+                </div>
+              );
+            })}
+            {localItems.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "16px 0", fontSize: 13 }}>Aucune valeur — ajoutez-en ci-dessous</div>}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>LABEL *</label>
+              <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Nouvelle valeur…" onKeyDown={e => e.key === "Enter" && add()}
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+            </div>
+            <Btn onClick={add} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>+ Ajouter</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AccountTypePillsEditor = ({ config, updateField }) => {
   const items = Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : [];
   const [localItems, setLocalItems] = useState(items);
@@ -1823,46 +1927,26 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           </div>
 
           {/* ── Account Financing Bank ── */}
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-            <FieldEditor
-              fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivFinancingBanks")}
-              values={Array.isArray(config["derivFinancingBanks"]) ? config["derivFinancingBanks"] : []}
-              onUpdate={updateField}
-            />
-          </div>
+          <DerivPillsEditor configKey="derivFinancingBanks" label="Financing Banks" icon="🏦" description="Banques de financement disponibles pour les comptes de trading" config={config} updateField={updateField} />
 
           {/* ── Account Type ── */}
           <AccountTypePillsEditor config={config} updateField={updateField} />
 
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-            <DerivOpStatusEditor config={config} updateField={updateField} />
-          </div>
+          <DerivOpStatusEditor config={config} updateField={updateField} />
 
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-            <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivInstrumentTypes")} values={config["derivInstrumentTypes"] || []} onUpdate={updateField} defaultValue={config.derivInstrumentTypeDefault || ""} onSetDefault={v => updateField("derivInstrumentTypeDefault", v)} />
-          </div>
+          <DerivPillsEditor configKey="derivInstrumentTypes" label="Instrument Types" icon="📐" description="Types d'instruments disponibles dans la modale (Future, Option…)" config={config} updateField={updateField} defaultKey="derivInstrumentTypeDefault" onSetDefault={v => updateField("derivInstrumentTypeDefault", v)} />
 
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-            <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivOpTypes")} values={config["derivOpTypes"] || []} onUpdate={updateField} defaultValue={config.derivOpTypeDefault || ""} onSetDefault={v => updateField("derivOpTypeDefault", v)} />
-          </div>
+          <DerivPillsEditor configKey="derivOpTypes" label="Operation Types" icon="🔁" description="Types d'opérations disponibles dans la modale (Hedging, Rolling…)" config={config} updateField={updateField} defaultKey="derivOpTypeDefault" onSetDefault={v => updateField("derivOpTypeDefault", v)} />
 
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-            <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivExchanges")} values={config["derivExchanges"] || []} onUpdate={updateField} />
-          </div>
+          <DerivPillsEditor configKey="derivExchanges" label="Exchanges" icon="🏛" description="Bourses disponibles pour les opérations (CME, Euronext…)" config={config} updateField={updateField} />
 
           <DerivProductEditor config={config} />
 
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-            <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivVolumeUnits")} values={config["derivVolumeUnits"] || []} onUpdate={updateField} />
-          </div>
+          <DerivPillsEditor configKey="derivVolumeUnits" label="Volume Units" icon="📦" description="Unités de volume utilisées dans les opérations sur dérivés" config={config} updateField={updateField} />
 
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-            <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivCurrencies")} values={config["derivCurrencies"] || []} onUpdate={updateField} />
-          </div>
+          <DerivPillsEditor configKey="derivCurrencies" label="Currencies" icon="💱" description="Devises disponibles dans le module Derivatives" config={config} updateField={updateField} />
 
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-            <DerivDecimalsEditor config={config} updateField={updateField} />
-          </div>
+          <DerivPillsEditor configKey="derivDecimals" label="Decimals" icon="⅛" description="Formats de cotation : décimal standard ou fractions (1/8, 1/32…)" config={config} updateField={updateField} />
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <DerivBUEditor config={config} updateField={updateField} />
@@ -1874,9 +1958,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
           <UnderlyingOriginEditor config={config} updateField={updateField} setAdminTab={setAdminTab} />
 
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-            <FieldEditor fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivTarifTypes")} values={config["derivTarifTypes"] || []} onUpdate={updateField} />
-          </div>
+          <DerivPillsEditor configKey="derivTarifTypes" label="Tarif Types" icon="🏷" description="Types de tarifs de référence pour les opérations sur dérivés" config={config} updateField={updateField} />
 
           {/* Lot Sizes */}
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
@@ -2252,21 +2334,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           </div>
 
           {/* Order Transmission Types */}
-          {(() => {
-            const items = config.derivOrderTransmissionTypes || [];
-            const currentDefault = config.derivOrderTransmissionDefault || "";
-            return (
-              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-                <FieldEditor
-                  fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivOrderTransmissionTypes")}
-                  values={items}
-                  onUpdate={updateField}
-                  defaultValue={currentDefault}
-                  onSetDefault={v => updateField("derivOrderTransmissionDefault", v)}
-                />
-              </div>
-            );
-          })()}
+          <DerivPillsEditor configKey="derivOrderTransmissionTypes" label="Order Transmission Types" icon="📡" description="Modes de transmission des ordres (Electronic, Manual…)" config={config} updateField={updateField} defaultKey="derivOrderTransmissionDefault" onSetDefault={v => updateField("derivOrderTransmissionDefault", v)} />
 
           {/* Financial Brokers — lecture seule, alimenté par Companies */}
           {(() => {

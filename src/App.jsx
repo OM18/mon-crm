@@ -1,5 +1,27 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { supabase } from './supabase';
+
+// ─── SAFE SUPABASE SAVE ───────────────────────────────────────
+// Prevents data loss: only deletes after confirming items exist,
+// rolls back state on error.
+const safeSave = async (table, items, setStateFn, prevItems) => {
+  if (!items) return;
+  // Safety guard: never wipe a table if new list is empty but previous had data
+  if (items.length === 0 && prevItems && prevItems.length > 0) {
+    console.warn(`[safeSave] Blocked empty save on ${table} — ${prevItems.length} items preserved`);
+    return;
+  }
+  try {
+    await supabase.from(table).delete().neq('id', 0);
+    for (const item of items) {
+      await supabase.from(table).insert({ data: item });
+    }
+  } catch (err) {
+    console.error(`[safeSave] Error saving ${table}:`, err);
+    if (setStateFn && prevItems) setStateFn(prevItems); // rollback
+  }
+};
+
 // ─── COLORS ───────────────────────────────────────────────────
 const COLORS = {
   bg: "#0B0B0B",
@@ -1135,13 +1157,11 @@ useEffect(() => {
     if (!isValid()) return;
     const updated = editId ? products.map(p => p.id === editId ? { ...form, id: editId } : p) : [...products, { ...form, id: Date.now() }];
     setProducts(updated);
-    await supabase.from('deriv_products').delete().neq('id', 0);
-for (const p of updated) await supabase.from('deriv_products').insert({ data: p });
+    await safeSave('deriv_products', updated, setProducts, products);
     setForm(EMPTY_PROD); setInstrumentType(""); setEditId(null); setShowForm(false);
   };
 
-  const remove = async (id) => { const u = products.filter(p => p.id !== id); setProducts(u); await supabase.from('deriv_products').delete().neq('id', 0);
-for (const p of u) await supabase.from('deriv_products').insert({ data: p }); };
+  const remove = async (id) => { const u = products.filter(p => p.id !== id); setProducts(u); await safeSave('deriv_products', u, setProducts, products); };
 
   return (
     <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
@@ -1387,8 +1407,8 @@ useEffect(() => {
 
 useEffect(() => {
   async function loadAccounts() {
-    const { data } = await supabase.from('deriv_accounts').select('data');
-    if (data?.length) setDerivAccounts(data.map(r => r.data));
+    const { data } = await supabase.from('deriv_accounts').select('*');
+    if (data?.length) setDerivAccounts(data.map(r => r.data ?? r));
   }
   loadAccounts();
 }, []);
@@ -1427,8 +1447,7 @@ useEffect(() => {
       ? lotSizes.map(l => l.id === editLsId ? { ...lsForm, id: editLsId } : l)
       : [...lotSizes, { ...lsForm, id: Date.now() }];
     setLotSizes(updated);
-    await supabase.from('deriv_lot_sizes').delete().neq('id', 0);
-    for (const l of updated) await supabase.from('deriv_lot_sizes').insert({ data: l });
+    await safeSave('deriv_lot_sizes', updated, setLotSizes, lotSizes);
     setLsForm(EMPTY_LS);
     setEditLsId(null);
     setShowLsForm(false);
@@ -1437,8 +1456,7 @@ useEffect(() => {
   const deleteLotSize = async (id) => {
     const updated = lotSizes.filter(l => l.id !== id);
     setLotSizes(updated);
-    await supabase.from('deriv_lot_sizes').delete().neq('id', 0);
-    for (const l of updated) await supabase.from('deriv_lot_sizes').insert({ data: l });
+    await safeSave('deriv_lot_sizes', updated, setLotSizes, lotSizes);
   };
 
   // ── Exchange Tarifs state ──
@@ -1471,8 +1489,7 @@ useEffect(() => {
       ? exchangeTarifs.map(e => e.id === editEtId ? { ...etForm, id: editEtId } : e)
       : [...exchangeTarifs, { ...etForm, id: Date.now() }];
     setExchangeTarifs(updated);
-    await supabase.from('deriv_exchange_tarifs').delete().neq('id', 0);
-    for (const e of updated) await supabase.from('deriv_exchange_tarifs').insert({ data: e });
+    await safeSave('deriv_exchange_tarifs', updated, setExchangeTarifs, exchangeTarifs);
     setEtForm(EMPTY_ET);
     setEditEtId(null);
     setShowEtForm(false);
@@ -1481,8 +1498,7 @@ useEffect(() => {
   const deleteExchangeTarif = async (id) => {
     const updated = exchangeTarifs.filter(e => e.id !== id);
     setExchangeTarifs(updated);
-    await supabase.from('deriv_exchange_tarifs').delete().neq('id', 0);
-    for (const e of updated) await supabase.from('deriv_exchange_tarifs').insert({ data: e });
+    await safeSave('deriv_exchange_tarifs', updated, setExchangeTarifs, exchangeTarifs);
   };
 
   const isAccFormValid = () =>
@@ -1497,8 +1513,7 @@ useEffect(() => {
       ? derivAccounts.map(a => a.id === editAccId ? { ...accForm, id: editAccId } : a)
       : [...derivAccounts, { ...accForm, id: Date.now() }];
     setDerivAccounts(updated);
-    await supabase.from('deriv_accounts').delete().neq('id', 0);
-for (const a of updated) await supabase.from('deriv_accounts').insert({ data: a });
+    await safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts);
     setAccForm(EMPTY_ACC);
     setEditAccId(null);
     setShowAccForm(false);
@@ -1507,8 +1522,7 @@ for (const a of updated) await supabase.from('deriv_accounts').insert({ data: a 
   const deleteAccount = async (id) => {
     const updated = derivAccounts.filter(a => a.id !== id);
     setDerivAccounts(updated);
-    await supabase.from('deriv_accounts').delete().neq('id', 0);
-for (const a of updated) await supabase.from('deriv_accounts').insert({ data: a });
+    await safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts);
   };
 
   const saveEmployee = async () => {
@@ -1640,7 +1654,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                           {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>}
                         </div>
                       </div>
-                      <div onClick={() => { const updated = derivAccounts.map(x => x.id === a.id ? { ...x, isActive: !x.isActive } : x); setDerivAccounts(updated); supabase.from('deriv_accounts').delete().neq('id', 0).then(() => updated.forEach(a => supabase.from('deriv_accounts').insert({ data: a }))); }}
+                      <div onClick={() => { const updated = derivAccounts.map(x => x.id === a.id ? { ...x, isActive: !x.isActive } : x); setDerivAccounts(updated); safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts); }}
                         style={{ width: 40, height: 22, borderRadius: 11, background: a.isActive ? COLORS.green : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
                         <div style={{ position: "absolute", top: 3, left: a.isActive ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                       </div>
@@ -2055,8 +2069,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                           <div onClick={async () => {
                             const updated = exchangeTarifs.map(x => x.id === et.id ? { ...x, isActive: !x.isActive } : x);
                             setExchangeTarifs(updated);
-                            await supabase.from('deriv_exchange_tarifs').delete().neq('id', 0);
-                            for (const e of updated) await supabase.from('deriv_exchange_tarifs').insert({ data: e });
+                            await safeSave('deriv_exchange_tarifs', updated, setExchangeTarifs, exchangeTarifs);
                           }} style={{ width: 38, height: 22, borderRadius: 11, background: et.isActive ? COLORS.green : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
                             <div style={{ position: "absolute", top: 3, left: et.isActive ? 18 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                           </div>
@@ -4553,8 +4566,8 @@ const [derivAccounts, setDerivAccounts] = useState([]);
 
 useEffect(() => {
   async function loadDerivAccounts() {
-    const { data } = await supabase.from('deriv_accounts').select('data');
-    if (data?.length) setDerivAccounts(data.map(r => r.data));
+    const { data } = await supabase.from('deriv_accounts').select('*');
+    if (data?.length) setDerivAccounts(data.map(r => r.data ?? r));
   }
   loadDerivAccounts();
 }, []);
@@ -4619,8 +4632,7 @@ useEffect(() => {
 const setOps = async (val) => {
   const next = typeof val === "function" ? val(ops) : val;
   setOpsRaw(next);
-  await supabase.from('derivatives').delete().neq('id', 0);
-  for (const d of next) await supabase.from('derivatives').insert({ data: d });
+  await safeSave('derivatives', next, setOpsRaw, ops);
 };
   const [showForm, setShowForm]   = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -5515,10 +5527,10 @@ const DerivativesDashboard = () => {
     async function loadAll() {
       const [{ data: opsData }, { data: accData }] = await Promise.all([
         supabase.from('derivatives').select('data'),
-        supabase.from('deriv_accounts').select('data'),
+        supabase.from('deriv_accounts').select('*'),
       ]);
       if (opsData?.length) setOps(opsData.map(r => r.data));
-      if (accData?.length) setDerivAccounts(accData.map(r => r.data));
+      if (accData?.length) setDerivAccounts(accData.map(r => r.data ?? r));
     }
     loadAll();
   }, []);

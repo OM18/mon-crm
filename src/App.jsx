@@ -1442,7 +1442,7 @@ useEffect(() => {
   };
 
   // ── Exchange Tarifs state ──
-  const EMPTY_ET = { financialBroker: "", exchange: "", tarifType: "", orderTransmissionType: [], tarif: "", currency: "", validFrom: "", validTo: "", isActive: true };
+  const EMPTY_ET = { financialBroker: [], exchange: "", tarifType: "", orderTransmissionType: [], tarif: "", currency: "", validFrom: "", validTo: "", isActive: true };
   const [exchangeTarifs, setExchangeTarifs] = useState([]);
   const [etForm, setEtForm] = useState(EMPTY_ET);
   const [editEtId, setEditEtId] = useState(null);
@@ -1458,7 +1458,7 @@ useEffect(() => {
   }, []);
 
   const isEtFormValid = () =>
-    etForm.financialBroker !== "" &&
+    (etForm.financialBroker || []).length > 0 &&
     etForm.exchange !== "" &&
     etForm.tarifType !== "" &&
     (etForm.orderTransmissionType || []).length > 0 &&
@@ -1828,14 +1828,42 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       {/* Financial Broker */}
                       {(() => {
                         const brokers = companies.filter(c => (c.roles || []).some(r => r.toLowerCase().includes("financial") && r.toLowerCase().includes("broker")));
+                        const selectedBrokers = etForm.financialBroker || [];
                         return (
                           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>FINANCIAL BROKER <span style={{ color: COLORS.red }}>*</span></label>
-                            <select value={etForm.financialBroker} onChange={e => setEtForm(f => ({ ...f, financialBroker: e.target.value }))}
-                              style={{ background: COLORS.bg, border: `1px solid ${etForm.financialBroker ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: etForm.financialBroker ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
-                              <option value="">— Sélectionner —</option>
-                              {brokers.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                            </select>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <label style={{ fontSize: 11, color: selectedBrokers.length === 0 ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
+                                FINANCIAL BROKER <span style={{ color: COLORS.red }}>*</span>
+                              </label>
+                              {selectedBrokers.length > 1 && (
+                                <span style={{ fontSize: 10, color: COLORS.blue, fontWeight: 700, background: `${COLORS.blue}15`, borderRadius: 4, padding: "1px 6px" }}>OR</span>
+                              )}
+                              {selectedBrokers.length > 0 && (
+                                <span style={{ fontSize: 10, color: COLORS.textMuted }}>{selectedBrokers.length} sélectionné{selectedBrokers.length > 1 ? "s" : ""}</span>
+                              )}
+                            </div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "8px", background: COLORS.bg, border: `1px solid ${selectedBrokers.length === 0 ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, minHeight: 42 }}>
+                              {brokers.length === 0 && (
+                                <span style={{ fontSize: 12, color: COLORS.textMuted, padding: "2px 4px" }}>💡 Aucun Financial Broker dans Companies</span>
+                              )}
+                              {brokers.map(c => {
+                                const active = selectedBrokers.includes(c.name);
+                                return (
+                                  <div key={c.id} onClick={() => {
+                                    const next = active
+                                      ? selectedBrokers.filter(v => v !== c.name)
+                                      : [...selectedBrokers, c.name];
+                                    setEtForm(f => ({ ...f, financialBroker: next }));
+                                  }} style={{ padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 400, transition: "all 0.15s", border: `1.5px solid ${active ? COLORS.orange : COLORS.border}`, background: active ? `${COLORS.orange}18` : "transparent", color: active ? COLORS.orange : COLORS.textSub, userSelect: "none" }}>
+                                    {active && <span style={{ marginRight: 4 }}>✓</span>}
+                                    {c.name}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {selectedBrokers.length === 0 && (
+                              <span style={{ fontSize: 11, color: COLORS.red }}>⚠ Sélectionnez au moins un broker</span>
+                            )}
                           </div>
                         );
                       })()}
@@ -1962,7 +1990,9 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       const notYet = et.validFrom && et.validFrom > today;
                       return (
                         <div key={et.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 70px 55px 80px 55px 50px", gap: 8, alignItems: "center", background: !et.isActive ? `${COLORS.border}30` : COLORS.bg, border: `1px solid ${expired || !et.isActive ? COLORS.border : COLORS.border}`, borderRadius: 10, padding: "10px 12px", opacity: !et.isActive ? 0.6 : 1 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.orange, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{et.financialBroker}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.orange, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {Array.isArray(et.financialBroker) ? et.financialBroker.join(" OR ") : (et.financialBroker || "—")}
+                          </span>
                           <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.blue }}>{exchCfg?.label || et.exchange}</span>
                           <span style={{ fontSize: 12, color: COLORS.text }}>{tarifTypeCfg?.label || et.tarifType}</span>
                           <span style={{ fontSize: 12, color: COLORS.textSub }}>
@@ -1986,7 +2016,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                             <div style={{ position: "absolute", top: 3, left: et.isActive ? 18 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                           </div>
                           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                            <button onClick={() => { const ott = et.orderTransmissionType; setEtForm({ ...et, orderTransmissionType: Array.isArray(ott) ? ott : (ott ? [ott] : []) }); setEditEtId(et.id); setShowEtForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                            <button onClick={() => { const ott = et.orderTransmissionType; const fb = et.financialBroker; setEtForm({ ...et, financialBroker: Array.isArray(fb) ? fb : (fb ? [fb] : []), orderTransmissionType: Array.isArray(ott) ? ott : (ott ? [ott] : []) }); setEditEtId(et.id); setShowEtForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
                             <button onClick={() => deleteExchangeTarif(et.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
                           </div>
                         </div>

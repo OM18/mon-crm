@@ -13,8 +13,11 @@ const safeSave = async (table, items, setStateFn, prevItems) => {
   }
   try {
     await supabase.from(table).delete().neq('id', 0);
-    for (const item of items) {
-      await supabase.from(table).insert({ data: item });
+    // Batch insert in chunks of 100 to avoid timeouts on large imports
+    const CHUNK = 100;
+    for (let i = 0; i < items.length; i += CHUNK) {
+      const chunk = items.slice(i, i + CHUNK).map(item => ({ data: item }));
+      await supabase.from(table).insert(chunk);
     }
   } catch (err) {
     console.error(`[safeSave] Error saving ${table}:`, err);
@@ -2648,7 +2651,7 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
     return matched ? matched.value : v;
   });
 } else { obj.contractsCurrency = []; }
-      } else {
+      } else if (type === "contacts") {
         obj.avatar = (obj.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
         obj.tags = []; obj.revenue = Number(obj.revenue) || 0;
         const val = obj.status;
@@ -2658,9 +2661,23 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
         }
         obj.priority = obj.priority || "moyenne";
         obj.lastContact = new Date().toISOString().split("T")[0];
+      } else if (type === "derivatives") {
+        // Normalize numeric fields
+        if (obj.quantity) obj.quantity = String(obj.quantity).replace(/,/g, ".");
+        if (obj.price)    obj.price    = String(obj.price).replace(/,/g, ".");
+        if (obj.strike)   obj.strike   = String(obj.strike).replace(/,/g, ".");
+        // Normalize side to uppercase
+        if (obj.side) obj.side = obj.side.toString().toUpperCase().trim();
+        // Normalize internalDeal
+        obj.internalDeal = String(obj.internalDeal || "").toLowerCase() === "true";
+        // Normalize status
+        if (obj.status) obj.status = obj.status.toString().toUpperCase().trim();
       }
       return obj;
-    }).filter(o => o.name);
+    }).filter(o => {
+      if (type === "derivatives") return !!(o.ref || o.side || o.underlying || o.price || o.quantity);
+      return !!o.name;
+    });
 
     setParsedItems(items);
     const queue = Object.values(unknowns);

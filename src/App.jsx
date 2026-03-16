@@ -188,6 +188,7 @@ const DEFAULT_CONFIG = {
     { value: "trade",   label: "Trade"   },
   ],
   derivOpStatusDefault: "",
+  derivAccountTypes: {},
   derivBusinessUnits: [],
   derivBusinessUnitDefault: "",
   derivDefaultBroker: "",
@@ -1387,6 +1388,191 @@ const UnderlyingOriginEditor = ({ config, updateField, setAdminTab }) => {
   );
 };
 
+// ─── ACCOUNT FINANCING BANK BLOCK ────────────────────────────
+const AccountFinancingBankBlock = ({ derivAccounts, companies }) => {
+  const EMPTY = { id: null, accountId: "", bankId: "" };
+  const [list, setList] = useState([]);
+  const [form, setForm] = useState(EMPTY);
+  const [editId, setEditId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    supabase.from('deriv_account_banks').select('*').then(({ data }) => {
+      if (data?.length) setList(data.map(r => r.data ?? r));
+    });
+  }, []);
+
+  const bankCompanies = (companies || []).filter(c => (c.roles || []).some(r => r === "Bank" || r?.toLowerCase() === "bank"));
+
+  const save = async () => {
+    if (!form.accountId || !form.bankId) return;
+    const item = { ...form, id: editId || Date.now() };
+    const updated = editId ? list.map(x => x.id === editId ? item : x) : [...list, item];
+    setList(updated);
+    await supabase.from('deriv_account_banks').delete().neq('id', 0);
+    for (const x of updated) await supabase.from('deriv_account_banks').insert({ data: x });
+    setForm(EMPTY); setEditId(null); setShowForm(false);
+  };
+
+  const del = async (id) => {
+    const updated = list.filter(x => x.id !== id);
+    setList(updated);
+    await supabase.from('deriv_account_banks').delete().neq('id', 0);
+    for (const x of updated) await supabase.from('deriv_account_banks').insert({ data: x });
+  };
+
+  const getAccountLabel = (id) => derivAccounts.find(a => a.id === id || a.accountNumber === id)?.accountNumber || id || "—";
+  const getBankLabel = (id) => (companies || []).find(c => c.id === id || c.name === id)?.name || id || "—";
+
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div onClick={() => setExpanded(e => !e)} style={{ padding: "18px 24px", borderBottom: expanded ? `1px solid ${COLORS.border}` : "none", display: "flex", alignItems: "center", gap: 14, background: `${COLORS.blue}08`, cursor: "pointer", userSelect: "none" }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.blue}14`}
+        onMouseOut={e => e.currentTarget.style.background = `${COLORS.blue}08`}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏦</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Account Financing Bank</div>
+          <div style={{ fontSize: 12, color: COLORS.textSub }}>Associez une banque de financement à chaque compte de trading</div>
+        </div>
+        <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 8 }}>{list.length} entrée{list.length !== 1 ? "s" : ""}</span>
+        <Btn onClick={e => { e.stopPropagation(); setForm(EMPTY); setEditId(null); setShowForm(true); if (!expanded) setExpanded(true); }} style={{ padding: "7px 14px", fontSize: 13 }}>+ Ajouter</Btn>
+        <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)", marginLeft: 4 }}>▾</span>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: "20px 24px" }}>
+          {showForm && (
+            <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 18, marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ACCOUNT <span style={{ color: COLORS.red }}>*</span></label>
+                  <select value={form.accountId} onChange={e => setForm(f => ({ ...f, accountId: e.target.value }))}
+                    style={{ background: COLORS.card, border: `1px solid ${!form.accountId ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.accountId ? COLORS.text : COLORS.textMuted, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
+                    <option value="">— Sélectionner un compte —</option>
+                    {derivAccounts.map(a => <option key={a.id} value={a.accountNumber}>{a.accountNumber}</option>)}
+                  </select>
+                  {derivAccounts.length === 0 && <span style={{ fontSize: 11, color: COLORS.orange }}>💡 Aucun compte — créez-en dans le bloc Accounts</span>}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>FINANCING BANK <span style={{ color: COLORS.red }}>*</span></label>
+                  <select value={form.bankId} onChange={e => setForm(f => ({ ...f, bankId: e.target.value }))}
+                    style={{ background: COLORS.card, border: `1px solid ${!form.bankId ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.bankId ? COLORS.text : COLORS.textMuted, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
+                    <option value="">— Sélectionner une banque —</option>
+                    {bankCompanies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                  {bankCompanies.length === 0 && <span style={{ fontSize: 11, color: COLORS.orange }}>💡 Aucune company avec le rôle "Bank" — ajoutez-en dans Companies</span>}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
+                <Btn variant="secondary" onClick={() => { setShowForm(false); setForm(EMPTY); setEditId(null); }}>Annuler</Btn>
+                <Btn onClick={save} disabled={!form.accountId || !form.bankId}>Enregistrer</Btn>
+              </div>
+            </div>
+          )}
+
+          {list.length === 0 && !showForm && (
+            <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 32, fontSize: 13 }}>Aucune association — cliquez sur "+ Ajouter"</div>
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {list.map(item => (
+              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 14, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${COLORS.accent}18`, border: `1px solid ${COLORS.accent}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🏦</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{getAccountLabel(item.accountId)}</div>
+                  <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2 }}>🏛 {getBankLabel(item.bankId)}</div>
+                </div>
+                <button onClick={() => { setForm({ ...item }); setEditId(item.id); setShowForm(true); setExpanded(true); }}
+                  style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}30`, color: COLORS.accent, borderRadius: 7, padding: "5px 10px", cursor: "pointer", fontSize: 16 }}>✏️</button>
+                <button onClick={() => del(item.id)}
+                  style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}30`, color: COLORS.red, borderRadius: 7, padding: "5px 10px", cursor: "pointer", fontSize: 16 }}>🗑</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── ACCOUNT TYPE BLOCK ───────────────────────────────────────
+const ACCOUNT_TYPE_OPTIONS = [
+  { value: "hedging",          label: "Hedging",          color: COLORS.green },
+  { value: "speculative",      label: "Speculative",      color: COLORS.red },
+  { value: "global_hedging",   label: "Global Hedging",   color: COLORS.blue },
+];
+
+const AccountTypeBlock = ({ config, updateField }) => {
+  const [expanded, setExpanded] = useState(false);
+  // accountTypes stored in config as { accountNumber: string, type: string }[]
+  const [derivAccounts, setDerivAccounts] = useState([]);
+
+  useEffect(() => {
+    supabase.from('deriv_accounts').select('*').then(({ data }) => {
+      if (data?.length) setDerivAccounts(data.map(r => r.data ?? r));
+    });
+  }, []);
+
+  const accountTypes = config.derivAccountTypes || {};
+
+  const setType = (accountNumber, type) => {
+    const updated = { ...accountTypes, [accountNumber]: type };
+    updateField("derivAccountTypes", updated);
+  };
+
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div onClick={() => setExpanded(e => !e)} style={{ padding: "18px 24px", borderBottom: expanded ? `1px solid ${COLORS.border}` : "none", display: "flex", alignItems: "center", gap: 14, background: `${COLORS.purple}08`, cursor: "pointer", userSelect: "none" }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.purple}14`}
+        onMouseOut={e => e.currentTarget.style.background = `${COLORS.purple}08`}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.purple}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🗂</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Account Type</div>
+          <div style={{ fontSize: 12, color: COLORS.textSub }}>Définissez le type de chaque compte : Hedging, Speculative ou Global Hedging</div>
+        </div>
+        <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 8 }}>{Object.keys(accountTypes).length} configuré{Object.keys(accountTypes).length !== 1 ? "s" : ""}</span>
+        <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: "20px 24px" }}>
+          {derivAccounts.length === 0 && (
+            <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 32, fontSize: 13 }}>💡 Aucun compte — créez-en d'abord dans le bloc Accounts</div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {derivAccounts.map(a => {
+              const current = accountTypes[a.accountNumber] || "";
+              return (
+                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 16, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: `${COLORS.purple}18`, border: `1px solid ${COLORS.purple}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>💼</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace", minWidth: 120 }}>{a.accountNumber}</div>
+                  <div style={{ display: "flex", gap: 8, flex: 1 }}>
+                    {ACCOUNT_TYPE_OPTIONS.map(opt => {
+                      const active = current === opt.value;
+                      return (
+                        <div key={opt.value} onClick={() => setType(a.accountNumber, active ? "" : opt.value)}
+                          style={{ flex: 1, textAlign: "center", padding: "8px 6px", borderRadius: 8, cursor: "pointer", fontWeight: active ? 700 : 500, fontSize: 12, transition: "all 0.15s", border: `1.5px solid ${active ? opt.color : COLORS.border}`, background: active ? `${opt.color}18` : COLORS.card, color: active ? opt.color : COLORS.textSub, userSelect: "none" }}>
+                          {opt.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {current && (
+                    <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, fontWeight: 700, background: `${ACCOUNT_TYPE_OPTIONS.find(o => o.value === current)?.color || COLORS.textSub}20`, color: ACCOUNT_TYPE_OPTIONS.find(o => o.value === current)?.color || COLORS.textSub }}>
+                      {ACCOUNT_TYPE_OPTIONS.find(o => o.value === current)?.label}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -1671,6 +1857,12 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
               </div>
             </div>}
           </div>
+
+          {/* ── Account Financing Bank ── */}
+          <AccountFinancingBankBlock derivAccounts={derivAccounts} companies={companies} />
+
+          {/* ── Account Type ── */}
+          <AccountTypeBlock config={config} updateField={updateField} />
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <DerivOpStatusEditor config={config} updateField={updateField} />

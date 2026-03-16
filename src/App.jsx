@@ -4504,7 +4504,7 @@ useEffect(() => {
       tradeDate: new Date().toISOString().slice(0, 10), expiryDate: "",
       businessUnit: config.derivBusinessUnitDefault || "", broker: config.derivDefaultBroker || "", exchange: "", account: "",
       contract: "", trade: "", lotSize: "", orderTransmissionType: transVal,
-      status: (() => { const def = config.derivOpStatusDefault; const found = (config.derivOpStatuses || []).find(s => s.value === def); return found ? found.label.toUpperCase() : (config.derivOpStatuses?.[0]?.label?.toUpperCase() || "TRADED"); })(), notes: "", internalDeal: false, closePrice: "",
+      status: (() => { const def = config.derivOpStatusDefault; const found = (config.derivOpStatuses || []).find(s => s.value === def); return found ? found.label.toUpperCase() : (config.derivOpStatuses?.[0]?.label?.toUpperCase() || "TRADED"); })(), notes: "", internalDeal: false,
     };
   };
 
@@ -4871,38 +4871,6 @@ const setOps = async (val) => {
             </span>
           </div>
 
-          {/* Close Price & P&L */}
-          <div style={{ marginTop: 10, background: sel.closePrice ? `${COLORS.green}08` : `${COLORS.orange}08`, border: `1px solid ${sel.closePrice ? COLORS.green + "40" : COLORS.orange + "30"}`, borderRadius: 10, padding: "10px 12px" }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: sel.closePrice ? COLORS.green : COLORS.orange, letterSpacing: 0.6, marginBottom: 6 }}>
-              {sel.closePrice ? "✓ POSITION CLOSED" : "○ POSITION OPEN"}
-            </div>
-            {sel.closePrice ? (
-              <>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 11, color: COLORS.textMuted }}>Entry Price</span>
-                  <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.text }}>{sel.price || "—"}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 11, color: COLORS.textMuted }}>Close Price</span>
-                  <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.green, fontWeight: 700 }}>{sel.closePrice}</span>
-                </div>
-                {sel.price && sel.quantity && (() => {
-                  const pnl = (parseFloat(sel.closePrice) - parseFloat(sel.price)) * parseFloat(sel.quantity) * (sel.side === "SELL" ? -1 : 1);
-                  return (
-                    <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted }}>REALISED P&L</span>
-                      <span style={{ fontSize: 15, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: pnl >= 0 ? COLORS.green : COLORS.red }}>
-                        {pnl >= 0 ? "+ " : "− "}{Math.abs(pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  );
-                })()}
-              </>
-            ) : (
-              <div style={{ fontSize: 11, color: COLORS.textMuted }}>Edit this operation to add a Close Price and compute realised P&L.</div>
-            )}
-          </div>
-
           {sel.notes && <div style={{ marginTop: 12, fontSize: 12, color: COLORS.textSub, lineHeight: 1.6, background: COLORS.bg, borderRadius: 8, padding: "8px 12px" }}>{sel.notes}</div>}
 
           <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
@@ -5122,27 +5090,6 @@ const setOps = async (val) => {
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: form.internalDeal ? COLORS.blue : COLORS.textSub, letterSpacing: 0.5 }}>INTERNAL DEAL</div>
                 <div style={{ fontSize: 11, color: COLORS.textMuted }}>{form.internalDeal ? "Oui — opération interne" : "Non — opération externe"}</div>
-              </div>
-            </div>
-
-            {/* Close Price — for P&L calculation */}
-            <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 6, background: form.closePrice ? `${COLORS.green}08` : `${COLORS.orange}06`, border: `1px solid ${form.closePrice ? COLORS.green + "40" : COLORS.orange + "30"}`, borderRadius: 10, padding: "12px 14px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                <label style={{ fontSize: 11, color: form.closePrice ? COLORS.green : COLORS.orange, fontWeight: 700, letterSpacing: 0.5 }}>CLOSE PRICE</label>
-                <span style={{ fontSize: 10, color: COLORS.textMuted, background: COLORS.card, borderRadius: 4, padding: "1px 6px", border: `1px solid ${COLORS.border}` }}>REALISED P&L</span>
-                {form.closePrice && form.price && (
-                  <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: 700, marginLeft: "auto", color: (parseFloat(form.closePrice) - parseFloat(form.price)) * (form.side === "SELL" ? -1 : 1) >= 0 ? COLORS.green : COLORS.red }}>
-                    P&L/lot: {((parseFloat(form.closePrice) - parseFloat(form.price)) * (form.side === "SELL" ? -1 : 1)).toFixed(2)}
-                  </span>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <input value={form.closePrice} onChange={e => setForm(f => ({ ...f, closePrice: e.target.value }))} placeholder="Leave empty if position is still open"
-                  style={{ flex: 1, background: COLORS.bg, border: `1px solid ${form.closePrice ? COLORS.green + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "'DM Mono', monospace" }} />
-                {form.closePrice && <button onClick={() => setForm(f => ({ ...f, closePrice: "" }))} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, padding: "0 4px" }} title="Clear close price">×</button>}
-              </div>
-              <div style={{ fontSize: 10, color: COLORS.textMuted }}>
-                {form.closePrice ? `Position clôturée — P&L will appear in Derivatives Dashboard` : "Position ouverte — fill in to mark as closed and compute P&L"}
               </div>
             </div>
 
@@ -5419,81 +5366,117 @@ const Pipeline = ({ contacts, setContacts, companies, setCompanies }) => {
   );
 };
 
+
+// ─── FIFO ENGINE ─────────────────────────────────────────────
+const runFIFO = (bucketOps) => {
+  const parseP = (v) => { const n = parseFloat(String(v ?? "").replace(/,/g, ".")); return isNaN(n) ? 0 : n; };
+  const sorted = [...bucketOps].sort((a, b) => {
+    const da = a.tradeDate || "9999", db = b.tradeDate || "9999";
+    if (da !== db) return da < db ? -1 : 1;
+    return (a.id || 0) < (b.id || 0) ? -1 : 1;
+  });
+  const queue = [];
+  const matches = [];
+  let realizedPnl = 0;
+  for (const op of sorted) {
+    const side = (op.side || "").toUpperCase();
+    const lots = parseP(op.quantity);
+    const price = parseP(op.price);
+    if (side === "BUY") {
+      queue.push({ ref: op.ref, lots, price, remaining: lots });
+    } else if (side === "SELL") {
+      let toClose = lots;
+      while (toClose > 0 && queue.length > 0) {
+        const head = queue[0];
+        const matched = Math.min(toClose, head.remaining);
+        const pnl = (price - head.price) * matched;
+        realizedPnl += pnl;
+        matches.push({ buyRef: head.ref, sellRef: op.ref, lots: matched, entryPrice: head.price, exitPrice: price, pnl });
+        head.remaining -= matched;
+        toClose -= matched;
+        if (head.remaining <= 0) queue.shift();
+      }
+    }
+  }
+  const openLots = queue.reduce((s, e) => s + e.remaining, 0);
+  const openAvgPrice = openLots > 0 ? queue.reduce((s, e) => s + e.price * e.remaining, 0) / openLots : 0;
+  return { realizedPnl, matches, openLots, openAvgPrice };
+};
+
 // ─── DERIVATIVES DASHBOARD ───────────────────────────────────
 const DerivativesDashboard = () => {
   const { config } = useConfig();
   const [ops, setOps] = useState([]);
+  const [derivAccounts, setDerivAccounts] = useState([]);
 
   useEffect(() => {
-    async function loadOps() {
-      const { data } = await supabase.from('derivatives').select('data');
-      if (data?.length) setOps(data.map(r => r.data));
+    async function loadAll() {
+      const [{ data: opsData }, { data: accData }] = await Promise.all([
+        supabase.from('derivatives').select('data'),
+        supabase.from('deriv_accounts').select('data'),
+      ]);
+      if (opsData?.length) setOps(opsData.map(r => r.data));
+      if (accData?.length) setDerivAccounts(accData.map(r => r.data));
     }
-    loadOps();
+    loadAll();
   }, []);
 
-  // Only closed ops (have a closePrice set)
-  const closedOps = ops.filter(o => o.closePrice !== undefined && o.closePrice !== "" && o.closePrice !== null);
-
-  // Compute P&L for one op: (closePrice - entryPrice) * qty * sign(side)
-  const computePnl = (op) => {
-    const entry = parseFloat(op.price) || 0;
-    const close = parseFloat(op.closePrice) || 0;
-    const qty   = parseFloat(op.quantity) || 0;
-    const sign  = op.side === "SELL" ? -1 : 1;
-    return (close - entry) * qty * sign;
-  };
-
-  // Group by account
-  const accounts = [...new Set(ops.map(o => o.account || "N/A"))].filter(Boolean);
-
   const getAccountLabel = (val) => {
-    const found = (config.derivAccounts || []).find(a => a.value === val);
-    return found?.label || val || "N/A";
+    if (!val) return "No Account";
+    const fromTable = derivAccounts.find(a => a.accountNumber === val);
+    if (fromTable) return fromTable.accountNumber;
+    const fromConfig = (config.derivAccounts || []).find(a => a.value === val);
+    return fromConfig?.label || val;
   };
 
-  const allAccountKeys = [...new Set(ops.map(o => o.account || ""))];
-
-  // Build rows: one per account
-  const rows = allAccountKeys.map(accKey => {
-    const accOps     = ops.filter(o => (o.account || "") === accKey);
-    const accClosed  = accOps.filter(o => o.closePrice !== undefined && o.closePrice !== "" && o.closePrice !== null);
-    const totalPnl   = accClosed.reduce((s, o) => s + computePnl(o), 0);
-    const openOps    = accOps.filter(o => !accClosed.includes(o));
-    const totalLots  = accOps.reduce((s, o) => s + (parseFloat(o.quantity) || 0), 0);
-    const closedLots = accClosed.reduce((s, o) => s + (parseFloat(o.quantity) || 0), 0);
-    const openLots   = openOps.reduce((s, o) => s + (parseFloat(o.quantity) || 0), 0);
-    // By instrument breakdown
-    const instruments = [...new Set(accClosed.map(o => o.underlying || "—"))];
-    const byInstrument = instruments.map(inst => {
-      const instOps = accClosed.filter(o => (o.underlying || "—") === inst);
-      return {
-        instrument: inst,
-        lots: instOps.reduce((s, o) => s + (parseFloat(o.quantity) || 0), 0),
-        pnl: instOps.reduce((s, o) => s + computePnl(o), 0),
-        count: instOps.length,
-      };
-    }).sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl));
-
-    return { accKey, label: getAccountLabel(accKey), totalPnl, totalLots, closedLots, openLots, closedCount: accClosed.length, openCount: openOps.length, totalCount: accOps.length, byInstrument };
-  }).sort((a, b) => Math.abs(b.totalPnl) - Math.abs(a.totalPnl));
-
-  const grandPnl        = closedOps.reduce((s, o) => s + computePnl(o), 0);
-  const grandClosedLots = closedOps.reduce((s, o) => s + (parseFloat(o.quantity) || 0), 0);
-  const grandOpenLots   = ops.filter(o => !(o.closePrice !== undefined && o.closePrice !== "" && o.closePrice !== null)).reduce((s, o) => s + (parseFloat(o.quantity) || 0), 0);
-
+  const fmtLots = (n) => Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
   const fmt = (n) => {
     const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    return (n < 0 ? "− " : "+ ") + abs;
+    return (n >= 0 ? "+ " : "− ") + abs;
   };
-  const fmtLots = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  const pnlColor = (n) => n >= 0 ? COLORS.green : COLORS.red;
+  const pnlColor = (n) => n > 0 ? COLORS.green : n < 0 ? COLORS.red : COLORS.textMuted;
+
+  // Build buckets keyed by "account||instrument"
+  const buckets = {};
+  for (const op of ops) {
+    const key = `${op.account || ""}||${op.underlying || ""}`;
+    if (!buckets[key]) buckets[key] = { account: op.account || "", instrument: op.underlying || "", ops: [] };
+    buckets[key].ops.push(op);
+  }
+
+  const bucketResults = Object.values(buckets).map(b => ({ ...b, ...runFIFO(b.ops) }));
+
+  // Aggregate by account
+  const accountMap = {};
+  for (const b of bucketResults) {
+    if (!accountMap[b.account]) accountMap[b.account] = { account: b.account, realizedPnl: 0, openLots: 0, instruments: [] };
+    accountMap[b.account].realizedPnl += b.realizedPnl;
+    accountMap[b.account].openLots += b.openLots;
+    accountMap[b.account].instruments.push({
+      instrument: b.instrument,
+      realizedPnl: b.realizedPnl,
+      openLots: b.openLots,
+      openAvgPrice: b.openAvgPrice,
+      matches: b.matches,
+      buyCount: b.ops.filter(o => (o.side || "").toUpperCase() === "BUY").length,
+      sellCount: b.ops.filter(o => (o.side || "").toUpperCase() === "SELL").length,
+    });
+  }
+
+  const rows = Object.values(accountMap).sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl));
+  const grandPnl = rows.reduce((s, r) => s + r.realizedPnl, 0);
+  const grandOpenLots = rows.reduce((s, r) => s + r.openLots, 0);
+  const totalBuys = ops.filter(o => (o.side || "").toUpperCase() === "BUY").length;
+  const totalSells = ops.filter(o => (o.side || "").toUpperCase() === "SELL").length;
+  const totalMatches = bucketResults.reduce((s, b) => s + b.matches.length, 0);
 
   const [expandedAccounts, setExpandedAccounts] = useState({});
-  const toggleAccount = (key) => setExpandedAccounts(prev => ({ ...prev, [key]: !prev[key] }));
+  const toggle = (key) => setExpandedAccounts(p => ({ ...p, [key]: !p[key] }));
+
+  const GRID = "32px 1fr 70px 70px 120px 90px 170px";
 
   const KpiCard = ({ label, value, sub, color }) => (
-    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 14, padding: "20px 24px", minWidth: 0 }}>
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 14, padding: "20px 24px" }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, marginBottom: 8 }}>{label}</div>
       <div style={{ fontSize: 26, fontWeight: 800, color: color || COLORS.text, fontFamily: "'DM Mono', monospace", lineHeight: 1.1 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 6 }}>{sub}</div>}
@@ -5502,101 +5485,113 @@ const DerivativesDashboard = () => {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Derivatives Dashboard</h1>
-          <div style={{ fontSize: 13, color: COLORS.textMuted, marginTop: 4 }}>Realised P&amp;L — Closed positions only</div>
+          <div style={{ fontSize: 13, color: COLORS.textMuted, marginTop: 4 }}>Realised P&amp;L — FIFO par compte × instrument</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: `${COLORS.accent}12`, border: `1px solid ${COLORS.accent}30`, borderRadius: 10, padding: "8px 16px" }}>
-          <span style={{ fontSize: 20 }}>◬</span>
-          <span style={{ fontSize: 13, color: COLORS.accent, fontWeight: 700 }}>{closedOps.length} closed op{closedOps.length !== 1 ? "s" : ""}</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ background: `${COLORS.green}15`, border: `1px solid ${COLORS.green}30`, borderRadius: 10, padding: "8px 16px", fontSize: 13, color: COLORS.green, fontWeight: 700 }}>▲ {totalBuys} BUY</div>
+          <div style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}30`, borderRadius: 10, padding: "8px 16px", fontSize: 13, color: COLORS.red, fontWeight: 700 }}>▼ {totalSells} SELL</div>
         </div>
       </div>
 
-      {/* KPI row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-        <KpiCard label="TOTAL REALISED P&L" value={fmt(grandPnl)} color={pnlColor(grandPnl)} sub={`${closedOps.length} closed operations`} />
-        <KpiCard label="TOTAL OPERATIONS" value={ops.length} sub={`${closedOps.length} closed · ${ops.length - closedOps.length} open`} />
-        <KpiCard label="CLOSED LOTS" value={fmtLots(grandClosedLots)} sub="across all accounts" />
-        <KpiCard label="OPEN LOTS (EXPOSURE)" value={fmtLots(grandOpenLots)} color={COLORS.orange} sub="not yet closed" />
+        <KpiCard label="REALISED P&L (FIFO)" value={totalSells > 0 ? fmt(grandPnl) : "—"} color={totalSells > 0 ? pnlColor(grandPnl) : COLORS.textMuted} sub={totalSells > 0 ? `${rows.length} compte${rows.length > 1 ? "s" : ""}` : "Aucun SELL enregistré"} />
+        <KpiCard label="TOTAL OPÉRATIONS" value={ops.length} sub={`${totalBuys} BUY · ${totalSells} SELL`} />
+        <KpiCard label="LOTS OUVERTS" value={fmtLots(grandOpenLots)} color={COLORS.orange} sub="position nette non clôturée" />
+        <KpiCard label="MATCHES FIFO" value={totalMatches} sub={`sur ${Object.keys(buckets).length} bucket${Object.keys(buckets).length > 1 ? "s" : ""}`} />
       </div>
 
-      {/* P&L Table by Account */}
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
-        {/* Table header */}
-        <div style={{ background: COLORS.tableHeader, padding: "12px 20px" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, letterSpacing: 0.5 }}>P&amp;L BY ACCOUNT</div>
-          <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>Expand an account to see breakdown by instrument</div>
+        <div style={{ background: COLORS.tableHeader, padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>P&amp;L PAR COMPTE</div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>Cliquez sur un compte pour voir le détail par instrument</div>
         </div>
 
-        {/* Column headers */}
-        <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 100px 100px 100px 100px 160px", gap: 0, padding: "10px 20px", background: `${COLORS.tableHeader}CC`, borderBottom: `1px solid ${COLORS.border}` }}>
-          {["", "ACCOUNT", "TOTAL OPS", "CLOSED", "OPEN LOTS", "CLOSED LOTS", "REALISED P&L"].map((h, i) => (
+        <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "10px 20px", background: `${COLORS.tableHeader}99`, borderBottom: `1px solid ${COLORS.border}` }}>
+          {["", "COMPTE", "BUY", "SELL", "LOTS OUVERTS", "MATCHES", "REALISED P&L"].map((h, i) => (
             <div key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.7, textAlign: i >= 2 ? "right" : "left" }}>{h}</div>
           ))}
         </div>
 
         {rows.length === 0 && (
           <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "48px 0", fontSize: 14 }}>
-            No closed operations yet. Add a Close Price to an operation to compute its P&L.
+            Aucune opération. Ajoutez des BUY et des SELL dans Derivatives.
           </div>
         )}
 
         {rows.map((row, idx) => {
-          const expanded = expandedAccounts[row.accKey];
-          const isLast   = idx === rows.length - 1;
+          const expanded = expandedAccounts[row.account];
+          const isLast = idx === rows.length - 1;
+          const totalBuyCount = row.instruments.reduce((s, i) => s + i.buyCount, 0);
+          const totalSellCount = row.instruments.reduce((s, i) => s + i.sellCount, 0);
+          const totalMatchCount = row.instruments.reduce((s, i) => s + i.matches.length, 0);
+
           return (
-            <div key={row.accKey}>
-              {/* Account row */}
+            <div key={row.account}>
               <div
-                onClick={() => row.byInstrument.length > 0 && toggleAccount(row.accKey)}
-                style={{ display: "grid", gridTemplateColumns: "32px 1fr 100px 100px 100px 100px 160px", gap: 0, padding: "14px 20px", borderBottom: `1px solid ${isLast && !expanded ? "transparent" : COLORS.border}`, cursor: row.byInstrument.length > 0 ? "pointer" : "default", background: idx % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, transition: "background 0.12s" }}
-                onMouseOver={e => { if (row.byInstrument.length > 0) e.currentTarget.style.background = COLORS.hover; }}
+                onClick={() => toggle(row.account)}
+                style={{ display: "grid", gridTemplateColumns: GRID, padding: "14px 20px", borderBottom: `1px solid ${isLast && !expanded ? "transparent" : COLORS.border}`, cursor: "pointer", background: idx % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, transition: "background 0.12s" }}
+                onMouseOver={e => { e.currentTarget.style.background = COLORS.hover; }}
                 onMouseOut={e => { e.currentTarget.style.background = idx % 2 === 0 ? COLORS.card : `${COLORS.card}BB`; }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {row.byInstrument.length > 0 && (
-                    <span style={{ fontSize: 10, color: COLORS.textMuted, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
-                  )}
+                  <span style={{ fontSize: 10, color: COLORS.textMuted, display: "inline-block", transition: "transform 0.2s", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: `${COLORS.accent}18`, border: `1px solid ${COLORS.accent}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>🏦</div>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: `${COLORS.accent}18`, border: `1px solid ${COLORS.accent}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>🏦</div>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>{row.label}</div>
-                    <div style={{ fontSize: 11, color: COLORS.textMuted }}>{row.closedCount} closed · {row.byInstrument.length} instrument{row.byInstrument.length !== 1 ? "s" : ""}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>{getAccountLabel(row.account)}</div>
+                    <div style={{ fontSize: 11, color: COLORS.textMuted }}>{row.instruments.length} instrument{row.instruments.length > 1 ? "s" : ""}</div>
                   </div>
                 </div>
-                <div style={{ textAlign: "right", fontSize: 13, color: COLORS.textSub, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{row.totalCount}</div>
-                <div style={{ textAlign: "right", fontSize: 13, color: COLORS.textSub, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{row.closedCount}</div>
-                <div style={{ textAlign: "right", fontSize: 13, color: COLORS.orange, fontFamily: "'DM Mono', monospace", display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{fmtLots(row.openLots)}</div>
-                <div style={{ textAlign: "right", fontSize: 13, color: COLORS.textSub, fontFamily: "'DM Mono', monospace", display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{fmtLots(row.closedLots)}</div>
-                <div style={{ textAlign: "right", fontFamily: "'DM Mono', monospace", fontSize: 15, fontWeight: 800, color: pnlColor(row.totalPnl), display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-                  {row.closedCount > 0 ? fmt(row.totalPnl) : <span style={{ color: COLORS.textMuted, fontSize: 12, fontWeight: 400 }}>No closed ops</span>}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.green }}>{totalBuyCount}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.red }}>{totalSellCount}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+                  <span style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", color: row.openLots > 0 ? COLORS.orange : COLORS.textMuted }}>{fmtLots(row.openLots)}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+                  <span style={{ fontSize: 13, color: COLORS.textSub }}>{totalMatchCount}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+                  {totalSellCount > 0
+                    ? <span style={{ fontSize: 16, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: pnlColor(row.realizedPnl) }}>{fmt(row.realizedPnl)}</span>
+                    : <span style={{ fontSize: 12, color: COLORS.textMuted }}>Pas de SELL</span>}
                 </div>
               </div>
 
-              {/* Instrument breakdown (expanded) */}
               {expanded && (
-                <div style={{ background: `${COLORS.bg}`, borderBottom: `1px solid ${COLORS.border}` }}>
-                  {/* Sub-header */}
-                  <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 100px 100px 100px 100px 160px", gap: 0, padding: "8px 20px 8px 52px", background: `${COLORS.tableHeader}88` }}>
-                    {["", "INSTRUMENT", "OPS", "", "LOTS", "", "P&L"].map((h, i) => (
+                <div style={{ background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
+                  <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "8px 20px 8px 52px", background: `${COLORS.tableHeader}66`, borderBottom: `1px solid ${COLORS.border}40` }}>
+                    {["", "INSTRUMENT", "BUY", "SELL", "LOTS OUVERTS", "MATCHES", "P&L"].map((h, i) => (
                       <div key={i} style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.6, textAlign: i >= 2 ? "right" : "left" }}>{h}</div>
                     ))}
                   </div>
-                  {row.byInstrument.map((inst, j) => (
-                    <div key={j} style={{ display: "grid", gridTemplateColumns: "32px 1fr 100px 100px 100px 100px 160px", gap: 0, padding: "10px 20px 10px 52px", borderBottom: j < row.byInstrument.length - 1 ? `1px solid ${COLORS.border}40` : "none" }}>
+                  {row.instruments.sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl)).map((inst, j) => (
+                    <div key={j} style={{ display: "grid", gridTemplateColumns: GRID, padding: "11px 20px 11px 52px", borderBottom: j < row.instruments.length - 1 ? `1px solid ${COLORS.border}30` : "none" }}>
                       <div />
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <div style={{ width: 6, height: 6, borderRadius: "50%", background: COLORS.accent, flexShrink: 0 }} />
-                        <span style={{ fontSize: 13, color: COLORS.text, fontWeight: 600 }}>{inst.instrument}</span>
+                        <span style={{ fontSize: 13, color: COLORS.text, fontWeight: 600 }}>{inst.instrument || "—"}</span>
                       </div>
-                      <div style={{ textAlign: "right", fontSize: 12, color: COLORS.textSub, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{inst.count}</div>
-                      <div />
-                      <div style={{ textAlign: "right", fontSize: 12, color: COLORS.textSub, fontFamily: "'DM Mono', monospace", display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{fmtLots(inst.lots)}</div>
-                      <div />
-                      <div style={{ textAlign: "right", fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 700, color: pnlColor(inst.pnl), display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{fmt(inst.pnl)}</div>
+                      <div style={{ textAlign: "right", fontSize: 12, color: COLORS.green, fontWeight: 600 }}>{inst.buyCount}</div>
+                      <div style={{ textAlign: "right", fontSize: 12, color: COLORS.red, fontWeight: 600 }}>{inst.sellCount}</div>
+                      <div style={{ textAlign: "right" }}>
+                        <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: inst.openLots > 0 ? COLORS.orange : COLORS.textMuted }}>{fmtLots(inst.openLots)}</span>
+                        {inst.openLots > 0 && inst.openAvgPrice > 0 && (
+                          <div style={{ fontSize: 10, color: COLORS.textMuted }}>avg @ {inst.openAvgPrice.toFixed(2)}</div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: "right", fontSize: 12, color: COLORS.textSub }}>{inst.matches.length}</div>
+                      <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: inst.sellCount > 0 ? pnlColor(inst.realizedPnl) : COLORS.textMuted }}>
+                        {inst.sellCount > 0 ? fmt(inst.realizedPnl) : "—"}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -5605,27 +5600,28 @@ const DerivativesDashboard = () => {
           );
         })}
 
-        {/* Grand total row */}
         {rows.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 100px 100px 100px 100px 160px", gap: 0, padding: "14px 20px", background: `${COLORS.accent}08`, borderTop: `2px solid ${COLORS.accent}30` }}>
-            <div />
-            <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.accent, letterSpacing: 0.5 }}>TOTAL</div>
-            <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: COLORS.text, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{ops.length}</div>
-            <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: COLORS.text, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{closedOps.length}</div>
-            <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: COLORS.orange, fontFamily: "'DM Mono', monospace", display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{fmtLots(grandOpenLots)}</div>
-            <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: COLORS.textSub, fontFamily: "'DM Mono', monospace", display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{fmtLots(grandClosedLots)}</div>
-            <div style={{ textAlign: "right", fontFamily: "'DM Mono', monospace", fontSize: 17, fontWeight: 900, color: pnlColor(grandPnl), display: "flex", alignItems: "center", justifyContent: "flex-end" }}>{closedOps.length > 0 ? fmt(grandPnl) : "—"}</div>
+          <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "14px 20px", background: `${COLORS.accent}08`, borderTop: `2px solid ${COLORS.accent}30` }}>
+            <div /><div style={{ fontSize: 13, fontWeight: 800, color: COLORS.accent }}>TOTAL</div>
+            <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: COLORS.green }}>{totalBuys}</div>
+            <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: COLORS.red }}>{totalSells}</div>
+            <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: grandOpenLots > 0 ? COLORS.orange : COLORS.textMuted }}>{fmtLots(grandOpenLots)}</div>
+            <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: COLORS.textSub }}>{totalMatches}</div>
+            <div style={{ textAlign: "right", fontSize: 17, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: totalSells > 0 ? pnlColor(grandPnl) : COLORS.textMuted }}>
+              {totalSells > 0 ? fmt(grandPnl) : "—"}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Helper note */}
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: `${COLORS.blue}10`, border: `1px solid ${COLORS.blue}30`, borderRadius: 12, padding: "14px 18px" }}>
         <span style={{ fontSize: 16, flexShrink: 0 }}>💡</span>
-        <div style={{ fontSize: 12, color: COLORS.textSub, lineHeight: 1.6 }}>
-          <strong style={{ color: COLORS.text }}>How P&L is calculated:</strong> For each closed operation, P&L = (Close Price − Entry Price) × Lots. For BUY positions a rising price is profitable; for SELL positions a falling price is profitable. To close a position, edit the operation and fill in the <em>Close Price</em> field.
+        <div style={{ fontSize: 12, color: COLORS.textSub, lineHeight: 1.7 }}>
+          <strong style={{ color: COLORS.text }}>Méthode FIFO :</strong> pour chaque groupe <em>(compte × instrument)</em>, les BUY sont triés par date croissante et consommés dans l'ordre par les SELL.{" "}
+          P&amp;L réalisé = Σ (prix SELL − prix BUY) × lots matchés. Les lots sans SELL correspondant sont comptabilisés comme <span style={{ color: COLORS.orange }}>ouverts</span>.
         </div>
       </div>
+
     </div>
   );
 };

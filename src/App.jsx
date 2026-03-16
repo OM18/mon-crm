@@ -1409,57 +1409,92 @@ const UnderlyingOriginEditor = ({ config, updateField, setAdminTab }) => {
 
 const AccountTypePillsEditor = ({ config, updateField }) => {
   const items = Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : [];
-  const [showAdd, setShowAdd] = useState(false);
+  const [localItems, setLocalItems] = useState(items);
+  const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newColor, setNewColor] = useState(COLORS.accent);
-  const PRESET_COLORS = [COLORS.green, COLORS.red, COLORS.blue, COLORS.orange, COLORS.purple, COLORS.gold, COLORS.accent];
+  const PRESET_COLORS = [COLORS.green, COLORS.orange, COLORS.red, COLORS.blue, COLORS.purple, COLORS.gold, COLORS.accent];
+
+  useEffect(() => { setLocalItems(Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : []); setDirty(false); }, [config.derivAccountTypes]);
+
+  const mark = (next) => { setLocalItems(next); setDirty(true); };
 
   const add = () => {
     if (!newLabel.trim()) return;
-    const next = [...items, { value: newLabel.trim().toLowerCase().replace(/\s+/g, "_"), label: newLabel.trim(), color: newColor }];
-    updateField("derivAccountTypes", next);
-    setNewLabel(""); setShowAdd(false); setNewColor(COLORS.accent);
+    mark([...localItems, { value: newLabel.trim().toLowerCase().replace(/\s+/g, "_"), label: newLabel.trim(), color: newColor }]);
+    setNewLabel(""); setNewColor(COLORS.accent);
   };
-  const remove = (idx) => updateField("derivAccountTypes", items.filter((_, i) => i !== idx));
+
+  const save = (e) => {
+    e.stopPropagation();
+    updateField("derivAccountTypes", localItems);
+    setDirty(false);
+  };
 
   return (
-    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
-      <div style={{ padding: "16px 20px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 12, background: `${COLORS.purple}08` }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.purple}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🗂</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>Account Types</div>
-          <div style={{ fontSize: 12, color: COLORS.textSub }}>Types de compte disponibles pour les opérations sur dérivés</div>
+    <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
+      <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
+        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>🗂</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Account Types</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Types de compte disponibles pour les opérations sur dérivés</div>
+          </div>
         </div>
-        {/* Pills + add button all in the header */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "flex-end", flex: 2 }}>
-          {items.map((opt, idx) => (
-            <div key={idx} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 8, border: `1.5px solid ${opt.color || COLORS.accent}`, background: `${opt.color || COLORS.accent}18` }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: opt.color || COLORS.accent }}>{opt.label}</span>
-              <span onClick={() => remove(idx)} style={{ cursor: "pointer", color: opt.color || COLORS.accent, fontSize: 15, opacity: 0.6, lineHeight: 1 }}
-                onMouseOver={e => e.currentTarget.style.opacity = 1}
-                onMouseOut={e => e.currentTarget.style.opacity = 0.6}>×</span>
-            </div>
-          ))}
-          {items.length === 0 && <span style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>Aucune valeur</span>}
-          <button onClick={() => setShowAdd(s => !s)}
-            style={{ width: 28, height: 28, borderRadius: 8, background: showAdd ? `${COLORS.accent}30` : `${COLORS.accent}15`, border: `1.5px solid ${COLORS.accent}50`, color: COLORS.accent, cursor: "pointer", fontSize: 18, lineHeight: 1, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            {showAdd ? "−" : "+"}
-          </button>
-        </div>
-      </div>
-      {showAdd && (
-        <div style={{ padding: "14px 20px", display: "flex", gap: 8, alignItems: "center", background: `${COLORS.accent}06`, borderTop: `1px solid ${COLORS.accent}20` }}>
-          <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
-            placeholder="ex: Arbitrage…" autoFocus
-            style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ display: "flex", gap: 5 }}>
-            {PRESET_COLORS.map(c => (
-              <div key={c} onClick={() => setNewColor(c)}
-                style={{ width: 18, height: 18, borderRadius: "50%", background: c, cursor: "pointer", border: newColor === c ? "2px solid #fff" : "2px solid transparent", outline: newColor === c ? `2px solid ${c}` : "none", flexShrink: 0 }} />
+            {localItems.map(s => (
+              <span key={s.value} style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${s.color || COLORS.accent}20`, color: s.color || COLORS.accent, border: `1px solid ${s.color || COLORS.accent}40` }}>
+                {s.label}
+              </span>
             ))}
           </div>
-          <Btn onClick={add} disabled={!newLabel.trim()} style={{ padding: "7px 14px", fontSize: 12, flexShrink: 0 }}>Ajouter</Btn>
-          <button onClick={() => { setShowAdd(false); setNewLabel(""); }} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
+          {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✓ Sauvegarder</div>}
+          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+            {localItems.map((s, idx) => (
+              <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: `${s.color || COLORS.accent}10`, border: `1px solid ${s.color || COLORS.accent}30`, borderRadius: 10, padding: "10px 14px" }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: s.color || COLORS.accent, flexShrink: 0 }} />
+                <input value={s.label} onChange={e => { const v = e.target.value; mark(localItems.map((x, i) => i === idx ? { ...x, label: v } : x)); }}
+                  style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 700, fontFamily: "inherit", outline: "none" }} />
+                <div style={{ display: "flex", gap: 4 }}>
+                  {PRESET_COLORS.map(c => (
+                    <div key={c} onClick={() => mark(localItems.map((x, i) => i === idx ? { ...x, color: c } : x))}
+                      style={{ width: 14, height: 14, borderRadius: "50%", background: c, cursor: "pointer", border: s.color === c ? `2px solid #fff` : "2px solid transparent", outline: s.color === c ? `2px solid ${c}` : "none" }} />
+                  ))}
+                </div>
+                <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
+                  style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                  onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                  onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>LABEL *</label>
+              <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="ex: Arbitrage" onKeyDown={e => e.key === "Enter" && add()}
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>COULEUR</label>
+              <div style={{ display: "flex", gap: 5, padding: "6px 0" }}>
+                {PRESET_COLORS.map(c => (
+                  <div key={c} onClick={() => setNewColor(c)}
+                    style={{ width: 20, height: 20, borderRadius: "50%", background: c, cursor: "pointer", border: newColor === c ? `2px solid #fff` : "2px solid transparent", outline: newColor === c ? `2px solid ${c}` : "none" }} />
+                ))}
+              </div>
+            </div>
+            <Btn onClick={add} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>+ Ajouter</Btn>
+          </div>
         </div>
       )}
     </div>

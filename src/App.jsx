@@ -1981,7 +1981,17 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                         ))}
                       </div>
                     )}
-                    {exchangeTarifs.map(et => {
+                    {[...exchangeTarifs].sort((a, b) => {
+                        const ta = (a.tarifType || "").toLowerCase();
+                        const tb = (b.tarifType || "").toLowerCase();
+                        if (ta !== tb) return ta < tb ? -1 : 1;
+                        const ea = (a.exchange || "").toLowerCase();
+                        const eb = (b.exchange || "").toLowerCase();
+                        if (ea !== eb) return ea < eb ? -1 : 1;
+                        const fa = (Array.isArray(a.financialBroker) ? a.financialBroker.join(" ") : (a.financialBroker || "")).toLowerCase();
+                        const fb = (Array.isArray(b.financialBroker) ? b.financialBroker.join(" ") : (b.financialBroker || "")).toLowerCase();
+                        return fa < fb ? -1 : fa > fb ? 1 : 0;
+                      }).map(et => {
                       const exchCfg = (config.derivExchanges || []).find(e => e.value === et.exchange);
                       const transCfg = (config.derivOrderTransmissionTypes || []).find(t => t.value === et.orderTransmissionType);
                       const tarifTypeCfg = (config.derivTarifTypes || []).find(t => (t.value || t.label) === et.tarifType);
@@ -2016,8 +2026,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                             <div style={{ position: "absolute", top: 3, left: et.isActive ? 18 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                           </div>
                           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                            <button onClick={() => { const ott = et.orderTransmissionType; const fb = et.financialBroker; setEtForm({ ...et, financialBroker: Array.isArray(fb) ? fb : (fb ? [fb] : []), orderTransmissionType: Array.isArray(ott) ? ott : (ott ? [ott] : []) }); setEditEtId(et.id); setShowEtForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
-                            <button onClick={() => deleteExchangeTarif(et.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
+                            <button onClick={() => { const ott = et.orderTransmissionType; const fb = et.financialBroker; setEtForm({ ...et, financialBroker: Array.isArray(fb) ? fb : (fb ? [fb] : []), orderTransmissionType: Array.isArray(ott) ? ott : (ott ? [ott] : []) }); setEditEtId(et.id); setShowEtForm(true); }} title="Modifier" style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}30`, color: COLORS.accent, borderRadius: 7, padding: "5px 10px", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>✏️</button>
+                            <button onClick={() => deleteExchangeTarif(et.id)} title="Supprimer" style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}30`, color: COLORS.red, borderRadius: 7, padding: "5px 10px", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>🗑</button>
                           </div>
                         </div>
                       );

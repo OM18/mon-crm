@@ -191,6 +191,12 @@ const DEFAULT_CONFIG = {
   derivAccountTypes: {},
   derivDefaultFinancingBank: "",
   derivDefaultAccountType: "",
+  derivAccountTypes: [
+    { value: "hedging",        label: "Hedging",        color: "#22C55E" },
+    { value: "speculative",    label: "Speculative",    color: "#EF4444" },
+    { value: "global_hedging", label: "Global Hedging", color: "#4BA3F5" },
+  ],
+  derivFinancingBanks: [],
   derivBusinessUnits: [],
   derivBusinessUnitDefault: "",
   derivDefaultBroker: "",
@@ -469,6 +475,8 @@ const DERIV_FIELD_DEFINITIONS = [
   { key: "derivUnderlyingOrigins", label: "Underlying Origin", icon: "🌍", description: "Origines géographiques du sous-jacent", hasColor: false, hasValue: false },
   { key: "derivTarifTypes", label: "Tarifs Types", icon: "🏷", description: "Liste des tarifs types de référence pour les opérations sur dérivés", hasColor: false, hasValue: false },
   { key: "derivOrderTransmissionTypes", label: "Order Transmission Types", icon: "📡", description: "Modes de transmission des ordres (Electronic, Manual…)", hasColor: false, hasValue: true },
+  { key: "derivAccountTypes",     label: "Account Types",      icon: "🗂", description: "Types de compte (Hedging, Speculative, Global Hedging…)", hasColor: true, hasValue: true },
+  { key: "derivFinancingBanks",   label: "Financing Banks",    icon: "🏦", description: "Banques de financement disponibles pour les comptes de trading", hasColor: false, hasValue: true },
 ];
 
 const FieldEditor = ({ fieldDef, values, onUpdate, defaultValue, onSetDefault }) => {
@@ -1630,16 +1638,18 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                     {/* Account Type */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ACCOUNT TYPE</label>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        {[{ value: "hedging", label: "Hedging", color: COLORS.green }, { value: "speculative", label: "Speculative", color: COLORS.red }, { value: "global_hedging", label: "Global Hedging", color: COLORS.blue }].map(opt => {
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {(config.derivAccountTypes || []).map(opt => {
                           const active = accForm.accountType === opt.value;
+                          const col = opt.color || COLORS.accent;
                           return (
                             <div key={opt.value} onClick={() => setAccForm(f => ({ ...f, accountType: active ? "" : opt.value }))}
-                              style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: 8, cursor: "pointer", fontWeight: active ? 700 : 500, fontSize: 11, transition: "all 0.15s", border: `1.5px solid ${active ? opt.color : COLORS.border}`, background: active ? `${opt.color}18` : COLORS.bg, color: active ? opt.color : COLORS.textSub, userSelect: "none" }}>
+                              style={{ flex: 1, minWidth: 80, textAlign: "center", padding: "9px 4px", borderRadius: 8, cursor: "pointer", fontWeight: active ? 700 : 500, fontSize: 11, transition: "all 0.15s", border: `1.5px solid ${active ? col : COLORS.border}`, background: active ? `${col}18` : COLORS.bg, color: active ? col : COLORS.textSub, userSelect: "none" }}>
                               {opt.label}
                             </div>
                           );
                         })}
+                        {(config.derivAccountTypes || []).length === 0 && <span style={{ fontSize: 11, color: COLORS.orange }}>💡 Aucun type — ajoutez-en dans le bloc Account Types</span>}
                       </div>
                     </div>
                     {/* Financing Bank */}
@@ -1648,12 +1658,12 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       <select value={accForm.financingBank} onChange={e => setAccForm(f => ({ ...f, financingBank: e.target.value }))}
                         style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: accForm.financingBank ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
                         <option value="">— Aucune —</option>
-                        {(companies || []).filter(c => (c.roles || []).some(r => r === "Bank" || r?.toLowerCase() === "bank")).map(c => (
-                          <option key={c.id} value={c.name}>{c.name}</option>
+                        {(config.derivFinancingBanks || []).map(b => (
+                          <option key={b.value} value={b.value}>{b.label}</option>
                         ))}
                       </select>
-                      {(companies || []).filter(c => (c.roles || []).some(r => r === "Bank" || r?.toLowerCase() === "bank")).length === 0 && (
-                        <span style={{ fontSize: 11, color: COLORS.orange }}>💡 Aucune company avec le rôle "Bank"</span>
+                      {(config.derivFinancingBanks || []).length === 0 && (
+                        <span style={{ fontSize: 11, color: COLORS.orange }}>💡 Aucune banque — ajoutez-en dans le bloc Financing Banks</span>
                       )}
                     </div>
                   </div>
@@ -1694,7 +1704,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                           {bu && <span style={{ color: bu.color || COLORS.textSub }}>◈ {bu.label}</span>}
                           <span>💱 {a.currency}</span>
                           {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>}
-                          {a.accountType && (() => { const opt = [{ value: "hedging", label: "Hedging", color: COLORS.green }, { value: "speculative", label: "Speculative", color: COLORS.red }, { value: "global_hedging", label: "Global Hedging", color: COLORS.blue }].find(o => o.value === a.accountType); return opt ? <span style={{ color: opt.color, fontWeight: 700 }}>● {opt.label}</span> : null; })()}
+                          {a.accountType && (() => { const opt = (config.derivAccountTypes || []).find(o => o.value === a.accountType); return opt ? <span style={{ color: opt.color || COLORS.accent, fontWeight: 700 }}>● {opt.label}</span> : <span style={{ color: COLORS.textMuted }}>● {a.accountType}</span>; })()}
                           {a.financingBank && <span style={{ color: COLORS.accent }}>🏦 {a.financingBank}</span>}
                         </div>
                       </div>
@@ -1714,65 +1724,22 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           </div>
 
           {/* ── Account Financing Bank ── */}
-          {(() => {
-            const bankCompanies = (companies || []).filter(c => (c.roles || []).some(r => r === "Bank" || r?.toLowerCase() === "bank"));
-            const current = config.derivDefaultFinancingBank || "";
-            return (
-              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
-                <div style={{ padding: "18px 24px", display: "flex", alignItems: "center", gap: 14, background: `${COLORS.blue}08` }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏦</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Account Financing Bank</div>
-                    <div style={{ fontSize: 12, color: COLORS.textSub }}>Banque de financement par défaut pour les comptes de trading</div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <div onClick={() => updateField("derivDefaultFinancingBank", "")}
-                      style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: !current ? 700 : 500, border: `1.5px solid ${!current ? COLORS.accent : COLORS.border}`, background: !current ? `${COLORS.accent}18` : COLORS.bg, color: !current ? COLORS.accent : COLORS.textSub, userSelect: "none" }}>
-                      — Aucune
-                    </div>
-                    {bankCompanies.map(c => {
-                      const active = current === c.name;
-                      return (
-                        <div key={c.id} onClick={() => updateField("derivDefaultFinancingBank", active ? "" : c.name)}
-                          style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 500, border: `1.5px solid ${active ? COLORS.blue : COLORS.border}`, background: active ? `${COLORS.blue}18` : COLORS.bg, color: active ? COLORS.blue : COLORS.textSub, userSelect: "none" }}>
-                          {active && "✓ "}{c.name}
-                        </div>
-                      );
-                    })}
-                    {bankCompanies.length === 0 && <span style={{ fontSize: 12, color: COLORS.orange }}>💡 Ajoutez des companies avec le rôle "Bank"</span>}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
+            <FieldEditor
+              fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivFinancingBanks")}
+              values={config["derivFinancingBanks"] || []}
+              onUpdate={updateField}
+            />
+          </div>
 
           {/* ── Account Type ── */}
-          {(() => {
-            const TYPE_OPTS = [{ value: "hedging", label: "Hedging", color: COLORS.green }, { value: "speculative", label: "Speculative", color: COLORS.red }, { value: "global_hedging", label: "Global Hedging", color: COLORS.blue }];
-            const current = config.derivDefaultAccountType || "";
-            return (
-              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
-                <div style={{ padding: "18px 24px", display: "flex", alignItems: "center", gap: 14, background: `${COLORS.purple}08` }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.purple}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🗂</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Account Type</div>
-                    <div style={{ fontSize: 12, color: COLORS.textSub }}>Type de compte par défaut pour les opérations sur dérivés</div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {TYPE_OPTS.map(opt => {
-                      const active = current === opt.value;
-                      return (
-                        <div key={opt.value} onClick={() => updateField("derivDefaultAccountType", active ? "" : opt.value)}
-                          style={{ padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 500, border: `1.5px solid ${active ? opt.color : COLORS.border}`, background: active ? `${opt.color}18` : COLORS.bg, color: active ? opt.color : COLORS.textSub, userSelect: "none" }}>
-                          {active && "✓ "}{opt.label}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
+            <FieldEditor
+              fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivAccountTypes")}
+              values={config["derivAccountTypes"] || []}
+              onUpdate={updateField}
+            />
+          </div>
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <DerivOpStatusEditor config={config} updateField={updateField} />

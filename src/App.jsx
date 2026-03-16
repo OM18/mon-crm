@@ -1442,7 +1442,7 @@ useEffect(() => {
   };
 
   // ── Exchange Tarifs state ──
-  const EMPTY_ET = { financialBroker: [], exchange: "", tarifType: "", orderTransmissionType: [], tarif: "", currency: "", validFrom: "", validTo: "", isActive: true };
+  const EMPTY_ET = { financialBroker: [], exchange: "", tarifType: "", opType: [], orderTransmissionType: [], tarif: "", currency: "", validFrom: "", validTo: "", isActive: true };
   const [exchangeTarifs, setExchangeTarifs] = useState([]);
   const [etForm, setEtForm] = useState(EMPTY_ET);
   const [editEtId, setEditEtId] = useState(null);
@@ -1888,6 +1888,38 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                         </select>
                       </div>
 
+                      {/* Operation Type — multi-select pills (OR logic) */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>OPERATION TYPE</label>
+                          {(etForm.opType || []).length > 1 && (
+                            <span style={{ fontSize: 10, color: COLORS.blue, fontWeight: 700, background: `${COLORS.blue}15`, borderRadius: 4, padding: "1px 6px" }}>OR</span>
+                          )}
+                          {(etForm.opType || []).length > 0 && (
+                            <span style={{ fontSize: 10, color: COLORS.textMuted }}>{(etForm.opType || []).length} sélectionné{(etForm.opType || []).length > 1 ? "s" : ""}</span>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "8px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, minHeight: 42 }}>
+                          {(config.derivOpTypes || []).length === 0 && (
+                            <span style={{ fontSize: 12, color: COLORS.textMuted, padding: "2px 4px" }}>💡 Aucun type défini dans l'admin</span>
+                          )}
+                          {(config.derivOpTypes || []).map(t => {
+                            const val = t.label || t.value;
+                            const active = (etForm.opType || []).includes(val);
+                            return (
+                              <div key={t.value || t.label} onClick={() => {
+                                const current = etForm.opType || [];
+                                const next = active ? current.filter(v => v !== val) : [...current, val];
+                                setEtForm(f => ({ ...f, opType: next }));
+                              }} style={{ padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 400, transition: "all 0.15s", border: `1.5px solid ${active ? COLORS.accent : COLORS.border}`, background: active ? `${COLORS.accent}18` : "transparent", color: active ? COLORS.accent : COLORS.textSub, userSelect: "none" }}>
+                                {active && <span style={{ marginRight: 4 }}>✓</span>}
+                                {val}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       {/* Order Transmission Type — multi-select toggle (OR logic) */}
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <label style={{ fontSize: 11, color: (etForm.orderTransmissionType || []).length === 0 ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
@@ -1975,8 +2007,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {exchangeTarifs.length > 0 && (
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 70px 55px 80px 55px 50px", gap: 8, padding: "4px 12px" }}>
-                        {["BROKER", "EXCHANGE", "TARIF TYPE", "TRANSMISSION", "TARIF", "CUR.", "VALIDITÉ", "STATUT", ""].map(h => (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 90px 80px 70px 55px 80px 55px 80px", gap: 8, padding: "4px 12px" }}>
+                        {["BROKER", "EXCHANGE", "TARIF TYPE", "OP TYPE", "TRANSMISSION", "TARIF", "CUR.", "VALIDITÉ", "STATUT", ""].map(h => (
                           <span key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.5 }}>{h}</span>
                         ))}
                       </div>
@@ -1999,15 +2031,18 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       const expired = et.validTo && et.validTo < today;
                       const notYet = et.validFrom && et.validFrom > today;
                       return (
-                        <div key={et.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 70px 55px 80px 55px 50px", gap: 8, alignItems: "center", background: !et.isActive ? `${COLORS.border}30` : COLORS.bg, border: `1px solid ${expired || !et.isActive ? COLORS.border : COLORS.border}`, borderRadius: 10, padding: "10px 12px", opacity: !et.isActive ? 0.6 : 1 }}>
+                        <div key={et.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 90px 80px 70px 55px 80px 55px 80px", gap: 8, alignItems: "center", background: !et.isActive ? `${COLORS.border}30` : COLORS.bg, border: `1px solid ${expired || !et.isActive ? COLORS.border : COLORS.border}`, borderRadius: 10, padding: "10px 12px", opacity: !et.isActive ? 0.6 : 1 }}>
                           <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.orange, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {Array.isArray(et.financialBroker) ? et.financialBroker.join(" OR ") : (et.financialBroker || "—")}
                           </span>
                           <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.blue }}>{exchCfg?.label || et.exchange}</span>
                           <span style={{ fontSize: 12, color: COLORS.text }}>{tarifTypeCfg?.label || et.tarifType}</span>
-                          <span style={{ fontSize: 12, color: COLORS.textSub }}>
+                          <span style={{ fontSize: 11, color: COLORS.accent, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={Array.isArray(et.opType) ? et.opType.join(" OR ") : (et.opType || "—")}>
+                            {Array.isArray(et.opType) && et.opType.length > 0 ? et.opType.join(" / ") : (et.opType || "—")}
+                          </span>
+                          <span style={{ fontSize: 11, color: COLORS.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={Array.isArray(et.orderTransmissionType) ? et.orderTransmissionType.map(v => (config.derivOrderTransmissionTypes || []).find(t => t.value === v)?.label || v).join(" OR ") : (transCfg?.label || et.orderTransmissionType || "—")}>
                             {Array.isArray(et.orderTransmissionType)
-                              ? et.orderTransmissionType.map(v => (config.derivOrderTransmissionTypes || []).find(t => t.value === v)?.label || v).join(" OR ")
+                              ? et.orderTransmissionType.map(v => (config.derivOrderTransmissionTypes || []).find(t => t.value === v)?.label || v).join(" / ")
                               : (transCfg?.label || et.orderTransmissionType || "—")}
                           </span>
                           <span style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.green, fontWeight: 700 }}>{et.tarif}</span>
@@ -2026,7 +2061,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                             <div style={{ position: "absolute", top: 3, left: et.isActive ? 18 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                           </div>
                           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                            <button onClick={() => { const ott = et.orderTransmissionType; const fb = et.financialBroker; setEtForm({ ...et, financialBroker: Array.isArray(fb) ? fb : (fb ? [fb] : []), orderTransmissionType: Array.isArray(ott) ? ott : (ott ? [ott] : []) }); setEditEtId(et.id); setShowEtForm(true); }} title="Modifier" style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}30`, color: COLORS.accent, borderRadius: 7, padding: "5px 10px", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>✏️</button>
+                            <button onClick={() => { const ott = et.orderTransmissionType; const fb = et.financialBroker; const ot = et.opType; setEtForm({ ...et, financialBroker: Array.isArray(fb) ? fb : (fb ? [fb] : []), opType: Array.isArray(ot) ? ot : (ot ? [ot] : []), orderTransmissionType: Array.isArray(ott) ? ott : (ott ? [ott] : []) }); setEditEtId(et.id); setShowEtForm(true); }} title="Modifier" style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}30`, color: COLORS.accent, borderRadius: 7, padding: "5px 10px", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>✏️</button>
                             <button onClick={() => deleteExchangeTarif(et.id)} title="Supprimer" style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}30`, color: COLORS.red, borderRadius: 7, padding: "5px 10px", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>🗑</button>
                           </div>
                         </div>

@@ -188,7 +188,6 @@ const DEFAULT_CONFIG = {
     { value: "trade",   label: "Trade"   },
   ],
   derivOpStatusDefault: "",
-  derivAccountTypes: {},
   derivDefaultFinancingBank: "",
   derivDefaultAccountType: "",
   derivAccountTypes: [
@@ -248,7 +247,13 @@ const ConfigProvider = ({ children }) => {
   useEffect(() => {
     async function loadConfig() {
       const { data } = await supabase.from('config').select('data').eq('key', 'admin-config').single();
-      if (data) setConfig({ ...DEFAULT_CONFIG, ...data.data });
+      if (data) {
+        const loaded = { ...DEFAULT_CONFIG, ...data.data };
+        // Normalize fields that must be arrays but may have been saved as objects
+        if (!Array.isArray(loaded.derivAccountTypes)) loaded.derivAccountTypes = DEFAULT_CONFIG.derivAccountTypes;
+        if (!Array.isArray(loaded.derivFinancingBanks)) loaded.derivFinancingBanks = DEFAULT_CONFIG.derivFinancingBanks;
+        setConfig(loaded);
+      }
       setLoaded(true);
     }
     loadConfig();
@@ -1639,7 +1644,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ACCOUNT TYPE</label>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {(config.derivAccountTypes || []).map(opt => {
+                        {(Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : []).map(opt => {
                           const active = accForm.accountType === opt.value;
                           const col = opt.color || COLORS.accent;
                           return (
@@ -1649,7 +1654,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                             </div>
                           );
                         })}
-                        {(config.derivAccountTypes || []).length === 0 && <span style={{ fontSize: 11, color: COLORS.orange }}>💡 Aucun type — ajoutez-en dans le bloc Account Types</span>}
+                        {(Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : []).length === 0 && <span style={{ fontSize: 11, color: COLORS.orange }}>💡 Aucun type — ajoutez-en dans le bloc Account Types</span>}
                       </div>
                     </div>
                     {/* Financing Bank */}
@@ -1658,11 +1663,11 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       <select value={accForm.financingBank} onChange={e => setAccForm(f => ({ ...f, financingBank: e.target.value }))}
                         style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: accForm.financingBank ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
                         <option value="">— Aucune —</option>
-                        {(config.derivFinancingBanks || []).map(b => (
+                        {(Array.isArray(config.derivFinancingBanks) ? config.derivFinancingBanks : []).map(b => (
                           <option key={b.value} value={b.value}>{b.label}</option>
                         ))}
                       </select>
-                      {(config.derivFinancingBanks || []).length === 0 && (
+                      {(Array.isArray(config.derivFinancingBanks) ? config.derivFinancingBanks : []).length === 0 && (
                         <span style={{ fontSize: 11, color: COLORS.orange }}>💡 Aucune banque — ajoutez-en dans le bloc Financing Banks</span>
                       )}
                     </div>
@@ -1704,7 +1709,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                           {bu && <span style={{ color: bu.color || COLORS.textSub }}>◈ {bu.label}</span>}
                           <span>💱 {a.currency}</span>
                           {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>}
-                          {a.accountType && (() => { const opt = (config.derivAccountTypes || []).find(o => o.value === a.accountType); return opt ? <span style={{ color: opt.color || COLORS.accent, fontWeight: 700 }}>● {opt.label}</span> : <span style={{ color: COLORS.textMuted }}>● {a.accountType}</span>; })()}
+                          {a.accountType && (() => { const opt = (Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : []).find(o => o.value === a.accountType); return opt ? <span style={{ color: opt.color || COLORS.accent, fontWeight: 700 }}>● {opt.label}</span> : <span style={{ color: COLORS.textMuted }}>● {a.accountType}</span>; })()}
                           {a.financingBank && <span style={{ color: COLORS.accent }}>🏦 {a.financingBank}</span>}
                         </div>
                       </div>
@@ -1727,7 +1732,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <FieldEditor
               fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivFinancingBanks")}
-              values={config["derivFinancingBanks"] || []}
+              values={Array.isArray(config["derivFinancingBanks"]) ? config["derivFinancingBanks"] : []}
               onUpdate={updateField}
             />
           </div>
@@ -1736,7 +1741,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <FieldEditor
               fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivAccountTypes")}
-              values={config["derivAccountTypes"] || []}
+              values={Array.isArray(config["derivAccountTypes"]) ? config["derivAccountTypes"] : []}
               onUpdate={updateField}
             />
           </div>

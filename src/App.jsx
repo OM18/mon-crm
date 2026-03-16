@@ -953,17 +953,21 @@ const DerivBUEditor = ({ config, updateField }) => {
             <div style={{ fontSize: 11, color: COLORS.textMuted }}>Business Units actives dans le module Derivatives</div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 400 }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
             {localSelected.map(v => {
               const bu = allBUs.find(b => b.value === v);
-              return <div key={v} style={{ width: 8, height: 8, borderRadius: "50%", background: bu?.color || COLORS.textSub }} />;
+              const isDefault = v === localDefault;
+              return (
+                <span key={v} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: COLORS.card, color: COLORS.text, border: `1px solid ${COLORS.border}` }}>
+                  {bu?.label || v}{isDefault ? " ★" : ""}
+                </span>
+              );
             })}
+            {localSelected.length === 0 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>Aucune BU active</span>}
           </div>
-          <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{localSelected.length} / {allBUs.length}</span>
           {dirty && (
-            <div onClick={save}
-              style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
               ✓ Sauvegarder
             </div>
           )}
@@ -1060,11 +1064,17 @@ const UnderlyingEditor = ({ config, updateField }) => {
             <div style={{ fontSize: 11, color: COLORS.textMuted }}>Sous-jacents disponibles avec leur catégorie (Commodity / FX)</div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{localItems.length} valeur{localItems.length > 1 ? "s" : ""}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 500 }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {localItems.map(s => (
+              <span key={s.value} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: COLORS.card, color: COLORS.text, border: `1px solid ${COLORS.border}` }}>
+                {s.label}
+              </span>
+            ))}
+          </div>
           {dirty && (
             <div onClick={e => { e.stopPropagation(); updateField("derivCommodities", localItems); setDirty(false); }}
-              style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
               ✓ Sauvegarder
             </div>
           )}
@@ -1367,9 +1377,19 @@ const UnderlyingOriginEditor = ({ config, updateField, setAdminTab }) => {
             <div style={{ fontSize: 11, color: COLORS.textMuted }}>Pays disponibles — source : <span style={{ color: COLORS.accent, cursor: "pointer", textDecoration: "underline" }} onClick={e => { e.stopPropagation(); setAdminTab("fields"); }}>Champs CRM → Country</span></div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{localSelected.length} / {allCountries.length}</span>
-          {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✓ Sauvegarder</div>}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 500 }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {localSelected.map(v => {
+              const country = allCountries.find(c => c.value === v);
+              return country ? (
+                <span key={v} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: COLORS.card, color: COLORS.text, border: `1px solid ${COLORS.border}` }}>
+                  {country.label}
+                </span>
+              ) : null;
+            })}
+            {localSelected.length === 0 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>Aucune sélection</span>}
+          </div>
+          {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>✓ Sauvegarder</div>}
           <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
         </div>
       </div>
@@ -1511,7 +1531,7 @@ const DerivPillsEditor = ({ configKey, label, icon, description, config, updateF
   );
 };
 
-const AccountTypePillsEditor = ({ config, updateField }) => {
+const AccountTypePillsEditor = ({ config, updateField, defaultKey, onSetDefault }) => {
   const items = Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : [];
   const [localItems, setLocalItems] = useState(items);
   const [dirty, setDirty] = useState(false);
@@ -1550,11 +1570,14 @@ const AccountTypePillsEditor = ({ config, updateField }) => {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ display: "flex", gap: 5 }}>
-            {localItems.map(s => (
-              <span key={s.value} style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${s.color || COLORS.accent}20`, color: s.color || COLORS.accent, border: `1px solid ${s.color || COLORS.accent}40` }}>
-                {s.label}
-              </span>
-            ))}
+            {localItems.map(s => {
+              const isDefault = defaultKey && (config[defaultKey] || "") === s.value;
+              return (
+                <span key={s.value} style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${s.color || COLORS.accent}20`, color: s.color || COLORS.accent, border: `1px solid ${s.color || COLORS.accent}40` }}>
+                  {s.label}{isDefault ? " ★" : ""}
+                </span>
+              );
+            })}
           </div>
           {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✓ Sauvegarder</div>}
           <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
@@ -1930,7 +1953,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <DerivPillsEditor configKey="derivFinancingBanks" label="Financing Banks" icon="🏦" description="Banques de financement disponibles pour les comptes de trading" config={config} updateField={updateField} />
 
           {/* ── Account Type ── */}
-          <AccountTypePillsEditor config={config} updateField={updateField} />
+          <AccountTypePillsEditor config={config} updateField={updateField} defaultKey="derivDefaultAccountType" onSetDefault={v => updateField("derivDefaultAccountType", v)} />
 
           <DerivOpStatusEditor config={config} updateField={updateField} />
 
@@ -1938,7 +1961,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
           <DerivPillsEditor configKey="derivOpTypes" label="Operation Types" icon="🔁" description="Types d'opérations disponibles dans la modale (Hedging, Rolling…)" config={config} updateField={updateField} defaultKey="derivOpTypeDefault" onSetDefault={v => updateField("derivOpTypeDefault", v)} />
 
-          <DerivPillsEditor configKey="derivExchanges" label="Exchanges" icon="🏛" description="Bourses disponibles pour les opérations (CME, Euronext…)" config={config} updateField={updateField} />
+          <DerivPillsEditor configKey="derivExchanges" label="Exchanges" icon="🏛" description="Bourses disponibles pour les opérations (CME, Euronext…)" config={config} updateField={updateField} defaultKey="derivDefaultExchange" onSetDefault={v => updateField("derivDefaultExchange", v)} />
 
           <DerivProductEditor config={config} />
 
@@ -2356,9 +2379,14 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       Sociétés ayant le rôle <span style={{ color: COLORS.orange, fontWeight: 700 }}>Financial Broker</span> — gérez-les dans la section <span style={{ color: COLORS.accent, fontWeight: 600 }}>Companies</span>
                     </div>
                   </div>
-                  <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 4 }}>
-                    {financialBrokers.length} broker{financialBrokers.length !== 1 ? "s" : ""}
-                  </span>
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 400, marginRight: 8 }}>
+                    {financialBrokers.map(c => (
+                      <span key={c.id} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: COLORS.bg, color: COLORS.text, border: `1px solid ${COLORS.border}` }}>
+                        {c.name}
+                      </span>
+                    ))}
+                    {financialBrokers.length === 0 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>Aucun broker</span>}
+                  </div>
                   <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expandedFinancialBrokers ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
                 </div>
                 {expandedFinancialBrokers && (

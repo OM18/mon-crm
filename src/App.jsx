@@ -1738,13 +1738,60 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           </div>
 
           {/* ── Account Type ── */}
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
-            <FieldEditor
-              fieldDef={DERIV_FIELD_DEFINITIONS.find(f => f.key === "derivAccountTypes")}
-              values={Array.isArray(config["derivAccountTypes"]) ? config["derivAccountTypes"] : []}
-              onUpdate={updateField}
-            />
-          </div>
+          {(() => {
+            const items = Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : [];
+            const [newLabel, setNewLabel] = React.useState("");
+            const [newColor, setNewColor] = React.useState(COLORS.accent);
+            const PRESET_COLORS = [COLORS.green, COLORS.red, COLORS.blue, COLORS.orange, COLORS.purple, COLORS.gold, COLORS.accent];
+
+            const add = () => {
+              if (!newLabel.trim()) return;
+              const next = [...items, { value: newLabel.trim().toLowerCase().replace(/\s+/g, "_"), label: newLabel.trim(), color: newColor }];
+              updateField("derivAccountTypes", next);
+              setNewLabel("");
+            };
+            const remove = (idx) => updateField("derivAccountTypes", items.filter((_, i) => i !== idx));
+
+            return (
+              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ padding: "16px 20px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 12, background: `${COLORS.purple}08` }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.purple}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🗂</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>Account Types</div>
+                    <div style={{ fontSize: 12, color: COLORS.textSub }}>Types de compte disponibles pour les opérations sur dérivés</div>
+                  </div>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}` }}>{items.length} valeur{items.length !== 1 ? "s" : ""}</span>
+                </div>
+                <div style={{ padding: "16px 20px" }}>
+                  {/* Existing pills */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: items.length > 0 ? 16 : 0 }}>
+                    {items.map((opt, idx) => (
+                      <div key={idx} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: `1.5px solid ${opt.color || COLORS.accent}`, background: `${opt.color || COLORS.accent}18` }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: opt.color || COLORS.accent }}>{opt.label}</span>
+                        <span onClick={() => remove(idx)} style={{ cursor: "pointer", color: opt.color || COLORS.accent, fontSize: 14, opacity: 0.7, lineHeight: 1 }}
+                          onMouseOver={e => e.currentTarget.style.opacity = 1}
+                          onMouseOut={e => e.currentTarget.style.opacity = 0.7}>×</span>
+                      </div>
+                    ))}
+                    {items.length === 0 && <span style={{ fontSize: 12, color: COLORS.textMuted }}>Aucune valeur — ajoutez-en ci-dessous</span>}
+                  </div>
+                  {/* Add form */}
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "12px 14px", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10 }}>
+                    <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
+                      placeholder="ex: Arbitrage…"
+                      style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+                    <div style={{ display: "flex", gap: 5 }}>
+                      {PRESET_COLORS.map(c => (
+                        <div key={c} onClick={() => setNewColor(c)}
+                          style={{ width: 20, height: 20, borderRadius: "50%", background: c, cursor: "pointer", border: newColor === c ? "2px solid #fff" : "2px solid transparent", outline: newColor === c ? `2px solid ${c}` : "none", flexShrink: 0 }} />
+                      ))}
+                    </div>
+                    <Btn onClick={add} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 12, flexShrink: 0 }}>+ Ajouter</Btn>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <DerivOpStatusEditor config={config} updateField={updateField} />

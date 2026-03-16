@@ -189,6 +189,8 @@ const DEFAULT_CONFIG = {
   ],
   derivOpStatusDefault: "",
   derivAccountTypes: {},
+  derivDefaultFinancingBank: "",
+  derivDefaultAccountType: "",
   derivBusinessUnits: [],
   derivBusinessUnitDefault: "",
   derivDefaultBroker: "",
@@ -1388,190 +1390,9 @@ const UnderlyingOriginEditor = ({ config, updateField, setAdminTab }) => {
   );
 };
 
-// ─── ACCOUNT FINANCING BANK BLOCK ────────────────────────────
-const AccountFinancingBankBlock = ({ derivAccounts, companies }) => {
-  const EMPTY = { id: null, accountId: "", bankId: "" };
-  const [list, setList] = useState([]);
-  const [form, setForm] = useState(EMPTY);
-  const [editId, setEditId] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
-    supabase.from('deriv_account_banks').select('*').then(({ data }) => {
-      if (data?.length) setList(data.map(r => r.data ?? r));
-    });
-  }, []);
 
-  const bankCompanies = (companies || []).filter(c => (c.roles || []).some(r => r === "Bank" || r?.toLowerCase() === "bank"));
 
-  const save = async () => {
-    if (!form.accountId || !form.bankId) return;
-    const item = { ...form, id: editId || Date.now() };
-    const updated = editId ? list.map(x => x.id === editId ? item : x) : [...list, item];
-    setList(updated);
-    await supabase.from('deriv_account_banks').delete().neq('id', 0);
-    for (const x of updated) await supabase.from('deriv_account_banks').insert({ data: x });
-    setForm(EMPTY); setEditId(null); setShowForm(false);
-  };
-
-  const del = async (id) => {
-    const updated = list.filter(x => x.id !== id);
-    setList(updated);
-    await supabase.from('deriv_account_banks').delete().neq('id', 0);
-    for (const x of updated) await supabase.from('deriv_account_banks').insert({ data: x });
-  };
-
-  const getAccountLabel = (id) => derivAccounts.find(a => a.id === id || a.accountNumber === id)?.accountNumber || id || "—";
-  const getBankLabel = (id) => (companies || []).find(c => c.id === id || c.name === id)?.name || id || "—";
-
-  return (
-    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
-      <div onClick={() => setExpanded(e => !e)} style={{ padding: "18px 24px", borderBottom: expanded ? `1px solid ${COLORS.border}` : "none", display: "flex", alignItems: "center", gap: 14, background: `${COLORS.blue}08`, cursor: "pointer", userSelect: "none" }}
-        onMouseOver={e => e.currentTarget.style.background = `${COLORS.blue}14`}
-        onMouseOut={e => e.currentTarget.style.background = `${COLORS.blue}08`}>
-        <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏦</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Account Financing Bank</div>
-          <div style={{ fontSize: 12, color: COLORS.textSub }}>Associez une banque de financement à chaque compte de trading</div>
-        </div>
-        <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 8 }}>{list.length} entrée{list.length !== 1 ? "s" : ""}</span>
-        <Btn onClick={e => { e.stopPropagation(); setForm(EMPTY); setEditId(null); setShowForm(true); if (!expanded) setExpanded(true); }} style={{ padding: "7px 14px", fontSize: 13 }}>+ Ajouter</Btn>
-        <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)", marginLeft: 4 }}>▾</span>
-      </div>
-
-      {expanded && (
-        <div style={{ padding: "20px 24px" }}>
-          {showForm && (
-            <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 18, marginBottom: 16 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ACCOUNT <span style={{ color: COLORS.red }}>*</span></label>
-                  <select value={form.accountId} onChange={e => setForm(f => ({ ...f, accountId: e.target.value }))}
-                    style={{ background: COLORS.card, border: `1px solid ${!form.accountId ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.accountId ? COLORS.text : COLORS.textMuted, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
-                    <option value="">— Sélectionner un compte —</option>
-                    {derivAccounts.map(a => <option key={a.id} value={a.accountNumber}>{a.accountNumber}</option>)}
-                  </select>
-                  {derivAccounts.length === 0 && <span style={{ fontSize: 11, color: COLORS.orange }}>💡 Aucun compte — créez-en dans le bloc Accounts</span>}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>FINANCING BANK <span style={{ color: COLORS.red }}>*</span></label>
-                  <select value={form.bankId} onChange={e => setForm(f => ({ ...f, bankId: e.target.value }))}
-                    style={{ background: COLORS.card, border: `1px solid ${!form.bankId ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.bankId ? COLORS.text : COLORS.textMuted, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
-                    <option value="">— Sélectionner une banque —</option>
-                    {bankCompanies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                  </select>
-                  {bankCompanies.length === 0 && <span style={{ fontSize: 11, color: COLORS.orange }}>💡 Aucune company avec le rôle "Bank" — ajoutez-en dans Companies</span>}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
-                <Btn variant="secondary" onClick={() => { setShowForm(false); setForm(EMPTY); setEditId(null); }}>Annuler</Btn>
-                <Btn onClick={save} disabled={!form.accountId || !form.bankId}>Enregistrer</Btn>
-              </div>
-            </div>
-          )}
-
-          {list.length === 0 && !showForm && (
-            <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 32, fontSize: 13 }}>Aucune association — cliquez sur "+ Ajouter"</div>
-          )}
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {list.map(item => (
-              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 14, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${COLORS.accent}18`, border: `1px solid ${COLORS.accent}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🏦</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{getAccountLabel(item.accountId)}</div>
-                  <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2 }}>🏛 {getBankLabel(item.bankId)}</div>
-                </div>
-                <button onClick={() => { setForm({ ...item }); setEditId(item.id); setShowForm(true); setExpanded(true); }}
-                  style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}30`, color: COLORS.accent, borderRadius: 7, padding: "5px 10px", cursor: "pointer", fontSize: 16 }}>✏️</button>
-                <button onClick={() => del(item.id)}
-                  style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}30`, color: COLORS.red, borderRadius: 7, padding: "5px 10px", cursor: "pointer", fontSize: 16 }}>🗑</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ─── ACCOUNT TYPE BLOCK ───────────────────────────────────────
-const ACCOUNT_TYPE_OPTIONS = [
-  { value: "hedging",          label: "Hedging",          color: COLORS.green },
-  { value: "speculative",      label: "Speculative",      color: COLORS.red },
-  { value: "global_hedging",   label: "Global Hedging",   color: COLORS.blue },
-];
-
-const AccountTypeBlock = ({ config, updateField }) => {
-  const [expanded, setExpanded] = useState(false);
-  // accountTypes stored in config as { accountNumber: string, type: string }[]
-  const [derivAccounts, setDerivAccounts] = useState([]);
-
-  useEffect(() => {
-    supabase.from('deriv_accounts').select('*').then(({ data }) => {
-      if (data?.length) setDerivAccounts(data.map(r => r.data ?? r));
-    });
-  }, []);
-
-  const accountTypes = config.derivAccountTypes || {};
-
-  const setType = (accountNumber, type) => {
-    const updated = { ...accountTypes, [accountNumber]: type };
-    updateField("derivAccountTypes", updated);
-  };
-
-  return (
-    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
-      <div onClick={() => setExpanded(e => !e)} style={{ padding: "18px 24px", borderBottom: expanded ? `1px solid ${COLORS.border}` : "none", display: "flex", alignItems: "center", gap: 14, background: `${COLORS.purple}08`, cursor: "pointer", userSelect: "none" }}
-        onMouseOver={e => e.currentTarget.style.background = `${COLORS.purple}14`}
-        onMouseOut={e => e.currentTarget.style.background = `${COLORS.purple}08`}>
-        <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.purple}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🗂</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Account Type</div>
-          <div style={{ fontSize: 12, color: COLORS.textSub }}>Définissez le type de chaque compte : Hedging, Speculative ou Global Hedging</div>
-        </div>
-        <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 8 }}>{Object.keys(accountTypes).length} configuré{Object.keys(accountTypes).length !== 1 ? "s" : ""}</span>
-        <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
-      </div>
-
-      {expanded && (
-        <div style={{ padding: "20px 24px" }}>
-          {derivAccounts.length === 0 && (
-            <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 32, fontSize: 13 }}>💡 Aucun compte — créez-en d'abord dans le bloc Accounts</div>
-          )}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {derivAccounts.map(a => {
-              const current = accountTypes[a.accountNumber] || "";
-              return (
-                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 16, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: `${COLORS.purple}18`, border: `1px solid ${COLORS.purple}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>💼</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace", minWidth: 120 }}>{a.accountNumber}</div>
-                  <div style={{ display: "flex", gap: 8, flex: 1 }}>
-                    {ACCOUNT_TYPE_OPTIONS.map(opt => {
-                      const active = current === opt.value;
-                      return (
-                        <div key={opt.value} onClick={() => setType(a.accountNumber, active ? "" : opt.value)}
-                          style={{ flex: 1, textAlign: "center", padding: "8px 6px", borderRadius: 8, cursor: "pointer", fontWeight: active ? 700 : 500, fontSize: 12, transition: "all 0.15s", border: `1.5px solid ${active ? opt.color : COLORS.border}`, background: active ? `${opt.color}18` : COLORS.card, color: active ? opt.color : COLORS.textSub, userSelect: "none" }}>
-                          {opt.label}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {current && (
-                    <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, fontWeight: 700, background: `${ACCOUNT_TYPE_OPTIONS.find(o => o.value === current)?.color || COLORS.textSub}20`, color: ACCOUNT_TYPE_OPTIONS.find(o => o.value === current)?.color || COLORS.textSub }}>
-                      {ACCOUNT_TYPE_OPTIONS.find(o => o.value === current)?.label}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
@@ -1591,7 +1412,7 @@ useEffect(() => {
   const [showEmpForm, setShowEmpForm] = useState(false);
 
   // ── Deriv Accounts state ──
-  const EMPTY_ACC = { accountNumber: "", businessUnit: "", currency: "EUR", initialAmount: "", isActive: true };
+  const EMPTY_ACC = { accountNumber: "", businessUnit: "", currency: "EUR", initialAmount: "", isActive: true, accountType: "", financingBank: "" };
   const [derivAccounts, setDerivAccounts] = useState([]);
 
 useEffect(() => {
@@ -1805,6 +1626,38 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                         onFocus={e => e.target.style.borderColor = COLORS.accent} onBlur={e => e.target.style.borderColor = String(accForm.initialAmount).trim() === "" ? COLORS.red + "60" : COLORS.border} />
                     </div>
                   </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
+                    {/* Account Type */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ACCOUNT TYPE</label>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {[{ value: "hedging", label: "Hedging", color: COLORS.green }, { value: "speculative", label: "Speculative", color: COLORS.red }, { value: "global_hedging", label: "Global Hedging", color: COLORS.blue }].map(opt => {
+                          const active = accForm.accountType === opt.value;
+                          return (
+                            <div key={opt.value} onClick={() => setAccForm(f => ({ ...f, accountType: active ? "" : opt.value }))}
+                              style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: 8, cursor: "pointer", fontWeight: active ? 700 : 500, fontSize: 11, transition: "all 0.15s", border: `1.5px solid ${active ? opt.color : COLORS.border}`, background: active ? `${opt.color}18` : COLORS.bg, color: active ? opt.color : COLORS.textSub, userSelect: "none" }}>
+                              {opt.label}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {/* Financing Bank */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>FINANCING BANK</label>
+                      <select value={accForm.financingBank} onChange={e => setAccForm(f => ({ ...f, financingBank: e.target.value }))}
+                        style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: accForm.financingBank ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                        <option value="">— Aucune —</option>
+                        {(companies || []).filter(c => (c.roles || []).some(r => r === "Bank" || r?.toLowerCase() === "bank")).map(c => (
+                          <option key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                      </select>
+                      {(companies || []).filter(c => (c.roles || []).some(r => r === "Bank" || r?.toLowerCase() === "bank")).length === 0 && (
+                        <span style={{ fontSize: 11, color: COLORS.orange }}>💡 Aucune company avec le rôle "Bank"</span>
+                      )}
+                    </div>
+                  </div>
+
                   <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12 }}>
                     <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>IS ACTIVE</label>
                     <div onClick={() => setAccForm({ ...accForm, isActive: !accForm.isActive })}
@@ -1841,6 +1694,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                           {bu && <span style={{ color: bu.color || COLORS.textSub }}>◈ {bu.label}</span>}
                           <span>💱 {a.currency}</span>
                           {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>}
+                          {a.accountType && (() => { const opt = [{ value: "hedging", label: "Hedging", color: COLORS.green }, { value: "speculative", label: "Speculative", color: COLORS.red }, { value: "global_hedging", label: "Global Hedging", color: COLORS.blue }].find(o => o.value === a.accountType); return opt ? <span style={{ color: opt.color, fontWeight: 700 }}>● {opt.label}</span> : null; })()}
+                          {a.financingBank && <span style={{ color: COLORS.accent }}>🏦 {a.financingBank}</span>}
                         </div>
                       </div>
                       <div onClick={() => { const updated = derivAccounts.map(x => x.id === a.id ? { ...x, isActive: !x.isActive } : x); setDerivAccounts(updated); safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts); }}
@@ -1859,10 +1714,65 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           </div>
 
           {/* ── Account Financing Bank ── */}
-          <AccountFinancingBankBlock derivAccounts={derivAccounts} companies={companies} />
+          {(() => {
+            const bankCompanies = (companies || []).filter(c => (c.roles || []).some(r => r === "Bank" || r?.toLowerCase() === "bank"));
+            const current = config.derivDefaultFinancingBank || "";
+            return (
+              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ padding: "18px 24px", display: "flex", alignItems: "center", gap: 14, background: `${COLORS.blue}08` }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏦</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Account Financing Bank</div>
+                    <div style={{ fontSize: 12, color: COLORS.textSub }}>Banque de financement par défaut pour les comptes de trading</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <div onClick={() => updateField("derivDefaultFinancingBank", "")}
+                      style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: !current ? 700 : 500, border: `1.5px solid ${!current ? COLORS.accent : COLORS.border}`, background: !current ? `${COLORS.accent}18` : COLORS.bg, color: !current ? COLORS.accent : COLORS.textSub, userSelect: "none" }}>
+                      — Aucune
+                    </div>
+                    {bankCompanies.map(c => {
+                      const active = current === c.name;
+                      return (
+                        <div key={c.id} onClick={() => updateField("derivDefaultFinancingBank", active ? "" : c.name)}
+                          style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 500, border: `1.5px solid ${active ? COLORS.blue : COLORS.border}`, background: active ? `${COLORS.blue}18` : COLORS.bg, color: active ? COLORS.blue : COLORS.textSub, userSelect: "none" }}>
+                          {active && "✓ "}{c.name}
+                        </div>
+                      );
+                    })}
+                    {bankCompanies.length === 0 && <span style={{ fontSize: 12, color: COLORS.orange }}>💡 Ajoutez des companies avec le rôle "Bank"</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── Account Type ── */}
-          <AccountTypeBlock config={config} updateField={updateField} />
+          {(() => {
+            const TYPE_OPTS = [{ value: "hedging", label: "Hedging", color: COLORS.green }, { value: "speculative", label: "Speculative", color: COLORS.red }, { value: "global_hedging", label: "Global Hedging", color: COLORS.blue }];
+            const current = config.derivDefaultAccountType || "";
+            return (
+              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ padding: "18px 24px", display: "flex", alignItems: "center", gap: 14, background: `${COLORS.purple}08` }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.purple}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🗂</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Account Type</div>
+                    <div style={{ fontSize: 12, color: COLORS.textSub }}>Type de compte par défaut pour les opérations sur dérivés</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {TYPE_OPTS.map(opt => {
+                      const active = current === opt.value;
+                      return (
+                        <div key={opt.value} onClick={() => updateField("derivDefaultAccountType", active ? "" : opt.value)}
+                          style={{ padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 500, border: `1.5px solid ${active ? opt.color : COLORS.border}`, background: active ? `${opt.color}18` : COLORS.bg, color: active ? opt.color : COLORS.textSub, userSelect: "none" }}>
+                          {active && "✓ "}{opt.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <DerivOpStatusEditor config={config} updateField={updateField} />

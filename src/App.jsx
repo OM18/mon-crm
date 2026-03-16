@@ -6263,16 +6263,29 @@ export default function CRM() {
 
 
   useEffect(() => {
+    async function loadAllPages(table) {
+      const PAGE = 1000;
+      let all = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase.from(table).select('data').range(from, from + PAGE - 1);
+        if (error || !data || data.length === 0) break;
+        all = [...all, ...data.map(r => r.data ?? r)];
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      return all;
+    }
+
     async function loadData() {
-      const { data: c } = await supabase.from('contacts').select('data');
-      if (c?.length) setContacts(c.map(r => r.data));
-
-      const { data: co } = await supabase.from('companies').select('data');
-      if (co?.length) setCompanies(co.map(r => r.data));
-
-      const { data: t } = await supabase.from('tasks').select('data');
-      if (t?.length) setTasks(t.map(r => r.data));
-
+      const [contacts, companies, tasks] = await Promise.all([
+        loadAllPages('contacts'),
+        loadAllPages('companies'),
+        loadAllPages('tasks'),
+      ]);
+      if (contacts.length) setContacts(contacts);
+      if (companies.length) setCompanies(companies);
+      if (tasks.length) setTasks(tasks);
       dataLoaded.current = true;
     }
     loadData();

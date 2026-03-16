@@ -2562,6 +2562,14 @@ const g = guessField(h, fieldMap);  if (g && !Object.values(autoMap).includes(g)
     foodFeed: { configKey: "foodFeed", label: "Food / Feed" },
   };
 
+  // For derivatives: fields that reference config lists or admin-managed tables
+  const DERIV_FIELD_CONFIG_MAP = {
+    type:         { configKey: "derivInstrumentTypes", label: "Instrument Type",  getValue: (v, cfg) => cfg.derivInstrumentTypes?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.label },
+    opType:       { configKey: "derivOpTypes",         label: "Operation Type",   getValue: (v, cfg) => cfg.derivOpTypes?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.label },
+    exchange:     { configKey: "derivExchanges",       label: "Exchange",         getValue: (v, cfg) => cfg.derivExchanges?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.value },
+    businessUnit: { configKey: "businessUnit",         label: "Business Unit",    getValue: (v, cfg) => cfg.businessUnit?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.value },
+  };
+
   const mapToConfigValue = (configKey, val) => {
     if (!val) return null;
     const normalize = s => s.toLowerCase().replace(/_/g, " ").trim();
@@ -2672,6 +2680,34 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
         obj.internalDeal = String(obj.internalDeal || "").toLowerCase() === "true";
         // Normalize status
         if (obj.status) obj.status = obj.status.toString().toUpperCase().trim();
+        // Validate config-linked fields
+        Object.entries(DERIV_FIELD_CONFIG_MAP).forEach(([fieldKey, { configKey, label, getValue }]) => {
+          const val = obj[fieldKey];
+          if (!val) return;
+          const found = getValue(val, config);
+          if (!found) {
+            const key = `${configKey}:${val}`;
+            if (!unknowns[key]) unknowns[key] = { fieldKey, configKey, fieldLabel: label, value: val };
+          }
+        });
+        // Validate account against deriv_accounts (loaded separately — check by raw string match)
+        if (obj.account) {
+          const key = `derivAccount:${obj.account}`;
+          if (!unknowns[key]) unknowns[key] = { fieldKey: "account", configKey: "derivAccount", fieldLabel: "Account Number", value: obj.account, infoOnly: true };
+        }
+        // Validate underlying/instrument against derivProducts
+        if (obj.underlying) {
+          const found = (config.derivProducts || []).find(p => p.label?.toLowerCase() === obj.underlying?.toLowerCase() || p.value?.toLowerCase() === obj.underlying?.toLowerCase());
+          if (!found) {
+            const key = `derivProducts:${obj.underlying}`;
+            if (!unknowns[key]) unknowns[key] = { fieldKey: "underlying", configKey: "derivProducts", fieldLabel: "Instrument (Underlying)", value: obj.underlying };
+          }
+        }
+        // Validate broker against derivDefaultBroker / companies
+        if (obj.broker) {
+          const key = `derivBroker:${obj.broker}`;
+          if (!unknowns[key]) unknowns[key] = { fieldKey: "broker", configKey: "derivBroker", fieldLabel: "Broker", value: obj.broker, infoOnly: true };
+        }
       }
       return obj;
     }).filter(o => {
@@ -2729,7 +2765,7 @@ if (Array.isArray(resolved.contractsCurrency)) {
     return finalDecisions[key] === "add" ? v : null;
   }).filter(Boolean);
 }
-      } else {
+      } else if (type === "contacts") {
         const val = resolved.status;
         if (val) {
           const mapped = mapToConfigValue("activityStatus", val);
@@ -2739,6 +2775,31 @@ if (Array.isArray(resolved.contractsCurrency)) {
             resolved.status = finalDecisions[key] === "add"
               ? (mapToConfigValue("activityStatus", val) || config.activityStatus[0]?.value || "")
               : (config.activityStatus[0]?.value || "");
+          }
+        }
+      } else if (type === "derivatives") {
+        // Apply decisions for config-linked fields
+        Object.entries(DERIV_FIELD_CONFIG_MAP).forEach(([fieldKey, { configKey, getValue }]) => {
+          const val = resolved[fieldKey];
+          if (!val) return;
+          const found = getValue(val, config);
+          if (found) {
+            resolved[fieldKey] = found;
+          } else {
+            const key = `${configKey}:${val}`;
+            const decision = finalDecisions[key];
+            resolved[fieldKey] = decision === "add" ? val : "";
+          }
+        });
+        // underlying
+        if (resolved.underlying) {
+          const found = (config.derivProducts || []).find(p => p.label?.toLowerCase() === resolved.underlying?.toLowerCase() || p.value?.toLowerCase() === resolved.underlying?.toLowerCase());
+          if (found) {
+            resolved.underlying = found.value || found.label;
+          } else {
+            const key = `derivProducts:${resolved.underlying}`;
+            const decision = finalDecisions[key];
+            resolved.underlying = decision === "add" ? resolved.underlying : "";
           }
         }
       }
@@ -2777,7 +2838,7 @@ const newItem = { value: useLabel ? current.value.toUpperCase() : isCountry ? cu
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 700, maxHeight: "90vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 20, color: COLORS.text, fontFamily: "'Inter', sans-serif" }}>Import Excel — {type === "companies" ? "Companies" : "Contacts"}</h2>
+            <h2 style={{ margin: 0, fontSize: 20, color: COLORS.text, fontFamily: "'Inter', sans-serif" }}>Import Excel — {type === "companies" ? "Companies" : type === "derivatives" ? "Derivatives" : "Contacts"}</h2>
             <p style={{ margin: "4px 0 0", fontSize: 13, color: COLORS.textSub }}>Formats acceptés : .xlsx, .xls, .csv</p>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
@@ -2913,7 +2974,7 @@ const newItem = { value: useLabel ? current.value.toUpperCase() : isCountry ? cu
               </table>
             </div>
             <div style={{ marginTop: 16, padding: "10px 14px", background: `${COLORS.green}12`, border: `1px solid ${COLORS.green}30`, borderRadius: 8, fontSize: 13, color: COLORS.green }}>
-              ✓ {rawRows.filter(r => r[Object.keys(mapping).find(k => mapping[k] === "name")]?.toString()).length} entrées valides
+              ✓ {rawRows.length} lignes prêtes à l'import
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end" }}>
               <Btn variant="secondary" onClick={() => setStep("mapping")}>← Modifier</Btn>
@@ -2936,18 +2997,37 @@ const newItem = { value: useLabel ? current.value.toUpperCase() : isCountry ? cu
             <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.gold}40`, borderRadius: 16, padding: 28, textAlign: "center" }}>
               <div style={{ fontSize: 13, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, marginBottom: 10 }}>CHAMP : {currentItem.fieldLabel.toUpperCase()}</div>
               <div style={{ fontSize: 28, fontWeight: 800, color: COLORS.gold, marginBottom: 10, fontFamily: "'Inter', sans-serif" }}>"{currentItem.value}"</div>
-              <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 28 }}>
-                Cette valeur n&#39;existe pas dans l&#39;Admin Panel.<br />
-                Voulez-vous l'intégrer dans la liste <strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong> ?
-              </div>
-              <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-                <button onClick={() => handleDecision("skip")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                  ✗ Ne pas intégrer
-                </button>
-                <button onClick={() => handleDecision("add")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.green}20`, border: `1.5px solid ${COLORS.green}60`, color: COLORS.green, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                  ✓ Intégrer dans l&#39;Admin Panel
-                </button>
-              </div>
+              {currentItem.infoOnly ? (
+                <>
+                  <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 28 }}>
+                    Cette valeur (<strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong>) sera importée telle quelle.<br />
+                    <span style={{ color: COLORS.orange }}>⚠ Vérifiez qu'elle correspond à une entrée existante dans l'Admin Panel.</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                    <button onClick={() => handleDecision("skip")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                      ✗ Ignorer ce champ
+                    </button>
+                    <button onClick={() => handleDecision("add")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.green}20`, border: `1.5px solid ${COLORS.green}60`, color: COLORS.green, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                      ✓ Importer tel quel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 28 }}>
+                    Cette valeur n&#39;existe pas dans l&#39;Admin Panel.<br />
+                    Voulez-vous l'intégrer dans la liste <strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong> ?
+                  </div>
+                  <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                    <button onClick={() => handleDecision("skip")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                      ✗ Ne pas intégrer
+                    </button>
+                    <button onClick={() => handleDecision("add")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.green}20`, border: `1.5px solid ${COLORS.green}60`, color: COLORS.green, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                      ✓ Intégrer dans l&#39;Admin Panel
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -3648,6 +3728,16 @@ return (
               </div>
             )}
           </div>
+          {companies.length > 0 && (
+            <button onClick={async () => {
+              if (window.confirm(`⚠️ Supprimer les ${companies.length} companies ? Cette action est irréversible.`)) {
+                await supabase.from('companies').delete().neq('id', 0);
+                setCompanies([]);
+              }
+            }} style={{ background: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: "10px 14px", letterSpacing: 0.3, height: "46px" }}>
+              🗑 Effacer tout ({companies.length})
+            </button>
+          )}
           <div onClick={() => setShowImport(true)} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent" }}><img src="/logoxl.png" style={{ width: 32, height: 32, objectFit: "contain" }} /></div>
           <button onClick={openNew} style={{ background: COLORS.accent, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 14px", lineHeight: "1", height: "46px", marginTop: 3 }}>+ NEW COMPANY</button>
         </div>
@@ -4794,6 +4884,17 @@ const setOps = async (val) => {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Derivatives</h1>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {ops.length > 0 && (
+              <button onClick={async () => {
+                if (window.confirm(`⚠️ Supprimer les ${ops.length} opérations ? Cette action est irréversible.`)) {
+                  await supabase.from('derivatives').delete().neq('id', 0);
+                  setOpsRaw([]);
+                  setSelected(null);
+                }
+              }} style={{ background: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: "10px 14px", letterSpacing: 0.3 }}>
+                🗑 Effacer tout ({ops.length})
+              </button>
+            )}
             <div onClick={() => setShowImport(true)} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent" }}>
               <img src="/logoxl.png" style={{ width: 32, height: 32, objectFit: "contain" }} />
             </div>

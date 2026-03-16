@@ -25,6 +25,24 @@ const safeSave = async (table, items, setStateFn, prevItems) => {
   }
 };
 
+// ─── LARGE TABLE SAVE ────────────────────────────────────────
+// For large datasets (companies, contacts) — uses smaller chunks
+// and sequential inserts to stay within Supabase payload limits
+const saveLargeTable = async (table, items) => {
+  if (!items || items.length === 0) return;
+  try {
+    await supabase.from(table).delete().neq('id', 0);
+    const CHUNK = 50; // smaller chunks for large payloads
+    for (let i = 0; i < items.length; i += CHUNK) {
+      const chunk = items.slice(i, i + CHUNK).map(item => ({ data: item }));
+      const { error } = await supabase.from(table).insert(chunk);
+      if (error) console.error(`[saveLargeTable] chunk error on ${table}:`, error);
+    }
+  } catch (err) {
+    console.error(`[saveLargeTable] Error saving ${table}:`, err);
+  }
+};
+
 // ─── COLORS ───────────────────────────────────────────────────
 const COLORS = {
   bg: "#0B0B0B",
@@ -3848,12 +3866,18 @@ const sel = selected ? filtered.find(c => c.id === selected) : null;
 
   const save = () => {
     const data = { ...form, tags: form.tags.split(",").map(t => t.trim()).filter(Boolean), avatar: form.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase(), revenue: Number(form.revenue) || 0, roles: form.roles || [] };
-    if (editCompany) setCompanies(companies.map(c => c.id === editCompany.id ? { ...c, ...data } : c));
-    else setCompanies([...companies, { ...data, id: Date.now(), ref: generateCompanyRef() }]);
+    const updated = editCompany ? companies.map(c => c.id === editCompany.id ? { ...c, ...data } : c) : [...companies, { ...data, id: Date.now(), ref: generateCompanyRef() }];
+    setCompanies(updated);
+    saveLargeTable('companies', updated);
     setShowForm(false); setSelected(null);
   };
 
-  const del = (id) => { setCompanies(companies.filter(c => c.id !== id)); setSelected(null); };
+  const del = (id) => {
+    const updated = companies.filter(c => c.id !== id);
+    setCompanies(updated);
+    saveLargeTable('companies', updated);
+    setSelected(null);
+  };
 
   const selContacts = sel ? contacts.filter(c => c.companyId === sel.id) : [];
 
@@ -4265,7 +4289,14 @@ return (
           </div>
         </Modal>
       )}
-      {showImport && <ExcelImportModal type="companies" onClose={() => setShowImport(false)} onImport={(items) => setCompanies(prev => { const ex = new Set(prev.map(c => c.name?.toLowerCase())); return [...prev, ...items.filter(i => !ex.has(i.name?.toLowerCase()))]; })} />}
+      {showImport && <ExcelImportModal type="companies" onClose={() => setShowImport(false)} onImport={(items) => {
+  setCompanies(prev => {
+    const ex = new Set(prev.map(c => c.name?.toLowerCase()));
+    const next = [...prev, ...items.filter(i => !ex.has(i.name?.toLowerCase()))];
+    saveLargeTable('companies', next);
+    return next;
+  });
+}} />}
     </div>
   );
 };
@@ -4500,12 +4531,18 @@ const Contacts = ({ contacts, setContacts, companies }) => {
       revenue: Number(form.revenue) || 0,
       lastContact: editContact?.lastContact || new Date().toISOString().split("T")[0],
     };
-    if (editContact) setContacts(contacts.map(c => c.id === editContact.id ? { ...c, ...data } : c));
-    else setContacts([...contacts, { ...data, id: Date.now() }]);
+    const updated = editContact ? contacts.map(c => c.id === editContact.id ? { ...c, ...data } : c) : [...contacts, { ...data, id: Date.now() }];
+    setContacts(updated);
+    saveLargeTable('contacts', updated);
     setShowForm(false); setSelected(null);
   };
 
-  const del = (id) => { setContacts(contacts.filter(c => c.id !== id)); setSelected(null); };
+  const del = (id) => {
+    const updated = contacts.filter(c => c.id !== id);
+    setContacts(updated);
+    saveLargeTable('contacts', updated);
+    setSelected(null);
+  };
   const sel = selected ? contacts.find(c => c.id === selected) : null;
   const selCompany = sel ? companies.find(co => co.id === sel.companyId) : null;
   const getStatusCfg = (v) => config.activityStatus.find(s => s.value === v) || { label: v || "—", color: COLORS.textSub };
@@ -4820,7 +4857,14 @@ const Contacts = ({ contacts, setContacts, companies }) => {
           </div>
         </Modal>
       )}
-      {showImport && <ExcelImportModal type="contacts" onClose={() => setShowImport(false)} onImport={(items) => setContacts(prev => { const ex = new Set(prev.map(c => c.email?.toLowerCase()).filter(Boolean)); return [...prev, ...items.filter(i => !i.email || !ex.has(i.email?.toLowerCase()))]; })} />}
+      {showImport && <ExcelImportModal type="contacts" onClose={() => setShowImport(false)} onImport={(items) => {
+  setContacts(prev => {
+    const ex = new Set(prev.map(c => c.email?.toLowerCase()).filter(Boolean));
+    const next = [...prev, ...items.filter(i => !i.email || !ex.has(i.email?.toLowerCase()))];
+    saveLargeTable('contacts', next);
+    return next;
+  });
+}} />}
     </div>
   );
 };
@@ -6234,29 +6278,7 @@ export default function CRM() {
     loadData();
   }, []);
 
-  useEffect(() => {
-    if (!dataLoaded.current) return;
-    async function saveCompanies() {
-      await supabase.from('companies').delete().neq('id', 0);
-      const CHUNK = 100;
-      for (let i = 0; i < companies.length; i += CHUNK) {
-        await supabase.from('companies').insert(companies.slice(i, i + CHUNK).map(c => ({ data: c })));
-      }
-    }
-    saveCompanies();
-  }, [companies]);
-
-  useEffect(() => {
-    if (!dataLoaded.current) return;
-    async function saveContacts() {
-      await supabase.from('contacts').delete().neq('id', 0);
-      const CHUNK = 100;
-      for (let i = 0; i < contacts.length; i += CHUNK) {
-        await supabase.from('contacts').insert(contacts.slice(i, i + CHUNK).map(c => ({ data: c })));
-      }
-    }
-    saveContacts();
-  }, [contacts]);
+  // Companies and contacts are saved explicitly on each action (no auto-save to avoid overwrite issues with large datasets)
 
   useEffect(() => {
     async function saveTasks() {

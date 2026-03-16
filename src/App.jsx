@@ -5383,7 +5383,7 @@ const runFIFO = (bucketOps) => {
     const lots = parseP(op.quantity);
     const price = parseP(op.price);
     if (side === "BUY") {
-      queue.push({ ref: op.ref, lots, price, remaining: lots });
+      queue.push({ ref: op.ref, date: op.tradeDate || "—", lots, price, remaining: lots });
     } else if (side === "SELL") {
       let toClose = lots;
       while (toClose > 0 && queue.length > 0) {
@@ -5391,7 +5391,11 @@ const runFIFO = (bucketOps) => {
         const matched = Math.min(toClose, head.remaining);
         const pnl = (price - head.price) * matched;
         realizedPnl += pnl;
-        matches.push({ buyRef: head.ref, sellRef: op.ref, lots: matched, entryPrice: head.price, exitPrice: price, pnl });
+        matches.push({
+          buyRef: head.ref,  buyDate: head.date,
+          sellRef: op.ref,   sellDate: op.tradeDate || "—",
+          lots: matched, entryPrice: head.price, exitPrice: price, pnl,
+        });
         head.remaining -= matched;
         toClose -= matched;
         if (head.remaining <= 0) queue.shift();
@@ -5471,9 +5475,12 @@ const DerivativesDashboard = () => {
   const totalMatches = bucketResults.reduce((s, b) => s + b.matches.length, 0);
 
   const [expandedAccounts, setExpandedAccounts] = useState({});
+  const [expandedInstruments, setExpandedInstruments] = useState({});
   const toggle = (key) => setExpandedAccounts(p => ({ ...p, [key]: !p[key] }));
+  const toggleInst = (key) => setExpandedInstruments(p => ({ ...p, [key]: !p[key] }));
 
   const GRID = "32px 1fr 70px 70px 120px 90px 170px";
+  const MATCH_GRID = "1fr 1fr 1fr 1fr 100px 100px 100px 130px";
 
   const KpiCard = ({ label, value, sub, color }) => (
     <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 14, padding: "20px 24px" }}>
@@ -5568,32 +5575,86 @@ const DerivativesDashboard = () => {
 
               {expanded && (
                 <div style={{ background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
+                  {/* Instrument sub-header */}
                   <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "8px 20px 8px 52px", background: `${COLORS.tableHeader}66`, borderBottom: `1px solid ${COLORS.border}40` }}>
                     {["", "INSTRUMENT", "BUY", "SELL", "LOTS OUVERTS", "MATCHES", "P&L"].map((h, i) => (
                       <div key={i} style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.6, textAlign: i >= 2 ? "right" : "left" }}>{h}</div>
                     ))}
                   </div>
-                  {row.instruments.sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl)).map((inst, j) => (
-                    <div key={j} style={{ display: "grid", gridTemplateColumns: GRID, padding: "11px 20px 11px 52px", borderBottom: j < row.instruments.length - 1 ? `1px solid ${COLORS.border}30` : "none" }}>
-                      <div />
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: COLORS.accent, flexShrink: 0 }} />
-                        <span style={{ fontSize: 13, color: COLORS.text, fontWeight: 600 }}>{inst.instrument || "—"}</span>
-                      </div>
-                      <div style={{ textAlign: "right", fontSize: 12, color: COLORS.green, fontWeight: 600 }}>{inst.buyCount}</div>
-                      <div style={{ textAlign: "right", fontSize: 12, color: COLORS.red, fontWeight: 600 }}>{inst.sellCount}</div>
-                      <div style={{ textAlign: "right" }}>
-                        <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: inst.openLots > 0 ? COLORS.orange : COLORS.textMuted }}>{fmtLots(inst.openLots)}</span>
-                        {inst.openLots > 0 && inst.openAvgPrice > 0 && (
-                          <div style={{ fontSize: 10, color: COLORS.textMuted }}>avg @ {inst.openAvgPrice.toFixed(2)}</div>
+                  {row.instruments.sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl)).map((inst, j) => {
+                    const instKey = `${row.account}||${inst.instrument}`;
+                    const instExpanded = expandedInstruments[instKey];
+                    const hasMatches = inst.matches.length > 0;
+                    return (
+                      <div key={j}>
+                        {/* Instrument row — clickable if has matches */}
+                        <div
+                          onClick={() => hasMatches && toggleInst(instKey)}
+                          style={{ display: "grid", gridTemplateColumns: GRID, padding: "11px 20px 11px 52px", borderBottom: `1px solid ${COLORS.border}20`, cursor: hasMatches ? "pointer" : "default", transition: "background 0.12s" }}
+                          onMouseOver={e => { if (hasMatches) e.currentTarget.style.background = `${COLORS.accent}08`; }}
+                          onMouseOut={e => { e.currentTarget.style.background = "transparent"; }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {hasMatches && (
+                              <span style={{ fontSize: 9, color: COLORS.textMuted, display: "inline-block", transition: "transform 0.2s", transform: instExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: COLORS.accent, flexShrink: 0 }} />
+                            <span style={{ fontSize: 13, color: COLORS.text, fontWeight: 600 }}>{inst.instrument || "—"}</span>
+                            {hasMatches && <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 4 }}>Cliquez pour détailler</span>}
+                          </div>
+                          <div style={{ textAlign: "right", fontSize: 12, color: COLORS.green, fontWeight: 600 }}>{inst.buyCount}</div>
+                          <div style={{ textAlign: "right", fontSize: 12, color: COLORS.red, fontWeight: 600 }}>{inst.sellCount}</div>
+                          <div style={{ textAlign: "right" }}>
+                            <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: inst.openLots > 0 ? COLORS.orange : COLORS.textMuted }}>{fmtLots(inst.openLots)}</span>
+                            {inst.openLots > 0 && inst.openAvgPrice > 0 && (
+                              <div style={{ fontSize: 10, color: COLORS.textMuted }}>avg @ {inst.openAvgPrice.toFixed(2)}</div>
+                            )}
+                          </div>
+                          <div style={{ textAlign: "right", fontSize: 12, color: COLORS.textSub }}>{inst.matches.length}</div>
+                          <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: inst.sellCount > 0 ? pnlColor(inst.realizedPnl) : COLORS.textMuted }}>
+                            {inst.sellCount > 0 ? fmt(inst.realizedPnl) : "—"}
+                          </div>
+                        </div>
+
+                        {/* Matches detail drill-down */}
+                        {instExpanded && (
+                          <div style={{ background: `${COLORS.surface}`, borderBottom: `1px solid ${COLORS.border}30`, borderLeft: `3px solid ${COLORS.accent}40`, marginLeft: 52 }}>
+                            {/* Match table header */}
+                            <div style={{ display: "grid", gridTemplateColumns: MATCH_GRID, padding: "8px 16px", background: `${COLORS.tableHeader}AA`, borderBottom: `1px solid ${COLORS.border}40` }}>
+                              {["BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS MATCHÉS", "PRIX ENTRÉE", "PRIX SORTIE", "P&L"].map((h, i) => (
+                                <div key={i} style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.5, textAlign: i >= 4 ? "right" : "left" }}>{h}</div>
+                              ))}
+                            </div>
+                            {/* Match rows */}
+                            {inst.matches.map((m, k) => (
+                              <div key={k} style={{ display: "grid", gridTemplateColumns: MATCH_GRID, padding: "9px 16px", borderBottom: k < inst.matches.length - 1 ? `1px solid ${COLORS.border}20` : "none", background: k % 2 === 0 ? "transparent" : `${COLORS.card}40` }}>
+                                <div style={{ fontSize: 11, color: COLORS.green, fontFamily: "'DM Mono', monospace", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.buyRef || "—"}</div>
+                                <div style={{ fontSize: 11, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{m.buyDate}</div>
+                                <div style={{ fontSize: 11, color: COLORS.red, fontFamily: "'DM Mono', monospace", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.sellRef || "—"}</div>
+                                <div style={{ fontSize: 11, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{m.sellDate}</div>
+                                <div style={{ textAlign: "right", fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.text, fontWeight: 600 }}>{fmtLots(m.lots)}</div>
+                                <div style={{ textAlign: "right", fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{m.entryPrice.toFixed(2)}</div>
+                                <div style={{ textAlign: "right", fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{m.exitPrice.toFixed(2)}</div>
+                                <div style={{ textAlign: "right", fontSize: 13, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: pnlColor(m.pnl) }}>
+                                  {fmt(m.pnl)}
+                                </div>
+                              </div>
+                            ))}
+                            {/* Match subtotal */}
+                            <div style={{ display: "grid", gridTemplateColumns: MATCH_GRID, padding: "8px 16px", background: `${COLORS.accent}08`, borderTop: `1px solid ${COLORS.accent}25` }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.accent, gridColumn: "1 / 5" }}>SOUS-TOTAL {inst.instrument}</div>
+                              <div style={{ textAlign: "right", fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.text, fontWeight: 700 }}>{fmtLots(inst.matches.reduce((s, m) => s + m.lots, 0))}</div>
+                              <div />
+                              <div />
+                              <div style={{ textAlign: "right", fontSize: 13, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: pnlColor(inst.realizedPnl) }}>{fmt(inst.realizedPnl)}</div>
+                            </div>
+                          </div>
                         )}
                       </div>
-                      <div style={{ textAlign: "right", fontSize: 12, color: COLORS.textSub }}>{inst.matches.length}</div>
-                      <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: inst.sellCount > 0 ? pnlColor(inst.realizedPnl) : COLORS.textMuted }}>
-                        {inst.sellCount > 0 ? fmt(inst.realizedPnl) : "—"}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

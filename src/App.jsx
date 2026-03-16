@@ -3728,6 +3728,7 @@ return (
               </div>
             )}
           </div>
+          <div onClick={() => setShowImport(true)} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent" }}><img src="/logoxl.png" style={{ width: 32, height: 32, objectFit: "contain" }} /></div>
           {companies.length > 0 && (
             <button onClick={async () => {
               if (window.confirm(`⚠️ Supprimer les ${companies.length} companies ? Cette action est irréversible.`)) {
@@ -3738,7 +3739,6 @@ return (
               🗑 Effacer tout ({companies.length})
             </button>
           )}
-          <div onClick={() => setShowImport(true)} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent" }}><img src="/logoxl.png" style={{ width: 32, height: 32, objectFit: "contain" }} /></div>
           <button onClick={openNew} style={{ background: COLORS.accent, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 14px", lineHeight: "1", height: "46px", marginTop: 3 }}>+ NEW COMPANY</button>
         </div>
 
@@ -4277,6 +4277,16 @@ const Contacts = ({ contacts, setContacts, companies }) => {
           <div onClick={() => setShowImport(true)} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent" }}>
             <img src="/logoxl.png" style={{ width: 32, height: 32, objectFit: "contain" }} />
           </div>
+          {contacts.length > 0 && (
+            <button onClick={async () => {
+              if (window.confirm(`⚠️ Supprimer les ${contacts.length} contacts ? Cette action est irréversible.`)) {
+                await supabase.from('contacts').delete().neq('id', 0);
+                setContacts([]);
+              }
+            }} style={{ background: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: "10px 14px", letterSpacing: 0.3, height: "46px" }}>
+              🗑 Effacer tout ({contacts.length})
+            </button>
+          )}
           <button onClick={openNew} style={{ background: COLORS.accent, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 14px", lineHeight: "1", height: "46px", marginTop: 3 }}>NEW CONTACT</button>
         </div>
 
@@ -5963,21 +5973,9 @@ export default function CRM() {
     loadData();
   }, []);
 
-  useEffect(() => {
-    async function saveContacts() {
-      await supabase.from('contacts').delete().neq('id', 0);
-      for (const c of contacts) await supabase.from('contacts').insert({ data: c });
-    }
-    saveContacts();
-  }, [contacts]);
+  // Auto-save contacts removed — use explicit save actions
 
-  useEffect(() => {
-    async function saveCompanies() {
-      await supabase.from('companies').delete().neq('id', 0);
-      for (const c of companies) await supabase.from('companies').insert({ data: c });
-    }
-    saveCompanies();
-  }, [companies]);
+  // Auto-save companies removed — use explicit save actions or the delete button
 
   useEffect(() => {
     async function saveTasks() {

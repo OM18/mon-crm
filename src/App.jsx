@@ -5942,6 +5942,7 @@ export default function CRM() {
   const [companies, setCompanies] = useState([]);
   const [tasks, setTasks] = useState(initialTasks);
   const [page, setPage] = useState("dashboard");
+  const dataLoaded = useRef(false);
 
   useEffect(() => {
   async function initEmployees() {
@@ -5969,13 +5970,35 @@ export default function CRM() {
 
       const { data: t } = await supabase.from('tasks').select('data');
       if (t?.length) setTasks(t.map(r => r.data));
+
+      dataLoaded.current = true;
     }
     loadData();
   }, []);
 
-  // Auto-save contacts removed — use explicit save actions
+  useEffect(() => {
+    if (!dataLoaded.current) return;
+    async function saveCompanies() {
+      await supabase.from('companies').delete().neq('id', 0);
+      const CHUNK = 100;
+      for (let i = 0; i < companies.length; i += CHUNK) {
+        await supabase.from('companies').insert(companies.slice(i, i + CHUNK).map(c => ({ data: c })));
+      }
+    }
+    saveCompanies();
+  }, [companies]);
 
-  // Auto-save companies removed — use explicit save actions or the delete button
+  useEffect(() => {
+    if (!dataLoaded.current) return;
+    async function saveContacts() {
+      await supabase.from('contacts').delete().neq('id', 0);
+      const CHUNK = 100;
+      for (let i = 0; i < contacts.length; i += CHUNK) {
+        await supabase.from('contacts').insert(contacts.slice(i, i + CHUNK).map(c => ({ data: c })));
+      }
+    }
+    saveContacts();
+  }, [contacts]);
 
   useEffect(() => {
     async function saveTasks() {

@@ -1502,7 +1502,10 @@ useEffect(() => {
           <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Instruments</div>
           <div style={{ fontSize: 12, color: COLORS.textSub }}>Instruments dérivés disponibles (futures, options…)</div>
         </div>
-        <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 8 }}>{products.length} instrument{products.length !== 1 ? "s" : ""}</span>
+        <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 8 }}>
+          {products.filter(p => p.active !== false).length} actif{products.filter(p => p.active !== false).length !== 1 ? "s" : ""}
+          {products.filter(p => p.active === false).length > 0 && <span style={{ color: COLORS.textMuted }}> · {products.filter(p => p.active === false).length} inactif{products.filter(p => p.active === false).length !== 1 ? "s" : ""}</span>}
+        </span>
         <div onClick={e => { e.stopPropagation(); setShowImport(true); if (!expanded) setExpanded(true); }} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 12px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent", marginRight: 4 }} title="Importer depuis Excel"><img src="/logoxl.png" style={{ width: 22, height: 22, objectFit: "contain" }} /></div>
         <Btn onClick={e => { e.stopPropagation(); setForm(EMPTY_PROD); setInstrumentType(""); setEditId(null); setShowForm(true); if (!expanded) setExpanded(true); }} style={{ padding: "7px 14px", fontSize: 13 }}>+ Ajouter</Btn>
         <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)", marginLeft: 4 }}>▾</span>
@@ -1615,31 +1618,72 @@ useEffect(() => {
           <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 32, fontSize: 13 }}>Aucun instrument — cliquez sur "+ Ajouter" pour commencer</div>
         )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {products.map(p => (
-            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: `${COLORS.blue}18`, border: `1px solid ${COLORS.blue}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>🌾</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{p.label}</div>
-                <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 3, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <span style={{ color: COLORS.blue }}>🏛 {p.stoxxExchange}</span>
-                  {p.instrumentType && <span style={{ color: COLORS.blue, background: `${COLORS.blue}18`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.instrumentType}</span>}
-                  <span style={{ color: p.instrumentType?.toLowerCase().includes("option") ? COLORS.purple : COLORS.orange, background: p.instrumentType?.toLowerCase().includes("option") ? `${COLORS.purple}18` : `${COLORS.orange}18`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.instrumentType?.toLowerCase().includes("option") ? "Options" : "Futures"}</span>
-                  <span style={{ color: p.underlyingCategory === "commodity" ? COLORS.green : COLORS.gold, background: p.underlyingCategory === "commodity" ? `${COLORS.green}15` : `${COLORS.gold}15`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.underlyingCategory === "commodity" ? "Commodity" : "FX"}</span>
-                  <span>📦 {p.underlying}</span>
-                  {p.underlyingOrigin && <span style={{ color: COLORS.textSub }}>🌍 {p.underlyingOrigin}</span>}
-                  <span style={{ fontFamily: "'DM Mono', monospace" }}>×{p.volumeSizePerLot}{p.volumeUnit ? ` ${p.volumeUnit}` : ""}</span>
-                  <span style={{ color: COLORS.gold }}>💱 {p.currency}</span>
-                  {p.firstNoticeDay && <span>📅 FND: {p.firstNoticeDay}</span>}
-                  {p.lastTradingDate && <span>🔚 LTD: {p.lastTradingDate}</span>}
-                  {p.instrumentType?.toLowerCase() === "option" && p.expiryDate && <span style={{ color: COLORS.purple }}>⏱ EXP: {p.expiryDate}</span>}
+        {(() => {
+          const activeProds = products.filter(p => p.active !== false);
+          const inactiveProds = products.filter(p => p.active === false);
+
+          const toggleActive = async (prod) => {
+            const updated = products.map(p => p.id === prod.id ? { ...p, active: p.active === false ? true : false } : p);
+            setProducts(updated);
+            await safeSave('deriv_products', updated, setProducts, products);
+          };
+
+          const renderRow = (p) => {
+            const isInactive = p.active === false;
+            return (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: isInactive ? "transparent" : COLORS.bg, border: `1px solid ${isInactive ? COLORS.border : COLORS.border}`, borderRadius: 10, padding: "12px 16px", opacity: isInactive ? 0.55 : 1 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: isInactive ? COLORS.surface : `${COLORS.blue}18`, border: `1px solid ${isInactive ? COLORS.border : COLORS.blue + "30"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>🌾</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: isInactive ? COLORS.textMuted : COLORS.text }}>{p.label}</div>
+                  <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 3, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ color: COLORS.blue }}>🏛 {p.stoxxExchange}</span>
+                    {p.instrumentType && <span style={{ color: COLORS.blue, background: `${COLORS.blue}18`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.instrumentType}</span>}
+                    <span style={{ color: p.instrumentType?.toLowerCase().includes("option") ? COLORS.purple : COLORS.orange, background: p.instrumentType?.toLowerCase().includes("option") ? `${COLORS.purple}18` : `${COLORS.orange}18`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.instrumentType?.toLowerCase().includes("option") ? "Options" : "Futures"}</span>
+                    <span style={{ color: p.underlyingCategory === "commodity" ? COLORS.green : COLORS.gold, background: p.underlyingCategory === "commodity" ? `${COLORS.green}15` : `${COLORS.gold}15`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.underlyingCategory === "commodity" ? "Commodity" : "FX"}</span>
+                    <span>📦 {p.underlying}</span>
+                    {p.underlyingOrigin && <span style={{ color: COLORS.textSub }}>🌍 {p.underlyingOrigin}</span>}
+                    <span style={{ fontFamily: "'DM Mono', monospace" }}>×{p.volumeSizePerLot}{p.volumeUnit ? ` ${p.volumeUnit}` : ""}</span>
+                    <span style={{ color: COLORS.gold }}>💱 {p.currency}</span>
+                    {p.firstNoticeDay && <span>📅 FND: {p.firstNoticeDay}</span>}
+                    {p.lastTradingDate && <span>🔚 LTD: {p.lastTradingDate}</span>}
+                    {p.instrumentType?.toLowerCase() === "option" && p.expiryDate && <span style={{ color: COLORS.purple }}>⏱ EXP: {p.expiryDate}</span>}
+                  </div>
                 </div>
+                {/* Toggle active/inactive */}
+                <div onClick={() => toggleActive(p)} title={isInactive ? "Réactiver" : "Désactiver"}
+                  style={{ cursor: "pointer", flexShrink: 0, width: 36, height: 20, borderRadius: 10, background: isInactive ? COLORS.border : COLORS.green, border: `1px solid ${isInactive ? COLORS.textMuted : COLORS.green}`, position: "relative", transition: "background 0.2s" }}>
+                  <div style={{ position: "absolute", top: 2, left: isInactive ? 2 : 18, width: 14, height: 14, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0004" }} />
+                </div>
+                <button onClick={() => { setForm({ ...p }); setInstrumentType(p.instrumentType || ""); setEditId(p.id); setShowForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                <button onClick={() => remove(p.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
               </div>
-              <button onClick={() => { setForm({ ...p }); setInstrumentType(p.instrumentType || ""); setEditId(p.id); setShowForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
-              <button onClick={() => remove(p.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
+            );
+          };
+
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Active instruments */}
+              {activeProds.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {activeProds.map(renderRow)}
+                </div>
+              )}
+
+              {/* Inactive instruments */}
+              {inactiveProds.length > 0 && (
+                <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden" }}>
+                  <div style={{ padding: "8px 14px", background: COLORS.surface, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 1 }}>INACTIFS</span>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "1px 7px", borderRadius: 4, border: `1px solid ${COLORS.border}` }}>{inactiveProds.length}</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 10px" }}>
+                    {inactiveProds.map(renderRow)}
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
-        </div>
+          );
+        })()}
       </div>}
       {showImport && (
         <DerivProductImportModal

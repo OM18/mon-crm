@@ -2617,6 +2617,7 @@ const Dashboard = ({ contacts, companies, tasks }) => {
 
 // ─── EXCEL IMPORT ─────────────────────────────────────────────
 const COMPANY_FIELD_MAP = {
+  "id": ["id", "company id", "companyid", "identifiant"],
   "name": ["name", "company name", "société", "societe", "company"],
   "website": ["website", "site", "url", "site web"],
   "city": ["city", "ville"],
@@ -2738,6 +2739,7 @@ const ExcelImportModal = ({ onClose, onImport, type }) => {
 
   const IMPORT_GUIDE = {
   companies: [
+    { field: "id", format: "Nombre", note: "Optionnel — si absent, généré automatiquement" },
     { field: "name", format: "Texte", note: "" },
     { field: "legalName", format: "Texte", note: "" },
     { field: "companyType", format: "Texte", note: "" },
@@ -2868,8 +2870,11 @@ const g = guessField(h, fieldMap);  if (g && !Object.values(autoMap).includes(g)
     setImporting(true);
     const unknowns = {};
     const items = rawRows.map((row, i) => {
-      const obj = { id: Date.now() + i };
+      const obj = {};
       Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[ci]?.toString() || ""; });
+      // Use imported id if provided and valid, otherwise auto-generate
+      const importedId = obj.id ? Number(obj.id) : NaN;
+      obj.id = (!isNaN(importedId) && importedId > 0) ? importedId : Date.now() + i;
       if (type === "companies") {
         obj.avatar = (obj.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
         obj.tags = []; obj.revenue = Number(obj.revenue) || 0;

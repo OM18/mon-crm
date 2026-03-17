@@ -2347,7 +2347,7 @@ useEffect(() => {
   const [showEmpForm, setShowEmpForm] = useState(false);
 
   // ── Deriv Accounts state ──
-  const EMPTY_ACC = () => ({ accountNumber: "", businessUnit: "", currency: "EUR", initialAmount: "", isActive: true, accountType: config.derivDefaultAccountType || "", financingBank: "" });
+  const EMPTY_ACC = () => ({ accountNumber: "", businessUnit: "", currency: "EUR", initialAmount: "", isActive: true, accountType: config.derivDefaultAccountType || "", financingBank: "", contracts: "", trade: "" });
   const [derivAccounts, setDerivAccounts] = useState([]);
 
 useEffect(() => {
@@ -2609,6 +2609,19 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                     </div>
                   </div>
 
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>CONTRACTS</label>
+                      <input value={accForm.contracts || ""} onChange={e => setAccForm(f => ({ ...f, contracts: e.target.value }))} placeholder="ex: CME-001"
+                        style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>TRADE</label>
+                      <input value={accForm.trade || ""} onChange={e => setAccForm(f => ({ ...f, trade: e.target.value }))} placeholder="ex: TRD-001"
+                        style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+                    </div>
+                  </div>
+
                   <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12 }}>
                     <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>IS ACTIVE</label>
                     <div onClick={() => setAccForm({ ...accForm, isActive: !accForm.isActive })}
@@ -2647,6 +2660,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                           {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>}
                           {a.accountType && (() => { const opt = (Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : []).find(o => o.value === a.accountType); return opt ? <span style={{ color: opt.color || COLORS.accent, fontWeight: 700 }}>● {opt.label}</span> : <span style={{ color: COLORS.textMuted }}>● {a.accountType}</span>; })()}
                           {a.financingBank && <span style={{ color: COLORS.accent }}>🏦 {a.financingBank}</span>}
+                          {a.contracts && <span style={{ color: COLORS.textSub }}>📄 {a.contracts}</span>}
+                          {a.trade && <span style={{ color: COLORS.textSub }}>🔀 {a.trade}</span>}
                         </div>
                       </div>
                       <div onClick={() => { const updated = derivAccounts.map(x => x.id === a.id ? { ...x, isActive: !x.isActive } : x); setDerivAccounts(updated); safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts); }}

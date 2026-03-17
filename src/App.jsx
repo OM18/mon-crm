@@ -1940,6 +1940,85 @@ const AccountTypePillsEditor = ({ config, updateField, defaultKey, onSetDefault 
   );
 };
 
+// ─── FINANCING BANKS EDITOR ──────────────────────────────────
+const FinancingBanksEditor = ({ companies = [], config, updateField }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const bankCompanies = companies.filter(c =>
+    Array.isArray(c.roles) ? c.roles.includes("Bank") : c.roles === "Bank"
+  );
+
+  const selected = Array.isArray(config.derivFinancingBanks) ? config.derivFinancingBanks : [];
+
+  const toggle = (companyName) => {
+    const next = selected.includes(companyName)
+      ? selected.filter(v => v !== companyName)
+      : [...selected, companyName];
+    updateField("derivFinancingBanks", next);
+  };
+
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 14, marginBottom: 0, overflow: "hidden" }}>
+      <div onClick={() => setExpanded(!expanded)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
+        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>🏦</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Financing Banks</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Banques de financement — sélectionner parmi les companies avec le rôle Bank</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 420 }}>
+          {selected.length === 0
+            ? <span style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>Aucune sélectionnée</span>
+            : selected.map(name => (
+              <span key={name} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: `${COLORS.accent}20`, color: COLORS.accent, border: `1px solid ${COLORS.accent}40` }}>
+                {name}
+              </span>
+            ))
+          }
+          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)", marginLeft: 4 }}>▾</span>
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
+          {bankCompanies.length === 0 ? (
+            <div style={{ textAlign: "center", color: COLORS.textMuted, fontSize: 13, padding: "16px 0" }}>
+              Aucune company avec le rôle <strong style={{ color: COLORS.text }}>Bank</strong> trouvée.
+              <div style={{ fontSize: 11, marginTop: 4 }}>Assignez ce rôle dans le module Companies.</div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {bankCompanies.map(c => {
+                const isSelected = selected.includes(c.name);
+                return (
+                  <div key={c.id} onClick={() => toggle(c.name)}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 10, cursor: "pointer", border: `1px solid ${isSelected ? COLORS.accent + "60" : COLORS.border}`, background: isSelected ? `${COLORS.accent}10` : COLORS.card, transition: "all 0.15s" }}
+                    onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
+                    onMouseOut={e => { e.currentTarget.style.background = isSelected ? `${COLORS.accent}10` : COLORS.card; }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 8, background: isSelected ? `${COLORS.accent}25` : COLORS.bg, border: `1px solid ${isSelected ? COLORS.accent + "50" : COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: isSelected ? COLORS.accent : COLORS.textMuted, flexShrink: 0 }}>
+                      {(c.name || "?")[0].toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{c.name}</div>
+                      {c.country && <div style={{ fontSize: 11, color: COLORS.textMuted }}>{c.country}</div>}
+                    </div>
+                    <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${isSelected ? COLORS.accent : COLORS.border}`, background: isSelected ? COLORS.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                      {isSelected && <span style={{ color: COLORS.textOnAccent, fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -2262,7 +2341,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           </div>
 
           {/* ── Account Financing Bank ── */}
-          <DerivPillsEditor configKey="derivFinancingBanks" label="Financing Banks" icon="🏦" description="Banques de financement disponibles pour les comptes de trading" config={config} updateField={updateField} />
+          <FinancingBanksEditor companies={companies} config={config} updateField={updateField} />
 
           {/* ── Account Type ── */}
           <AccountTypePillsEditor config={config} updateField={updateField} defaultKey="derivDefaultAccountType" onSetDefault={v => updateField("derivDefaultAccountType", v)} />

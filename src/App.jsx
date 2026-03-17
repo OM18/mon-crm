@@ -3094,12 +3094,26 @@ if (Array.isArray(resolved.contractsCurrency)) {
     const newDecisions = { ...decisions, [key]: decision };
     setDecisions(newDecisions);
     if (decision === "add") {
-      const fieldDef = FIELD_DEFINITIONS.find(f => f.key === current.configKey);
-      const useLabel = fieldDef && !fieldDef.hasValue;
-const isCountry = current.configKey === "country";
-const newItem = { value: useLabel ? current.value.toUpperCase() : isCountry ? current.value.toUpperCase() : current.value.toLowerCase().replace(/\s+/g, "_"), label: isCountry ? current.value.toUpperCase() : current.value };      const hasColor = config[current.configKey]?.[0]?.color !== undefined;
-      if (hasColor) newItem.color = COLORS.textSub;
-      updateField(current.configKey, [...(config[current.configKey] || []), newItem]);
+      if (current.configKey === "derivProducts") {
+        // derivProducts (underlying) doit être stocké dans derivCommodities pour apparaître dans l'Admin Panel
+        const newCommodity = {
+          value: current.value.toLowerCase().replace(/\s+/g, "_"),
+          label: current.value,
+          underlyingCategory: "commodity",
+        };
+        updateField("derivCommodities", [...(config.derivCommodities || []), newCommodity]);
+        // Synchroniser derivProducts pour que la validation fonctionne au prochain import
+        const newProduct = { value: newCommodity.value, label: current.value };
+        updateField("derivProducts", [...(config.derivProducts || []), newProduct]);
+      } else {
+        const fieldDef = FIELD_DEFINITIONS.find(f => f.key === current.configKey);
+        const useLabel = fieldDef && !fieldDef.hasValue;
+        const isCountry = current.configKey === "country";
+        const newItem = { value: useLabel ? current.value.toUpperCase() : isCountry ? current.value.toUpperCase() : current.value.toLowerCase().replace(/\s+/g, "_"), label: isCountry ? current.value.toUpperCase() : current.value };
+        const hasColor = config[current.configKey]?.[0]?.color !== undefined;
+        if (hasColor) newItem.color = COLORS.textSub;
+        updateField(current.configKey, [...(config[current.configKey] || []), newItem]);
+      }
     }
     if (currentQueueIdx < unknownQueue.length - 1) {
       setCurrentQueueIdx(currentQueueIdx + 1);

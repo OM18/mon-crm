@@ -2319,9 +2319,10 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       <select value={accForm.financingBank} onChange={e => setAccForm(f => ({ ...f, financingBank: e.target.value }))}
                         style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: accForm.financingBank ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
                         <option value="">— Aucune —</option>
-                        {(Array.isArray(config.derivFinancingBanks) ? config.derivFinancingBanks : []).map(b => (
-                          <option key={b.value} value={b.value}>{b.label}</option>
-                        ))}
+                        {(Array.isArray(config.derivFinancingBanks) ? config.derivFinancingBanks : []).map(b => {
+                          const name = typeof b === "string" ? b : (b.label || b.value || "");
+                          return <option key={name} value={name}>{name}</option>;
+                        })}
                       </select>
                       {(Array.isArray(config.derivFinancingBanks) ? config.derivFinancingBanks : []).length === 0 && (
                         <span style={{ fontSize: 11, color: COLORS.orange }}>💡 Aucune banque — ajoutez-en dans le bloc Financing Banks</span>

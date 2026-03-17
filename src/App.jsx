@@ -1155,7 +1155,6 @@ const DERIV_PRODUCT_FIELD_MAP = {
   "label":              ["label", "nom", "name", "instrument", "product"],
   "stoxxExchange":      ["stoxx exchange", "stoxxexchange", "exchange", "bourse"],
   "instrumentType":     ["instrument type", "instrumenttype", "type instrument", "type"],
-  "derivType":          ["deriv type", "derivtype", "futures/options", "futures or options"],
   "underlyingCategory": ["underlying category", "underlyingcategory", "catégorie", "categorie", "category"],
   "underlying":         ["underlying", "sous-jacent", "commodity", "produit"],
   "underlyingOrigin":   ["underlying origin", "underlyingorigin", "origine", "origin", "pays origine"],
@@ -1191,7 +1190,6 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
     { field: "label",              format: "Texte",         required: true,  note: "ex: Wheat Futures Dec24" },
     { field: "stoxxExchange",      format: "Texte",         required: true,  note: "Valeur de la liste Exchanges (ex: euronext, cme)" },
     { field: "instrumentType",     format: "Texte",         required: true,  note: "ex: Future, Option" },
-    { field: "derivType",          format: "futures / options", required: true,  note: "" },
     { field: "underlyingCategory", format: "commodity / fx", required: true,  note: "" },
     { field: "underlying",         format: "Texte",         required: true,  note: "Valeur de la liste Underlying (ex: wheat, corn)" },
     { field: "underlyingOrigin",   format: "Texte",         required: true,  note: "ex: FRANCE, UKRAINE" },
@@ -1264,7 +1262,6 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
       if (obj.underlying) obj.underlying = resolveConfigValue("derivCommodities", obj.underlying);
       if (obj.volumeUnit) obj.volumeUnit = resolveConfigValue("derivVolumeUnits", obj.volumeUnit);
       if (obj.currency) obj.currency = resolveConfigValue("derivCurrencies", obj.currency);
-      if (obj.derivType) obj.derivType = obj.derivType.toLowerCase().trim();
       if (obj.instrumentType) {
         const match = (config.derivInstrumentTypes || []).find(t =>
           t.label?.toLowerCase() === obj.instrumentType.toLowerCase() ||
@@ -1453,7 +1450,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
   );
 };
 
-const EMPTY_PROD = { label: "", stoxxExchange: "", instrumentType: "", derivType: "", underlyingCategory: "", underlying: "", underlyingOrigin: "", volumeSizePerLot: "", volumeUnit: "", currency: "EUR", decimals: "decimal", expiryDate: "", firstNoticeDay: "", lastTradingDate: "" };
+const EMPTY_PROD = { label: "", stoxxExchange: "", instrumentType: "", underlyingCategory: "", underlying: "", underlyingOrigin: "", volumeSizePerLot: "", volumeUnit: "", currency: "EUR", decimals: "decimal", expiryDate: "", firstNoticeDay: "", lastTradingDate: "" };
 
 const DerivFormField = ({ label, field, type = "text", placeholder, form, setForm }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -1647,7 +1644,7 @@ useEffect(() => {
                 <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 3, display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <span style={{ color: COLORS.blue }}>🏛 {p.stoxxExchange}</span>
                   {p.instrumentType && <span style={{ color: COLORS.blue, background: `${COLORS.blue}18`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.instrumentType}</span>}
-                  <span style={{ color: p.derivType === "futures" ? COLORS.orange : COLORS.purple, background: p.derivType === "futures" ? `${COLORS.orange}18` : `${COLORS.purple}18`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.derivType === "futures" ? "Futures" : "Options"}</span>
+                  <span style={{ color: p.instrumentType?.toLowerCase().includes("option") ? COLORS.purple : COLORS.orange, background: p.instrumentType?.toLowerCase().includes("option") ? `${COLORS.purple}18` : `${COLORS.orange}18`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.instrumentType?.toLowerCase().includes("option") ? "Options" : "Futures"}</span>
                   <span style={{ color: p.underlyingCategory === "commodity" ? COLORS.green : COLORS.gold, background: p.underlyingCategory === "commodity" ? `${COLORS.green}15` : `${COLORS.gold}15`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.underlyingCategory === "commodity" ? "Commodity" : "FX"}</span>
                   <span>📦 {p.underlying}</span>
                   {p.underlyingOrigin && <span style={{ color: COLORS.textSub }}>🌍 {p.underlyingOrigin}</span>}

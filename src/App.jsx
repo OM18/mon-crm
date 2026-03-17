@@ -1150,6 +1150,309 @@ const UnderlyingEditor = ({ config, updateField }) => {
 };
 
 // ─── DERIV PRODUCT EDITOR ─────────────────────────────────────
+// ─── DERIV PRODUCT IMPORT MODAL ──────────────────────────────
+const DERIV_PRODUCT_FIELD_MAP = {
+  "label":              ["label", "nom", "name", "instrument", "product"],
+  "stoxxExchange":      ["stoxx exchange", "stoxxexchange", "exchange", "bourse"],
+  "instrumentType":     ["instrument type", "instrumenttype", "type instrument", "type"],
+  "derivType":          ["deriv type", "derivtype", "futures/options", "futures or options"],
+  "underlyingCategory": ["underlying category", "underlyingcategory", "catégorie", "categorie", "category"],
+  "underlying":         ["underlying", "sous-jacent", "commodity", "produit"],
+  "underlyingOrigin":   ["underlying origin", "underlyingorigin", "origine", "origin", "pays origine"],
+  "volumeSizePerLot":   ["volume size per lot", "volumesizeperlot", "lot size", "taille lot", "volume lot"],
+  "volumeUnit":         ["volume unit", "volumeunit", "unité volume", "unite volume", "unit"],
+  "currency":           ["currency", "devise", "monnaie"],
+  "decimals":           ["decimals", "décimales", "format cotation"],
+  "firstNoticeDay":     ["first notice day", "firstnoticeday", "fnd", "premier préavis"],
+  "lastTradingDate":    ["last trading date", "lasttradingdate", "ltd", "dernier jour négociation"],
+  "expiryDate":         ["expiry date", "expirydate", "expiration", "échéance"],
+};
+
+const normalizeHeaderDP = (h) => h?.toString().toLowerCase().trim().replace(/[_\-]/g, " ") || "";
+const guessFieldDP = (header) => {
+  const norm = normalizeHeaderDP(header);
+  for (const [field, aliases] of Object.entries(DERIV_PRODUCT_FIELD_MAP)) {
+    if (aliases.some(a => norm === a || norm.includes(a) || a.includes(norm))) return field;
+  }
+  return null;
+};
+
+const DerivProductImportModal = ({ onClose, onImport, config }) => {
+  const [step, setStep] = useState("guide");
+  const [rawRows, setRawRows] = useState([]);
+  const [headers, setHeaders] = useState([]);
+  const [mapping, setMapping] = useState({});
+  const [error, setError] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [results, setResults] = useState(null);
+  const fileRef = useRef();
+
+  const GUIDE_FIELDS = [
+    { field: "label",              format: "Texte",         required: true,  note: "ex: Wheat Futures Dec24" },
+    { field: "stoxxExchange",      format: "Texte",         required: true,  note: "Valeur de la liste Exchanges (ex: euronext, cme)" },
+    { field: "instrumentType",     format: "Texte",         required: true,  note: "ex: Future, Option" },
+    { field: "derivType",          format: "futures / options", required: true,  note: "" },
+    { field: "underlyingCategory", format: "commodity / fx", required: true,  note: "" },
+    { field: "underlying",         format: "Texte",         required: true,  note: "Valeur de la liste Underlying (ex: wheat, corn)" },
+    { field: "underlyingOrigin",   format: "Texte",         required: true,  note: "ex: FRANCE, UKRAINE" },
+    { field: "volumeSizePerLot",   format: "Nombre",        required: true,  note: "ex: 50, 100" },
+    { field: "volumeUnit",         format: "Texte",         required: true,  note: "ex: mt, bu, lot" },
+    { field: "currency",           format: "Texte",         required: true,  note: "ex: EUR, USD" },
+    { field: "decimals",           format: "Texte",         required: false, note: "decimal / 1/2 / 1/4 / 1/8… (défaut: decimal)" },
+    { field: "firstNoticeDay",     format: "JJ/MM/AAAA",    required: true,  note: "" },
+    { field: "lastTradingDate",    format: "JJ/MM/AAAA",    required: true,  note: "" },
+    { field: "expiryDate",         format: "JJ/MM/AAAA",    required: false, note: "Options uniquement" },
+  ];
+
+  const parseDate = (val) => {
+    if (!val) return "";
+    const s = val.toString().trim();
+    // DD/MM/YYYY
+    const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m1) return `${m1[3]}-${m1[2].padStart(2,"0")}-${m1[1].padStart(2,"0")}`;
+    // Excel serial date
+    if (/^\d{5}$/.test(s)) {
+      const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+      return d.toISOString().split("T")[0];
+    }
+    // ISO already
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return s;
+  };
+
+  const resolveConfigValue = (configKey, val) => {
+    if (!val) return val;
+    const norm = v => v?.toString().toLowerCase().trim().replace(/[_\s-]/g, "");
+    const normVal = norm(val);
+    const list = config[configKey] || [];
+    const match = list.find(i => norm(i.value) === normVal || norm(i.label) === normVal);
+    return match ? match.value : val.toLowerCase().replace(/\s+/g, "_");
+  };
+
+  const handleFile = async (file) => {
+    setError("");
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      if (!json.length) { setError("Le fichier est vide."); return; }
+      const hdrs = json[0].map(h => h?.toString() || "");
+      const rows = json.slice(1).filter(r => r.some(c => c !== ""));
+      setHeaders(hdrs);
+      setRawRows(rows);
+      const autoMap = {};
+      hdrs.forEach((h, i) => { const g = guessFieldDP(h); if (g && !Object.values(autoMap).includes(g)) autoMap[i] = g; });
+      setMapping(autoMap);
+      setStep("mapping");
+    } catch { setError("Erreur de lecture du fichier."); }
+  };
+
+  const doImport = () => {
+    setImporting(true);
+    const errors = [];
+    const valid = [];
+
+    rawRows.forEach((row, i) => {
+      const obj = { id: Date.now() + i };
+      Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[ci]?.toString().trim() || ""; });
+
+      // Normalize select fields against config
+      if (obj.stoxxExchange) obj.stoxxExchange = resolveConfigValue("derivExchanges", obj.stoxxExchange);
+      if (obj.underlyingCategory) obj.underlyingCategory = obj.underlyingCategory.toLowerCase().trim();
+      if (obj.underlying) obj.underlying = resolveConfigValue("derivCommodities", obj.underlying);
+      if (obj.volumeUnit) obj.volumeUnit = resolveConfigValue("derivVolumeUnits", obj.volumeUnit);
+      if (obj.currency) obj.currency = resolveConfigValue("derivCurrencies", obj.currency);
+      if (obj.derivType) obj.derivType = obj.derivType.toLowerCase().trim();
+      if (obj.instrumentType) {
+        const match = (config.derivInstrumentTypes || []).find(t =>
+          t.label?.toLowerCase() === obj.instrumentType.toLowerCase() ||
+          t.value?.toLowerCase() === obj.instrumentType.toLowerCase()
+        );
+        obj.instrumentType = match ? match.label : obj.instrumentType;
+      }
+      if (obj.decimals) {
+        const match = (config.derivDecimals || []).find(d => d.value === obj.decimals || d.label === obj.decimals);
+        obj.decimals = match ? match.value : "decimal";
+      } else { obj.decimals = "decimal"; }
+
+      // Parse dates
+      obj.firstNoticeDay = parseDate(obj.firstNoticeDay);
+      obj.lastTradingDate = parseDate(obj.lastTradingDate);
+      obj.expiryDate = parseDate(obj.expiryDate);
+
+      // Normalize volumeSizePerLot
+      if (obj.volumeSizePerLot) obj.volumeSizePerLot = String(obj.volumeSizePerLot).replace(/,/g, ".");
+
+      // Validate required fields
+      const missing = [];
+      if (!obj.label) missing.push("label");
+      if (!obj.stoxxExchange) missing.push("stoxxExchange");
+      if (!obj.instrumentType) missing.push("instrumentType");
+      if (!obj.underlyingCategory) missing.push("underlyingCategory");
+      if (!obj.underlying) missing.push("underlying");
+      if (!obj.underlyingOrigin) missing.push("underlyingOrigin");
+      if (!obj.volumeSizePerLot) missing.push("volumeSizePerLot");
+      if (!obj.firstNoticeDay) missing.push("firstNoticeDay");
+      if (!obj.lastTradingDate) missing.push("lastTradingDate");
+      if (obj.instrumentType?.toLowerCase() === "option" && !obj.expiryDate) missing.push("expiryDate");
+
+      if (missing.length > 0) {
+        errors.push({ row: i + 2, label: obj.label || `Ligne ${i + 2}`, missing });
+      } else {
+        valid.push(obj);
+      }
+    });
+
+    setResults({ valid, errors });
+    setStep("summary");
+    setImporting(false);
+  };
+
+  const confirmImport = () => {
+    if (results?.valid?.length > 0) {
+      onImport(results.valid);
+    }
+    onClose();
+  };
+
+  const allFields = Object.keys(DERIV_PRODUCT_FIELD_MAP);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 720, maxHeight: "90vh", overflowY: "auto" }}>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20, color: COLORS.text, fontFamily: "'Inter', sans-serif" }}>Import Excel — Instruments</h2>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: COLORS.textSub }}>Formats acceptés : .xlsx, .xls, .csv</p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Step: Guide */}
+        {step === "guide" && (
+          <div>
+            <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
+              <div style={{ padding: "10px 16px", background: COLORS.tableHeader, display: "grid", gridTemplateColumns: "1.5fr 1fr 0.6fr 2fr", gap: 8 }}>
+                {["Colonne", "Format", "Requis", "Note"].map(h => (
+                  <div key={h} style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 1 }}>{h.toUpperCase()}</div>
+                ))}
+              </div>
+              {GUIDE_FIELDS.map((f, i) => (
+                <div key={f.field} style={{ padding: "9px 16px", display: "grid", gridTemplateColumns: "1.5fr 1fr 0.6fr 2fr", gap: 8, background: i % 2 === 0 ? "transparent" : `${COLORS.surface}80`, alignItems: "center" }}>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: COLORS.accent }}>{f.field}</div>
+                  <div style={{ fontSize: 12, color: COLORS.textSub }}>{f.format}</div>
+                  <div>
+                    {f.required
+                      ? <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.red, background: `${COLORS.red}15`, padding: "2px 7px", borderRadius: 4 }}>OBL.</span>
+                      : <span style={{ fontSize: 10, color: COLORS.textMuted, background: COLORS.bg, padding: "2px 7px", borderRadius: 4, border: `1px solid ${COLORS.border}` }}>OPT.</span>
+                    }
+                  </div>
+                  <div style={{ fontSize: 11, color: COLORS.textMuted }}>{f.note}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); }} />
+              <Btn onClick={() => fileRef.current.click()}>📂 Choisir un fichier</Btn>
+            </div>
+            {error && <div style={{ marginTop: 12, fontSize: 13, color: COLORS.red, background: `${COLORS.red}10`, border: `1px solid ${COLORS.red}30`, borderRadius: 8, padding: "10px 14px" }}>⚠ {error}</div>}
+          </div>
+        )}
+
+        {/* Step: Mapping */}
+        {step === "mapping" && (
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 12 }}>
+              Mapper les colonnes Excel → champs instrument
+            </div>
+            <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
+              <div style={{ padding: "10px 16px", background: COLORS.tableHeader, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {["Colonne Excel", "Champ instrument"].map(h => (
+                  <div key={h} style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 1 }}>{h.toUpperCase()}</div>
+                ))}
+              </div>
+              {headers.map((h, i) => (
+                <div key={i} style={{ padding: "8px 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, alignItems: "center", background: i % 2 === 0 ? "transparent" : `${COLORS.surface}80` }}>
+                  <div style={{ fontSize: 13, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{h}</div>
+                  <select value={mapping[i] || ""} onChange={e => setMapping(prev => ({ ...prev, [i]: e.target.value || null }))}
+                    style={{ background: COLORS.card, border: `1px solid ${mapping[i] ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 8, padding: "6px 10px", color: mapping[i] ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit" }}>
+                    <option value="">— Ignorer —</option>
+                    {allFields.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <Btn variant="secondary" onClick={() => setStep("guide")}>← Retour</Btn>
+              <Btn onClick={doImport} style={{ background: COLORS.green }}>{importing ? "Import..." : `✓ Importer ${rawRows.length} lignes`}</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* Step: Summary */}
+        {step === "summary" && results && (
+          <div>
+            <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+              <div style={{ flex: 1, background: `${COLORS.green}12`, border: `1px solid ${COLORS.green}30`, borderRadius: 12, padding: "16px 20px", textAlign: "center" }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: COLORS.green }}>{results.valid.length}</div>
+                <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>instrument{results.valid.length !== 1 ? "s" : ""} valide{results.valid.length !== 1 ? "s" : ""}</div>
+              </div>
+              <div style={{ flex: 1, background: results.errors.length > 0 ? `${COLORS.red}12` : `${COLORS.green}08`, border: `1px solid ${results.errors.length > 0 ? COLORS.red + "30" : COLORS.border}`, borderRadius: 12, padding: "16px 20px", textAlign: "center" }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: results.errors.length > 0 ? COLORS.red : COLORS.textMuted }}>{results.errors.length}</div>
+                <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>ligne{results.errors.length !== 1 ? "s" : ""} rejetée{results.errors.length !== 1 ? "s" : ""}</div>
+              </div>
+            </div>
+
+            {results.errors.length > 0 && (
+              <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.red}30`, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
+                <div style={{ padding: "10px 16px", background: `${COLORS.red}10`, fontSize: 12, fontWeight: 700, color: COLORS.red }}>LIGNES REJETÉES — champs obligatoires manquants</div>
+                {results.errors.map((e, i) => (
+                  <div key={i} style={{ padding: "8px 16px", borderTop: `1px solid ${COLORS.border}`, display: "flex", gap: 12, alignItems: "center" }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Ligne {e.row}</span>
+                    <span style={{ fontSize: 13, color: COLORS.text, flex: 1 }}>{e.label}</span>
+                    <span style={{ fontSize: 11, color: COLORS.red }}>{e.missing.join(", ")}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {results.valid.length > 0 && (
+              <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
+                <div style={{ padding: "10px 16px", background: COLORS.tableHeader, fontSize: 12, fontWeight: 700, color: COLORS.textSub }}>APERÇU DES INSTRUMENTS VALIDES</div>
+                {results.valid.slice(0, 5).map((p, i) => (
+                  <div key={i} style={{ padding: "10px 16px", borderTop: `1px solid ${COLORS.border}`, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, minWidth: 180 }}>{p.label}</span>
+                    <span style={{ fontSize: 11, color: COLORS.blue, background: `${COLORS.blue}15`, padding: "2px 8px", borderRadius: 5 }}>{p.stoxxExchange}</span>
+                    <span style={{ fontSize: 11, color: COLORS.green, background: `${COLORS.green}15`, padding: "2px 8px", borderRadius: 5 }}>{p.instrumentType}</span>
+                    <span style={{ fontSize: 11, color: COLORS.textSub }}>{p.underlying} · {p.underlyingOrigin}</span>
+                    <span style={{ fontSize: 11, color: COLORS.gold, fontFamily: "'DM Mono', monospace" }}>×{p.volumeSizePerLot} {p.volumeUnit}</span>
+                  </div>
+                ))}
+                {results.valid.length > 5 && (
+                  <div style={{ padding: "8px 16px", borderTop: `1px solid ${COLORS.border}`, fontSize: 12, color: COLORS.textMuted }}>
+                    + {results.valid.length - 5} autre{results.valid.length - 5 > 1 ? "s" : ""} instrument{results.valid.length - 5 > 1 ? "s" : ""}…
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <Btn variant="secondary" onClick={() => setStep("mapping")}>← Modifier le mapping</Btn>
+              {results.valid.length > 0
+                ? <Btn onClick={confirmImport} style={{ background: COLORS.green }}>✓ Confirmer l'import ({results.valid.length})</Btn>
+                : <Btn variant="secondary" onClick={onClose}>Fermer</Btn>
+              }
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const EMPTY_PROD = { label: "", stoxxExchange: "", instrumentType: "", derivType: "", underlyingCategory: "", underlying: "", underlyingOrigin: "", volumeSizePerLot: "", volumeUnit: "", currency: "EUR", decimals: "decimal", expiryDate: "", firstNoticeDay: "", lastTradingDate: "" };
 
 const DerivFormField = ({ label, field, type = "text", placeholder, form, setForm }) => (
@@ -1192,10 +1495,12 @@ useEffect(() => {
   }
   loadLotSizes();
 }, []);
+  const { config: cfg } = useConfig();
   const [form, setForm] = useState(EMPTY_PROD);
   const [instrumentType, setInstrumentType] = useState("");
   const [editId, setEditId] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const isValid = () => form.label.trim() !== "" && form.stoxxExchange !== "" && form.instrumentType !== "" && form.underlyingCategory !== "" && form.underlying !== "" && form.underlyingOrigin !== "" && String(form.volumeSizePerLot).trim() !== "" && form.volumeUnit !== "" && form.currency !== "" && form.firstNoticeDay !== "" && form.lastTradingDate !== "" && (form.instrumentType?.toLowerCase() !== "option" || form.expiryDate !== "");
@@ -1221,6 +1526,7 @@ useEffect(() => {
           <div style={{ fontSize: 12, color: COLORS.textSub }}>Instruments dérivés disponibles (futures, options…)</div>
         </div>
         <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 8 }}>{products.length} instrument{products.length !== 1 ? "s" : ""}</span>
+        <div onClick={e => { e.stopPropagation(); setShowImport(true); if (!expanded) setExpanded(true); }} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 12px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent", marginRight: 4 }} title="Importer depuis Excel"><img src="/logoxl.png" style={{ width: 22, height: 22, objectFit: "contain" }} /></div>
         <Btn onClick={e => { e.stopPropagation(); setForm(EMPTY_PROD); setInstrumentType(""); setEditId(null); setShowForm(true); if (!expanded) setExpanded(true); }} style={{ padding: "7px 14px", fontSize: 13 }}>+ Ajouter</Btn>
         <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)", marginLeft: 4 }}>▾</span>
       </div>
@@ -1358,6 +1664,17 @@ useEffect(() => {
           ))}
         </div>
       </div>}
+      {showImport && (
+        <DerivProductImportModal
+          config={cfg}
+          onClose={() => setShowImport(false)}
+          onImport={async (newItems) => {
+            const updated = [...products, ...newItems];
+            setProducts(updated);
+            await safeSave('deriv_products', updated, setProducts, products);
+          }}
+        />
+      )}
     </div>
   );
 };

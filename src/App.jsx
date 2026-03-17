@@ -1943,23 +1943,32 @@ const AccountTypePillsEditor = ({ config, updateField, defaultKey, onSetDefault 
       {expanded && (
         <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-            {localItems.map((s, idx) => (
-              <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: `${s.color || COLORS.accent}10`, border: `1px solid ${s.color || COLORS.accent}30`, borderRadius: 10, padding: "10px 14px" }}>
-                <div style={{ width: 12, height: 12, borderRadius: "50%", background: s.color || COLORS.accent, flexShrink: 0 }} />
-                <input value={s.label} onChange={e => { const v = e.target.value; mark(localItems.map((x, i) => i === idx ? { ...x, label: v } : x)); }}
-                  style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 700, fontFamily: "inherit", outline: "none" }} />
-                <div style={{ display: "flex", gap: 4 }}>
-                  {PRESET_COLORS.map(c => (
-                    <div key={c} onClick={() => mark(localItems.map((x, i) => i === idx ? { ...x, color: c } : x))}
-                      style={{ width: 14, height: 14, borderRadius: "50%", background: c, cursor: "pointer", border: s.color === c ? `2px solid #fff` : "2px solid transparent", outline: s.color === c ? `2px solid ${c}` : "none" }} />
-                  ))}
+            {localItems.map((s, idx) => {
+              const isDefault = defaultKey && (config[defaultKey] || "") === s.value;
+              return (
+                <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: `${s.color || COLORS.accent}10`, border: `1px solid ${isDefault ? (s.color || COLORS.accent) : (s.color || COLORS.accent) + "30"}`, borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ width: 12, height: 12, borderRadius: "50%", background: s.color || COLORS.accent, flexShrink: 0 }} />
+                  <input value={s.label} onChange={e => { const v = e.target.value; mark(localItems.map((x, i) => i === idx ? { ...x, label: v } : x)); }}
+                    style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 700, fontFamily: "inherit", outline: "none" }} />
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {PRESET_COLORS.map(c => (
+                      <div key={c} onClick={() => mark(localItems.map((x, i) => i === idx ? { ...x, color: c } : x))}
+                        style={{ width: 14, height: 14, borderRadius: "50%", background: c, cursor: "pointer", border: s.color === c ? `2px solid #fff` : "2px solid transparent", outline: s.color === c ? `2px solid ${c}` : "none" }} />
+                    ))}
+                  </div>
+                  {/* Star: set as default */}
+                  <button onClick={() => onSetDefault && onSetDefault(isDefault ? "" : s.value)}
+                    title={isDefault ? "Retirer la valeur par défaut" : "Définir comme valeur par défaut"}
+                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, lineHeight: 1, color: isDefault ? COLORS.gold : COLORS.textMuted, transition: "color 0.15s" }}
+                    onMouseOver={e => e.currentTarget.style.color = COLORS.gold}
+                    onMouseOut={e => e.currentTarget.style.color = isDefault ? COLORS.gold : COLORS.textMuted}>★</button>
+                  <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
+                    style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                    onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                    onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
                 </div>
-                <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
-                  style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
-                  onMouseOver={e => e.currentTarget.style.color = COLORS.red}
-                  onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px" }}>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
@@ -2338,7 +2347,7 @@ useEffect(() => {
   const [showEmpForm, setShowEmpForm] = useState(false);
 
   // ── Deriv Accounts state ──
-  const EMPTY_ACC = { accountNumber: "", businessUnit: "", currency: "EUR", initialAmount: "", isActive: true, accountType: "", financingBank: "" };
+  const EMPTY_ACC = () => ({ accountNumber: "", businessUnit: "", currency: "EUR", initialAmount: "", isActive: true, accountType: config.derivDefaultAccountType || "", financingBank: "" });
   const [derivAccounts, setDerivAccounts] = useState([]);
 
 useEffect(() => {
@@ -2348,7 +2357,7 @@ useEffect(() => {
   }
   loadAccounts();
 }, []);
-  const [accForm, setAccForm] = useState(EMPTY_ACC);
+  const [accForm, setAccForm] = useState(EMPTY_ACC());
   const [editAccId, setEditAccId] = useState(null);
   const [showAccForm, setShowAccForm] = useState(false);
   const [showAccImport, setShowAccImport] = useState(false);
@@ -2451,7 +2460,7 @@ useEffect(() => {
       : [...derivAccounts, { ...accForm, id: Date.now() }];
     setDerivAccounts(updated);
     await safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts);
-    setAccForm(EMPTY_ACC);
+    setAccForm(EMPTY_ACC());
     setEditAccId(null);
     setShowAccForm(false);
   };
@@ -2518,7 +2527,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
               </div>
               <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 8 }}>{derivAccounts.length} compte{derivAccounts.length !== 1 ? "s" : ""}</span>
               <div onClick={e => { e.stopPropagation(); setShowAccImport(true); if (!expandedAccounts) setExpandedAccounts(true); }} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 12px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent", marginRight: 4 }} title="Importer depuis Excel"><img src="/logoxl.png" style={{ width: 22, height: 22, objectFit: "contain" }} /></div>
-              <Btn onClick={e => { e.stopPropagation(); setAccForm(EMPTY_ACC); setEditAccId(null); setShowAccForm(true); if (!expandedAccounts) setExpandedAccounts(true); }} style={{ padding: "7px 14px", fontSize: 13 }}>+ Ajouter</Btn>
+              <Btn onClick={e => { e.stopPropagation(); setAccForm(EMPTY_ACC()); setEditAccId(null); setShowAccForm(true); if (!expandedAccounts) setExpandedAccounts(true); }} style={{ padding: "7px 14px", fontSize: 13 }}>+ Ajouter</Btn>
               <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expandedAccounts ? "rotate(180deg)" : "rotate(0deg)", marginLeft: 4 }}>▾</span>
             </div>
             {showAccImport && (

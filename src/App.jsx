@@ -2001,6 +2001,8 @@ const DERIV_ACCOUNT_FIELD_MAP = {
   "initialAmount": ["initial amount", "initialamount", "montant initial", "montant", "amount"],
   "accountType":   ["account type", "accounttype", "type compte", "type"],
   "financingBank": ["financing bank", "financingbank", "banque", "bank"],
+  "contracts":     ["contracts", "contrats", "contract"],
+  "trade":         ["trade", "trade id", "tradeid", "négoce"],
   "isActive":      ["is active", "isactive", "actif", "active", "status", "statut"],
 };
 
@@ -2030,6 +2032,8 @@ const DerivAccountImportModal = ({ onClose, onImport, config }) => {
     { field: "initialAmount", format: "Nombre",       required: true,  note: "ex: 500000" },
     { field: "accountType",   format: "Texte",        required: false, note: "Valeur de la liste Account Types" },
     { field: "financingBank", format: "Texte",        required: false, note: "Nom exact d'une Financing Bank" },
+    { field: "contracts",     format: "Texte",        required: false, note: "ex: CME-001" },
+    { field: "trade",         format: "Texte",        required: false, note: "ex: TRD-001" },
     { field: "isActive",      format: "TRUE / FALSE", required: false, note: "Défaut : TRUE" },
   ];
 

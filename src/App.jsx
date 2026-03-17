@@ -2976,12 +2976,12 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
           const key = `derivAccount:${obj.account}`;
           if (!unknowns[key]) unknowns[key] = { fieldKey: "account", configKey: "derivAccount", fieldLabel: "Account Number", value: obj.account, infoOnly: true };
         }
-        // Validate underlying/instrument against derivProducts
+        // Validate underlying/instrument against derivCommodities (source de vérité)
         if (obj.underlying) {
-          const found = (config.derivProducts || []).find(p => p.label?.toLowerCase() === obj.underlying?.toLowerCase() || p.value?.toLowerCase() === obj.underlying?.toLowerCase());
+          const found = (config.derivCommodities || []).find(p => p.label?.toLowerCase() === obj.underlying?.toLowerCase() || p.value?.toLowerCase() === obj.underlying?.toLowerCase());
           if (!found) {
-            const key = `derivProducts:${obj.underlying}`;
-            if (!unknowns[key]) unknowns[key] = { fieldKey: "underlying", configKey: "derivProducts", fieldLabel: "Instrument (Underlying)", value: obj.underlying };
+            const key = `derivCommodities:${obj.underlying}`;
+            if (!unknowns[key]) unknowns[key] = { fieldKey: "underlying", configKey: "derivCommodities", fieldLabel: "Instrument (Underlying)", value: obj.underlying };
           }
         }
         // Validate broker against derivDefaultBroker / companies
@@ -3074,11 +3074,11 @@ if (Array.isArray(resolved.contractsCurrency)) {
         });
         // underlying
         if (resolved.underlying) {
-          const found = (config.derivProducts || []).find(p => p.label?.toLowerCase() === resolved.underlying?.toLowerCase() || p.value?.toLowerCase() === resolved.underlying?.toLowerCase());
+          const found = (config.derivCommodities || []).find(p => p.label?.toLowerCase() === resolved.underlying?.toLowerCase() || p.value?.toLowerCase() === resolved.underlying?.toLowerCase());
           if (found) {
             resolved.underlying = found.value || found.label;
           } else {
-            const key = `derivProducts:${resolved.underlying}`;
+            const key = `derivCommodities:${resolved.underlying}`;
             const decision = finalDecisions[key];
             resolved.underlying = decision === "add" ? resolved.underlying : "";
           }
@@ -3094,17 +3094,14 @@ if (Array.isArray(resolved.contractsCurrency)) {
     const newDecisions = { ...decisions, [key]: decision };
     setDecisions(newDecisions);
     if (decision === "add") {
-      if (current.configKey === "derivProducts") {
-        // derivProducts (underlying) doit être stocké dans derivCommodities pour apparaître dans l'Admin Panel
+      if (current.configKey === "derivCommodities") {
+        // Ajouter dans derivCommodities avec le format attendu par UnderlyingEditor
         const newCommodity = {
           value: current.value.toLowerCase().replace(/\s+/g, "_"),
           label: current.value,
           underlyingCategory: "commodity",
         };
         updateField("derivCommodities", [...(config.derivCommodities || []), newCommodity]);
-        // Synchroniser derivProducts pour que la validation fonctionne au prochain import
-        const newProduct = { value: newCommodity.value, label: current.value };
-        updateField("derivProducts", [...(config.derivProducts || []), newProduct]);
       } else {
         const fieldDef = FIELD_DEFINITIONS.find(f => f.key === current.configKey);
         const useLabel = fieldDef && !fieldDef.hasValue;

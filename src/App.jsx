@@ -1984,6 +1984,263 @@ const AccountTypePillsEditor = ({ config, updateField, defaultKey, onSetDefault 
   );
 };
 
+// ─── DERIV ACCOUNT IMPORT MODAL ──────────────────────────────
+const DERIV_ACCOUNT_FIELD_MAP = {
+  "accountNumber": ["account number", "accountnumber", "account", "numéro compte", "numero compte", "num compte"],
+  "businessUnit":  ["business unit", "businessunit", "bu", "unité"],
+  "currency":      ["currency", "devise", "monnaie"],
+  "initialAmount": ["initial amount", "initialamount", "montant initial", "montant", "amount"],
+  "accountType":   ["account type", "accounttype", "type compte", "type"],
+  "financingBank": ["financing bank", "financingbank", "banque", "bank"],
+  "isActive":      ["is active", "isactive", "actif", "active", "status", "statut"],
+};
+
+const normalizeHeaderDA = (h) => h?.toString().toLowerCase().trim().replace(/[_\-]/g, " ") || "";
+const guessFieldDA = (header) => {
+  const norm = normalizeHeaderDA(header);
+  for (const [field, aliases] of Object.entries(DERIV_ACCOUNT_FIELD_MAP)) {
+    if (aliases.some(a => norm === a || norm.includes(a) || a.includes(norm))) return field;
+  }
+  return null;
+};
+
+const DerivAccountImportModal = ({ onClose, onImport, config }) => {
+  const [step, setStep]       = useState("guide");
+  const [rawRows, setRawRows] = useState([]);
+  const [headers, setHeaders] = useState([]);
+  const [mapping, setMapping] = useState({});
+  const [error, setError]     = useState("");
+  const [importing, setImporting] = useState(false);
+  const [results, setResults] = useState(null);
+  const fileRef = useRef();
+
+  const GUIDE_FIELDS = [
+    { field: "accountNumber", format: "Texte",        required: true,  note: "ex: ACC-001" },
+    { field: "businessUnit",  format: "Texte",        required: true,  note: "Valeur de la liste Business Units (ex: morocco, ukraine)" },
+    { field: "currency",      format: "Texte",        required: true,  note: "ex: EUR, USD, MAD" },
+    { field: "initialAmount", format: "Nombre",       required: true,  note: "ex: 500000" },
+    { field: "accountType",   format: "Texte",        required: false, note: "Valeur de la liste Account Types" },
+    { field: "financingBank", format: "Texte",        required: false, note: "Nom exact d'une Financing Bank" },
+    { field: "isActive",      format: "TRUE / FALSE", required: false, note: "Défaut : TRUE" },
+  ];
+
+  const handleFile = async (file) => {
+    setError("");
+    try {
+      const XLSX = await import("xlsx");
+      const buf  = await file.arrayBuffer();
+      const wb   = XLSX.read(buf, { type: "array" });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      if (!json.length) { setError("Le fichier est vide."); return; }
+      const hdrs = json[0].map(h => h?.toString() || "");
+      const rows = json.slice(1).filter(r => r.some(c => c !== ""));
+      setHeaders(hdrs);
+      setRawRows(rows);
+      const autoMap = {};
+      hdrs.forEach((h, i) => { const g = guessFieldDA(h); if (g && !Object.values(autoMap).includes(g)) autoMap[i] = g; });
+      setMapping(autoMap);
+      setStep("mapping");
+    } catch { setError("Erreur de lecture du fichier."); }
+  };
+
+  const doImport = () => {
+    setImporting(true);
+    const errors = [];
+    const valid  = [];
+
+    rawRows.forEach((row, i) => {
+      const obj = { id: Date.now() + i };
+      Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[ci]?.toString().trim() || ""; });
+
+      // Normalize businessUnit against config
+      if (obj.businessUnit) {
+        const norm = v => v?.toLowerCase().trim().replace(/[\s_-]/g, "");
+        const match = (config.businessUnit || []).find(b => norm(b.value) === norm(obj.businessUnit) || norm(b.label) === norm(obj.businessUnit));
+        obj.businessUnit = match ? match.value : obj.businessUnit.toLowerCase().replace(/\s+/g, "_");
+      }
+
+      // Normalize currency
+      if (obj.currency) {
+        const match = (config.contractsCurrency || []).find(c => c.value.toLowerCase() === obj.currency.toLowerCase() || c.label.toLowerCase() === obj.currency.toLowerCase());
+        obj.currency = match ? match.value : obj.currency.toUpperCase();
+      }
+
+      // Normalize accountType
+      if (obj.accountType) {
+        const norm = v => v?.toLowerCase().trim();
+        const match = (Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : []).find(t => norm(t.value) === norm(obj.accountType) || norm(t.label) === norm(obj.accountType));
+        obj.accountType = match ? match.value : obj.accountType;
+      }
+
+      // Normalize initialAmount
+      if (obj.initialAmount) obj.initialAmount = String(obj.initialAmount).replace(/,/g, ".");
+
+      // Normalize isActive
+      if (obj.isActive !== undefined && obj.isActive !== "") {
+        obj.isActive = String(obj.isActive).toLowerCase() !== "false" && obj.isActive !== "0" && obj.isActive !== "non";
+      } else {
+        obj.isActive = true;
+      }
+
+      // Validate required fields
+      const missing = [];
+      if (!obj.accountNumber) missing.push("accountNumber");
+      if (!obj.businessUnit)  missing.push("businessUnit");
+      if (!obj.currency)      missing.push("currency");
+      if (!String(obj.initialAmount).trim()) missing.push("initialAmount");
+
+      if (missing.length > 0) {
+        errors.push({ row: i + 2, label: obj.accountNumber || `Ligne ${i + 2}`, missing });
+      } else {
+        valid.push(obj);
+      }
+    });
+
+    setResults({ valid, errors });
+    setStep("summary");
+    setImporting(false);
+  };
+
+  const confirmImport = () => {
+    if (results?.valid?.length > 0) onImport(results.valid);
+    onClose();
+  };
+
+  const allFields = Object.keys(DERIV_ACCOUNT_FIELD_MAP);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 680, maxHeight: "90vh", overflowY: "auto" }}>
+
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20, color: COLORS.text }}>Import Excel — Accounts</h2>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: COLORS.textSub }}>Formats acceptés : .xlsx, .xls, .csv</p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Step: Guide */}
+        {step === "guide" && (
+          <div>
+            <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
+              <div style={{ padding: "10px 16px", background: COLORS.tableHeader, display: "grid", gridTemplateColumns: "1.5fr 1fr 0.6fr 2fr", gap: 8 }}>
+                {["Colonne", "Format", "Requis", "Note"].map(h => (
+                  <div key={h} style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 1 }}>{h.toUpperCase()}</div>
+                ))}
+              </div>
+              {GUIDE_FIELDS.map((f, i) => (
+                <div key={f.field} style={{ padding: "9px 16px", display: "grid", gridTemplateColumns: "1.5fr 1fr 0.6fr 2fr", gap: 8, background: i % 2 === 0 ? "transparent" : `${COLORS.surface}80`, alignItems: "center" }}>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: COLORS.accent }}>{f.field}</div>
+                  <div style={{ fontSize: 12, color: COLORS.textSub }}>{f.format}</div>
+                  <div>
+                    {f.required
+                      ? <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.red, background: `${COLORS.red}15`, padding: "2px 7px", borderRadius: 4 }}>OBL.</span>
+                      : <span style={{ fontSize: 10, color: COLORS.textMuted, background: COLORS.bg, padding: "2px 7px", borderRadius: 4, border: `1px solid ${COLORS.border}` }}>OPT.</span>
+                    }
+                  </div>
+                  <div style={{ fontSize: 11, color: COLORS.textMuted }}>{f.note}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); }} />
+              <Btn onClick={() => fileRef.current.click()}>📂 Choisir un fichier</Btn>
+            </div>
+            {error && <div style={{ marginTop: 12, fontSize: 13, color: COLORS.red, background: `${COLORS.red}10`, border: `1px solid ${COLORS.red}30`, borderRadius: 8, padding: "10px 14px" }}>⚠ {error}</div>}
+          </div>
+        )}
+
+        {/* Step: Mapping */}
+        {step === "mapping" && (
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 12 }}>Mapper les colonnes Excel → champs compte</div>
+            <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
+              <div style={{ padding: "10px 16px", background: COLORS.tableHeader, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {["Colonne Excel", "Champ compte"].map(h => (
+                  <div key={h} style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 1 }}>{h.toUpperCase()}</div>
+                ))}
+              </div>
+              {headers.map((h, i) => (
+                <div key={i} style={{ padding: "8px 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, alignItems: "center", background: i % 2 === 0 ? "transparent" : `${COLORS.surface}80` }}>
+                  <div style={{ fontSize: 13, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{h}</div>
+                  <select value={mapping[i] || ""} onChange={e => setMapping(prev => ({ ...prev, [i]: e.target.value || null }))}
+                    style={{ background: COLORS.card, border: `1px solid ${mapping[i] ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 8, padding: "6px 10px", color: mapping[i] ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit" }}>
+                    <option value="">— Ignorer —</option>
+                    {allFields.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <Btn variant="secondary" onClick={() => setStep("guide")}>← Retour</Btn>
+              <Btn onClick={doImport} style={{ background: COLORS.green }}>{importing ? "Import..." : `✓ Importer ${rawRows.length} lignes`}</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* Step: Summary */}
+        {step === "summary" && results && (
+          <div>
+            <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+              <div style={{ flex: 1, background: `${COLORS.green}12`, border: `1px solid ${COLORS.green}30`, borderRadius: 12, padding: "16px 20px", textAlign: "center" }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: COLORS.green }}>{results.valid.length}</div>
+                <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>compte{results.valid.length !== 1 ? "s" : ""} valide{results.valid.length !== 1 ? "s" : ""}</div>
+              </div>
+              <div style={{ flex: 1, background: results.errors.length > 0 ? `${COLORS.red}12` : `${COLORS.green}08`, border: `1px solid ${results.errors.length > 0 ? COLORS.red + "30" : COLORS.border}`, borderRadius: 12, padding: "16px 20px", textAlign: "center" }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: results.errors.length > 0 ? COLORS.red : COLORS.textMuted }}>{results.errors.length}</div>
+                <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>ligne{results.errors.length !== 1 ? "s" : ""} rejetée{results.errors.length !== 1 ? "s" : ""}</div>
+              </div>
+            </div>
+            {results.errors.length > 0 && (
+              <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.red}30`, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
+                <div style={{ padding: "10px 16px", background: `${COLORS.red}10`, fontSize: 12, fontWeight: 700, color: COLORS.red }}>LIGNES REJETÉES — champs obligatoires manquants</div>
+                {results.errors.map((e, i) => (
+                  <div key={i} style={{ padding: "8px 16px", borderTop: `1px solid ${COLORS.border}`, display: "flex", gap: 12, alignItems: "center" }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Ligne {e.row}</span>
+                    <span style={{ fontSize: 13, color: COLORS.text, flex: 1 }}>{e.label}</span>
+                    <span style={{ fontSize: 11, color: COLORS.red }}>{e.missing.join(", ")}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {results.valid.length > 0 && (
+              <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
+                <div style={{ padding: "10px 16px", background: COLORS.tableHeader, fontSize: 12, fontWeight: 700, color: COLORS.textSub }}>APERÇU DES COMPTES VALIDES</div>
+                {results.valid.slice(0, 5).map((a, i) => (
+                  <div key={i} style={{ padding: "10px 16px", borderTop: `1px solid ${COLORS.border}`, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace", minWidth: 120 }}>{a.accountNumber}</span>
+                    <span style={{ fontSize: 11, color: COLORS.blue, background: `${COLORS.blue}15`, padding: "2px 8px", borderRadius: 5 }}>{a.businessUnit}</span>
+                    <span style={{ fontSize: 11, color: COLORS.gold }}>{a.currency}</span>
+                    <span style={{ fontSize: 11, color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>
+                    {a.accountType && <span style={{ fontSize: 11, color: COLORS.accent, background: `${COLORS.accent}15`, padding: "2px 8px", borderRadius: 5 }}>{a.accountType}</span>}
+                    {a.financingBank && <span style={{ fontSize: 11, color: COLORS.textSub }}>🏦 {a.financingBank}</span>}
+                    <span style={{ fontSize: 11, color: a.isActive ? COLORS.green : COLORS.textMuted, fontWeight: 600 }}>{a.isActive ? "● Actif" : "○ Inactif"}</span>
+                  </div>
+                ))}
+                {results.valid.length > 5 && (
+                  <div style={{ padding: "8px 16px", borderTop: `1px solid ${COLORS.border}`, fontSize: 12, color: COLORS.textMuted }}>
+                    + {results.valid.length - 5} autre{results.valid.length - 5 > 1 ? "s" : ""} compte{results.valid.length - 5 > 1 ? "s" : ""}…
+                  </div>
+                )}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <Btn variant="secondary" onClick={() => setStep("mapping")}>← Modifier le mapping</Btn>
+              {results.valid.length > 0
+                ? <Btn onClick={confirmImport} style={{ background: COLORS.green }}>✓ Confirmer l'import ({results.valid.length})</Btn>
+                : <Btn variant="secondary" onClick={onClose}>Fermer</Btn>
+              }
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ─── FINANCING BANKS EDITOR ──────────────────────────────────
 const FinancingBanksEditor = ({ companies = [], config, updateField }) => {
   const [expanded, setExpanded] = useState(false);
@@ -2094,6 +2351,7 @@ useEffect(() => {
   const [accForm, setAccForm] = useState(EMPTY_ACC);
   const [editAccId, setEditAccId] = useState(null);
   const [showAccForm, setShowAccForm] = useState(false);
+  const [showAccImport, setShowAccImport] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState(false);
   const [expandedOrderTransmission, setExpandedOrderTransmission] = useState(false);
   const [expandedFinancialBrokers, setExpandedFinancialBrokers] = useState(false);
@@ -2259,9 +2517,21 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                 <div style={{ fontSize: 12, color: COLORS.textSub }}>Comptes de trading pour les opérations sur dérivés</div>
               </div>
               <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 8 }}>{derivAccounts.length} compte{derivAccounts.length !== 1 ? "s" : ""}</span>
+              <div onClick={e => { e.stopPropagation(); setShowAccImport(true); if (!expandedAccounts) setExpandedAccounts(true); }} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 12px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent", marginRight: 4 }} title="Importer depuis Excel"><img src="/logoxl.png" style={{ width: 22, height: 22, objectFit: "contain" }} /></div>
               <Btn onClick={e => { e.stopPropagation(); setAccForm(EMPTY_ACC); setEditAccId(null); setShowAccForm(true); if (!expandedAccounts) setExpandedAccounts(true); }} style={{ padding: "7px 14px", fontSize: 13 }}>+ Ajouter</Btn>
               <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expandedAccounts ? "rotate(180deg)" : "rotate(0deg)", marginLeft: 4 }}>▾</span>
             </div>
+            {showAccImport && (
+              <DerivAccountImportModal
+                config={config}
+                onClose={() => setShowAccImport(false)}
+                onImport={async (newItems) => {
+                  const updated = [...derivAccounts, ...newItems];
+                  setDerivAccounts(updated);
+                  await safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts);
+                }}
+              />
+            )}
             {expandedAccounts && <div style={{ padding: "20px 24px" }}>
 
               {showAccForm && (

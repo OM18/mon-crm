@@ -868,14 +868,14 @@ const DerivAutocomplete = ({ form, setForm, requiredError, products = [] }) => {
   const derivProds = form.type
     ? allProds.filter(p => !p.instrumentType || p.instrumentType.toUpperCase() === form.type.toUpperCase())
     : allProds;
-  const query = form.underlying || "";
+  const query = form.instrument || "";
   const suggestions = query.length > 0
     ? derivProds.filter(p => p.label.toUpperCase().includes(query.toUpperCase()))
     : derivProds;
   const isValid = derivProds.some(p => p.label.toUpperCase() === query.toUpperCase());
 
   const pick = (p) => {
-    setForm(f => ({ ...f, underlying: p.label, exchange: p.stoxxExchange || f.exchange, expiryDate: p.expiryDate || "" }));
+    setForm(f => ({ ...f, instrument: p.label, exchange: p.stoxxExchange || f.exchange, expiryDate: p.expiryDate || "" }));
     setOpen(false);
   };
 
@@ -890,7 +890,7 @@ const DerivAutocomplete = ({ form, setForm, requiredError, products = [] }) => {
         onChange={e => {
           const val = e.target.value;
           const match = derivProds.find(p => p.label.toUpperCase() === val.toUpperCase());
-          setForm(f => ({ ...f, underlying: val, exchange: match?.stoxxExchange || (val === "" ? "" : f.exchange) }));
+          setForm(f => ({ ...f, instrument: val, exchange: match?.stoxxExchange || (val === "" ? "" : f.exchange) }));
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
@@ -1155,9 +1155,9 @@ const DERIV_PRODUCT_FIELD_MAP = {
   "label":              ["label", "nom", "name", "instrument", "product"],
   "stoxxExchange":      ["stoxx exchange", "stoxxexchange", "exchange", "bourse"],
   "instrumentType":     ["instrument type", "instrumenttype", "type instrument", "type"],
-  "underlyingCategory": ["underlying category", "underlyingcategory", "catégorie", "categorie", "category"],
-  "underlying":         ["underlying", "sous-jacent", "commodity", "produit"],
-  "underlyingOrigin":   ["underlying origin", "underlyingorigin", "origine", "origin", "pays origine"],
+  "underlyingCategory": ["instrument category", "underlyingcategory", "catégorie", "categorie", "category"],
+  "instrument":         ["instrument", "sous-jacent", "commodity", "produit"],
+  "underlyingOrigin":   ["instrument origin", "underlyingorigin", "origine", "origin", "pays origine"],
   "volumeSizePerLot":   ["volume size per lot", "volumesizeperlot", "lot size", "taille lot", "volume lot"],
   "volumeUnit":         ["volume unit", "volumeunit", "unité volume", "unite volume", "unit"],
   "currency":           ["currency", "devise", "monnaie"],
@@ -1191,7 +1191,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
     { field: "stoxxExchange",      format: "Texte",          required: true,  note: "Valeur de la liste Exchanges (ex: euronext, cme)" },
     { field: "instrumentType",     format: "Texte",          required: true,  note: "ex: Future, Option" },
     { field: "underlyingCategory", format: "commodity / fx", required: true,  note: "" },
-    { field: "underlying",         format: "Texte",          required: true,  note: "Valeur de la liste Underlying (ex: wheat, corn)" },
+    { field: "instrument",         format: "Texte",          required: true,  note: "Valeur de la liste Underlying (ex: wheat, corn)" },
     { field: "underlyingOrigin",   format: "Texte",          required: true,  note: "ex: FRANCE, UKRAINE" },
     { field: "volumeSizePerLot",   format: "Nombre",         required: true,  note: "ex: 50, 100" },
     { field: "volumeUnit",         format: "Texte",          required: true,  note: "ex: mt, bu, lot" },
@@ -1255,7 +1255,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
 
       if (obj.stoxxExchange) obj.stoxxExchange = resolveConfigValue("derivExchanges", obj.stoxxExchange);
       if (obj.underlyingCategory) obj.underlyingCategory = obj.underlyingCategory.toLowerCase().trim();
-      if (obj.underlying) obj.underlying = resolveConfigValue("derivCommodities", obj.underlying);
+      if (obj.instrument) obj.instrument = resolveConfigValue("derivCommodities", obj.instrument);
       if (obj.volumeUnit) obj.volumeUnit = resolveConfigValue("derivVolumeUnits", obj.volumeUnit);
       if (obj.currency) obj.currency = resolveConfigValue("derivCurrencies", obj.currency);
       if (obj.instrumentType) {
@@ -1280,7 +1280,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
       if (!obj.stoxxExchange) missing.push("stoxxExchange");
       if (!obj.instrumentType) missing.push("instrumentType");
       if (!obj.underlyingCategory) missing.push("underlyingCategory");
-      if (!obj.underlying) missing.push("underlying");
+      if (!obj.instrument) missing.push("instrument");
       if (!obj.underlyingOrigin) missing.push("underlyingOrigin");
       if (!obj.volumeSizePerLot) missing.push("volumeSizePerLot");
       if (!obj.lastTradingDate) missing.push("lastTradingDate");
@@ -1405,7 +1405,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
                     <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, minWidth: 180 }}>{p.label}</span>
                     <span style={{ fontSize: 11, color: COLORS.blue, background: `${COLORS.blue}15`, padding: "2px 8px", borderRadius: 5 }}>{p.stoxxExchange}</span>
                     <span style={{ fontSize: 11, color: COLORS.green, background: `${COLORS.green}15`, padding: "2px 8px", borderRadius: 5 }}>{p.instrumentType}</span>
-                    <span style={{ fontSize: 11, color: COLORS.textSub }}>{p.underlying} · {p.underlyingOrigin}</span>
+                    <span style={{ fontSize: 11, color: COLORS.textSub }}>{p.instrument} · {p.underlyingOrigin}</span>
                     <span style={{ fontSize: 11, color: COLORS.gold, fontFamily: "'DM Mono', monospace" }}>×{p.volumeSizePerLot} {p.volumeUnit}</span>
                   </div>
                 ))}
@@ -1430,7 +1430,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
   );
 };
 
-const EMPTY_PROD = { label: "", stoxxExchange: "", instrumentType: "", underlyingCategory: "", underlying: "", underlyingOrigin: "", volumeSizePerLot: "", volumeUnit: "", currency: "EUR", decimals: "decimal", expiryDate: "", firstNoticeDay: "", lastTradingDate: "" };
+const EMPTY_PROD = { label: "", stoxxExchange: "", instrumentType: "", underlyingCategory: "", instrument: "", underlyingOrigin: "", volumeSizePerLot: "", volumeUnit: "", currency: "EUR", decimals: "decimal", expiryDate: "", firstNoticeDay: "", lastTradingDate: "" };
 
 const DerivFormField = ({ label, field, type = "text", placeholder, form, setForm }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -1480,7 +1480,7 @@ useEffect(() => {
   const [showImport, setShowImport] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  const isValid = () => form.label.trim() !== "" && form.stoxxExchange !== "" && form.instrumentType !== "" && form.underlyingCategory !== "" && form.underlying !== "" && form.underlyingOrigin !== "" && String(form.volumeSizePerLot).trim() !== "" && form.volumeUnit !== "" && form.currency !== "" && form.lastTradingDate !== "" && (form.instrumentType?.toLowerCase() !== "option" || form.expiryDate !== "");
+  const isValid = () => form.label.trim() !== "" && form.stoxxExchange !== "" && form.instrumentType !== "" && form.underlyingCategory !== "" && form.instrument !== "" && form.underlyingOrigin !== "" && String(form.volumeSizePerLot).trim() !== "" && form.volumeUnit !== "" && form.currency !== "" && form.lastTradingDate !== "" && (form.instrumentType?.toLowerCase() !== "option" || form.expiryDate !== "");
 
   const save = async () => {
     if (!isValid()) return;
@@ -1526,7 +1526,7 @@ useEffect(() => {
                 </select>
               </div>
               <DerivSelectField label="Underlying Category" field="underlyingCategory" options={[{ value: "commodity", label: "Commodity" }, { value: "fx", label: "FX" }]} form={form} setForm={setForm} />
-              <DerivSelectField label="Underlying" field="underlying" options={(config.derivCommodities || []).map(c => ({ value: c.value, label: c.label }))} form={form} setForm={setForm} />
+              <DerivSelectField label="Underlying" field="instrument" options={(config.derivCommodities || []).map(c => ({ value: c.value, label: c.label }))} form={form} setForm={setForm} />
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>UNDERLYING ORIGIN <span style={{ color: COLORS.red }}>*</span></label>
                 <select value={form.underlyingOrigin || ""} onChange={e => setForm(f => ({ ...f, underlyingOrigin: e.target.value }))}
@@ -1542,7 +1542,7 @@ useEffect(() => {
               {(() => {
                 const match = lotSizes.find(l =>
                   l.exchange === form.stoxxExchange &&
-                  l.underlying?.toLowerCase() === (config.derivCommodities || []).find(c => c.value === form.underlying)?.label?.toLowerCase()
+                  l.instrument?.toLowerCase() === (config.derivCommodities || []).find(c => c.value === form.instrument)?.label?.toLowerCase()
                 ) || lotSizes.find(l => l.exchange === form.stoxxExchange);
                 const autoQty = match?.quantity || "";
                 const autoUnit = match?.volumeUnit || "";
@@ -1640,7 +1640,7 @@ useEffect(() => {
                     {p.instrumentType && <span style={{ color: COLORS.blue, background: `${COLORS.blue}18`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.instrumentType}</span>}
                     <span style={{ color: p.instrumentType?.toLowerCase().includes("option") ? COLORS.purple : COLORS.orange, background: p.instrumentType?.toLowerCase().includes("option") ? `${COLORS.purple}18` : `${COLORS.orange}18`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.instrumentType?.toLowerCase().includes("option") ? "Options" : "Futures"}</span>
                     <span style={{ color: p.underlyingCategory === "commodity" ? COLORS.green : COLORS.gold, background: p.underlyingCategory === "commodity" ? `${COLORS.green}15` : `${COLORS.gold}15`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.underlyingCategory === "commodity" ? "Commodity" : "FX"}</span>
-                    <span>📦 {p.underlying}</span>
+                    <span>📦 {p.instrument}</span>
                     {p.underlyingOrigin && <span style={{ color: COLORS.textSub }}>🌍 {p.underlyingOrigin}</span>}
                     <span style={{ fontFamily: "'DM Mono', monospace" }}>×{p.volumeSizePerLot}{p.volumeUnit ? ` ${p.volumeUnit}` : ""}</span>
                     <span style={{ color: COLORS.gold }}>💱 {p.currency}</span>
@@ -2371,7 +2371,7 @@ useEffect(() => {
   const [expandedLotSizes, setExpandedLotSizes] = useState(false);
 
   // ── Lot Sizes state ──
-  const EMPTY_LS = { exchange: "", underlying: "", quantity: "", volumeUnit: "" };
+  const EMPTY_LS = { exchange: "", instrument: "", quantity: "", volumeUnit: "" };
   const [lotSizes, setLotSizes] = useState([]);
   const [lsForm, setLsForm] = useState(EMPTY_LS);
   const [editLsId, setEditLsId] = useState(null);
@@ -2387,7 +2387,7 @@ useEffect(() => {
 
   const isLsFormValid = () =>
     lsForm.exchange.trim() !== "" &&
-    lsForm.underlying.trim() !== "" &&
+    lsForm.instrument.trim() !== "" &&
     String(lsForm.quantity).trim() !== "" &&
     lsForm.volumeUnit !== "";
 
@@ -2726,7 +2726,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
               <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.green}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📦</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Lot Sizes</div>
-                <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Taille de lot par exchange et underlying</div>
+                <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Taille de lot par exchange et instrument</div>
               </div>
               <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 4 }}>
                 {lotSizes.length} entrée{lotSizes.length !== 1 ? "s" : ""}
@@ -2753,8 +2753,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>UNDERLYING <span style={{ color: COLORS.red }}>*</span></label>
-                        <select value={lsForm.underlying} onChange={e => setLsForm(f => ({ ...f, underlying: e.target.value }))}
-                          style={{ background: COLORS.bg, border: `1px solid ${lsForm.underlying ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: lsForm.underlying ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                        <select value={lsForm.instrument} onChange={e => setLsForm(f => ({ ...f, instrument: e.target.value }))}
+                          style={{ background: COLORS.bg, border: `1px solid ${lsForm.instrument ? COLORS.border : COLORS.red + "60"}`, borderRadius: 8, padding: "9px 14px", color: lsForm.instrument ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
                           <option value="">— Sélectionner —</option>
                           {(config.derivCommodities || []).map(u => (
                             <option key={u.value || u} value={u.value || u}>{u.label || u}</option>
@@ -2798,7 +2798,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       return (
                         <div key={l.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px 80px 60px", gap: 8, alignItems: "center", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 12px" }}>
                           <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.blue }}>{exchCfg?.label || l.exchange}</span>
-                          <span style={{ fontSize: 13, color: COLORS.text }}>{l.underlying}</span>
+                          <span style={{ fontSize: 13, color: COLORS.text }}>{l.instrument}</span>
                           <span style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.green }}>{l.quantity}</span>
                           <span style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600 }}>{unitCfg?.label || l.volumeUnit}</span>
                           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -3382,7 +3382,7 @@ const DERIV_FIELD_MAP = {
   "type":         ["type", "instrument type", "inst type"],
   "opType":       ["op type", "optype", "operation type", "type opération"],
   "side":         ["side", "sens", "buy/sell", "achat/vente"],
-  "underlying":   ["instrument", "underlying", "product", "produit", "contrat"],
+  "instrument":   ["instrument", "instrument", "product", "produit", "contrat"],
   "quantity":     ["lots", "quantity", "qty", "nb lots", "number of lots", "quantité"],
   "price":        ["price", "prix"],
   "strike":       ["strike", "strike price", "prix exercice"],
@@ -3500,7 +3500,7 @@ const ExcelImportModal = ({ onClose, onImport, type }) => {
     { field: "type",         format: "Texte",        note: "ex: Future, Option" },
     { field: "opType",       format: "Texte",        note: "ex: Trade, Hedging, Rolling" },
     { field: "side",         format: "BUY / SELL",   note: "" },
-    { field: "underlying",   format: "Texte",        note: "Nom de l'instrument" },
+    { field: "instrument",   format: "Texte",        note: "Nom de l'instrument", label: "instrument" },
     { field: "quantity",     format: "Nombre",       note: "Nombre de lots" },
     { field: "price",        format: "Nombre",       note: "" },
     { field: "strike",       format: "Nombre",       note: "Options uniquement" },
@@ -3687,12 +3687,12 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
           const key = `derivAccount:${obj.account}`;
           if (!unknowns[key]) unknowns[key] = { fieldKey: "account", configKey: "derivAccount", fieldLabel: "Account Number", value: obj.account, infoOnly: true };
         }
-        // Validate underlying/instrument against derivProducts
-        if (obj.underlying) {
-          const found = (config.derivProducts || []).find(p => p.label?.toLowerCase() === obj.underlying?.toLowerCase() || p.value?.toLowerCase() === obj.underlying?.toLowerCase());
+        // Validate instrument/instrument against derivProducts
+        if (obj.instrument) {
+          const found = (config.derivProducts || []).find(p => p.label?.toLowerCase() === obj.instrument?.toLowerCase() || p.value?.toLowerCase() === obj.instrument?.toLowerCase());
           if (!found) {
-            const key = `derivProducts:${obj.underlying}`;
-            if (!unknowns[key]) unknowns[key] = { fieldKey: "underlying", configKey: "derivProducts", fieldLabel: "Instrument (Underlying)", value: obj.underlying };
+            const key = `derivProducts:${obj.instrument}`;
+            if (!unknowns[key]) unknowns[key] = { fieldKey: "instrument", configKey: "derivCommodities", fieldLabel: "Instrument", value: obj.instrument };
           }
         }
         // Validate broker against derivDefaultBroker / companies
@@ -3703,7 +3703,7 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
       }
       return obj;
     }).filter(o => {
-      if (type === "derivatives") return !!(o.ref || o.side || o.underlying || o.price || o.quantity);
+      if (type === "derivatives") return !!(o.ref || o.side || o.instrument || o.price || o.quantity);
       return !!o.name;
     });
 
@@ -3783,15 +3783,15 @@ if (Array.isArray(resolved.contractsCurrency)) {
             resolved[fieldKey] = decision === "add" ? val : "";
           }
         });
-        // underlying
-        if (resolved.underlying) {
-          const found = (config.derivProducts || []).find(p => p.label?.toLowerCase() === resolved.underlying?.toLowerCase() || p.value?.toLowerCase() === resolved.underlying?.toLowerCase());
+        // instrument
+        if (resolved.instrument) {
+          const found = (config.derivProducts || []).find(p => p.label?.toLowerCase() === resolved.instrument?.toLowerCase() || p.value?.toLowerCase() === resolved.instrument?.toLowerCase());
           if (found) {
-            resolved.underlying = found.value || found.label;
+            resolved.instrument = found.value || found.label;
           } else {
-            const key = `derivProducts:${resolved.underlying}`;
+            const key = `derivProducts:${resolved.instrument}`;
             const decision = finalDecisions[key];
-            resolved.underlying = decision === "add" ? resolved.underlying : "";
+            resolved.instrument = decision === "add" ? resolved.instrument : "";
           }
         }
       }
@@ -5744,7 +5744,7 @@ useEffect(() => {
     const transVal = transItem?.value || transDefault || "";
 
     return {
-      id: null, ref: "", type: instrVal, opType: opVal, underlying: "",
+      id: null, ref: "", type: instrVal, opType: opVal, instrument: "",
       side: "BUY", quantity: "", price: "",
       strike: "", optionType: "Call",
       tradeDate: new Date().toISOString().slice(0, 10), expiryDate: "",
@@ -5785,7 +5785,7 @@ const setOps = async (val) => {
 
   const DERIV_CUSTOM_FIELDS = [
     { key: "ref",        label: "Reference",    type: "text" },
-    { key: "underlying", label: "Instrument",   type: "text" },
+    { key: "instrument", label: "Instrument",   type: "text" },
     { key: "broker",     label: "Broker",       type: "text" },
     { key: "exchange",   label: "Exchange",     type: "text" },
     { key: "account",    label: "Account",      type: "text" },
@@ -5811,7 +5811,7 @@ const setOps = async (val) => {
     { key: "quantity",     label: "Number of Lots" },
     { key: "price",        label: "Price" },
     { key: "tradeDate",    label: "Trade Date" },
-    { key: "underlying",   label: "Instrument" },
+    { key: "instrument",   label: "Instrument" },
     { key: "account",      label: "Account" },
     { key: "side",         label: "Side" },
     { key: "broker",       label: "Broker" },
@@ -5838,7 +5838,7 @@ const setOps = async (val) => {
 
   const filtered = ops.filter(o => {
     const q = search.toLowerCase();
-    const ms = !q || o.ref?.toLowerCase().includes(q) || o.underlying?.toLowerCase().includes(q) || o.broker?.toLowerCase().includes(q) || o.exchange?.toLowerCase().includes(q) || o.contract?.toLowerCase().includes(q) || o.notes?.toLowerCase().includes(q);
+    const ms = !q || o.ref?.toLowerCase().includes(q) || o.instrument?.toLowerCase().includes(q) || o.broker?.toLowerCase().includes(q) || o.exchange?.toLowerCase().includes(q) || o.contract?.toLowerCase().includes(q) || o.notes?.toLowerCase().includes(q);
     if (!ms) return false;
     const tagChecks = [
       !activeFilters.type.length         || activeFilters.type.includes(o.type),
@@ -6060,7 +6060,7 @@ const setOps = async (val) => {
                   <div style={{ fontSize: 12, fontWeight: 700, color: o.type?.toLowerCase() === "future" ? COLORS.blue : COLORS.purple }}>{o.type}</div>
                   <div style={{ fontSize: 11, color: COLORS.textSub }}>{o.opType || "—"}</div>
                   <div><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.side === "BUY" ? `${COLORS.green}20` : `${COLORS.red}20`, color: o.side === "BUY" ? COLORS.green : COLORS.red }}>{o.side}</span></div>
-                  {(() => { const prod = (config.derivProducts || []).find(p => p.value === o.underlying); return <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{prod?.label || o.underlying || "—"}</div>; })()}
+                  {(() => { const prod = (config.derivProducts || []).find(p => p.value === o.instrument); return <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{prod?.label || o.instrument || "—"}</div>; })()}
                   <div style={{ fontSize: 12, color: COLORS.textSub }}>{o.quantity ? `${Number(o.quantity).toLocaleString()}` : "—"}</div>
                   <div style={{ fontSize: 12, color: COLORS.textSub }}>{o.price || "—"}</div>
                   <div style={{ fontSize: 11, color: COLORS.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.businessUnit ? o.businessUnit.toUpperCase() : "—"}</div>
@@ -6099,7 +6099,7 @@ const setOps = async (val) => {
           </div>
 
           {[
-            { label: "INSTRUMENT",      value: sel.underlying || null },
+            { label: "INSTRUMENT",      value: sel.instrument || null },
             { label: "NUMBER OF LOTS",  value: sel.quantity ? `${Number(sel.quantity).toLocaleString()} lots` : null },
             { label: "PRICE",           value: sel.price || null },
             sel.type?.toLowerCase() === "option" ? { label: "STRIKE", value: sel.strike || null } : null,
@@ -6163,8 +6163,8 @@ const setOps = async (val) => {
             {/* Type instrument */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4, border: formErrors.type ? `1.5px solid ${COLORS.red}` : "1.5px solid transparent", borderRadius: 10, padding: formErrors.type ? "6px 8px" : 0 }}>
               <ToggleGroup label="INSTRUMENT TYPE *" options={(config.derivInstrumentTypes || []).map(o => o.label)} value={form.type} onChange={v => {
-                const stillValid = products.some(p => p.label.toUpperCase() === (form.underlying || "").toUpperCase() && (!p.instrumentType || p.instrumentType.toUpperCase() === v.toUpperCase()));
-                setForm(f => ({ ...f, type: v, underlying: stillValid ? f.underlying : "", exchange: stillValid ? f.exchange : "" }));
+                const stillValid = products.some(p => p.label.toUpperCase() === (form.instrument || "").toUpperCase() && (!p.instrumentType || p.instrumentType.toUpperCase() === v.toUpperCase()));
+                setForm(f => ({ ...f, type: v, instrument: stillValid ? f.instrument : "", exchange: stillValid ? f.exchange : "" }));
                 setFormErrors(e => ({ ...e, type: undefined }));
               }} colorFn={v => v === "Option" ? COLORS.purple : COLORS.blue} />
               {formErrors.type && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.type}</span>}
@@ -6191,7 +6191,7 @@ const setOps = async (val) => {
 
             {/* Derivatives — autocomplétion depuis l'admin panel */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <DerivAutocomplete form={form} setForm={(val) => { setForm(val); setFormErrors(e => ({ ...e, underlying: undefined })); }} requiredError={formErrors.underlying} products={products} />
+              <DerivAutocomplete form={form} setForm={(val) => { setForm(val); setFormErrors(e => ({ ...e, instrument: undefined })); }} requiredError={formErrors.instrument} products={products} />
             </div>
 
             {/* Number of Lots */}
@@ -6205,7 +6205,7 @@ const setOps = async (val) => {
             {/* Price — adapté selon le format décimal de l'instrument */}
             {(() => {
               const derivProds = products;
-              const instrument = derivProds.find(p => p.label === form.underlying);
+              const instrument = derivProds.find(p => p.label === form.instrument);
               const decimalsFormat = instrument?.decimals || "decimal";
               const decConfig = (config.derivDecimals || []).find(d => d.value === decimalsFormat);
               const isFraction = decimalsFormat !== "decimal";
@@ -6699,8 +6699,8 @@ const DerivativesDashboard = () => {
   // Build buckets keyed by "account||instrument"
   const buckets = {};
   for (const op of ops) {
-    const key = `${op.account || ""}||${op.underlying || ""}`;
-    if (!buckets[key]) buckets[key] = { account: op.account || "", instrument: op.underlying || "", ops: [] };
+    const key = `${op.account || ""}||${op.instrument || ""}`;
+    if (!buckets[key]) buckets[key] = { account: op.account || "", instrument: op.instrument || "", ops: [] };
     buckets[key].ops.push(op);
   }
 

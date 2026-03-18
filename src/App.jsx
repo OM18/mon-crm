@@ -5718,7 +5718,13 @@ const [derivAccounts, setDerivAccounts] = useState([]);
 useEffect(() => {
   async function loadDerivAccounts() {
     const { data } = await supabase.from('deriv_accounts').select('*');
-    if (data?.length) setDerivAccounts(data.map(r => r.data ?? r));
+    if (data?.length) setDerivAccounts(data.map(r => {
+      const acc = r.data ?? r;
+      if (typeof acc.isActive === "string") {
+        acc.isActive = acc.isActive.trim().toLowerCase() !== "false" && acc.isActive.trim() !== "0";
+      }
+      return acc;
+    }));
   }
   loadDerivAccounts();
 }, []);

@@ -1165,6 +1165,7 @@ const DERIV_PRODUCT_FIELD_MAP = {
   "firstNoticeDay":     ["first notice day", "firstnoticeday", "fnd", "premier préavis"],
   "lastTradingDate":    ["last trading date", "lasttradingdate", "ltd", "dernier jour négociation"],
   "expiryDate":         ["expiry date", "expirydate", "expiration", "échéance"],
+  "active":             ["active", "is active", "isactive", "actif"],
 };
 
 const normalizeHeaderDP = (h) => h?.toString().toLowerCase().trim().replace(/[_\-]/g, " ") || "";
@@ -1200,6 +1201,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
     { field: "firstNoticeDay",     format: "JJ/MM/AAAA",     required: false, note: "" },
     { field: "lastTradingDate",    format: "JJ/MM/AAAA",     required: true,  note: "" },
     { field: "expiryDate",         format: "JJ/MM/AAAA",     required: false, note: "Options uniquement" },
+    { field: "active",             format: "TRUE / FALSE",   required: false, note: "Défaut : TRUE" },
   ];
 
   const parseDate = (val) => {
@@ -1274,6 +1276,10 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
       obj.lastTradingDate = parseDate(obj.lastTradingDate);
       obj.expiryDate = parseDate(obj.expiryDate);
       if (obj.volumeSizePerLot) obj.volumeSizePerLot = String(obj.volumeSizePerLot).replace(/,/g, ".");
+      // Normalize active: défaut true si absent
+      if (obj.active !== undefined && obj.active !== "") {
+        obj.active = String(obj.active).toLowerCase() !== "false" && obj.active !== "0";
+      } else { obj.active = true; }
 
       const missing = [];
       if (!obj.label) missing.push("label");

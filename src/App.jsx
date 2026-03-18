@@ -6328,7 +6328,7 @@ const setOps = async (val) => {
                 style={{ background: COLORS.bg, border: `1px solid ${formErrors.account ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
                 <option value="">— Select —</option>
                 {derivAccounts
-  .filter(a => a.isActive !== false)
+  .filter(a => a.isActive !== false && String(a.isActive).toLowerCase() !== "false")
   .map(a => <option key={a.id} value={a.accountNumber}>{a.accountNumber.toUpperCase()}</option>)}
               </select>
               {formErrors.account && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.account}</span>}

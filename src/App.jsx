@@ -863,7 +863,8 @@ const DerivDecimalsEditor = ({ config, updateField }) => {
 // ─── DERIV BUSINESS UNITS EDITOR ─────────────────────────────
 const DerivAutocomplete = ({ form, setForm, requiredError, products = [] }) => {
   const [open, setOpen] = useState(false);
-  const allProds = products.length > 0 ? products : JSON.parse(localStorage.getItem("crm_deriv_products") || "[]");
+  const allProds = (products.length > 0 ? products : JSON.parse(localStorage.getItem("crm_deriv_products") || "[]"))
+    .filter(p => p.active !== false && String(p.active).toLowerCase() !== "false");
   // Filtrer par instrument type si renseigné
   const derivProds = form.type
     ? allProds.filter(p => !p.instrumentType || p.instrumentType.toUpperCase() === form.type.toUpperCase())

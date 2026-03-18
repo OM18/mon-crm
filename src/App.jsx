@@ -868,7 +868,7 @@ const DerivAutocomplete = ({ form, setForm, requiredError, products = [] }) => {
   const derivProds = form.type
     ? allProds.filter(p => !p.instrumentType || p.instrumentType.toUpperCase() === form.type.toUpperCase())
     : allProds;
-  const query = form.instrument || "";
+  const query = form.underlying || "";
   const suggestions = query.length > 0
     ? derivProds.filter(p => p.label.toUpperCase().includes(query.toUpperCase()))
     : derivProds;
@@ -1156,7 +1156,7 @@ const DERIV_PRODUCT_FIELD_MAP = {
   "stoxxExchange":      ["stoxx exchange", "stoxxexchange", "exchange", "bourse"],
   "instrumentType":     ["instrument type", "instrumenttype", "type instrument", "type"],
   "underlyingCategory": ["instrument category", "underlyingcategory", "catégorie", "categorie", "category"],
-  "instrument":         ["instrument", "sous-jacent", "commodity", "produit"],
+  "underlying":         ["underlying", "sous-jacent", "commodity", "produit"],
   "underlyingOrigin":   ["instrument origin", "underlyingorigin", "origine", "origin", "pays origine"],
   "volumeSizePerLot":   ["volume size per lot", "volumesizeperlot", "lot size", "taille lot", "volume lot"],
   "volumeUnit":         ["volume unit", "volumeunit", "unité volume", "unite volume", "unit"],
@@ -1191,7 +1191,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
     { field: "stoxxExchange",      format: "Texte",          required: true,  note: "Valeur de la liste Exchanges (ex: euronext, cme)" },
     { field: "instrumentType",     format: "Texte",          required: true,  note: "ex: Future, Option" },
     { field: "underlyingCategory", format: "commodity / fx", required: true,  note: "" },
-    { field: "instrument",         format: "Texte",          required: true,  note: "Valeur de la liste Underlying (ex: wheat, corn)" },
+    { field: "underlying",         format: "Texte",          required: true,  note: "Valeur de la liste Underlying (ex: wheat, corn)" },
     { field: "underlyingOrigin",   format: "Texte",          required: true,  note: "ex: FRANCE, UKRAINE" },
     { field: "volumeSizePerLot",   format: "Nombre",         required: true,  note: "ex: 50, 100" },
     { field: "volumeUnit",         format: "Texte",          required: true,  note: "ex: mt, bu, lot" },
@@ -1255,7 +1255,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
 
       if (obj.stoxxExchange) obj.stoxxExchange = resolveConfigValue("derivExchanges", obj.stoxxExchange);
       if (obj.underlyingCategory) obj.underlyingCategory = obj.underlyingCategory.toLowerCase().trim();
-      if (obj.instrument) obj.instrument = resolveConfigValue("derivCommodities", obj.instrument);
+      if (obj.underlying) obj.underlying = resolveConfigValue("derivCommodities", obj.underlying);
       if (obj.volumeUnit) obj.volumeUnit = resolveConfigValue("derivVolumeUnits", obj.volumeUnit);
       if (obj.currency) obj.currency = resolveConfigValue("derivCurrencies", obj.currency);
       if (obj.instrumentType) {
@@ -1280,7 +1280,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
       if (!obj.stoxxExchange) missing.push("stoxxExchange");
       if (!obj.instrumentType) missing.push("instrumentType");
       if (!obj.underlyingCategory) missing.push("underlyingCategory");
-      if (!obj.instrument) missing.push("instrument");
+      if (!obj.underlying) missing.push("underlying");
       if (!obj.underlyingOrigin) missing.push("underlyingOrigin");
       if (!obj.volumeSizePerLot) missing.push("volumeSizePerLot");
       if (!obj.lastTradingDate) missing.push("lastTradingDate");
@@ -1405,7 +1405,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
                     <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, minWidth: 180 }}>{p.label}</span>
                     <span style={{ fontSize: 11, color: COLORS.blue, background: `${COLORS.blue}15`, padding: "2px 8px", borderRadius: 5 }}>{p.stoxxExchange}</span>
                     <span style={{ fontSize: 11, color: COLORS.green, background: `${COLORS.green}15`, padding: "2px 8px", borderRadius: 5 }}>{p.instrumentType}</span>
-                    <span style={{ fontSize: 11, color: COLORS.textSub }}>{p.instrument} · {p.underlyingOrigin}</span>
+                    <span style={{ fontSize: 11, color: COLORS.textSub }}>{p.underlying} · {p.underlyingOrigin}</span>
                     <span style={{ fontSize: 11, color: COLORS.gold, fontFamily: "'DM Mono', monospace" }}>×{p.volumeSizePerLot} {p.volumeUnit}</span>
                   </div>
                 ))}
@@ -1430,7 +1430,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
   );
 };
 
-const EMPTY_PROD = { label: "", stoxxExchange: "", instrumentType: "", underlyingCategory: "", instrument: "", underlyingOrigin: "", volumeSizePerLot: "", volumeUnit: "", currency: "EUR", decimals: "decimal", expiryDate: "", firstNoticeDay: "", lastTradingDate: "" };
+const EMPTY_PROD = { label: "", stoxxExchange: "", instrumentType: "", underlyingCategory: "", underlying: "", underlyingOrigin: "", volumeSizePerLot: "", volumeUnit: "", currency: "EUR", decimals: "decimal", expiryDate: "", firstNoticeDay: "", lastTradingDate: "" };
 
 const DerivFormField = ({ label, field, type = "text", placeholder, form, setForm }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -1480,7 +1480,7 @@ useEffect(() => {
   const [showImport, setShowImport] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  const isValid = () => form.label.trim() !== "" && form.stoxxExchange !== "" && form.instrumentType !== "" && form.underlyingCategory !== "" && form.instrument !== "" && form.underlyingOrigin !== "" && String(form.volumeSizePerLot).trim() !== "" && form.volumeUnit !== "" && form.currency !== "" && form.lastTradingDate !== "" && (form.instrumentType?.toLowerCase() !== "option" || form.expiryDate !== "");
+  const isValid = () => form.label.trim() !== "" && form.stoxxExchange !== "" && form.instrumentType !== "" && form.underlyingCategory !== "" && form.underlying !== "" && form.underlyingOrigin !== "" && String(form.volumeSizePerLot).trim() !== "" && form.volumeUnit !== "" && form.currency !== "" && form.lastTradingDate !== "" && (form.instrumentType?.toLowerCase() !== "option" || form.expiryDate !== "");
 
   const save = async () => {
     if (!isValid()) return;
@@ -1542,7 +1542,7 @@ useEffect(() => {
               {(() => {
                 const match = lotSizes.find(l =>
                   l.exchange === form.stoxxExchange &&
-                  l.instrument?.toLowerCase() === (config.derivCommodities || []).find(c => c.value === form.instrument)?.label?.toLowerCase()
+                  l.underlying?.toLowerCase() === (config.derivCommodities || []).find(c => c.value === form.underlying)?.label?.toLowerCase()
                 ) || lotSizes.find(l => l.exchange === form.stoxxExchange);
                 const autoQty = match?.quantity || "";
                 const autoUnit = match?.volumeUnit || "";
@@ -1640,7 +1640,7 @@ useEffect(() => {
                     {p.instrumentType && <span style={{ color: COLORS.blue, background: `${COLORS.blue}18`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.instrumentType}</span>}
                     <span style={{ color: p.instrumentType?.toLowerCase().includes("option") ? COLORS.purple : COLORS.orange, background: p.instrumentType?.toLowerCase().includes("option") ? `${COLORS.purple}18` : `${COLORS.orange}18`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.instrumentType?.toLowerCase().includes("option") ? "Options" : "Futures"}</span>
                     <span style={{ color: p.underlyingCategory === "commodity" ? COLORS.green : COLORS.gold, background: p.underlyingCategory === "commodity" ? `${COLORS.green}15` : `${COLORS.gold}15`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>{p.underlyingCategory === "commodity" ? "Commodity" : "FX"}</span>
-                    <span>📦 {p.instrument}</span>
+                    <span>📦 {p.underlying}</span>
                     {p.underlyingOrigin && <span style={{ color: COLORS.textSub }}>🌍 {p.underlyingOrigin}</span>}
                     <span style={{ fontFamily: "'DM Mono', monospace" }}>×{p.volumeSizePerLot}{p.volumeUnit ? ` ${p.volumeUnit}` : ""}</span>
                     <span style={{ color: COLORS.gold }}>💱 {p.currency}</span>

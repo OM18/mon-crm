@@ -868,7 +868,7 @@ const DerivAutocomplete = ({ form, setForm, requiredError, products = [] }) => {
   const derivProds = form.type
     ? allProds.filter(p => !p.instrumentType || p.instrumentType.toUpperCase() === form.type.toUpperCase())
     : allProds;
-  const query = form.underlying || "";
+  const query = form.instrument || "";
   const suggestions = query.length > 0
     ? derivProds.filter(p => p.label.toUpperCase().includes(query.toUpperCase()))
     : derivProds;

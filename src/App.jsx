@@ -1152,13 +1152,13 @@ const UnderlyingEditor = ({ config, updateField }) => {
 // ─── DERIV PRODUCT EDITOR ─────────────────────────────────────
 // ─── DERIV PRODUCT IMPORT MODAL ──────────────────────────────
 const DERIV_PRODUCT_FIELD_MAP = {
-  "label":              ["label", "nom", "name", "instrument", "product"],
+  "label":              ["label", "nom", "name", "product"],
   "stoxxExchange":      ["stoxx exchange", "stoxxexchange", "exchange", "bourse"],
   "instrumentType":     ["instrument type", "instrumenttype", "type instrument", "type"],
   "underlyingCategory": ["underlying category", "underlyingcategory", "catégorie", "categorie", "category"],
-  "underlying":         ["underlying", "sous-jacent", "commodity", "produit"],
+  "underlying":         ["underlying", "sous jacent", "commodity", "produit", "sousjacent"],
   "underlyingOrigin":   ["underlying origin", "underlyingorigin", "origine", "origin", "pays origine"],
-  "volumeSizePerLot":   ["volume size per lot", "volumesizeperlot", "lot size", "taille lot", "volume lot"],
+  "volumeSizePerLot":   ["volume size per lot", "volumesizeperlot", "lot size", "lotsize", "taille lot", "volume lot"],
   "volumeUnit":         ["volume unit", "volumeunit", "unité volume", "unite volume", "unit"],
   "currency":           ["currency", "devise", "monnaie"],
   "decimals":           ["decimals", "décimales", "format cotation"],
@@ -1168,11 +1168,21 @@ const DERIV_PRODUCT_FIELD_MAP = {
   "active":             ["active", "is active", "isactive", "actif"],
 };
 
-const normalizeHeaderDP = (h) => h?.toString().toLowerCase().trim().replace(/[_\-]/g, " ") || "";
+const normalizeHeaderDP = (h) => h?.toString().toLowerCase().trim()
+  .replace(/([a-z])([A-Z])/g, '$1 $2') // camelCase → spaces before normalizing
+  .toLowerCase()
+  .replace(/[_\-]/g, " ")
+  .replace(/\s+/g, " ")
+  .trim() || "";
+
 const guessFieldDP = (header) => {
   const norm = normalizeHeaderDP(header);
+  const normCompact = norm.replace(/\s/g, ""); // also compare without spaces
   for (const [field, aliases] of Object.entries(DERIV_PRODUCT_FIELD_MAP)) {
-    if (aliases.some(a => norm === a || norm.includes(a) || a.includes(norm))) return field;
+    if (aliases.some(a => {
+      const ac = a.replace(/\s/g, "");
+      return norm === a || normCompact === ac;
+    })) return field;
   }
   return null;
 };

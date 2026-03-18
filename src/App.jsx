@@ -5727,16 +5727,12 @@ useEffect(() => {
     const { data } = await supabase.from('deriv_accounts').select('*');
     if (data?.length) setDerivAccounts(data.map(r => {
       const acc = r.data ?? r;
+      console.log('[DEBUG account]', acc.accountNumber, 'isActive=', acc.isActive, typeof acc.isActive);
       if (typeof acc.isActive === "string") {
         acc.isActive = acc.isActive.trim().toLowerCase() !== "false" && acc.isActive.trim() !== "0";
       }
       return acc;
     }));
-  }
-  loadDerivAccounts();
-}, []);
-
-const [lotSizes, setLotSizes] = useState([]);
 
 useEffect(() => {
   async function loadLotSizes() {

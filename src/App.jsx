@@ -3797,11 +3797,17 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
     });
 
     setParsedItems(items);
-    const queue = Object.values(unknowns);
+    const allUnknowns = Object.values(unknowns);
+    // infoOnly = valeurs déjà vérifiées (compte, broker) — acceptées automatiquement
+    const autoDecisions = {};
+    allUnknowns.filter(u => u.infoOnly).forEach(u => {
+      autoDecisions[`${u.configKey}:${u.value}`] = "add";
+    });
+    const queue = allUnknowns.filter(u => !u.infoOnly);
     if (queue.length > 0) {
-      setUnknownQueue(queue); setCurrentQueueIdx(0); setDecisions({}); setStep("validate");
+      setUnknownQueue(queue); setCurrentQueueIdx(0); setDecisions(autoDecisions); setStep("validate");
     } else {
-      const resolved = resolveItems(items, {});
+      const resolved = resolveItems(items, autoDecisions);
       onImport(resolved); setImporting(false); onClose();
     }
     setImporting(false);

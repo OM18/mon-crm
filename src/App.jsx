@@ -3742,6 +3742,24 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
         obj.priority = obj.priority || "moyenne";
         obj.lastContact = new Date().toISOString().split("T")[0];
       } else if (type === "derivatives") {
+        // Parse dates (handles Excel serial, DD/MM/YYYY, ISO)
+        const parseExcelDate = (val) => {
+          if (!val && val !== 0) return "";
+          const s = val.toString().trim();
+          // Excel serial number
+          if (/^\d{4,5}$/.test(s)) {
+            const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+            return d.toISOString().split("T")[0];
+          }
+          // DD/MM/YYYY or DD-MM-YYYY
+          const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+          if (m1) return `${m1[3]}-${m1[2].padStart(2,"0")}-${m1[1].padStart(2,"0")}`;
+          // Already ISO YYYY-MM-DD
+          if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+          return s;
+        };
+        if (obj.tradeDate)  obj.tradeDate  = parseExcelDate(obj.tradeDate);
+        if (obj.expiryDate) obj.expiryDate = parseExcelDate(obj.expiryDate);
         // Normalize numeric fields
         if (obj.quantity) obj.quantity = String(obj.quantity).replace(/,/g, ".");
         if (obj.price)    obj.price    = String(obj.price).replace(/,/g, ".");

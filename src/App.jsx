@@ -3499,7 +3499,7 @@ if (aliases.some(a => { console.log("COMPARE:", JSON.stringify(norm), JSON.strin
   return null;
 };
 
-const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [] }) => {
+const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivProducts = [] }) => {
   const { config, updateField } = useConfig();
   const [step, setStep] = useState("guide");
   const [guideTab, setGuideTab] = useState(type === "companies" ? "companies" : type === "derivatives" ? "derivatives" : "contacts");
@@ -3772,12 +3772,12 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
             if (!unknowns[key]) unknowns[key] = { fieldKey: "account", configKey: "derivAccount", fieldLabel: "Account Number", value: obj.account, infoOnly: true };
           }
         }
-        // Validate instrument against derivCommodities (case-insensitive, trimmed)
+        // Validate instrument against deriv_products table (case-insensitive, trimmed)
         if (obj.instrument) {
           const norm = v => v?.toString().toLowerCase().trim() || "";
-          const found = (config.derivCommodities || []).find(p => norm(p.label) === norm(obj.instrument) || norm(p.value) === norm(obj.instrument));
+          const found = derivProducts.find(p => norm(p.label) === norm(obj.instrument) || norm(p.value) === norm(obj.instrument));
           if (!found) {
-            const key = `derivCommodities:${obj.instrument}`;
+            const key = `derivProducts:${obj.instrument}`;
             if (!unknowns[key]) unknowns[key] = { fieldKey: "instrument", configKey: "derivCommodities", fieldLabel: "Instrument", value: obj.instrument };
           }
         }
@@ -3872,11 +3872,11 @@ if (Array.isArray(resolved.contractsCurrency)) {
         // instrument
         if (resolved.instrument) {
           const norm = v => v?.toString().toLowerCase().trim() || "";
-          const found = (config.derivCommodities || []).find(p => norm(p.label) === norm(resolved.instrument) || norm(p.value) === norm(resolved.instrument));
+          const found = derivProducts.find(p => norm(p.label) === norm(resolved.instrument) || norm(p.value) === norm(resolved.instrument));
           if (found) {
-            resolved.instrument = found.value || found.label;
+            resolved.instrument = found.label || found.value;
           } else {
-            const key = `derivCommodities:${resolved.instrument}`;
+            const key = `derivProducts:${resolved.instrument}`;
             const decision = finalDecisions[key];
             resolved.instrument = decision === "add" ? resolved.instrument : "";
           }
@@ -6561,7 +6561,7 @@ const setOps = async (val) => {
         </Modal>
       )}
       {showImport && (
-        <ExcelImportModal type="derivatives" derivAccounts={derivAccounts} onClose={() => setShowImport(false)}
+        <ExcelImportModal type="derivatives" derivAccounts={derivAccounts} derivProducts={products} onClose={() => setShowImport(false)}
           onImport={(items) => setOps(prev => {
             const ex = new Set(prev.map(o => o.ref?.toLowerCase()).filter(Boolean));
             const toAdd = items.map(i => ({ ...makeEmpty(), ...i, id: Date.now() + Math.random(), internalDeal: String(i.internalDeal).toLowerCase() === "true" }))

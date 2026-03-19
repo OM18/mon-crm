@@ -6226,7 +6226,7 @@ const setOps = async (val) => {
                   <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{o.quantity ? `${Number(o.quantity).toLocaleString()}` : "—"}</div>
                   <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{o.price || "—"}</div>
                   <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.businessUnit ? o.businessUnit.toUpperCase() : "—"}</div>
-                  <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{o.tradeDate || "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{o.tradeDate ? o.tradeDate.split("-").reverse().join("/") : "—"}</div>
                   <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{o.type?.toLowerCase() === "option" ? (o.expiryDate || "—") : <span style={{ color: COLORS.textMuted }}>—</span>}</div>
                   <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.broker || "—"}</div>
                   {(() => { const exch = (config.derivExchanges || []).find(e => e.value === o.exchange); return <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{exch?.label || o.exchange || "—"}</div>; })()}

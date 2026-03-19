@@ -5968,7 +5968,7 @@ const setOps = async (val) => {
   );
 
   // Colonnes tableau : REF · TYPE · OP TYPE · SIDE · UNDERLYING · QTY · PRICE · TRADE DATE · EXPIRY · BROKER · EXCHANGE · ACCOUNT · STATUS
-  const COLS = "90px 70px 80px 55px 110px 90px 80px 80px 100px 90px 110px 110px 110px 90px 60px 90px 1fr";
+  const COLS = "90px 70px 80px 55px 180px 90px 80px 80px 100px 90px 110px 110px 110px 90px 60px 90px 1fr";
   const HEADERS = ["REF", "TYPE", "OP TYPE", "SIDE", "INSTRUMENT", "LOTS", "PRICE", "BU", "TRADE DATE", "EXPIRY DATE", "BROKER", "EXCHANGE", "ACCOUNT", "STATUS", "INT.", "FEES", "NOTES"];
 
   return (

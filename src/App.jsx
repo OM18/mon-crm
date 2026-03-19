@@ -2593,7 +2593,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       <select value={accForm.businessUnit} onChange={e => { const v = e.target.value; setAccForm(p => ({ ...p, businessUnit: v })); }}
                         style={{ background: COLORS.card, border: `1px solid ${!accForm.businessUnit ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: accForm.businessUnit ? COLORS.text : COLORS.textMuted, fontSize: 14, outline: "none", fontFamily: "inherit" }}>
                         <option value="">— Sélectionner —</option>
-                        {config.businessUnit.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
+                        {config.businessUnit.filter(b => (config.derivBusinessUnits || []).includes(b.value)).map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
                       </select>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

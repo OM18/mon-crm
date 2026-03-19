@@ -3499,7 +3499,7 @@ if (aliases.some(a => { console.log("COMPARE:", JSON.stringify(norm), JSON.strin
   return null;
 };
 
-const ExcelImportModal = ({ onClose, onImport, type }) => {
+const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [] }) => {
   const { config, updateField } = useConfig();
   const [step, setStep] = useState("guide");
   const [guideTab, setGuideTab] = useState(type === "companies" ? "companies" : type === "derivatives" ? "derivatives" : "contacts");
@@ -3762,10 +3762,15 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
             if (!unknowns[key]) unknowns[key] = { fieldKey, configKey, fieldLabel: label, value: val };
           }
         });
-        // Validate account against deriv_accounts (loaded separately — check by raw string match)
+        // Validate account against derivAccounts table
         if (obj.account) {
-          const key = `derivAccount:${obj.account}`;
-          if (!unknowns[key]) unknowns[key] = { fieldKey: "account", configKey: "derivAccount", fieldLabel: "Account Number", value: obj.account, infoOnly: true };
+          const accountExists = derivAccounts.some(a =>
+            a.accountNumber?.toString().toLowerCase() === obj.account?.toString().toLowerCase()
+          );
+          if (!accountExists) {
+            const key = `derivAccount:${obj.account}`;
+            if (!unknowns[key]) unknowns[key] = { fieldKey: "account", configKey: "derivAccount", fieldLabel: "Account Number", value: obj.account, infoOnly: true };
+          }
         }
         // Validate instrument/instrument against derivProducts
         if (obj.instrument) {
@@ -6554,7 +6559,7 @@ const setOps = async (val) => {
         </Modal>
       )}
       {showImport && (
-        <ExcelImportModal type="derivatives" onClose={() => setShowImport(false)}
+        <ExcelImportModal type="derivatives" derivAccounts={derivAccounts} onClose={() => setShowImport(false)}
           onImport={(items) => setOps(prev => {
             const ex = new Set(prev.map(o => o.ref?.toLowerCase()).filter(Boolean));
             const toAdd = items.map(i => ({ ...makeEmpty(), ...i, id: Date.now() + Math.random(), internalDeal: String(i.internalDeal).toLowerCase() === "true" }))

@@ -6126,7 +6126,7 @@ const setOps = async (val) => {
                   <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.ref || "—"}</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: o.type?.toLowerCase() === "future" ? COLORS.blue : COLORS.purple, textAlign: "center" }}>{o.type}</div>
                   <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{o.opType || "—"}</div>
-                  <div style={{ textAlign: "center" }}><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.side === "BUY" ? `${COLORS.green}20` : `${COLORS.red}20`, color: o.side === "BUY" ? COLORS.green : COLORS.red }}>{o.side}</span></div>
+                  <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.side === "BUY" ? `${COLORS.green}20` : `${COLORS.red}20`, color: o.side === "BUY" ? COLORS.green : COLORS.red }}>{o.side}</span></div>
                   {(() => { const prod = (config.derivProducts || []).find(p => p.value === o.instrument); return <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{prod?.label || o.instrument || "—"}</div>; })()}
                   <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{o.quantity ? `${Number(o.quantity).toLocaleString()}` : "—"}</div>
                   <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{o.price || "—"}</div>
@@ -6136,8 +6136,8 @@ const setOps = async (val) => {
                   <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.broker || "—"}</div>
                   {(() => { const exch = (config.derivExchanges || []).find(e => e.value === o.exchange); return <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{exch?.label || o.exchange || "—"}</div>; })()}
                   {(() => { const acc = (config.derivAccounts || []).find(a => a.value === o.account); return <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{acc?.label || o.account || "—"}</div>; })()}
-                  <div style={{ textAlign: "center" }}><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sc.color}20`, color: sc.color }}>{sc.label}</span></div>
-                  <div style={{ textAlign: "center" }}><span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.internalDeal ? `${COLORS.blue}20` : "transparent", color: o.internalDeal ? COLORS.blue : COLORS.textMuted }}>{o.internalDeal ? "YES" : "—"}</span></div>
+                  <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sc.color}20`, color: sc.color }}>{sc.label}</span></div>
+                  <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.internalDeal ? `${COLORS.blue}20` : "transparent", color: o.internalDeal ? COLORS.blue : COLORS.textMuted }}>{o.internalDeal ? "YES" : "—"}</span></div>
                   {/* FEES — calculé auto, éditable manuellement */}
                   {(() => {
                     const account = derivAccounts.find(a => a.accountNumber === o.account);

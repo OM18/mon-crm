@@ -5727,12 +5727,16 @@ useEffect(() => {
     const { data } = await supabase.from('deriv_accounts').select('*');
     if (data?.length) setDerivAccounts(data.map(r => {
       const acc = r.data ?? r;
-      console.log('[DEBUG account]', acc.accountNumber, 'isActive=', acc.isActive, typeof acc.isActive);
       if (typeof acc.isActive === "string") {
         acc.isActive = acc.isActive.trim().toLowerCase() !== "false" && acc.isActive.trim() !== "0";
       }
       return acc;
     }));
+  }
+  loadDerivAccounts();
+}, []);
+
+const [lotSizes, setLotSizes] = useState([]);
 
 useEffect(() => {
   async function loadLotSizes() {
@@ -5741,6 +5745,40 @@ useEffect(() => {
   }
   loadLotSizes();
 }, []);
+  const [exchangeTarifs, setExchangeTarifs] = useState([]);
+
+useEffect(() => {
+  async function loadExchangeTarifs() {
+    const { data } = await supabase.from('deriv_exchange_tarifs').select('data');
+    if (data?.length) setExchangeTarifs(data.map(r => r.data));
+  }
+  loadExchangeTarifs();
+}, []);
+
+  const CURRENCY_SYMBOLS = { EUR: "€", USD: "$", GBP: "£", MAD: "MAD", UAH: "₴", CHF: "CHF" };
+
+  const computeFees = (op, tarifs) => {
+    if (!tarifs || tarifs.length === 0) return "";
+    const norm = v => (v || "").toString().toLowerCase().trim();
+    const opBroker = norm(op.broker);
+    const opExchange = norm(op.exchange);
+    const opTrans = norm(op.orderTransmissionType);
+
+    const matching = tarifs.filter(t => {
+      if (!t.isActive) return false;
+      const brokers = Array.isArray(t.financialBroker) ? t.financialBroker : [t.financialBroker];
+      const transmissions = Array.isArray(t.orderTransmissionType) ? t.orderTransmissionType : [t.orderTransmissionType];
+      const brokerMatch = brokers.some(b => norm(b) === opBroker || norm(b).includes(opBroker) || opBroker.includes(norm(b)));
+      const exchangeMatch = norm(t.exchange) === opExchange || norm(t.exchange).includes(opExchange) || opExchange.includes(norm(t.exchange));
+      const transMatch = opTrans === "" || transmissions.some(tr => norm(tr) === opTrans);
+      return brokerMatch && exchangeMatch && transMatch;
+    });
+
+    if (matching.length === 0) return "";
+    const total = matching.reduce((sum, t) => sum + (parseFloat(t.tarif) || 0), 0);
+    return Math.round(total);
+  };
+
   const INSTRUMENT_TYPES = ["Future", "Option"];
   const SIDES = ["BUY", "SELL"];
   const OP_TYPES = ["Hedging", "Rolling", "Trade"];
@@ -5774,7 +5812,7 @@ useEffect(() => {
       strike: "", optionType: "Call",
       tradeDate: new Date().toISOString().slice(0, 10), expiryDate: "",
       businessUnit: config.derivBusinessUnitDefault || "", broker: config.derivDefaultBroker || "", exchange: "", account: "",
-      contract: "", trade: "", lotSize: "", orderTransmissionType: transVal,
+      contract: "", trade: "", lotSize: "", orderTransmissionType: transVal, fees: "",
       status: (() => { const def = config.derivOpStatusDefault; const found = (config.derivOpStatuses || []).find(s => s.value === def); return found ? found.label.toUpperCase() : (config.derivOpStatuses?.[0]?.label?.toUpperCase() || "TRADED"); })(), notes: "", internalDeal: false,
     };
   };
@@ -5926,8 +5964,8 @@ const setOps = async (val) => {
   );
 
   // Colonnes tableau : REF · TYPE · OP TYPE · SIDE · UNDERLYING · QTY · PRICE · TRADE DATE · EXPIRY · BROKER · EXCHANGE · ACCOUNT · STATUS
-  const COLS = "90px 70px 80px 55px 110px 90px 80px 80px 100px 90px 110px 110px 110px 90px 60px 1fr";
-  const HEADERS = ["REF", "TYPE", "OP TYPE", "SIDE", "INSTRUMENT", "LOTS", "PRICE", "BU", "TRADE DATE", "EXPIRY DATE", "BROKER", "EXCHANGE", "ACCOUNT", "STATUS", "INT.", "NOTES"];
+  const COLS = "90px 70px 80px 55px 110px 90px 80px 80px 100px 90px 110px 110px 110px 90px 60px 90px 1fr";
+  const HEADERS = ["REF", "TYPE", "OP TYPE", "SIDE", "INSTRUMENT", "LOTS", "PRICE", "BU", "TRADE DATE", "EXPIRY DATE", "BROKER", "EXCHANGE", "ACCOUNT", "STATUS", "INT.", "FEES", "NOTES"];
 
   return (
     <div style={{ display: "flex", gap: 24, height: "calc(100vh - 130px)", width: "100%" }}>
@@ -6096,6 +6134,31 @@ const setOps = async (val) => {
                   {(() => { const acc = (config.derivAccounts || []).find(a => a.value === o.account); return <div style={{ fontSize: 12, color: COLORS.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{acc?.label || o.account || "—"}</div>; })()}
                   <div><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sc.color}20`, color: sc.color }}>{sc.label}</span></div>
                   <div style={{ textAlign: "center" }}><span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.internalDeal ? `${COLORS.blue}20` : "transparent", color: o.internalDeal ? COLORS.blue : COLORS.textMuted }}>{o.internalDeal ? "YES" : "—"}</span></div>
+                  {/* FEES — calculé auto, éditable manuellement */}
+                  <div onClick={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                    {(() => {
+                      const account = derivAccounts.find(a => a.accountNumber === o.account);
+                      const currency = account?.currency || "";
+                      const sym = CURRENCY_SYMBOLS[currency] || currency;
+                      const autoFees = computeFees(o, exchangeTarifs);
+                      const displayVal = o.fees !== undefined && o.fees !== "" ? o.fees : autoFees;
+                      return (
+                        <>
+                          {sym && <span style={{ fontSize: 10, color: COLORS.textMuted, flexShrink: 0 }}>{sym}</span>}
+                          <input
+                            value={displayVal === "" ? "" : displayVal}
+                            onChange={e => {
+                              const v = e.target.value;
+                              const updated = ops.map(x => x.id === o.id ? { ...x, fees: v === "" ? "" : v } : x);
+                              setOps(updated);
+                            }}
+                            placeholder={autoFees !== "" ? String(autoFees) : "—"}
+                            style={{ width: "100%", background: "transparent", border: "none", borderBottom: `1px solid ${COLORS.border}`, color: o.fees !== undefined && o.fees !== "" ? COLORS.accent : COLORS.textMuted, fontSize: 12, fontFamily: "'DM Mono', monospace", outline: "none", padding: "1px 2px", textAlign: "right" }}
+                          />
+                        </>
+                      );
+                    })()}
+                  </div>
                   <div style={{ fontSize: 11, color: COLORS.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontStyle: o.notes ? "italic" : "normal" }}>{o.notes || "—"}</div>
                 </div>
               );

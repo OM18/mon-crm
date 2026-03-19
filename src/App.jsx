@@ -5838,7 +5838,7 @@ const setOps = async (val) => {
   const [editOp, setEditOp]       = useState(null);
   const [form, setForm]         = useState(makeEmpty());
   const [selected, setSelected] = useState(null);
-  const [search, setSearch]     = useState("");
+  const [editingFeesId, setEditingFeesId] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filterMode, setFilterMode]   = useState("AND");
   const EMPTY_FILTERS = { type: [], opType: [], side: [], status: [], businessUnit: [], internalDeal: [] };
@@ -6136,30 +6136,40 @@ const setOps = async (val) => {
                   <div><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sc.color}20`, color: sc.color }}>{sc.label}</span></div>
                   <div style={{ textAlign: "center" }}><span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.internalDeal ? `${COLORS.blue}20` : "transparent", color: o.internalDeal ? COLORS.blue : COLORS.textMuted }}>{o.internalDeal ? "YES" : "—"}</span></div>
                   {/* FEES — calculé auto, éditable manuellement */}
-                  <div onClick={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                    {(() => {
-                      const account = derivAccounts.find(a => a.accountNumber === o.account);
-                      const currency = account?.currency || "";
-                      const sym = CURRENCY_SYMBOLS[currency] || currency;
-                      const autoFees = computeFees(o, exchangeTarifs);
-                      const displayVal = o.fees !== undefined && o.fees !== "" ? o.fees : autoFees;
-                      return (
-                        <>
-                          {sym && <span style={{ fontSize: 10, color: COLORS.textMuted, flexShrink: 0 }}>{sym}</span>}
-                          <input
-                            value={displayVal === "" ? "" : displayVal}
-                            onChange={e => {
-                              const v = e.target.value;
+                  {(() => {
+                    const account = derivAccounts.find(a => a.accountNumber === o.account);
+                    const currency = account?.currency || "";
+                    const sym = CURRENCY_SYMBOLS[currency] || currency;
+                    const autoFees = computeFees(o, exchangeTarifs);
+                    const hasManual = o.fees !== undefined && o.fees !== "";
+                    const displayVal = hasManual ? o.fees : autoFees;
+                    const editingFees = editingFeesId === o.id;
+                    return (
+                      <div onClick={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        {editingFees ? (
+                          <input autoFocus
+                            defaultValue={hasManual ? o.fees : autoFees}
+                            onBlur={e => {
+                              const v = e.target.value.replace(/[^\d.-]/g, "");
                               const updated = ops.map(x => x.id === o.id ? { ...x, fees: v === "" ? "" : v } : x);
                               setOps(updated);
+                              setEditingFeesId(null);
                             }}
-                            placeholder={autoFees !== "" ? String(autoFees) : "—"}
-                            style={{ width: "100%", background: "transparent", border: "none", borderBottom: `1px solid ${COLORS.border}`, color: o.fees !== undefined && o.fees !== "" ? COLORS.accent : COLORS.textMuted, fontSize: 12, fontFamily: "'DM Mono', monospace", outline: "none", padding: "1px 2px", textAlign: "right" }}
+                            onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditingFeesId(null); }}
+                            style={{ width: 60, background: COLORS.bg, border: `1px solid ${COLORS.accent}60`, borderRadius: 5, color: COLORS.text, fontSize: 12, fontFamily: "'DM Mono', monospace", outline: "none", padding: "1px 5px" }}
                           />
-                        </>
-                      );
-                    })()}
-                  </div>
+                        ) : (
+                          <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: hasManual ? COLORS.accent : COLORS.textSub }}>
+                            {displayVal !== "" ? `${displayVal}${sym}` : "—"}
+                          </span>
+                        )}
+                        <span onClick={() => setEditingFeesId(editingFees ? null : o.id)}
+                          style={{ fontSize: 10, color: COLORS.textMuted, cursor: "pointer", flexShrink: 0, opacity: 0.6 }}
+                          onMouseOver={e => e.currentTarget.style.color = COLORS.accent}
+                          onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>✏</span>
+                      </div>
+                    );
+                  })()}
                   <div style={{ fontSize: 11, color: COLORS.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontStyle: o.notes ? "italic" : "normal" }}>{o.notes || "—"}</div>
                 </div>
               );

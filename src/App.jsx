@@ -3772,11 +3772,12 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
             if (!unknowns[key]) unknowns[key] = { fieldKey: "account", configKey: "derivAccount", fieldLabel: "Account Number", value: obj.account, infoOnly: true };
           }
         }
-        // Validate instrument/instrument against derivProducts
+        // Validate instrument against derivCommodities (case-insensitive, trimmed)
         if (obj.instrument) {
-          const found = (config.derivProducts || []).find(p => p.label?.toLowerCase() === obj.instrument?.toLowerCase() || p.value?.toLowerCase() === obj.instrument?.toLowerCase());
+          const norm = v => v?.toString().toLowerCase().trim() || "";
+          const found = (config.derivCommodities || []).find(p => norm(p.label) === norm(obj.instrument) || norm(p.value) === norm(obj.instrument));
           if (!found) {
-            const key = `derivProducts:${obj.instrument}`;
+            const key = `derivCommodities:${obj.instrument}`;
             if (!unknowns[key]) unknowns[key] = { fieldKey: "instrument", configKey: "derivCommodities", fieldLabel: "Instrument", value: obj.instrument };
           }
         }
@@ -3870,11 +3871,12 @@ if (Array.isArray(resolved.contractsCurrency)) {
         });
         // instrument
         if (resolved.instrument) {
-          const found = (config.derivProducts || []).find(p => p.label?.toLowerCase() === resolved.instrument?.toLowerCase() || p.value?.toLowerCase() === resolved.instrument?.toLowerCase());
+          const norm = v => v?.toString().toLowerCase().trim() || "";
+          const found = (config.derivCommodities || []).find(p => norm(p.label) === norm(resolved.instrument) || norm(p.value) === norm(resolved.instrument));
           if (found) {
             resolved.instrument = found.value || found.label;
           } else {
-            const key = `derivProducts:${resolved.instrument}`;
+            const key = `derivCommodities:${resolved.instrument}`;
             const decision = finalDecisions[key];
             resolved.instrument = decision === "add" ? resolved.instrument : "";
           }

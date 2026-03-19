@@ -6125,17 +6125,17 @@ const setOps = async (val) => {
                   onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`; }}>
                   <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.ref || "—"}</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: o.type?.toLowerCase() === "future" ? COLORS.blue : COLORS.purple }}>{o.type}</div>
-                  <div style={{ fontSize: 13, color: COLORS.textSub }}>{o.opType || "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text }}>{o.opType || "—"}</div>
                   <div><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.side === "BUY" ? `${COLORS.green}20` : `${COLORS.red}20`, color: o.side === "BUY" ? COLORS.green : COLORS.red }}>{o.side}</span></div>
                   {(() => { const prod = (config.derivProducts || []).find(p => p.value === o.instrument); return <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{prod?.label || o.instrument || "—"}</div>; })()}
-                  <div style={{ fontSize: 13, color: COLORS.textSub }}>{o.quantity ? `${Number(o.quantity).toLocaleString()}` : "—"}</div>
-                  <div style={{ fontSize: 13, color: COLORS.textSub }}>{o.price || "—"}</div>
-                  <div style={{ fontSize: 13, color: COLORS.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.businessUnit ? o.businessUnit.toUpperCase() : "—"}</div>
-                  <div style={{ fontSize: 13, color: COLORS.textSub }}>{o.tradeDate || "—"}</div>
-                  <div style={{ fontSize: 13, color: COLORS.textSub }}>{o.type?.toLowerCase() === "option" ? (o.expiryDate || "—") : <span style={{ color: COLORS.textMuted }}>—</span>}</div>
-                  <div style={{ fontSize: 13, color: COLORS.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.broker || "—"}</div>
-                  {(() => { const exch = (config.derivExchanges || []).find(e => e.value === o.exchange); return <div style={{ fontSize: 13, color: COLORS.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exch?.label || o.exchange || "—"}</div>; })()}
-                  {(() => { const acc = (config.derivAccounts || []).find(a => a.value === o.account); return <div style={{ fontSize: 13, color: COLORS.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{acc?.label || o.account || "—"}</div>; })()}
+                  <div style={{ fontSize: 13, color: COLORS.text }}>{o.quantity ? `${Number(o.quantity).toLocaleString()}` : "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text }}>{o.price || "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.businessUnit ? o.businessUnit.toUpperCase() : "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text }}>{o.tradeDate || "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text }}>{o.type?.toLowerCase() === "option" ? (o.expiryDate || "—") : <span style={{ color: COLORS.textMuted }}>—</span>}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.broker || "—"}</div>
+                  {(() => { const exch = (config.derivExchanges || []).find(e => e.value === o.exchange); return <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exch?.label || o.exchange || "—"}</div>; })()}
+                  {(() => { const acc = (config.derivAccounts || []).find(a => a.value === o.account); return <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{acc?.label || o.account || "—"}</div>; })()}
                   <div><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sc.color}20`, color: sc.color }}>{sc.label}</span></div>
                   <div style={{ textAlign: "center" }}><span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.internalDeal ? `${COLORS.blue}20` : "transparent", color: o.internalDeal ? COLORS.blue : COLORS.textMuted }}>{o.internalDeal ? "YES" : "—"}</span></div>
                   {/* FEES — calculé auto, éditable manuellement */}
@@ -6173,7 +6173,7 @@ const setOps = async (val) => {
                       </div>
                     );
                   })()}
-                  <div style={{ fontSize: 13, color: COLORS.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontStyle: o.notes ? "italic" : "normal" }}>{o.notes || "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontStyle: o.notes ? "italic" : "normal" }}>{o.notes || "—"}</div>
                 </div>
               );
             })}

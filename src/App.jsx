@@ -2398,6 +2398,7 @@ useEffect(() => {
   const [showAccForm, setShowAccForm] = useState(false);
   const [showAccImport, setShowAccImport] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState(false);
+  const [accSearch, setAccSearch] = useState("");
   const [expandedOrderTransmission, setExpandedOrderTransmission] = useState(false);
   const [expandedFinancialBrokers, setExpandedFinancialBrokers] = useState(false);
   const [expandedLotSizes, setExpandedLotSizes] = useState(false);
@@ -2681,36 +2682,84 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                 <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 32, fontSize: 13 }}>Aucun compte — cliquez sur "+ Ajouter" pour commencer</div>
               )}
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {derivAccounts.map(a => {
-                  const bu = config.businessUnit.find(b => b.value === a.businessUnit);
-                  return (
-                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 14, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: `${COLORS.blue}18`, border: `1px solid ${COLORS.blue}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>💼</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{a.accountNumber}</div>
-                        <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                          {bu && <span style={{ color: bu.color || COLORS.textSub }}>◈ {bu.label}</span>}
-                          <span>💱 {a.currency}</span>
-                          {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>}
-                          {a.accountType && (() => { const opt = (Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : []).find(o => o.value === a.accountType); return opt ? <span style={{ color: opt.color || COLORS.accent, fontWeight: 700 }}>● {opt.label}</span> : <span style={{ color: COLORS.textMuted }}>● {a.accountType}</span>; })()}
-                          {a.financingBank && <span style={{ color: COLORS.accent }}>🏦 {a.financingBank}</span>}
-                          {a.contracts && <span style={{ color: COLORS.textSub }}>📄 {a.contracts}</span>}
-                          {a.trade && <span style={{ color: COLORS.textSub }}>🔀 {a.trade}</span>}
+              {derivAccounts.length > 0 && (
+                <>
+                  {/* Search bar */}
+                  <div style={{ marginBottom: 12 }}>
+                    <input
+                      value={accSearch}
+                      onChange={e => setAccSearch(e.target.value)}
+                      placeholder="🔍 Rechercher un compte…"
+                      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }}
+                    />
+                  </div>
+
+                  {(() => {
+                    const q = accSearch.trim().toLowerCase();
+                    const filtered = derivAccounts.filter(a =>
+                      !q ||
+                      a.accountNumber?.toLowerCase().includes(q) ||
+                      a.businessUnit?.toLowerCase().includes(q) ||
+                      a.financingBank?.toLowerCase().includes(q) ||
+                      a.contracts?.toLowerCase().includes(q)
+                    );
+                    const active = filtered.filter(a => a.isActive !== false && String(a.isActive).toLowerCase() !== "false");
+                    const inactive = filtered.filter(a => a.isActive === false || String(a.isActive).toLowerCase() === "false");
+
+                    const renderRow = (a) => {
+                      const bu = config.businessUnit.find(b => b.value === a.businessUnit);
+                      return (
+                        <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 14, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: `${COLORS.blue}18`, border: `1px solid ${COLORS.blue}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>💼</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{a.accountNumber}</div>
+                            <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                              {bu && <span style={{ color: bu.color || COLORS.textSub }}>◈ {bu.label}</span>}
+                              <span>💱 {a.currency}</span>
+                              {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>}
+                              {a.accountType && (() => { const opt = (Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : []).find(o => o.value === a.accountType); return opt ? <span style={{ color: opt.color || COLORS.accent, fontWeight: 700 }}>● {opt.label}</span> : <span style={{ color: COLORS.textMuted }}>● {a.accountType}</span>; })()}
+                              {a.financingBank && <span style={{ color: COLORS.accent }}>🏦 {a.financingBank}</span>}
+                              {a.contracts && <span style={{ color: COLORS.textSub }}>📄 {a.contracts}</span>}
+                              {a.trade && <span style={{ color: COLORS.textSub }}>🔀 {a.trade}</span>}
+                            </div>
+                          </div>
+                          <div onClick={() => { const updated = derivAccounts.map(x => x.id === a.id ? { ...x, isActive: !x.isActive } : x); setDerivAccounts(updated); safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts); }}
+                            style={{ width: 40, height: 22, borderRadius: 11, background: a.isActive ? COLORS.green : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+                            <div style={{ position: "absolute", top: 3, left: a.isActive ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
+                          </div>
+                          <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, fontWeight: 600, minWidth: 58, textAlign: "center", background: a.isActive ? `${COLORS.green}22` : `${COLORS.red}22`, color: a.isActive ? COLORS.green : COLORS.red }}>{a.isActive ? "Active" : "Inactive"}</span>
+                          <button onClick={() => { setAccForm({ ...a }); setEditAccId(a.id); setShowAccForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                          <button onClick={() => deleteAccount(a.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
                         </div>
+                      );
+                    };
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                        {/* Actifs */}
+                        {active.length > 0 && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {active.map(renderRow)}
+                          </div>
+                        )}
+                        {/* Inactifs */}
+                        {inactive.length > 0 && (
+                          <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden" }}>
+                            <div style={{ padding: "8px 14px", background: COLORS.surface, display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 1 }}>INACTIFS</span>
+                              <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "1px 7px", borderRadius: 4, border: `1px solid ${COLORS.border}` }}>{inactive.length}</span>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 10px", opacity: 0.6 }}>
+                              {inactive.map(renderRow)}
+                            </div>
+                          </div>
+                        )}
+                        {filtered.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 20, fontSize: 13 }}>Aucun résultat pour « {accSearch} »</div>}
                       </div>
-                      <div onClick={() => { const updated = derivAccounts.map(x => x.id === a.id ? { ...x, isActive: !x.isActive } : x); setDerivAccounts(updated); safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts); }}
-                        style={{ width: 40, height: 22, borderRadius: 11, background: a.isActive ? COLORS.green : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
-                        <div style={{ position: "absolute", top: 3, left: a.isActive ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
-                      </div>
-                      
-                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, fontWeight: 600, minWidth: 58, textAlign: "center", background: a.isActive ? `${COLORS.green}22` : `${COLORS.red}22`, color: a.isActive ? COLORS.green : COLORS.red }}>{a.isActive ? "Active" : "Inactive"}</span>
-                      <button onClick={() => { setAccForm({ ...a }); setEditAccId(a.id); setShowAccForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
-                      <button onClick={() => deleteAccount(a.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })()}
+                </>
+              )}
             </div>}
           </div>
 

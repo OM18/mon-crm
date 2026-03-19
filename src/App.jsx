@@ -1543,7 +1543,7 @@ useEffect(() => {
                 </select>
               </div>
               <DerivSelectField label="Underlying Category" field="underlyingCategory" options={[{ value: "commodity", label: "Commodity" }, { value: "fx", label: "FX" }]} form={form} setForm={setForm} />
-              <DerivSelectField label="Underlying" field="instrument" options={(config.derivCommodities || []).map(c => ({ value: c.value, label: c.label }))} form={form} setForm={setForm} />
+              <DerivSelectField label="Underlying" field="underlying" options={(config.derivCommodities || []).map(c => ({ value: c.value, label: c.label }))} form={form} setForm={setForm} />
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>UNDERLYING ORIGIN <span style={{ color: COLORS.red }}>*</span></label>
                 <select value={form.underlyingOrigin || ""} onChange={e => setForm(f => ({ ...f, underlyingOrigin: e.target.value }))}

@@ -3747,7 +3747,11 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
         if (obj.price)    obj.price    = String(obj.price).replace(/,/g, ".");
         if (obj.strike)   obj.strike   = String(obj.strike).replace(/,/g, ".");
         // Normalize side to uppercase
-        if (obj.side) obj.side = obj.side.toString().toUpperCase().trim();
+        if (obj.side) {
+          obj.side = obj.side.toString().toUpperCase().trim();
+          if (obj.side === "LONG") obj.side = "BUY";
+          if (obj.side === "SHORT") obj.side = "SELL";
+        }
         // Normalize internalDeal
         obj.internalDeal = String(obj.internalDeal || "").toLowerCase() === "true";
         // Normalize status

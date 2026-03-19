@@ -5776,7 +5776,8 @@ useEffect(() => {
 
     if (matching.length === 0) return "";
     const total = matching.reduce((sum, t) => sum + (parseFloat(t.tarif) || 0), 0);
-    return Math.round(total);
+    const lots = parseFloat(op.quantity) || 1;
+    return Math.round(total * lots);
   };
 
   const INSTRUMENT_TYPES = ["Future", "Option"];

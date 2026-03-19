@@ -3499,7 +3499,7 @@ if (aliases.some(a => { console.log("COMPARE:", JSON.stringify(norm), JSON.strin
   return null;
 };
 
-const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivProducts = [] }) => {
+const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivProducts = [], derivCompanies = [] }) => {
   const { config, updateField } = useConfig();
   const [step, setStep] = useState("guide");
   const [guideTab, setGuideTab] = useState(type === "companies" ? "companies" : type === "derivatives" ? "derivatives" : "contacts");
@@ -3764,9 +3764,8 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
         });
         // Validate account against derivAccounts table
         if (obj.account) {
-          const accountExists = derivAccounts.some(a =>
-            a.accountNumber?.toString().toLowerCase() === obj.account?.toString().toLowerCase()
-          );
+          const norm = v => v?.toString().toLowerCase().trim() || "";
+          const accountExists = derivAccounts.some(a => norm(a.accountNumber) === norm(obj.account));
           if (!accountExists) {
             const key = `derivAccount:${obj.account}`;
             if (!unknowns[key]) unknowns[key] = { fieldKey: "account", configKey: "derivAccount", fieldLabel: "Account Number", value: obj.account, infoOnly: true };
@@ -3781,10 +3780,14 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
             if (!unknowns[key]) unknowns[key] = { fieldKey: "instrument", configKey: "derivCommodities", fieldLabel: "Instrument", value: obj.instrument };
           }
         }
-        // Validate broker against derivDefaultBroker / companies
+        // Validate broker against companies list
         if (obj.broker) {
-          const key = `derivBroker:${obj.broker}`;
-          if (!unknowns[key]) unknowns[key] = { fieldKey: "broker", configKey: "derivBroker", fieldLabel: "Broker", value: obj.broker, infoOnly: true };
+          const norm = v => v?.toString().toLowerCase().trim() || "";
+          const brokerExists = derivCompanies.some(c => norm(c.name) === norm(obj.broker));
+          if (!brokerExists) {
+            const key = `derivBroker:${obj.broker}`;
+            if (!unknowns[key]) unknowns[key] = { fieldKey: "broker", configKey: "derivBroker", fieldLabel: "Broker", value: obj.broker, infoOnly: true };
+          }
         }
       }
       return obj;
@@ -6561,7 +6564,7 @@ const setOps = async (val) => {
         </Modal>
       )}
       {showImport && (
-        <ExcelImportModal type="derivatives" derivAccounts={derivAccounts} derivProducts={products} onClose={() => setShowImport(false)}
+        <ExcelImportModal type="derivatives" derivAccounts={derivAccounts} derivProducts={products} derivCompanies={companies} onClose={() => setShowImport(false)}
           onImport={(items) => setOps(prev => {
             const ex = new Set(prev.map(o => o.ref?.toLowerCase()).filter(Boolean));
             const toAdd = items.map(i => ({ ...makeEmpty(), ...i, id: Date.now() + Math.random(), internalDeal: String(i.internalDeal).toLowerCase() === "true" }))

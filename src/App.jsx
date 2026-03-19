@@ -6162,7 +6162,7 @@ const setOps = async (val) => {
                             style={{ width: 60, background: COLORS.bg, border: `1px solid ${COLORS.accent}60`, borderRadius: 5, color: COLORS.text, fontSize: 12, fontFamily: "'DM Mono', monospace", outline: "none", padding: "1px 5px" }}
                           />
                         ) : (
-                          <span style={{ fontSize: 12, color: hasManual ? COLORS.accent : COLORS.textSub }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: hasManual ? COLORS.accent : COLORS.text }}>
                             {displayVal !== "" ? `${displayVal}${sym}` : "—"}
                           </span>
                         )}

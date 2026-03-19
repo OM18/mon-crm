@@ -6899,12 +6899,12 @@ const DerivativesDashboard = () => {
   };
   const pnlColor = (n) => n > 0 ? COLORS.green : n < 0 ? COLORS.red : COLORS.textMuted;
 
-  // Build buckets keyed by "account||instrument"
+  // Build buckets keyed by "account||instrument" — normalized to avoid case/space mismatches
   const buckets = {};
   for (const op of ops) {
-    const key = `${op.account || ""}||${op.instrument || ""}`;
-    if (!buckets[key]) buckets[key] = { account: op.account || "", instrument: op.instrument || "", ops: [] };
-    buckets[key].ops.push(op);
+    const normKey = `${(op.account || "").toLowerCase().trim()}||${(op.instrument || "").toLowerCase().trim()}`;
+    if (!buckets[normKey]) buckets[normKey] = { account: op.account || "", instrument: op.instrument || "", ops: [] };
+    buckets[normKey].ops.push(op);
   }
 
   const bucketResults = Object.values(buckets).map(b => ({ ...b, ...runFIFO(b.ops) }));

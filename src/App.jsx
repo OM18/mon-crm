@@ -2281,10 +2281,10 @@ const FinancingBanksEditor = ({ companies = [], config, updateField }) => {
 
   const selected = Array.isArray(config.derivFinancingBanks) ? config.derivFinancingBanks : [];
 
-  const toggle = (companyName) => {
-    const next = selected.includes(companyName)
-      ? selected.filter(v => v !== companyName)
-      : [...selected, companyName];
+  const toggle = (companyId) => {
+    const next = selected.includes(companyId)
+      ? selected.filter(v => v !== companyId)
+      : [...selected, companyId];
     updateField("derivFinancingBanks", next);
   };
 
@@ -2303,11 +2303,15 @@ const FinancingBanksEditor = ({ companies = [], config, updateField }) => {
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 420 }}>
           {selected.length === 0
             ? <span style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>Aucune sélectionnée</span>
-            : selected.map(name => (
-              <span key={name} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: `${COLORS.accent}20`, color: COLORS.accent, border: `1px solid ${COLORS.accent}40` }}>
-                {name}
-              </span>
-            ))
+            : selected.map(id => {
+              const c = bankCompanies.find(c => String(c.id) === String(id)) || companies.find(c => String(c.id) === String(id));
+              const displayName = c?.name || id;
+              return (
+                <span key={id} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: `${COLORS.accent}20`, color: COLORS.accent, border: `1px solid ${COLORS.accent}40` }}>
+                  {displayName}
+                </span>
+              );
+            })
           }
           <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)", marginLeft: 4 }}>▾</span>
         </div>
@@ -2323,9 +2327,9 @@ const FinancingBanksEditor = ({ companies = [], config, updateField }) => {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {bankCompanies.map(c => {
-                const isSelected = selected.includes(c.name);
+                const isSelected = selected.includes(String(c.id));
                 return (
-                  <div key={c.id} onClick={() => toggle(c.name)}
+                  <div key={c.id} onClick={() => toggle(String(c.id))}
                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 10, cursor: "pointer", border: `1px solid ${isSelected ? COLORS.accent + "60" : COLORS.border}`, background: isSelected ? `${COLORS.accent}10` : COLORS.card, transition: "all 0.15s" }}
                     onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
                     onMouseOut={e => { e.currentTarget.style.background = isSelected ? `${COLORS.accent}10` : COLORS.card; }}>
@@ -2625,9 +2629,10 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       <select value={accForm.financingBank} onChange={e => setAccForm(f => ({ ...f, financingBank: e.target.value }))}
                         style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: accForm.financingBank ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
                         <option value="">— Aucune —</option>
-                        {(Array.isArray(config.derivFinancingBanks) ? config.derivFinancingBanks : []).map(b => {
-                          const name = typeof b === "string" ? b : (b.label || b.value || "");
-                          return <option key={name} value={name}>{name}</option>;
+                        {(Array.isArray(config.derivFinancingBanks) ? config.derivFinancingBanks : []).map(id => {
+                          const company = companies.find(c => String(c.id) === String(id));
+                          const name = company?.name || id;
+                          return <option key={id} value={id}>{name}</option>;
                         })}
                       </select>
                       {(Array.isArray(config.derivFinancingBanks) ? config.derivFinancingBanks : []).length === 0 && (
@@ -2686,7 +2691,10 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                           <span>💱 {a.currency}</span>
                           {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>}
                           {a.accountType && (() => { const opt = (Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : []).find(o => o.value === a.accountType); return opt ? <span style={{ color: opt.color || COLORS.accent, fontWeight: 700 }}>● {opt.label}</span> : <span style={{ color: COLORS.textMuted }}>● {a.accountType}</span>; })()}
-                          {a.financingBank && <span style={{ color: COLORS.accent }}>🏦 {a.financingBank}</span>}
+                          {a.financingBank && (() => {
+                            const company = companies.find(c => String(c.id) === String(a.financingBank));
+                            return <span style={{ color: COLORS.accent }}>🏦 {company?.name || a.financingBank}</span>;
+                          })()}
                           {a.contracts && <span style={{ color: COLORS.textSub }}>📄 {a.contracts}</span>}
                           {a.trade && <span style={{ color: COLORS.textSub }}>🔀 {a.trade}</span>}
                         </div>

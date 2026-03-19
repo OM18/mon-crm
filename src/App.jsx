@@ -5758,26 +5758,28 @@ useEffect(() => {
   const CURRENCY_SYMBOLS = { EUR: "€", USD: "$", GBP: "£", MAD: "MAD", UAH: "₴", CHF: "CHF" };
 
   const computeFees = (op, tarifs) => {
-    if (!tarifs || tarifs.length === 0) return "";
-    const norm = v => (v || "").toString().toLowerCase().trim();
-    const opBroker = norm(op.broker);
-    const opExchange = norm(op.exchange);
-    const opTrans = norm(op.orderTransmissionType);
+    try {
+      if (!tarifs || tarifs.length === 0 || !op) return "";
+      const norm = v => (v || "").toString().toLowerCase().trim();
+      const opBroker = norm(op.broker);
+      const opExchange = norm(op.exchange);
+      const opTrans = norm(op.orderTransmissionType);
 
-    const matching = tarifs.filter(t => {
-      if (!t.isActive) return false;
-      const brokers = Array.isArray(t.financialBroker) ? t.financialBroker : [t.financialBroker];
-      const transmissions = Array.isArray(t.orderTransmissionType) ? t.orderTransmissionType : [t.orderTransmissionType];
-      const brokerMatch = brokers.some(b => norm(b) === opBroker || norm(b).includes(opBroker) || opBroker.includes(norm(b)));
-      const exchangeMatch = norm(t.exchange) === opExchange || norm(t.exchange).includes(opExchange) || opExchange.includes(norm(t.exchange));
-      const transMatch = opTrans === "" || transmissions.some(tr => norm(tr) === opTrans);
-      return brokerMatch && exchangeMatch && transMatch;
-    });
+      const matching = tarifs.filter(t => {
+        if (!t.isActive) return false;
+        const brokers = Array.isArray(t.financialBroker) ? t.financialBroker : [t.financialBroker];
+        const transmissions = Array.isArray(t.orderTransmissionType) ? t.orderTransmissionType : [t.orderTransmissionType];
+        const brokerMatch = brokers.some(b => norm(b) === opBroker || norm(b).includes(opBroker) || opBroker.includes(norm(b)));
+        const exchangeMatch = norm(t.exchange) === opExchange || norm(t.exchange).includes(opExchange) || opExchange.includes(norm(t.exchange));
+        const transMatch = opTrans === "" || transmissions.some(tr => norm(tr) === opTrans);
+        return brokerMatch && exchangeMatch && transMatch;
+      });
 
-    if (matching.length === 0) return "";
-    const total = matching.reduce((sum, t) => sum + (parseFloat(t.tarif) || 0), 0);
-    const lots = parseFloat(op.quantity) || 1;
-    return Math.round(total * lots);
+      if (matching.length === 0) return "";
+      const total = matching.reduce((sum, t) => sum + (parseFloat(t.tarif) || 0), 0);
+      const lots = parseFloat(op.quantity) || 1;
+      return Math.round(total * lots);
+    } catch { return ""; }
   };
 
   const INSTRUMENT_TYPES = ["Future", "Option"];
@@ -6143,7 +6145,7 @@ const setOps = async (val) => {
                     const autoFees = computeFees(o, exchangeTarifs);
                     const hasManual = o.fees !== undefined && o.fees !== "";
                     const displayVal = hasManual ? o.fees : autoFees;
-                    const editingFees = editingFeesId === o.id;
+                    const editingFees = o.id && editingFeesId === o.id;
                     return (
                       <div onClick={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                         {editingFees ? (

@@ -5840,6 +5840,7 @@ const setOps = async (val) => {
   const [editOp, setEditOp]       = useState(null);
   const [form, setForm]         = useState(makeEmpty());
   const [selected, setSelected] = useState(null);
+  const [search, setSearch]     = useState("");
   const [editingFeesId, setEditingFeesId] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filterMode, setFilterMode]   = useState("AND");

@@ -6043,14 +6043,14 @@ const saveAllDerivatives = async (items) => {
 
 // ── Save a single op (create/update) ───────────────────────
 const saveOneDerivative = async (op) => {
-  // Use data->>'id' filter to upsert by logical id
-  await supabase.from('derivatives').delete().filter('data->>'id'', 'eq', String(op.id));
+  // Targeted save: delete by id then reinsert
+  await supabase.from('derivatives').delete().eq('data->>id', String(op.id));
   await supabase.from('derivatives').insert({ data: op });
 };
 
 // ── Delete a single op ─────────────────────────────────────
 const deleteOneDerivative = async (id) => {
-  await supabase.from('derivatives').delete().filter('data->>'id'', 'eq', String(id));
+  await supabase.from('derivatives').delete().eq('data->>id', String(id));
 };
 
 const setOps = async (val) => {

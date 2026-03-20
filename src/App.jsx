@@ -6016,16 +6016,16 @@ useEffect(() => {
 }, []);
 
 // ── Save ALL derivatives (import only) ─────────────────────
-const saveAllDerivatives = async (items) => {
+const saveAllDerivatives = async (items, onComplete) => {
   if (!items || items.length === 0) return;
-  const CHUNK = 20;
-  const DELAY = 100;
-  const MAX_RETRY = 3;
+  const CHUNK = 10;  // smaller chunks
+  const DELAY = 150; // more time between chunks
+  const MAX_RETRY = 5;
   const insertChunkWithRetry = async (chunk, attempt = 0) => {
     const { error } = await supabase.from('derivatives').insert(chunk);
     if (error) {
       if (attempt < MAX_RETRY) {
-        await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
+        await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
         return insertChunkWithRetry(chunk, attempt + 1);
       }
       console.error(`[saveAllDerivatives] chunk failed after ${MAX_RETRY} retries:`, error);
@@ -6038,6 +6038,21 @@ const saveAllDerivatives = async (items) => {
     const chunk = items.slice(i, i + CHUNK).map(item => ({ data: item }));
     await insertChunkWithRetry(chunk);
     if (i + CHUNK < items.length) await new Promise(r => setTimeout(r, DELAY));
+  }
+  // Reload from Supabase to confirm what was actually saved
+  const PAGE = 1000;
+  let all = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
+    if (error || !data || data.length === 0) break;
+    all = [...all, ...data.map(r => r.data ?? r)];
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  if (all.length) {
+    setOpsRaw(all);
+    if (onComplete) onComplete(all.length);
   }
 };
 
@@ -6730,7 +6745,9 @@ const setOps = async (val) => {
               .filter(i => !i.ref || !ex.has(i.ref?.toLowerCase()));
             const next = [...ops, ...toAdd];
             setOpsRaw(next);
-            await saveAllDerivatives(next);
+            await saveAllDerivatives(next, (count) => {
+              console.log(`[import] ${count} opérations confirmées en base`);
+            });
           }} />
       )}
     </div>

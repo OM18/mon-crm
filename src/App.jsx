@@ -6030,25 +6030,8 @@ const saveAllDerivatives = async (items, setOpsRaw, onComplete) => {
   } catch (err) {
     console.error('[saveAllDerivatives] error:', err);
   }
-  // Poll until Supabase count matches expected, up to 30 attempts
-  const expected = items.length;
-  let all = [];
-  for (let attempt = 0; attempt < 30; attempt++) {
-    await new Promise(r => setTimeout(r, 500));
-    const PAGE = 1000;
-    all = [];
-    let from = 0;
-    while (true) {
-      const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
-      if (error || !data || data.length === 0) break;
-      all = [...all, ...data.map(r => r.data ?? r)];
-      if (data.length < PAGE) break;
-      from += PAGE;
-    }
-    if (all.length >= expected) break;
-  }
-  if (all.length && setOpsRaw) setOpsRaw(all);
-  if (onComplete) onComplete(all.length);
+  // Wait for Supabase to fully persist, then reload
+  if (onComplete) onComplete(items.length);
 };
 
 // ── Save a single op (create/update) ───────────────────────
@@ -6063,12 +6046,29 @@ const deleteOneDerivative = async (id) => {
   await supabase.from('derivatives').delete().eq('data->>id', String(id));
 };
 
+const reloadOps = async () => {
+  setIsReloading(true);
+  const PAGE = 1000;
+  let all = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
+    if (error || !data || data.length === 0) break;
+    all = [...all, ...data.map(r => r.data ?? r)];
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  if (all.length) setOpsRaw(all);
+  setIsReloading(false);
+};
+
 const setOps = async (val) => {
   const next = typeof val === "function" ? val(ops) : val;
   setOpsRaw(next);
 };
   const [showForm, setShowForm]   = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [isReloading, setIsReloading] = useState(false);
   const [editOp, setEditOp]       = useState(null);
   const [form, setForm]         = useState(makeEmpty());
   const [selected, setSelected] = useState(null);
@@ -6225,6 +6225,10 @@ const setOps = async (val) => {
             <div onClick={() => setShowImport(true)} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent" }}>
               <img src="/logoxl.png" style={{ width: 32, height: 32, objectFit: "contain" }} />
             </div>
+            <button onClick={reloadOps} disabled={isReloading} title="Recharger depuis Supabase"
+              style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: isReloading ? "wait" : "pointer", fontSize: 18, padding: "10px 14px", color: isReloading ? COLORS.textMuted : COLORS.textSub, transition: "color 0.2s" }}>
+              {isReloading ? "⟳" : "↺"}
+            </button>
             <button onClick={openNew} style={{ background: COLORS.accent, color: COLORS.textOnAccent, border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", padding: "10px 20px", letterSpacing: 0.5 }}>+ NEW OPERATION</button>
           </div>
         </div>
@@ -6740,9 +6744,9 @@ const setOps = async (val) => {
               .filter(i => !i.ref || !ex.has(i.ref?.toLowerCase()));
             const next = [...ops, ...toAdd];
             setOpsRaw(next);
-            await saveAllDerivatives(next, setOpsRaw, (count) => {
-              console.log(`[import] ${count} opérations confirmées en base`);
-            });
+            await saveAllDerivatives(next, setOpsRaw, () => {});
+            // Reload after a short delay to get confirmed data from Supabase
+            setTimeout(() => reloadOps(), 2000);
           }} />
       )}
     </div>

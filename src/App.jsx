@@ -6154,10 +6154,11 @@ const setOps = async (val) => {
       const val = o[cf.key];
       if (cf.op === "empty")    return !val || String(val).trim() === "";
       if (cf.op === "notempty") return !!val && String(val).trim() !== "";
+      if (!cf.value && cf.value !== 0) return true; // skip filter if no value entered
       if (cf.op === "eq")       return String(val || "").toLowerCase() === String(cf.value || "").toLowerCase();
       if (cf.op === "gt")       return Number(val) > Number(cf.value);
       if (cf.op === "lt")       return Number(val) < Number(cf.value);
-      if (cf.op === "contains") return String(val || "").toLowerCase().includes(cf.value.toLowerCase());
+      if (cf.op === "contains") return String(val || "").toLowerCase().includes(String(cf.value).toLowerCase());
       return true;
     });
     const allChecks = [...tagChecks, ...customChecks];

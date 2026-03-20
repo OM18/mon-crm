@@ -6000,8 +6000,17 @@ useEffect(() => {
 
 useEffect(() => {
   async function loadOps() {
-    const { data } = await supabase.from('derivatives').select('data');
-    if (data?.length) setOpsRaw(data.map(r => r.data));
+    const PAGE = 1000;
+    let all = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
+      if (error || !data || data.length === 0) break;
+      all = [...all, ...data.map(r => r.data ?? r)];
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    if (all.length) setOpsRaw(all);
   }
   loadOps();
 }, []);
@@ -6987,11 +6996,19 @@ const DerivativesDashboard = () => {
 
   useEffect(() => {
     async function loadAll() {
-      const [{ data: opsData }, { data: accData }] = await Promise.all([
-        supabase.from('derivatives').select('data'),
-        supabase.from('deriv_accounts').select('*'),
-      ]);
-      if (opsData?.length) setOps(opsData.map(r => r.data));
+      const { data: accData } = await supabase.from('deriv_accounts').select('*');
+      // Load all derivatives pages
+      const PAGE = 1000;
+      let allOps = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
+        if (error || !data || data.length === 0) break;
+        allOps = [...allOps, ...data.map(r => r.data ?? r)];
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      if (allOps.length) setOps(allOps);
       if (accData?.length) setDerivAccounts(accData.map(r => {
         const acc = r.data ?? r;
         if (typeof acc.isActive === "string") {

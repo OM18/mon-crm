@@ -6995,6 +6995,10 @@ const runFIFO = (bucketOps) => {
   const sorted = [...bucketOps].sort((a, b) => {
     const da = a.tradeDate || "9999", db = b.tradeDate || "9999";
     if (da !== db) return da < db ? -1 : 1;
+    // Same date: BUY before SELL to ensure proper matching
+    const sideA = (a.side || "").toUpperCase() === "BUY" ? 0 : 1;
+    const sideB = (b.side || "").toUpperCase() === "BUY" ? 0 : 1;
+    if (sideA !== sideB) return sideA - sideB;
     return (a.id || 0) < (b.id || 0) ? -1 : 1;
   });
   const queue = [];

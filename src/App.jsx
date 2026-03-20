@@ -1643,7 +1643,8 @@ useEffect(() => {
 
         {products.length > 0 && (() => {
           // ── Underlyings & years for filters ──
-          const allUnderlyings = [...new Set(products.map(p => p.underlying).filter(Boolean))].sort();
+          const validUnderlyings = new Set((config.derivCommodities || []).map(c => c.value));
+          const allUnderlyings = [...new Set(products.map(p => p.underlying).filter(u => u && validUnderlyings.has(u)))].sort();
           const allYears = [...new Set(products.map(p => {
             const d = p.lastTradingDate || p.expiryDate || p.firstNoticeDay || "";
             return d ? d.slice(0, 4) : null;

@@ -1496,6 +1496,9 @@ useEffect(() => {
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [prodSearch, setProdSearch] = useState("");
+  const [filterUnderlying, setFilterUnderlying] = useState("");
+  const [filterYear, setFilterYear] = useState("");
 
   const isValid = () => form.label.trim() !== "" && form.stoxxExchange !== "" && form.instrumentType !== "" && form.underlyingCategory !== "" && form.underlying !== "" && form.underlyingOrigin !== "" && String(form.volumeSizePerLot).trim() !== "" && form.volumeUnit !== "" && form.currency !== "" && form.lastTradingDate !== "" && (form.instrumentType?.toLowerCase() !== "option" || form.expiryDate !== "");
 
@@ -1635,9 +1638,27 @@ useEffect(() => {
           <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 32, fontSize: 13 }}>Aucun instrument — cliquez sur "+ Ajouter" pour commencer</div>
         )}
 
-        {(() => {
-          const activeProds = products.filter(p => p.active !== false);
-          const inactiveProds = products.filter(p => p.active === false);
+        {products.length > 0 && (() => {
+          // ── Underlyings & years for filters ──
+          const allUnderlyings = [...new Set(products.map(p => p.underlying).filter(Boolean))].sort();
+          const allYears = [...new Set(products.map(p => {
+            const d = p.lastTradingDate || p.expiryDate || p.firstNoticeDay || "";
+            return d ? d.slice(0, 4) : null;
+          }).filter(Boolean))].sort().reverse();
+
+          const hasFilters = prodSearch || filterUnderlying || filterYear;
+
+          // ── Apply filters ──
+          const applyFilters = (list) => list.filter(p => {
+            const q = prodSearch.toLowerCase().trim();
+            if (q && !p.label?.toLowerCase().includes(q) && !p.underlying?.toLowerCase().includes(q) && !p.stoxxExchange?.toLowerCase().includes(q)) return false;
+            if (filterUnderlying && p.underlying !== filterUnderlying) return false;
+            if (filterYear) {
+              const yr = (p.lastTradingDate || p.expiryDate || p.firstNoticeDay || "").slice(0, 4);
+              if (yr !== filterYear) return false;
+            }
+            return true;
+          });
 
           const toggleActive = async (prod) => {
             const updated = products.map(p => p.id === prod.id ? { ...p, active: p.active === false ? true : false } : p);
@@ -1648,7 +1669,7 @@ useEffect(() => {
           const renderRow = (p) => {
             const isInactive = p.active === false;
             return (
-              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: isInactive ? "transparent" : COLORS.bg, border: `1px solid ${isInactive ? COLORS.border : COLORS.border}`, borderRadius: 10, padding: "12px 16px", opacity: isInactive ? 0.55 : 1 }}>
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: isInactive ? "transparent" : COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px", opacity: isInactive ? 0.55 : 1 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: isInactive ? COLORS.surface : `${COLORS.blue}18`, border: `1px solid ${isInactive ? COLORS.border : COLORS.blue + "30"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>🌾</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: isInactive ? COLORS.textMuted : COLORS.text }}>{p.label}</div>
@@ -1666,7 +1687,6 @@ useEffect(() => {
                     {p.instrumentType?.toLowerCase() === "option" && p.expiryDate && <span style={{ color: COLORS.purple }}>⏱ EXP: {p.expiryDate}</span>}
                   </div>
                 </div>
-                {/* Toggle active/inactive */}
                 <div onClick={() => toggleActive(p)} title={isInactive ? "Réactiver" : "Désactiver"}
                   style={{ cursor: "pointer", flexShrink: 0, width: 36, height: 20, borderRadius: 10, background: isInactive ? COLORS.border : COLORS.green, border: `1px solid ${isInactive ? COLORS.textMuted : COLORS.green}`, position: "relative", transition: "background 0.2s" }}>
                   <div style={{ position: "absolute", top: 2, left: isInactive ? 2 : 18, width: 14, height: 14, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0004" }} />
@@ -1677,16 +1697,43 @@ useEffect(() => {
             );
           };
 
+          const activeProds = applyFilters(products.filter(p => p.active !== false));
+          const inactiveProds = applyFilters(products.filter(p => p.active === false));
+          const totalFiltered = activeProds.length + inactiveProds.length;
+
           return (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Active instruments */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* Search + filters */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <input value={prodSearch} onChange={e => setProdSearch(e.target.value)} placeholder="🔍 Rechercher un instrument…"
+                  style={{ flex: 1, minWidth: 200, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+                <select value={filterUnderlying} onChange={e => setFilterUnderlying(e.target.value)}
+                  style={{ background: COLORS.bg, border: `1px solid ${filterUnderlying ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: filterUnderlying ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", minWidth: 130 }}>
+                  <option value="">Underlying</option>
+                  {allUnderlyings.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+                <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
+                  style={{ background: COLORS.bg, border: `1px solid ${filterYear ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: filterYear ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", minWidth: 100 }}>
+                  <option value="">Année</option>
+                  {allYears.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                {hasFilters && (
+                  <button onClick={() => { setProdSearch(""); setFilterUnderlying(""); setFilterYear(""); }}
+                    style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}30`, borderRadius: 8, padding: "8px 12px", color: COLORS.red, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                    ✕ Reset
+                  </button>
+                )}
+                {hasFilters && <span style={{ fontSize: 12, color: COLORS.textMuted }}>{totalFiltered} résultat{totalFiltered !== 1 ? "s" : ""}</span>}
+              </div>
+
+              {/* Active */}
               {activeProds.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {activeProds.map(renderRow)}
                 </div>
               )}
 
-              {/* Inactive instruments */}
+              {/* Inactive */}
               {inactiveProds.length > 0 && (
                 <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden" }}>
                   <div style={{ padding: "8px 14px", background: COLORS.surface, display: "flex", alignItems: "center", gap: 8 }}>
@@ -1697,6 +1744,10 @@ useEffect(() => {
                     {inactiveProds.map(renderRow)}
                   </div>
                 </div>
+              )}
+
+              {hasFilters && totalFiltered === 0 && (
+                <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 20, fontSize: 13 }}>Aucun résultat pour ces filtres</div>
               )}
             </div>
           );

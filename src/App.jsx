@@ -3850,7 +3850,7 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
           const found = derivProducts.find(p => norm(p.label) === norm(obj.instrument) || norm(p.value) === norm(obj.instrument));
           if (!found) {
             const key = `derivProducts:${obj.instrument}`;
-            if (!unknowns[key]) unknowns[key] = { fieldKey: "instrument", configKey: "derivCommodities", fieldLabel: "Instrument", value: obj.instrument };
+            if (!unknowns[key]) unknowns[key] = { fieldKey: "instrument", configKey: "derivProducts", fieldLabel: "Instrument", value: obj.instrument };
           }
         }
         // Validate broker against companies list
@@ -3974,9 +3974,9 @@ if (Array.isArray(resolved.contractsCurrency)) {
     const newDecisions = { ...decisions, [key]: decision };
     setDecisions(newDecisions);
     if (decision === "add") {
-      if (current.configKey === "derivCommodities") {
-        // Instrument inconnu — on garde la valeur dans l'opération mais on n'ajoute pas dans l'admin
-        // L'utilisateur devra créer l'instrument dans Admin Panel > Instruments manuellement
+      if (current.configKey === "derivProducts") {
+        // Instrument inconnu — on ne peut pas l'ajouter ici (trop de champs requis)
+        // L'utilisateur doit créer l'instrument dans Admin Panel > Instruments
       } else {
         const fieldDef = FIELD_DEFINITIONS.find(f => f.key === current.configKey);
         const useLabel = fieldDef && !fieldDef.hasValue;
@@ -4181,11 +4181,13 @@ if (Array.isArray(resolved.contractsCurrency)) {
                 </>
               ) : (
                 <>
-                  <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 28 }}>
-                    Cette valeur n&#39;existe pas dans l&#39;Admin Panel.<br />
-                    Voulez-vous l'intégrer dans la liste <strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong> ?
-                  </div>
-                  {currentItem.configKey === "derivCommodities" ? (
+                  {currentItem.configKey !== "derivProducts" && (
+                    <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 28 }}>
+                      Cette valeur n&#39;existe pas dans l&#39;Admin Panel.<br />
+                      Voulez-vous l'intégrer dans la liste <strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong> ?
+                    </div>
+                  )}
+                  {currentItem.configKey === "derivProducts" ? (
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 20, lineHeight: 1.8 }}>
                         Cet instrument n'existe pas dans l'Admin Panel.<br />

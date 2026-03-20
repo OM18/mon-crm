@@ -6030,16 +6030,22 @@ const saveAllDerivatives = async (items, setOpsRaw, onComplete) => {
   } catch (err) {
     console.error('[saveAllDerivatives] error:', err);
   }
-  // Reload from Supabase to get confirmed count
-  const PAGE = 1000;
+  // Poll until Supabase count matches expected, up to 30 attempts
+  const expected = items.length;
   let all = [];
-  let from = 0;
-  while (true) {
-    const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
-    if (error || !data || data.length === 0) break;
-    all = [...all, ...data.map(r => r.data ?? r)];
-    if (data.length < PAGE) break;
-    from += PAGE;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    await new Promise(r => setTimeout(r, 500));
+    const PAGE = 1000;
+    all = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
+      if (error || !data || data.length === 0) break;
+      all = [...all, ...data.map(r => r.data ?? r)];
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    if (all.length >= expected) break;
   }
   if (all.length && setOpsRaw) setOpsRaw(all);
   if (onComplete) onComplete(all.length);

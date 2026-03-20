@@ -1714,7 +1714,10 @@ useEffect(() => {
                 <select value={filterUnderlying} onChange={e => setFilterUnderlying(e.target.value)}
                   style={{ background: COLORS.bg, border: `1px solid ${filterUnderlying ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: filterUnderlying ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", minWidth: 130 }}>
                   <option value="">Underlying</option>
-                  {allUnderlyings.map(u => <option key={u} value={u}>{u}</option>)}
+                  {allUnderlyings.map(u => {
+                    const label = (config.derivCommodities || []).find(c => c.value === u)?.label || u;
+                    return <option key={u} value={u}>{label}</option>;
+                  })}
                 </select>
                 <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
                   style={{ background: COLORS.bg, border: `1px solid ${filterYear ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: filterYear ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", minWidth: 100 }}>

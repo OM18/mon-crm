@@ -3842,8 +3842,32 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
             if (!unknowns[key]) unknowns[key] = { fieldKey, configKey, fieldLabel: label, value: val };
           }
         });
-        // Validate account against derivAccounts table
-        if (obj.account) {
+        // Validate required fields — same as REQUIRED_FIELDS in the form
+        const DERIV_REQUIRED = [
+          { key: "businessUnit", label: "Business Unit" },
+          { key: "type",         label: "Instrument Type" },
+          { key: "opType",       label: "Operation Type" },
+          { key: "quantity",     label: "Number of Lots" },
+          { key: "price",        label: "Price" },
+          { key: "tradeDate",    label: "Trade Date" },
+          { key: "instrument",   label: "Instrument" },
+          { key: "account",      label: "Account" },
+          { key: "side",         label: "Side" },
+          { key: "broker",       label: "Broker" },
+        ];
+        DERIV_REQUIRED.forEach(({ key, label }) => {
+          const val = obj[key];
+          const isEmpty = !val || String(val).trim() === "";
+          if (isEmpty) {
+            const uKey = `missing_${key}`;
+            if (!unknowns[uKey]) unknowns[uKey] = {
+              fieldKey: key, configKey: `missing_${key}`,
+              fieldLabel: label, value: "(vide)", missingRequired: true
+            };
+          }
+        });
+        // Validate account against derivAccounts table (only if account is present)
+        if (obj.account && obj.account.toString().trim()) {
           const norm = v => v?.toString().toLowerCase().trim() || "";
           const accountExists = derivAccounts.some(a => norm(a.accountNumber) === norm(obj.account));
           if (!accountExists) {
@@ -3872,7 +3896,10 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
       }
       return obj;
     }).filter(o => {
-      if (type === "derivatives") return !!(o.ref || o.side || o.instrument || o.price || o.quantity);
+      if (type === "derivatives") {
+        const hasRequired = !!(o.businessUnit && o.type && o.opType && o.quantity && o.price && o.tradeDate && o.instrument && o.account && o.side && o.broker);
+        return !!(o.ref || o.side || o.instrument || o.price || o.quantity) && hasRequired;
+      }
       return !!o.name;
     });
 
@@ -4186,6 +4213,16 @@ if (Array.isArray(resolved.contractsCurrency)) {
                     </button>
                   </div>
                 </>
+              ) : currentItem.configKey?.startsWith("missing_") ? (
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 20, lineHeight: 1.8 }}>
+                    <span style={{ color: COLORS.red, fontWeight: 600 }}>⚠ Certaines opérations n'ont pas de valeur pour le champ obligatoire <strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong>.</span><br />
+                    <span style={{ color: COLORS.textMuted, fontSize: 12 }}>Ces lignes seront ignorées à l'import.</span>
+                  </div>
+                  <button onClick={() => handleDecision("skip")} style={{ padding: "12px 32px", borderRadius: 10, background: `${COLORS.orange}15`, border: `1.5px solid ${COLORS.orange}40`, color: COLORS.orange, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                    OK — Continuer sans ces lignes
+                  </button>
+                </div>
               ) : (
                 <>
                   {currentItem.configKey !== "derivProducts" && (

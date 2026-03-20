@@ -6016,30 +6016,21 @@ useEffect(() => {
 }, []);
 
 // ── Save ALL derivatives (import only) ─────────────────────
-const saveAllDerivatives = async (items, onComplete) => {
+const saveAllDerivatives = async (items, setOpsRaw, onComplete) => {
   if (!items || items.length === 0) return;
-  const CHUNK = 10;  // smaller chunks
-  const DELAY = 150; // more time between chunks
-  const MAX_RETRY = 5;
-  const insertChunkWithRetry = async (chunk, attempt = 0) => {
-    const { error } = await supabase.from('derivatives').insert(chunk);
-    if (error) {
-      if (attempt < MAX_RETRY) {
-        await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
-        return insertChunkWithRetry(chunk, attempt + 1);
-      }
-      console.error(`[saveAllDerivatives] chunk failed after ${MAX_RETRY} retries:`, error);
-      return false;
+  // Use same approach as saveLargeTable (proven to work for companies/contacts)
+  try {
+    await supabase.from('derivatives').delete().neq('id', 0);
+    const CHUNK = 50;
+    for (let i = 0; i < items.length; i += CHUNK) {
+      const chunk = items.slice(i, i + CHUNK).map(item => ({ data: item }));
+      const { error } = await supabase.from('derivatives').insert(chunk);
+      if (error) console.error(`[saveAllDerivatives] chunk error:`, error);
     }
-    return true;
-  };
-  await supabase.from('derivatives').delete().neq('id', 0);
-  for (let i = 0; i < items.length; i += CHUNK) {
-    const chunk = items.slice(i, i + CHUNK).map(item => ({ data: item }));
-    await insertChunkWithRetry(chunk);
-    if (i + CHUNK < items.length) await new Promise(r => setTimeout(r, DELAY));
+  } catch (err) {
+    console.error('[saveAllDerivatives] error:', err);
   }
-  // Reload from Supabase to confirm what was actually saved
+  // Reload from Supabase to get confirmed count
   const PAGE = 1000;
   let all = [];
   let from = 0;
@@ -6050,10 +6041,8 @@ const saveAllDerivatives = async (items, onComplete) => {
     if (data.length < PAGE) break;
     from += PAGE;
   }
-  if (all.length) {
-    setOpsRaw(all);
-    if (onComplete) onComplete(all.length);
-  }
+  if (all.length && setOpsRaw) setOpsRaw(all);
+  if (onComplete) onComplete(all.length);
 };
 
 // ── Save a single op (create/update) ───────────────────────
@@ -6745,7 +6734,7 @@ const setOps = async (val) => {
               .filter(i => !i.ref || !ex.has(i.ref?.toLowerCase()));
             const next = [...ops, ...toAdd];
             setOpsRaw(next);
-            await saveAllDerivatives(next, (count) => {
+            await saveAllDerivatives(next, setOpsRaw, (count) => {
               console.log(`[import] ${count} opérations confirmées en base`);
             });
           }} />

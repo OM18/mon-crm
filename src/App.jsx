@@ -6995,26 +6995,49 @@ const runFIFO = (bucketOps) => {
   const sorted = [...bucketOps].sort((a, b) => {
     const da = a.tradeDate || "9999", db = b.tradeDate || "9999";
     if (da !== db) return da < db ? -1 : 1;
-    // Same date: BUY before SELL to ensure proper matching
+    // Same date: BUY before SELL
     const sideA = (a.side || "").toUpperCase() === "BUY" ? 0 : 1;
     const sideB = (b.side || "").toUpperCase() === "BUY" ? 0 : 1;
     if (sideA !== sideB) return sideA - sideB;
     return (a.id || 0) < (b.id || 0) ? -1 : 1;
   });
-  const queue = [];
+  const buyQueue  = []; // pending BUYs
+  const sellQueue = []; // pending SELLs (short positions)
   const matches = [];
   let realizedPnl = 0;
+
   for (const op of sorted) {
     const side = (op.side || "").toUpperCase();
-    const lots = parseP(op.quantity);
+    const lots  = parseP(op.quantity);
     const price = parseP(op.price);
+
     if (side === "BUY") {
-      queue.push({ ref: op.ref, date: op.tradeDate || "—", lots, price, remaining: lots });
+      let remaining = lots;
+      // First: match against pending SELLs (close short positions)
+      while (remaining > 0 && sellQueue.length > 0) {
+        const head = sellQueue[0];
+        const matched = Math.min(remaining, head.remaining);
+        const pnl = (head.price - price) * matched; // short PnL: sell price - buy price
+        realizedPnl += pnl;
+        matches.push({
+          buyRef: op.ref,    buyDate: op.tradeDate || "—",
+          sellRef: head.ref, sellDate: head.date,
+          lots: matched, entryPrice: head.price, exitPrice: price, pnl,
+        });
+        head.remaining -= matched;
+        remaining      -= matched;
+        if (head.remaining <= 0) sellQueue.shift();
+      }
+      // Remaining goes into BUY queue (long position)
+      if (remaining > 0) {
+        buyQueue.push({ ref: op.ref, date: op.tradeDate || "—", lots, price, remaining });
+      }
     } else if (side === "SELL") {
-      let toClose = lots;
-      while (toClose > 0 && queue.length > 0) {
-        const head = queue[0];
-        const matched = Math.min(toClose, head.remaining);
+      let remaining = lots;
+      // First: match against pending BUYs (close long positions)
+      while (remaining > 0 && buyQueue.length > 0) {
+        const head = buyQueue[0];
+        const matched = Math.min(remaining, head.remaining);
         const pnl = (price - head.price) * matched;
         realizedPnl += pnl;
         matches.push({
@@ -7023,13 +7046,24 @@ const runFIFO = (bucketOps) => {
           lots: matched, entryPrice: head.price, exitPrice: price, pnl,
         });
         head.remaining -= matched;
-        toClose -= matched;
-        if (head.remaining <= 0) queue.shift();
+        remaining      -= matched;
+        if (head.remaining <= 0) buyQueue.shift();
+      }
+      // Remaining goes into SELL queue (short position)
+      if (remaining > 0) {
+        sellQueue.push({ ref: op.ref, date: op.tradeDate || "—", lots, price, remaining });
       }
     }
   }
-  const openLots = queue.reduce((s, e) => s + e.remaining, 0);
-  const openAvgPrice = openLots > 0 ? queue.reduce((s, e) => s + e.price * e.remaining, 0) / openLots : 0;
+
+  const openLongLots  = buyQueue.reduce((s, e) => s + e.remaining, 0);
+  const openShortLots = sellQueue.reduce((s, e) => s + e.remaining, 0);
+  const openLots = openLongLots - openShortLots;
+  const openAvgPrice = openLongLots > 0
+    ? buyQueue.reduce((s, e) => s + e.price * e.remaining, 0) / openLongLots
+    : openShortLots > 0
+    ? sellQueue.reduce((s, e) => s + e.price * e.remaining, 0) / openShortLots
+    : 0;
   return { realizedPnl, matches, openLots, openAvgPrice };
 };
 

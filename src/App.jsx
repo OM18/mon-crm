@@ -1560,11 +1560,10 @@ useEffect(() => {
               </div>
               {/* Volume Size Per Lot — auto depuis Lot Sizes (exchange + underlying) */}
               {(() => {
-                const underlyingLabel = (config.derivCommodities || []).find(c => c.value === form.underlying)?.label?.toLowerCase();
-                const match = (form.stoxxExchange && underlyingLabel)
+                const match = (form.stoxxExchange && form.underlying)
                   ? lotSizes.find(l =>
                       l.exchange === form.stoxxExchange &&
-                      l.instrument?.toLowerCase() === underlyingLabel
+                      l.instrument === form.underlying
                     )
                   : null;
                 const autoQty = match?.quantity || "";

@@ -3568,7 +3568,6 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
   const [decisions, setDecisions] = useState({});
   const [parsedItems, setParsedItems] = useState([]);
   const [rejectedValues, setRejectedValues] = useState([]);
-  const [instrumentForm, setInstrumentForm] = useState(null); // mini-form for new instrument
 
   const GUIDE_CONFIG_MAP = {
   status: "activityStatus",
@@ -3969,20 +3968,15 @@ if (Array.isArray(resolved.contractsCurrency)) {
     });
   };
 
-  const proceedDecision = (decision, extraData = null) => {
+  const handleDecision = (decision) => {
     const current = unknownQueue[currentQueueIdx];
     const key = `${current.configKey}:${current.value}`;
     const newDecisions = { ...decisions, [key]: decision };
     setDecisions(newDecisions);
     if (decision === "add") {
       if (current.configKey === "derivCommodities") {
-        // Add to derivCommodities with full form data
-        const newCommodity = {
-          value: current.value.toLowerCase().replace(/\s+/g, "_"),
-          label: current.value,
-          underlyingCategory: extraData?.underlyingCategory || "commodity",
-        };
-        updateField("derivCommodities", [...(config.derivCommodities || []), newCommodity]);
+        // Instrument inconnu — on garde la valeur dans l'opération mais on n'ajoute pas dans l'admin
+        // L'utilisateur devra créer l'instrument dans Admin Panel > Instruments manuellement
       } else {
         const fieldDef = FIELD_DEFINITIONS.find(f => f.key === current.configKey);
         const useLabel = fieldDef && !fieldDef.hasValue;
@@ -3993,7 +3987,6 @@ if (Array.isArray(resolved.contractsCurrency)) {
         updateField(current.configKey, [...(config[current.configKey] || []), newItem]);
       }
     }
-    setInstrumentForm(null);
     if (currentQueueIdx < unknownQueue.length - 1) {
       setCurrentQueueIdx(currentQueueIdx + 1);
     } else {
@@ -4002,16 +3995,6 @@ if (Array.isArray(resolved.contractsCurrency)) {
       const resolved = resolveItems(parsedItems, newDecisions);
       onImport(resolved); setStep("summary");
     }
-  };
-
-  const handleDecision = (decision) => {
-    const current = unknownQueue[currentQueueIdx];
-    // If adding an instrument (derivCommodities), show mini-form first
-    if (decision === "add" && current.configKey === "derivCommodities") {
-      setInstrumentForm({ underlyingCategory: "commodity" });
-      return;
-    }
-    proceedDecision(decision);
   };
 
   const allFields = Object.keys(fieldMap);
@@ -4202,28 +4185,21 @@ if (Array.isArray(resolved.contractsCurrency)) {
                     Cette valeur n&#39;existe pas dans l&#39;Admin Panel.<br />
                     Voulez-vous l'intégrer dans la liste <strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong> ?
                   </div>
-                  {instrumentForm ? (
-                    /* Mini-form for new instrument (derivCommodities) */
-                    <div style={{ marginTop: 16, textAlign: "left" }}>
-                      <div style={{ fontSize: 12, color: COLORS.textSub, marginBottom: 12, textAlign: "center" }}>
-                        Renseignez les informations pour <strong style={{ color: COLORS.text }}>"{currentItem.value}"</strong>
+                  {currentItem.configKey === "derivCommodities" ? (
+                    /* Instrument inconnu — ne peut pas être créé ici, trop de champs requis */
+                    <div>
+                      <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 20 }}>
+                        Cet instrument n'existe pas dans l'Admin Panel.<br />
+                        <span style={{ color: COLORS.orange }}>⚠ Pour l'intégrer correctement, créez-le d'abord dans</span><br />
+                        <strong style={{ color: COLORS.text }}>Admin Panel → Derivatives → Instruments</strong><br />
+                        <span style={{ color: COLORS.textMuted, fontSize: 12 }}>puis relancez l'import.</span>
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                          <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>CATÉGORIE <span style={{ color: COLORS.red }}>*</span></label>
-                          <select value={instrumentForm.underlyingCategory} onChange={e => setInstrumentForm(f => ({ ...f, underlyingCategory: e.target.value }))}
-                            style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }}>
-                            <option value="commodity">COMMODITY</option>
-                            <option value="fx">FX</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                        <button onClick={() => setInstrumentForm(null)} style={{ padding: "10px 20px", borderRadius: 10, background: `${COLORS.border}`, border: "none", color: COLORS.textSub, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                          ← Retour
+                      <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                        <button onClick={() => handleDecision("skip")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                          ✗ Ignorer cet instrument
                         </button>
-                        <button onClick={() => proceedDecision("add", instrumentForm)} style={{ padding: "10px 20px", borderRadius: 10, background: `${COLORS.green}20`, border: `1.5px solid ${COLORS.green}60`, color: COLORS.green, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                          ✓ Confirmer et intégrer
+                        <button onClick={() => handleDecision("add")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.orange}20`, border: `1.5px solid ${COLORS.orange}60`, color: COLORS.orange, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                          ⚠ Importer quand même
                         </button>
                       </div>
                     </div>

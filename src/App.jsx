@@ -6015,28 +6015,47 @@ useEffect(() => {
   loadOps();
 }, []);
 
-const saveDerivatives = async (items, prevItems) => {
+// ── Save ALL derivatives (import only) ─────────────────────
+const saveAllDerivatives = async (items) => {
   if (!items || items.length === 0) return;
-  const CHUNK = 25; // small chunks for large datasets
-  const DELAY = 50; // ms between chunks to avoid rate limiting
-  try {
-    await supabase.from('derivatives').delete().neq('id', 0);
-    for (let i = 0; i < items.length; i += CHUNK) {
-      const chunk = items.slice(i, i + CHUNK).map(item => ({ data: item }));
-      const { error } = await supabase.from('derivatives').insert(chunk);
-      if (error) console.error(`[saveDerivatives] chunk ${i}-${i+CHUNK} error:`, error);
-      if (i + CHUNK < items.length) await new Promise(r => setTimeout(r, DELAY));
+  const CHUNK = 20;
+  const DELAY = 100;
+  const MAX_RETRY = 3;
+  const insertChunkWithRetry = async (chunk, attempt = 0) => {
+    const { error } = await supabase.from('derivatives').insert(chunk);
+    if (error) {
+      if (attempt < MAX_RETRY) {
+        await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
+        return insertChunkWithRetry(chunk, attempt + 1);
+      }
+      console.error(`[saveAllDerivatives] chunk failed after ${MAX_RETRY} retries:`, error);
+      return false;
     }
-  } catch (err) {
-    console.error('[saveDerivatives] error:', err);
-    if (prevItems) setOpsRaw(prevItems);
+    return true;
+  };
+  await supabase.from('derivatives').delete().neq('id', 0);
+  for (let i = 0; i < items.length; i += CHUNK) {
+    const chunk = items.slice(i, i + CHUNK).map(item => ({ data: item }));
+    await insertChunkWithRetry(chunk);
+    if (i + CHUNK < items.length) await new Promise(r => setTimeout(r, DELAY));
   }
+};
+
+// ── Save a single op (create/update) ───────────────────────
+const saveOneDerivative = async (op) => {
+  // Use data->>'id' filter to upsert by logical id
+  await supabase.from('derivatives').delete().filter('data->>'id'', 'eq', String(op.id));
+  await supabase.from('derivatives').insert({ data: op });
+};
+
+// ── Delete a single op ─────────────────────────────────────
+const deleteOneDerivative = async (id) => {
+  await supabase.from('derivatives').delete().filter('data->>'id'', 'eq', String(id));
 };
 
 const setOps = async (val) => {
   const next = typeof val === "function" ? val(ops) : val;
   setOpsRaw(next);
-  await saveDerivatives(next, ops);
 };
   const [showForm, setShowForm]   = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -6072,7 +6091,7 @@ const setOps = async (val) => {
 
   const openNew  = () => { setForm({ ...makeEmpty(), ref: genRef() }); setEditOp(null); setFormErrors({}); setShowForm(true); };
   const openEdit = (op) => { setForm({ ...op }); setEditOp(op); setFormErrors({}); setShowForm(true); };
-  const del      = (id) => { setOps(ops.filter(o => o.id !== id)); setSelected(null); };
+  const del      = (id) => { setOpsRaw(ops.filter(o => o.id !== id)); deleteOneDerivative(id); setSelected(null); };
 
   const REQUIRED_FIELDS = [
     { key: "businessUnit", label: "Business Unit" },
@@ -6100,8 +6119,8 @@ const setOps = async (val) => {
     }
     setFormErrors({});
     const data = { ...form, id: editOp ? editOp.id : Date.now() };
-    if (editOp) setOps(ops.map(o => o.id === editOp.id ? data : o));
-    else        setOps([...ops, data]);
+    if (editOp) { setOpsRaw(ops.map(o => o.id === editOp.id ? data : o)); await saveOneDerivative(data); }
+    else        { setOpsRaw([...ops, data]); await saveOneDerivative(data); }
     setShowForm(false);
     setSelected(data.id);
   };
@@ -6360,7 +6379,9 @@ const setOps = async (val) => {
                             onBlur={e => {
                               const v = e.target.value.replace(/[^\d.-]/g, "");
                               const updated = ops.map(x => x.id === o.id ? { ...x, fees: v === "" ? "" : v } : x);
-                              setOps(updated);
+                              setOpsRaw(updated);
+                              const updatedOp = updated.find(x => x.id === o.id);
+                              if (updatedOp) saveOneDerivative(updatedOp);
                               setEditingFeesId(null);
                             }}
                             onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditingFeesId(null); }}
@@ -6703,12 +6724,14 @@ const setOps = async (val) => {
       )}
       {showImport && (
         <ExcelImportModal type="derivatives" derivAccounts={derivAccounts} derivProducts={products} derivCompanies={companies} onClose={() => setShowImport(false)}
-          onImport={(items) => setOps(prev => {
-            const ex = new Set(prev.map(o => o.ref?.toLowerCase()).filter(Boolean));
+          onImport={async (items) => {
+            const ex = new Set(ops.map(o => o.ref?.toLowerCase()).filter(Boolean));
             const toAdd = items.map(i => ({ ...makeEmpty(), ...i, id: Date.now() + Math.random(), internalDeal: String(i.internalDeal).toLowerCase() === "true" }))
               .filter(i => !i.ref || !ex.has(i.ref?.toLowerCase()));
-            return [...prev, ...toAdd];
-          })} />
+            const next = [...ops, ...toAdd];
+            setOpsRaw(next);
+            await saveAllDerivatives(next);
+          }} />
       )}
     </div>
   );

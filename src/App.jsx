@@ -6106,7 +6106,7 @@ const setOps = async (val) => {
     { key: "broker",       label: "Broker" },
   ];
 
-  const save = () => {
+  const save = async () => {
     const errors = {};
     REQUIRED_FIELDS.forEach(({ key, label }) => {
       const val = form[key];

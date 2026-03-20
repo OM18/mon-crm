@@ -4186,22 +4186,17 @@ if (Array.isArray(resolved.contractsCurrency)) {
                     Voulez-vous l'intégrer dans la liste <strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong> ?
                   </div>
                   {currentItem.configKey === "derivCommodities" ? (
-                    /* Instrument inconnu — ne peut pas être créé ici, trop de champs requis */
-                    <div>
-                      <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 20 }}>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 20, lineHeight: 1.8 }}>
                         Cet instrument n'existe pas dans l'Admin Panel.<br />
-                        <span style={{ color: COLORS.orange }}>⚠ Pour l'intégrer correctement, créez-le d'abord dans</span><br />
+                        <span style={{ color: COLORS.orange, fontWeight: 600 }}>⚠ L'import ne peut pas continuer.</span><br />
+                        Créez d'abord cet instrument dans<br />
                         <strong style={{ color: COLORS.text }}>Admin Panel → Derivatives → Instruments</strong><br />
                         <span style={{ color: COLORS.textMuted, fontSize: 12 }}>puis relancez l'import.</span>
                       </div>
-                      <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-                        <button onClick={() => handleDecision("skip")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                          ✗ Ignorer cet instrument
-                        </button>
-                        <button onClick={() => handleDecision("add")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.orange}20`, border: `1.5px solid ${COLORS.orange}60`, color: COLORS.orange, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                          ⚠ Importer quand même
-                        </button>
-                      </div>
+                      <button onClick={onClose} style={{ padding: "12px 32px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                        ✗ Annuler l'import
+                      </button>
                     </div>
                   ) : (
                     <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>

@@ -6154,7 +6154,7 @@ const setOps = async (val) => {
       const val = o[cf.key];
       if (cf.op === "empty")    return !val || String(val).trim() === "";
       if (cf.op === "notempty") return !!val && String(val).trim() !== "";
-      if (cf.op === "eq")       return String(val) === String(cf.value);
+      if (cf.op === "eq")       return String(val || "").toLowerCase() === String(cf.value || "").toLowerCase();
       if (cf.op === "gt")       return Number(val) > Number(cf.value);
       if (cf.op === "lt")       return Number(val) < Number(cf.value);
       if (cf.op === "contains") return String(val || "").toLowerCase().includes(cf.value.toLowerCase());
@@ -6324,6 +6324,7 @@ const setOps = async (val) => {
                       <select value={cf.op} onChange={e => setCustomFilters(fs => fs.map((f, j) => j === i ? { ...f, op: e.target.value } : f))}
                         style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 6px", color: COLORS.text, fontSize: 11, outline: "none" }}>
                         {cf.type === "text"   && <option value="contains">Contient</option>}
+                        {cf.type === "text"   && <option value="eq">Égal à</option>}
                         {cf.type !== "text"   && <option value="eq">=</option>}
                         {cf.type === "number" && <option value="gt">&gt;</option>}
                         {cf.type === "number" && <option value="lt">&lt;</option>}

@@ -6006,10 +6006,28 @@ useEffect(() => {
   loadOps();
 }, []);
 
+const saveDerivatives = async (items, prevItems) => {
+  if (!items || items.length === 0) return;
+  const CHUNK = 25; // small chunks for large datasets
+  const DELAY = 50; // ms between chunks to avoid rate limiting
+  try {
+    await supabase.from('derivatives').delete().neq('id', 0);
+    for (let i = 0; i < items.length; i += CHUNK) {
+      const chunk = items.slice(i, i + CHUNK).map(item => ({ data: item }));
+      const { error } = await supabase.from('derivatives').insert(chunk);
+      if (error) console.error(`[saveDerivatives] chunk ${i}-${i+CHUNK} error:`, error);
+      if (i + CHUNK < items.length) await new Promise(r => setTimeout(r, DELAY));
+    }
+  } catch (err) {
+    console.error('[saveDerivatives] error:', err);
+    if (prevItems) setOpsRaw(prevItems);
+  }
+};
+
 const setOps = async (val) => {
   const next = typeof val === "function" ? val(ops) : val;
   setOpsRaw(next);
-  await safeSave('derivatives', next, setOpsRaw, ops);
+  await saveDerivatives(next, ops);
 };
   const [showForm, setShowForm]   = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -6200,7 +6218,7 @@ const setOps = async (val) => {
               ▼ FILTER {(Object.values(activeFilters).flat().length + customFilters.length) > 0 && <span style={{ background: COLORS.accent, color: "#fff", borderRadius: 10, fontSize: 11, padding: "1px 7px", marginLeft: 6 }}>{Object.values(activeFilters).flat().length + customFilters.length}</span>}
             </Btn>
             {showFilters && (
-              <div style={{ position: "absolute", top: "110%", right: 0, zIndex: 100, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 16, minWidth: 320, boxShadow: "0 8px 32px #0006", maxHeight: "70vh", overflowY: "auto" }}>
+              <div style={{ position: "absolute", top: "110%", right: 0, zIndex: 100, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 16, paddingBottom: 24, minWidth: 320, boxShadow: "0 8px 32px #0006", maxHeight: "70vh", overflowY: "auto" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>Filtres</span>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -6240,9 +6258,10 @@ const setOps = async (val) => {
 
                 {/* Filtres personnalisés */}
                 <div style={{ marginTop: 4, borderTop: `1px solid ${COLORS.border}`, paddingTop: 12 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSub, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Filtres personnalisés</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSub, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Filtres personnalisés <span style={{ color: COLORS.textMuted, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>— actifs en temps réel</span></div>
                   <div style={{ position: "relative" }}>
                     <input value={filterSearch} onChange={e => { setFilterSearch(e.target.value); setFilterSuggestions(e.target.value.trim() ? DERIV_CUSTOM_FIELDS.filter(f => f.label.toLowerCase().includes(e.target.value.toLowerCase()) && !customFilters.find(cf => cf.key === f.key)) : []); }}
+                      onKeyDown={e => { if (e.key === "Escape") { setFilterSearch(""); setFilterSuggestions([]); } }}
                       placeholder="Ajouter un filtre..." style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "7px 12px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
                     {filterSuggestions.length > 0 && (
                       <div style={{ position: "absolute", top: "110%", left: 0, right: 0, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, zIndex: 200, overflow: "hidden" }}>
@@ -6272,7 +6291,8 @@ const setOps = async (val) => {
                       {cf.op !== "empty" && cf.op !== "notempty" && (
                         <input value={cf.value} type={cf.type === "date" ? "date" : cf.type === "number" ? "number" : "text"}
                           onChange={e => setCustomFilters(fs => fs.map((f, j) => j === i ? { ...f, value: e.target.value } : f))}
-                          style={{ flex: 1, minWidth: 0, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontSize: 11, outline: "none" }} />
+                          placeholder="Valeur…"
+                          style={{ flex: 1, minWidth: 0, background: cf.value ? `${COLORS.accent}10` : COLORS.bg, border: `1px solid ${cf.value ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontSize: 11, outline: "none" }} />
                       )}
                       <span onClick={() => setCustomFilters(fs => fs.filter((_, j) => j !== i))} style={{ cursor: "pointer", color: COLORS.textMuted, fontSize: 14 }}>✕</span>
                     </div>

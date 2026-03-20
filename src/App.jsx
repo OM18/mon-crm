@@ -1558,15 +1558,19 @@ useEffect(() => {
                   })}
                 </select>
               </div>
-              {/* Volume Size Per Lot — auto depuis Lot Sizes */}
+              {/* Volume Size Per Lot — auto depuis Lot Sizes (exchange + underlying) */}
               {(() => {
-                const match = lotSizes.find(l =>
-                  l.exchange === form.stoxxExchange &&
-                  l.underlying?.toLowerCase() === (config.derivCommodities || []).find(c => c.value === form.underlying)?.label?.toLowerCase()
-                ) || lotSizes.find(l => l.exchange === form.stoxxExchange);
+                const underlyingLabel = (config.derivCommodities || []).find(c => c.value === form.underlying)?.label?.toLowerCase();
+                const match = (form.stoxxExchange && underlyingLabel)
+                  ? lotSizes.find(l =>
+                      l.exchange === form.stoxxExchange &&
+                      l.instrument?.toLowerCase() === underlyingLabel
+                    )
+                  : null;
                 const autoQty = match?.quantity || "";
                 const autoUnit = match?.volumeUnit || "";
                 if (autoQty && form.volumeSizePerLot !== String(autoQty)) setTimeout(() => setForm(f => ({ ...f, volumeSizePerLot: String(autoQty), volumeUnit: autoUnit })), 0);
+                if (!autoQty && (form.volumeSizePerLot || form.volumeUnit)) setTimeout(() => setForm(f => ({ ...f, volumeSizePerLot: "", volumeUnit: "" })), 0);
                 const unitLabel = (config.derivVolumeUnits || []).find(u => u.value === autoUnit)?.label || autoUnit;
                 return (
                   <>

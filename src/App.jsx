@@ -3568,6 +3568,7 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
   const [decisions, setDecisions] = useState({});
   const [parsedItems, setParsedItems] = useState([]);
   const [rejectedValues, setRejectedValues] = useState([]);
+  const [instrumentForm, setInstrumentForm] = useState(null); // mini-form for new instrument
 
   const GUIDE_CONFIG_MAP = {
   status: "activityStatus",
@@ -3968,19 +3969,31 @@ if (Array.isArray(resolved.contractsCurrency)) {
     });
   };
 
-  const handleDecision = (decision) => {
+  const proceedDecision = (decision, extraData = null) => {
     const current = unknownQueue[currentQueueIdx];
     const key = `${current.configKey}:${current.value}`;
     const newDecisions = { ...decisions, [key]: decision };
     setDecisions(newDecisions);
     if (decision === "add") {
-      const fieldDef = FIELD_DEFINITIONS.find(f => f.key === current.configKey);
-      const useLabel = fieldDef && !fieldDef.hasValue;
-const isCountry = current.configKey === "country";
-const newItem = { value: useLabel ? current.value.toUpperCase() : isCountry ? current.value.toUpperCase() : current.value.toLowerCase().replace(/\s+/g, "_"), label: isCountry ? current.value.toUpperCase() : current.value };      const hasColor = config[current.configKey]?.[0]?.color !== undefined;
-      if (hasColor) newItem.color = COLORS.textSub;
-      updateField(current.configKey, [...(config[current.configKey] || []), newItem]);
+      if (current.configKey === "derivCommodities") {
+        // Add to derivCommodities with full form data
+        const newCommodity = {
+          value: current.value.toLowerCase().replace(/\s+/g, "_"),
+          label: current.value,
+          underlyingCategory: extraData?.underlyingCategory || "commodity",
+        };
+        updateField("derivCommodities", [...(config.derivCommodities || []), newCommodity]);
+      } else {
+        const fieldDef = FIELD_DEFINITIONS.find(f => f.key === current.configKey);
+        const useLabel = fieldDef && !fieldDef.hasValue;
+        const isCountry = current.configKey === "country";
+        const newItem = { value: useLabel ? current.value.toUpperCase() : isCountry ? current.value.toUpperCase() : current.value.toLowerCase().replace(/\s+/g, "_"), label: isCountry ? current.value.toUpperCase() : current.value };
+        const hasColor = config[current.configKey]?.[0]?.color !== undefined;
+        if (hasColor) newItem.color = COLORS.textSub;
+        updateField(current.configKey, [...(config[current.configKey] || []), newItem]);
+      }
     }
+    setInstrumentForm(null);
     if (currentQueueIdx < unknownQueue.length - 1) {
       setCurrentQueueIdx(currentQueueIdx + 1);
     } else {
@@ -3989,6 +4002,16 @@ const newItem = { value: useLabel ? current.value.toUpperCase() : isCountry ? cu
       const resolved = resolveItems(parsedItems, newDecisions);
       onImport(resolved); setStep("summary");
     }
+  };
+
+  const handleDecision = (decision) => {
+    const current = unknownQueue[currentQueueIdx];
+    // If adding an instrument (derivCommodities), show mini-form first
+    if (decision === "add" && current.configKey === "derivCommodities") {
+      setInstrumentForm({ underlyingCategory: "commodity" });
+      return;
+    }
+    proceedDecision(decision);
   };
 
   const allFields = Object.keys(fieldMap);
@@ -4179,14 +4202,41 @@ const newItem = { value: useLabel ? current.value.toUpperCase() : isCountry ? cu
                     Cette valeur n&#39;existe pas dans l&#39;Admin Panel.<br />
                     Voulez-vous l'intégrer dans la liste <strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong> ?
                   </div>
-                  <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-                    <button onClick={() => handleDecision("skip")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                      ✗ Ne pas intégrer
-                    </button>
-                    <button onClick={() => handleDecision("add")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.green}20`, border: `1.5px solid ${COLORS.green}60`, color: COLORS.green, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                      ✓ Intégrer dans l&#39;Admin Panel
-                    </button>
-                  </div>
+                  {instrumentForm ? (
+                    /* Mini-form for new instrument (derivCommodities) */
+                    <div style={{ marginTop: 16, textAlign: "left" }}>
+                      <div style={{ fontSize: 12, color: COLORS.textSub, marginBottom: 12, textAlign: "center" }}>
+                        Renseignez les informations pour <strong style={{ color: COLORS.text }}>"{currentItem.value}"</strong>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>CATÉGORIE <span style={{ color: COLORS.red }}>*</span></label>
+                          <select value={instrumentForm.underlyingCategory} onChange={e => setInstrumentForm(f => ({ ...f, underlyingCategory: e.target.value }))}
+                            style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }}>
+                            <option value="commodity">COMMODITY</option>
+                            <option value="fx">FX</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                        <button onClick={() => setInstrumentForm(null)} style={{ padding: "10px 20px", borderRadius: 10, background: `${COLORS.border}`, border: "none", color: COLORS.textSub, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                          ← Retour
+                        </button>
+                        <button onClick={() => proceedDecision("add", instrumentForm)} style={{ padding: "10px 20px", borderRadius: 10, background: `${COLORS.green}20`, border: `1.5px solid ${COLORS.green}60`, color: COLORS.green, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                          ✓ Confirmer et intégrer
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                      <button onClick={() => handleDecision("skip")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                        ✗ Ne pas intégrer
+                      </button>
+                      <button onClick={() => handleDecision("add")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.green}20`, border: `1.5px solid ${COLORS.green}60`, color: COLORS.green, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                        ✓ Intégrer dans l&#39;Admin Panel
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </div>

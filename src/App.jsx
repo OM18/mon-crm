@@ -2789,7 +2789,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                             <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2, display: "flex", gap: 10, flexWrap: "wrap" }}>
                               {bu && <span style={{ color: bu.color || COLORS.textSub }}>◈ {bu.label}</span>}
                               <span>💱 {Array.isArray(a.currency) ? a.currency.join(" · ") : a.currency}</span>
-                              {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {Array.isArray(a.currency) ? a.currency[0] : a.currency}</span>}
+                              {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")}</span>}
                               {a.accountType && (() => { const opt = (Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : []).find(o => o.value === a.accountType); return opt ? <span style={{ color: opt.color || COLORS.accent, fontWeight: 700 }}>● {opt.label}</span> : <span style={{ color: COLORS.textMuted }}>● {a.accountType}</span>; })()}
                               {a.financingBank && <span style={{ color: COLORS.accent }}>🏦 {a.financingBank}</span>}
                               {a.contracts && <span style={{ color: COLORS.textSub }}>📄 {a.contracts}</span>}

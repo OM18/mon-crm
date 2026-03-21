@@ -3536,6 +3536,7 @@ const DERIV_FIELD_MAP = {
   "status":       ["status", "statut", "op status", "operation status"],
   "internalDeal": ["internal deal", "internal", "internaldeal"],
   "notes":        ["notes", "note", "comments", "commentaires"],
+  "fees":         ["fees", "fee", "frais", "commission", "brokerage", "courtage"],
 };
 
 
@@ -3654,6 +3655,7 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
     { field: "status",       format: "Texte",        note: "ex: traded, pending" },
     { field: "internalDeal", format: "TRUE / FALSE", note: "" },
     { field: "notes",        format: "Texte",        note: "" },
+    { field: "fees",         format: "Nombre",       note: "Frais de courtage (override du calcul automatique)" },
   ],
   };
   const handleFile = async (file) => {
@@ -3822,6 +3824,13 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
         if (obj.quantity) obj.quantity = String(obj.quantity).replace(/,/g, ".");
         if (obj.price)    obj.price    = String(obj.price).replace(/,/g, ".");
         if (obj.strike)   obj.strike   = String(obj.strike).replace(/,/g, ".");
+        // Normalize fees: keep as string if present, else empty (manual override of auto-compute)
+        if (obj.fees !== undefined && obj.fees !== "") {
+          const feesNum = parseFloat(String(obj.fees).replace(/,/g, "."));
+          obj.fees = isNaN(feesNum) ? "" : String(feesNum);
+        } else {
+          obj.fees = "";
+        }
         // Normalize side to uppercase
         if (obj.side) {
           obj.side = obj.side.toString().toUpperCase().trim();

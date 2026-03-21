@@ -3881,7 +3881,7 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
           const accountExists = derivAccounts.some(a => norm(a.accountNumber) === norm(obj.account));
           if (!accountExists) {
             const key = `derivAccount:${obj.account}`;
-            if (!unknowns[key]) unknowns[key] = { fieldKey: "account", configKey: "derivAccount", fieldLabel: "Account Number", value: obj.account, infoOnly: true };
+            if (!unknowns[key]) unknowns[key] = { fieldKey: "account", configKey: "derivAccount", fieldLabel: "Account Number", value: obj.account, unknownAccount: true };
           }
         }
         // Validate instrument against deriv_products table (case-insensitive, trimmed)
@@ -3914,7 +3914,8 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
 
     setParsedItems(items);
     const allUnknowns = Object.values(unknowns);
-    // infoOnly = valeurs déjà vérifiées (compte, broker) — acceptées automatiquement
+    // infoOnly = broker — accepté automatiquement sans demande à l'utilisateur
+    // unknownAccount = compte inconnu — doit passer dans la queue de validation
     const autoDecisions = {};
     allUnknowns.filter(u => u.infoOnly).forEach(u => {
       autoDecisions[`${u.configKey}:${u.value}`] = "add";
@@ -4207,7 +4208,24 @@ if (Array.isArray(resolved.contractsCurrency)) {
             <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.gold}40`, borderRadius: 16, padding: 28, textAlign: "center" }}>
               <div style={{ fontSize: 13, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, marginBottom: 10 }}>CHAMP : {currentItem.fieldLabel.toUpperCase()}</div>
               <div style={{ fontSize: 28, fontWeight: 800, color: COLORS.gold, marginBottom: 10, fontFamily: "'Inter', sans-serif" }}>"{currentItem.value}"</div>
-              {currentItem.infoOnly ? (
+              {currentItem.unknownAccount ? (
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 20, lineHeight: 1.8 }}>
+                    <span style={{ color: COLORS.red, fontWeight: 600 }}>⚠ Ce numéro de compte n'existe pas dans l'Admin Panel.</span><br />
+                    Créez d'abord ce compte dans<br />
+                    <strong style={{ color: COLORS.text }}>Admin Panel → Derivatives → Accounts</strong><br />
+                    <span style={{ color: COLORS.textMuted, fontSize: 12 }}>ou importez quand même en ignorant la validation.</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                    <button onClick={onClose} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                      ✗ Annuler l'import
+                    </button>
+                    <button onClick={() => handleDecision("add")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.orange}20`, border: `1.5px solid ${COLORS.orange}60`, color: COLORS.orange, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                      ⚠ Importer quand même
+                    </button>
+                  </div>
+                </div>
+              ) : currentItem.infoOnly ? (
                 <>
                   <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 28 }}>
                     Cette valeur (<strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong>) sera importée telle quelle.<br />

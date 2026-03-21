@@ -2550,9 +2550,11 @@ useEffect(() => {
 
   const saveAccount = async () => {
     if (!isAccFormValid()) return;
+    const cleanCurrency = [...new Set((Array.isArray(accForm.currency) ? accForm.currency : [accForm.currency]).map(v => v?.toUpperCase()).filter(Boolean))];
+    const cleanForm = { ...accForm, currency: cleanCurrency };
     const updated = editAccId
-      ? derivAccounts.map(a => a.id === editAccId ? { ...accForm, id: editAccId } : a)
-      : [...derivAccounts, { ...accForm, id: Date.now() }];
+      ? derivAccounts.map(a => a.id === editAccId ? { ...cleanForm, id: editAccId } : a)
+      : [...derivAccounts, { ...cleanForm, id: Date.now() }];
     setDerivAccounts(updated);
     await safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts);
     setAccForm(EMPTY_ACC());
@@ -2788,7 +2790,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                             <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{a.accountNumber}</div>
                             <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2, display: "flex", gap: 10, flexWrap: "wrap" }}>
                               {bu && <span style={{ color: bu.color || COLORS.textSub }}>◈ {bu.label}</span>}
-                              <span>💱 {Array.isArray(a.currency) ? a.currency.join(" · ") : a.currency}</span>
+                              <span>💱 {[...new Set((Array.isArray(a.currency) ? a.currency : (a.currency ? [a.currency] : [])).map(v => v?.toUpperCase()).filter(Boolean))].map(v => (config.contractsCurrency || []).find(c => c.value.toUpperCase() === v)?.label || v).join(" · ") || "—"}</span>
                               {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")}</span>}
                               {a.accountType && (() => { const opt = (Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : []).find(o => o.value === a.accountType); return opt ? <span style={{ color: opt.color || COLORS.accent, fontWeight: 700 }}>● {opt.label}</span> : <span style={{ color: COLORS.textMuted }}>● {a.accountType}</span>; })()}
                               {a.financingBank && <span style={{ color: COLORS.accent }}>🏦 {a.financingBank}</span>}

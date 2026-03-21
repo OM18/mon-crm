@@ -2151,7 +2151,7 @@ const DerivAccountImportModal = ({ onClose, onImport, config }) => {
       // Normalize currency
       if (obj.currency) {
         const match = (config.contractsCurrency || []).find(c => c.value.toLowerCase() === obj.currency.toLowerCase() || c.label.toLowerCase() === obj.currency.toLowerCase());
-        obj.currency = match ? match.value : obj.currency.toUpperCase();
+        obj.currency = match ? match.value : (typeof obj.currency === "string" ? obj.currency.toUpperCase() : obj.currency);
       }
 
       // Normalize accountType
@@ -6460,7 +6460,7 @@ const setOps = async (val) => {
                   {/* FEES — calculé auto, éditable manuellement */}
                   {(() => {
                     const account = derivAccounts.find(a => a.accountNumber === o.account);
-                    const currency = (account?.currency || "").toUpperCase();
+                    const currency = (Array.isArray(account?.currency) ? (account.currency[0] || "") : (account?.currency || "")).toUpperCase();
                     const sym = CURRENCY_SYMBOLS[currency] || currency;
                     const autoFees = computeFees(o, exchangeTarifs);
                     const hasManual = o.fees !== undefined && o.fees !== "";
@@ -6545,7 +6545,7 @@ const setOps = async (val) => {
           {/* FEES */}
           {(() => {
             const account = derivAccounts.find(a => a.accountNumber === sel.account);
-            const currency = (account?.currency || "").toUpperCase();
+            const currency = (Array.isArray(account?.currency) ? (account.currency[0] || "") : (account?.currency || "")).toUpperCase();
             const sym = CURRENCY_SYMBOLS[currency] || currency;
             const autoFees = computeFees(sel, exchangeTarifs);
             const hasManual = sel.fees !== undefined && sel.fees !== "";

@@ -2301,8 +2301,8 @@ const DerivAccountImportModal = ({ onClose, onImport, config }) => {
                   <div key={i} style={{ padding: "10px 16px", borderTop: `1px solid ${COLORS.border}`, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace", minWidth: 120 }}>{a.accountNumber}</span>
                     <span style={{ fontSize: 11, color: COLORS.blue, background: `${COLORS.blue}15`, padding: "2px 8px", borderRadius: 5 }}>{a.businessUnit}</span>
-                    <span style={{ fontSize: 11, color: COLORS.gold }}>{a.currency}</span>
-                    <span style={{ fontSize: 11, color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>
+                    <span style={{ fontSize: 11, color: COLORS.gold }}>{Array.isArray(a.currency) ? a.currency.join(" · ") : a.currency}</span>
+                    <span style={{ fontSize: 11, color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {Array.isArray(a.currency) ? a.currency[0] : a.currency}</span>
                     {a.accountType && <span style={{ fontSize: 11, color: COLORS.accent, background: `${COLORS.accent}15`, padding: "2px 8px", borderRadius: 5 }}>{a.accountType}</span>}
                     {a.financingBank && <span style={{ fontSize: 11, color: COLORS.textSub }}>🏦 {a.financingBank}</span>}
                     <span style={{ fontSize: 11, color: a.isActive ? COLORS.green : COLORS.textMuted, fontWeight: 600 }}>{a.isActive ? "● Actif" : "○ Inactif"}</span>
@@ -2435,7 +2435,7 @@ useEffect(() => {
   const [showEmpForm, setShowEmpForm] = useState(false);
 
   // ── Deriv Accounts state ──
-  const EMPTY_ACC = () => ({ accountNumber: "", businessUnit: "", currency: "EUR", initialAmount: "", isActive: true, accountType: config.derivDefaultAccountType || "", financingBank: "", contracts: "", trade: "" });
+  const EMPTY_ACC = () => ({ accountNumber: "", businessUnit: "", currency: [], initialAmount: "", isActive: true, accountType: config.derivDefaultAccountType || "", financingBank: "", contracts: "", trade: "" });
   const [derivAccounts, setDerivAccounts] = useState([]);
 
 useEffect(() => {
@@ -2545,7 +2545,7 @@ useEffect(() => {
   const isAccFormValid = () =>
     accForm.accountNumber.trim() !== "" &&
     accForm.businessUnit !== "" &&
-    accForm.currency !== "" &&
+    Array.isArray(accForm.currency) && accForm.currency.length > 0 &&
     String(accForm.initialAmount).trim() !== "";
 
   const saveAccount = async () => {
@@ -2657,10 +2657,25 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ACCOUNT CURRENCY <span style={{ color: COLORS.red }}>*</span></label>
-                      <select value={accForm.currency} onChange={e => { const v = e.target.value; setAccForm(p => ({ ...p, currency: v })); }}
-                        style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }}>
-                        {config.contractsCurrency.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                      </select>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {(config.contractsCurrency || []).map(c => {
+                          const selected = Array.isArray(accForm.currency) && accForm.currency.includes(c.value);
+                          const col = c.color || COLORS.accent;
+                          return (
+                            <div key={c.value} onClick={() => {
+                              const cur = Array.isArray(accForm.currency) ? accForm.currency : [];
+                              const next = selected ? cur.filter(v => v !== c.value) : [...cur, c.value];
+                              setAccForm(f => ({ ...f, currency: next }));
+                            }}
+                              style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontWeight: selected ? 700 : 500, fontSize: 12, transition: "all 0.15s", border: `1.5px solid ${selected ? col : COLORS.border}`, background: selected ? `${col}18` : COLORS.bg, color: selected ? col : COLORS.textSub, userSelect: "none" }}>
+                              {c.label}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {(!Array.isArray(accForm.currency) || accForm.currency.length === 0) && (
+                        <span style={{ fontSize: 11, color: COLORS.red + "99" }}>⚠ Sélectionnez au moins une devise</span>
+                      )}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>INITIAL AMOUNT <span style={{ color: COLORS.red }}>*</span></label>
@@ -2773,8 +2788,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                             <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{a.accountNumber}</div>
                             <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2, display: "flex", gap: 10, flexWrap: "wrap" }}>
                               {bu && <span style={{ color: bu.color || COLORS.textSub }}>◈ {bu.label}</span>}
-                              <span>💱 {a.currency}</span>
-                              {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {a.currency}</span>}
+                              <span>💱 {Array.isArray(a.currency) ? a.currency.join(" · ") : a.currency}</span>
+                              {a.initialAmount && <span style={{ color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{Number(a.initialAmount).toLocaleString("fr")} {Array.isArray(a.currency) ? a.currency[0] : a.currency}</span>}
                               {a.accountType && (() => { const opt = (Array.isArray(config.derivAccountTypes) ? config.derivAccountTypes : []).find(o => o.value === a.accountType); return opt ? <span style={{ color: opt.color || COLORS.accent, fontWeight: 700 }}>● {opt.label}</span> : <span style={{ color: COLORS.textMuted }}>● {a.accountType}</span>; })()}
                               {a.financingBank && <span style={{ color: COLORS.accent }}>🏦 {a.financingBank}</span>}
                               {a.contracts && <span style={{ color: COLORS.textSub }}>📄 {a.contracts}</span>}
@@ -2786,7 +2801,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                             <div style={{ position: "absolute", top: 3, left: a.isActive ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                           </div>
                           <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, fontWeight: 600, minWidth: 58, textAlign: "center", background: a.isActive ? `${COLORS.green}22` : `${COLORS.red}22`, color: a.isActive ? COLORS.green : COLORS.red }}>{a.isActive ? "Active" : "Inactive"}</span>
-                          <button onClick={() => { setAccForm({ ...a }); setEditAccId(a.id); setShowAccForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                          <button onClick={() => { const acc = { ...a, currency: Array.isArray(a.currency) ? a.currency : (a.currency ? [a.currency] : []) }; setAccForm(acc); setEditAccId(a.id); setShowAccForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
                           <button onClick={() => deleteAccount(a.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
                         </div>
                       );

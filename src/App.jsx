@@ -7255,16 +7255,18 @@ const DerivativesDashboard = () => {
       const allBuyLots  = b.ops.filter(o => (o.side||"").toUpperCase() === "BUY").reduce((s,o)  => s + (parseFloat(o.quantity)||0), 0);
       const allSellLots = b.ops.filter(o => (o.side||"").toUpperCase() === "SELL").reduce((s,o) => s + (parseFloat(o.quantity)||0), 0);
       const side = allBuyLots >= allSellLots ? "BUY" : "SELL";
+      const openPositionSide = side === "BUY" ? "LONG" : "SHORT";
       positions.push({
         key: `${b.account}||${b.instrument}`,
         account: b.account,
         instrument: b.instrument,
         side,
+        openPositionSide,
         openLots: b.openLots,
         avgOpenPrice: b.openAvgPrice || 0,
       });
     }
-    // Sort by side: BUY first, then SELL
+    // Sort by side: LONG first, then SHORT
     return positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);
   }, [bucketResults]);
 
@@ -7344,7 +7346,7 @@ const DerivativesDashboard = () => {
               <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 600 }}>{pos.instrument || "—"}</div>
               {/* Side */}
               <div style={{ textAlign: "right" }}>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sideColor}20`, color: sideColor }}>{pos.side}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sideColor}20`, color: sideColor }}>{pos.openPositionSide}</span>
               </div>
               {/* Quantity */}
               <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.orange, fontWeight: 700 }}>{fmtLots(pos.openLots)}</div>

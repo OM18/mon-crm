@@ -4229,18 +4229,14 @@ if (Array.isArray(resolved.contractsCurrency)) {
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 20, lineHeight: 1.8 }}>
                     <span style={{ color: COLORS.red, fontWeight: 600 }}>⚠ Ce numéro de compte n'existe pas dans l'Admin Panel.</span><br />
+                    <span style={{ color: COLORS.orange, fontWeight: 600 }}>⚠ L'import ne peut pas continuer.</span><br />
                     Créez d'abord ce compte dans<br />
                     <strong style={{ color: COLORS.text }}>Admin Panel → Derivatives → Accounts</strong><br />
-                    <span style={{ color: COLORS.textMuted, fontSize: 12 }}>ou importez quand même en ignorant la validation.</span>
+                    <span style={{ color: COLORS.textMuted, fontSize: 12 }}>puis relancez l'import.</span>
                   </div>
-                  <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-                    <button onClick={onClose} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                      ✗ Annuler l'import
-                    </button>
-                    <button onClick={() => handleDecision("add")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.orange}20`, border: `1.5px solid ${COLORS.orange}60`, color: COLORS.orange, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                      ⚠ Importer quand même
-                    </button>
-                  </div>
+                  <button onClick={onClose} style={{ padding: "12px 32px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                    ✗ Annuler l'import
+                  </button>
                 </div>
               ) : currentItem.infoOnly ? (
                 <>

@@ -2720,12 +2720,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>CONTRACTS</label>
-                      <input value={accForm.contracts || ""} onChange={e => setAccForm(f => ({ ...f, contracts: e.target.value }))} placeholder="ex: CME-001"
-                        style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
-                    </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14, marginTop: 14 }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>TRADE</label>
                       <input value={accForm.trade || ""} onChange={e => setAccForm(f => ({ ...f, trade: e.target.value }))} placeholder="ex: TRD-001"

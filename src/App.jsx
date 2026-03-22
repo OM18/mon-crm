@@ -7188,7 +7188,7 @@ const Pipeline = ({ contacts, setContacts, companies, setCompanies }) => {
 
 
 // ─── FIFO ENGINE ─────────────────────────────────────────────
-const runFIFO = (bucketOps) => {
+const runFIFO = (bucketOps, lotSize = 1) => {
   const parseP = (v) => { const n = parseFloat(String(v ?? "").replace(/,/g, ".")); return isNaN(n) ? 0 : n; };
   const sorted = [...bucketOps].sort((a, b) => {
     const da = a.tradeDate || "9999", db = b.tradeDate || "9999";
@@ -7215,7 +7215,7 @@ const runFIFO = (bucketOps) => {
       while (remaining > 0 && sellQueue.length > 0) {
         const head = sellQueue[0];
         const matched = Math.min(remaining, head.remaining);
-        const pnl = (head.price - price) * matched; // short PnL: sell price - buy price
+        const pnl = (head.price - price) * matched * lotSize; // short PnL: sell price - buy price
         realizedPnl += pnl;
         matches.push({
           buyRef: op.ref,    buyDate: op.tradeDate || "—",
@@ -7236,7 +7236,7 @@ const runFIFO = (bucketOps) => {
       while (remaining > 0 && buyQueue.length > 0) {
         const head = buyQueue[0];
         const matched = Math.min(remaining, head.remaining);
-        const pnl = (price - head.price) * matched;
+        const pnl = (price - head.price) * matched * lotSize;
         realizedPnl += pnl;
         matches.push({
           buyRef: head.ref,  buyDate: head.date,
@@ -7270,10 +7270,15 @@ const DerivativesDashboard = () => {
   const { config } = useConfig();
   const [ops, setOps] = useState([]);
   const [derivAccounts, setDerivAccounts] = useState([]);
+  const [lotSizes, setLotSizes] = useState([]);
+  const [marketPrices, setMarketPrices] = useState({});
+  const [editingMktKey, setEditingMktKey] = useState(null);
 
   useEffect(() => {
     async function loadAll() {
       const { data: accData } = await supabase.from('deriv_accounts').select('*');
+      const { data: lsData }  = await supabase.from('deriv_lot_sizes').select('data');
+      const { data: mpData }  = await supabase.from('deriv_market_prices').select('*');
       // Load all derivatives pages
       const PAGE = 1000;
       let allOps = [];
@@ -7293,6 +7298,12 @@ const DerivativesDashboard = () => {
         }
         return acc;
       }));
+      if (lsData?.length) setLotSizes(lsData.map(r => r.data ?? r));
+      if (mpData?.length) {
+        const prices = {};
+        mpData.forEach(r => { prices[r.key] = r.value; });
+        setMarketPrices(prices);
+      }
     }
     loadAll();
   }, []);
@@ -7303,6 +7314,25 @@ const DerivativesDashboard = () => {
     if (fromTable) return fromTable.accountNumber;
     const fromConfig = (config.derivAccounts || []).find(a => a.value === val);
     return fromConfig?.label || val;
+  };
+
+  // Get lot size for a given exchange+instrument combo
+  const getLotSize = (exchange, instrument) => {
+    if (!exchange && !instrument) return 1;
+    const norm = v => (v || "").toLowerCase().trim();
+    const match = lotSizes.find(l =>
+      norm(l.exchange) === norm(exchange) &&
+      norm(l.instrument) === norm(instrument)
+    ) || lotSizes.find(l => norm(l.exchange) === norm(exchange));
+    return match ? (parseFloat(match.lotSize) || 1) : 1;
+  };
+
+  const saveMarketPrice = async (key, value) => {
+    if (value === undefined || value === "") {
+      await supabase.from('deriv_market_prices').delete().eq('key', key);
+    } else {
+      await supabase.from('deriv_market_prices').upsert({ key, value: String(value) }, { onConflict: 'key' });
+    }
   };
 
   const fmtLots = (n) => Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -7320,7 +7350,11 @@ const DerivativesDashboard = () => {
     buckets[normKey].ops.push(op);
   }
 
-  const bucketResults = Object.values(buckets).map(b => ({ ...b, ...runFIFO(b.ops) }));
+  const bucketResults = Object.values(buckets).map(b => {
+    const exchange = b.ops[0]?.exchange || "";
+    const ls = getLotSize(exchange, b.instrument);
+    return { ...b, exchange, lotSize: ls, ...runFIFO(b.ops, ls) };
+  });
 
   // Aggregate by account
   const accountMap = {};
@@ -7348,21 +7382,25 @@ const DerivativesDashboard = () => {
 
   const [expandedAccounts, setExpandedAccounts] = useState({});
   const [expandedInstruments, setExpandedInstruments] = useState({});
-  const [marketPrices, setMarketPrices] = useState({});
-  const [editingMktKey, setEditingMktKey] = useState(null);
   const toggle = (key) => setExpandedAccounts(p => ({ ...p, [key]: !p[key] }));
   const toggleInst = (key) => setExpandedInstruments(p => ({ ...p, [key]: !p[key] }));
 
-  // Open positions: buckets with openLots > 0, grouped by account+instrument, with side inferred from net
+  // Open positions: buckets with openLots != 0
   const openPositions = useMemo(() => {
     const positions = [];
     for (const b of bucketResults) {
       if (!b.openLots || b.openLots === 0) continue;
-      // Determine open side from remaining open ops (FIFO leaves unmatched buys or sells)
       const allBuyLots  = b.ops.filter(o => (o.side||"").toUpperCase() === "BUY").reduce((s,o)  => s + (parseFloat(o.quantity)||0), 0);
       const allSellLots = b.ops.filter(o => (o.side||"").toUpperCase() === "SELL").reduce((s,o) => s + (parseFloat(o.quantity)||0), 0);
       const side = allBuyLots >= allSellLots ? "BUY" : "SELL";
       const openPositionSide = side === "BUY" ? "LONG" : "SHORT";
+      // Get trade and financing bank from the account record
+      const accRecord = derivAccounts.find(a => a.accountNumber === b.account);
+      const trade = accRecord?.trade || "";
+      const bank  = accRecord?.financingBank || "";
+      // Get lot size for this exchange+instrument
+      const exchange = b.ops[0]?.exchange || "";
+      const lotSize = getLotSize(exchange, b.instrument);
       positions.push({
         key: `${b.account}||${b.instrument}`,
         account: b.account,
@@ -7371,13 +7409,16 @@ const DerivativesDashboard = () => {
         openPositionSide,
         openLots: b.openLots,
         avgOpenPrice: b.openAvgPrice || 0,
+        trade,
+        bank,
+        lotSize,
+        exchange,
       });
     }
-    // Sort by side: LONG first, then SHORT
     return positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);
-  }, [bucketResults]);
+  }, [bucketResults, derivAccounts, lotSizes]);
 
-  const OPEN_GRID = "1fr 1fr 70px 80px 110px 110px 110px 130px";
+  const OPEN_GRID = "1fr 80px 1fr 70px 80px 110px 110px 110px 130px";
 
   const GRID = "32px 1fr 70px 70px 120px 90px 170px";
   const MATCH_GRID = "1fr 1fr 1fr 1fr 100px 100px 100px 130px";
@@ -7424,7 +7465,7 @@ const DerivativesDashboard = () => {
 
         {/* Header */}
         <div style={{ display: "grid", gridTemplateColumns: OPEN_GRID, padding: "10px 20px", background: `${COLORS.tableHeader}99`, borderBottom: `1px solid ${COLORS.border}` }}>
-          {["ACCOUNT", "INSTRUMENT", "SIDE", "QUANTITY", "AVG OPEN PRICE", "MARKET PRICE", "P&L / LOT", "P&L"].map((h, i) => (
+          {["ACCOUNT", "TRADE", "BANQUE", "SIDE", "QUANTITY", "AVG OPEN PRICE", "MARKET PRICE", "P&L / LOT", "P&L"].map((h, i) => (
             <div key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.7, textAlign: i >= 3 ? "right" : "left" }}>{h}</div>
           ))}
         </div>
@@ -7442,15 +7483,20 @@ const DerivativesDashboard = () => {
           const pnlPerLot = (mktPrice !== null && pos.avgOpenPrice)
             ? (pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice)
             : null;
-          const pnl = pnlPerLot !== null ? pnlPerLot * Math.abs(pos.openLots) : null;
+          const pnl = pnlPerLot !== null ? pnlPerLot * Math.abs(pos.openLots) * pos.lotSize : null;
           const sideColor = pos.side === "BUY" ? COLORS.green : COLORS.red;
 
           return (
             <div key={pos.key} style={{ display: "grid", gridTemplateColumns: OPEN_GRID, padding: "12px 20px", borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}>
               {/* Account */}
-              <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{pos.account || "—"}</div>
-              {/* Instrument */}
-              <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 600 }}>{pos.instrument || "—"}</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{pos.account || "—"}</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 1 }}>{pos.instrument || "—"}</div>
+              </div>
+              {/* Trade */}
+              <div style={{ fontSize: 12, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{pos.trade || "—"}</div>
+              {/* Banque */}
+              <div style={{ fontSize: 12, color: COLORS.textSub }}>{pos.bank || "—"}</div>
               {/* Side */}
               <div style={{ textAlign: "right" }}>
                 <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sideColor}20`, color: sideColor }}>{pos.openPositionSide}</span>
@@ -7459,13 +7505,19 @@ const DerivativesDashboard = () => {
               <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.orange, fontWeight: 700 }}>{fmtLots(Math.abs(pos.openLots))}</div>
               {/* Avg open price */}
               <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{pos.avgOpenPrice > 0 ? pos.avgOpenPrice.toFixed(2) : "—"}</div>
-              {/* Market price — editable */}
+              {/* Market price — editable, persisted */}
               <div style={{ textAlign: "right" }}>
                 {isEditing ? (
                   <input
                     autoFocus
                     defaultValue={mktRaw ?? ""}
-                    onBlur={e => { const v = e.target.value.replace(/[^\d.-]/g, ""); setMarketPrices(p => ({ ...p, [pos.key]: v === "" ? undefined : v })); setEditingMktKey(null); }}
+                    onBlur={e => {
+                      const v = e.target.value.replace(/[^\d.-]/g, "");
+                      const newVal = v === "" ? undefined : v;
+                      setMarketPrices(p => ({ ...p, [pos.key]: newVal }));
+                      saveMarketPrice(pos.key, newVal);
+                      setEditingMktKey(null);
+                    }}
                     onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditingMktKey(null); }}
                     style={{ width: 90, background: COLORS.bg, border: `1px solid ${COLORS.accent}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none", textAlign: "right" }}
                   />
@@ -7482,7 +7534,7 @@ const DerivativesDashboard = () => {
               <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: pnlPerLot !== null ? pnlColor(pnlPerLot) : COLORS.textMuted, fontWeight: 600 }}>
                 {pnlPerLot !== null ? fmt(pnlPerLot) : "—"}
               </div>
-              {/* P&L total */}
+              {/* P&L total (× lots × lotSize) */}
               <div style={{ textAlign: "right", fontSize: 14, fontFamily: "'DM Mono', monospace", color: pnl !== null ? pnlColor(pnl) : COLORS.textMuted, fontWeight: 800 }}>
                 {pnl !== null ? fmt(pnl) : "—"}
               </div>
@@ -7495,12 +7547,12 @@ const DerivativesDashboard = () => {
             const mktPrice = marketPrices[pos.key] !== undefined ? parseFloat(marketPrices[pos.key]) : null;
             if (mktPrice === null || !pos.avgOpenPrice) return s;
             const pnlPerLot = pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice;
-            return s + pnlPerLot * Math.abs(pos.openLots);
+            return s + pnlPerLot * Math.abs(pos.openLots) * pos.lotSize;
           }, 0);
           const hasAnyPrice = openPositions.some(pos => marketPrices[pos.key] !== undefined);
           return (
             <div style={{ display: "grid", gridTemplateColumns: OPEN_GRID, padding: "12px 20px", background: `${COLORS.accent}08`, borderTop: `2px solid ${COLORS.accent}30` }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.accent, gridColumn: "1 / 5" }}>TOTAL P&amp;L LATENT</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.accent, gridColumn: "1 / 6" }}>TOTAL P&amp;L LATENT</div>
               <div /><div /><div />
               <div style={{ textAlign: "right", fontSize: 16, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: hasAnyPrice ? pnlColor(totalPnl) : COLORS.textMuted }}>
                 {hasAnyPrice ? fmt(totalPnl) : "—"}

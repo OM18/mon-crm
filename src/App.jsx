@@ -7272,6 +7272,7 @@ const DerivativesDashboard = () => {
   const [derivAccounts, setDerivAccounts] = useState([]);
   const [lotSizes, setLotSizes] = useState([]);
   const [products, setProducts] = useState([]);
+  const [priceUnits, setPriceUnits] = useState([]);
   const [marketPrices, setMarketPrices] = useState({});
   const [editingMktKey, setEditingMktKey] = useState(null);
 
@@ -7281,6 +7282,7 @@ const DerivativesDashboard = () => {
       const { data: lsData }  = await supabase.from('deriv_lot_sizes').select('data');
       const { data: mpData }  = await supabase.from('deriv_market_prices').select('*');
       const { data: prodData } = await supabase.from('deriv_products').select('data');
+      const { data: puData }  = await supabase.from('deriv_price_units').select('data');
       // Load all derivatives pages
       const PAGE = 1000;
       let allOps = [];
@@ -7302,6 +7304,7 @@ const DerivativesDashboard = () => {
       }));
       if (lsData?.length) setLotSizes(lsData.map(r => r.data ?? r));
       if (prodData?.length) setProducts(prodData.map(r => r.data ?? r));
+      if (puData?.length) setPriceUnits(puData.map(r => r.data ?? r));
       if (mpData?.length) {
         const prices = {};
         mpData.forEach(r => { prices[r.key] = r.value; });
@@ -7340,6 +7343,16 @@ const DerivativesDashboard = () => {
     return match ? (parseFloat(match.quantity) || 1) : 1;
   };
 
+  const getPriceUnit = (exchange, instrument) => {
+    const norm = v => (v || "").toLowerCase().trim();
+    const product = products.find(p => norm(p.label) === norm(instrument));
+    const resolvedExchange = product?.stoxxExchange || exchange;
+    const normExchange = norm(resolvedExchange);
+    // 1. Match on exchange
+    let match = priceUnits.find(p => norm(p.exchange) === normExchange);
+    return match ? (parseFloat(match.unit) || 1) : 1;
+  };
+
   const saveMarketPrice = async (key, value) => {
     if (value === undefined || value === "") {
       await supabase.from('deriv_market_prices').delete().eq('key', key);
@@ -7367,7 +7380,8 @@ const DerivativesDashboard = () => {
     const bucketResults = Object.values(buckets).map(b => {
       const exchange = b.ops[0]?.exchange || "";
       const ls = getLotSize(exchange, b.instrument);
-      return { ...b, exchange, lotSize: ls, ...runFIFO(b.ops, ls) };
+      const pu = getPriceUnit(exchange, b.instrument);
+      return { ...b, exchange, lotSize: ls, priceUnit: pu, ...runFIFO(b.ops, ls * pu) };
     });
 
     const accountMap = {};
@@ -7414,6 +7428,7 @@ const DerivativesDashboard = () => {
         trade: accRecord?.trade || "",
         bank: accRecord?.financingBank || "",
         lotSize: b.lotSize,
+        priceUnit: b.priceUnit,
         exchange: b.exchange,
         currency: (product?.currency || "").toUpperCase(),
       });
@@ -7421,7 +7436,7 @@ const DerivativesDashboard = () => {
     const openPositions = positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);
 
     return { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions, bucketsCount: Object.keys(buckets).length };
-  }, [ops, lotSizes, derivAccounts, products]);
+  }, [ops, lotSizes, derivAccounts, products, priceUnits]);
 
   const OPEN_GRID = "1fr 80px 1fr 70px 80px 110px 110px 110px 130px";
 
@@ -7493,7 +7508,7 @@ const DerivativesDashboard = () => {
           const pnlPerLot = (mktPrice !== null && pos.avgOpenPrice)
             ? (pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice)
             : null;
-          const pnl = pnlPerLot !== null ? pnlPerLot * Math.abs(pos.openLots) * pos.lotSize : null;
+          const pnl = pnlPerLot !== null ? pnlPerLot * Math.abs(pos.openLots) * pos.lotSize * (pos.priceUnit || 1) : null;
           const sideColor = pos.side === "BUY" ? COLORS.green : COLORS.red;
           const CURRENCY_SYMBOLS = { EUR: "€", USD: "$", GBP: "£", MAD: "MAD", UAH: "₴", CHF: "CHF" };
           const sym = pos.currency ? (CURRENCY_SYMBOLS[pos.currency] || pos.currency) : "";
@@ -7564,7 +7579,7 @@ const DerivativesDashboard = () => {
             const mktPrice = marketPrices[pos.key] !== undefined ? parseFloat(marketPrices[pos.key]) : null;
             if (mktPrice === null || !pos.avgOpenPrice) return s;
             const pnlPerLot = pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice;
-            return s + pnlPerLot * Math.abs(pos.openLots) * pos.lotSize;
+            return s + pnlPerLot * Math.abs(pos.openLots) * pos.lotSize * (pos.priceUnit || 1);
           }, 0);
           const hasAnyPrice = openPositions.some(pos => marketPrices[pos.key] !== undefined);
           return (

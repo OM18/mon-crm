@@ -2508,6 +2508,41 @@ useEffect(() => {
   const [showEtForm, setShowEtForm] = useState(false);
   const [expandedExchangeTarifs, setExpandedExchangeTarifs] = useState(false);
 
+  // ── Price Units state ──
+  const EMPTY_PU = { exchange: "", unit: "" };
+  const [priceUnits, setPriceUnits] = useState([]);
+  const [puForm, setPuForm] = useState(EMPTY_PU);
+  const [editPuId, setEditPuId] = useState(null);
+  const [showPuForm, setShowPuForm] = useState(false);
+  const [expandedPriceUnits, setExpandedPriceUnits] = useState(false);
+
+  useEffect(() => {
+    async function loadPriceUnits() {
+      const { data } = await supabase.from('deriv_price_units').select('data');
+      if (data?.length) setPriceUnits(data.map(r => r.data));
+    }
+    loadPriceUnits();
+  }, []);
+
+  const isPuFormValid = () => puForm.exchange !== "" && String(puForm.unit).trim() !== "" && !isNaN(parseFloat(puForm.unit));
+
+  const savePriceUnit = async () => {
+    if (!isPuFormValid()) return;
+    const clean = { ...puForm, unit: parseFloat(puForm.unit) };
+    const updated = editPuId
+      ? priceUnits.map(p => p.id === editPuId ? { ...clean, id: editPuId } : p)
+      : [...priceUnits, { ...clean, id: Date.now() }];
+    setPriceUnits(updated);
+    await safeSave('deriv_price_units', updated, setPriceUnits, priceUnits);
+    setPuForm(EMPTY_PU); setEditPuId(null); setShowPuForm(false);
+  };
+
+  const deletePriceUnit = async (id) => {
+    const updated = priceUnits.filter(p => p.id !== id);
+    setPriceUnits(updated);
+    await safeSave('deriv_price_units', updated, setPriceUnits, priceUnits);
+  };
+
   useEffect(() => {
     async function loadExchangeTarifs() {
       const { data } = await supabase.from('deriv_exchange_tarifs').select('data');
@@ -3242,6 +3277,78 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
           {/* Order Transmission Types */}
           <DerivPillsEditor configKey="derivOrderTransmissionTypes" label="Order Transmission Types" icon="📡" description="Modes de transmission des ordres (Electronic, Manual…)" config={config} updateField={updateField} defaultKey="derivOrderTransmissionDefault" onSetDefault={v => updateField("derivOrderTransmissionDefault", v)} />
+
+          {/* Price Units */}
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+            <div onClick={() => setExpandedPriceUnits(v => !v)}
+              style={{ padding: "18px 24px", borderBottom: expandedPriceUnits ? `1px solid ${COLORS.border}` : "none", background: `${COLORS.blue}08`, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", userSelect: "none" }}
+              onMouseOver={e => e.currentTarget.style.background = `${COLORS.blue}14`}
+              onMouseOut={e => e.currentTarget.style.background = `${COLORS.blue}08`}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>💲</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Price Units</div>
+                <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Unité de prix par exchange (valeur décimale)</div>
+              </div>
+              <div style={{ fontSize: 12, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", marginRight: 8 }}>{priceUnits.length} entrée{priceUnits.length !== 1 ? "s" : ""}</div>
+              <Btn onClick={e => { e.stopPropagation(); setPuForm(EMPTY_PU); setEditPuId(null); setShowPuForm(true); if (!expandedPriceUnits) setExpandedPriceUnits(true); }} style={{ padding: "7px 14px", fontSize: 13 }}>+ Ajouter</Btn>
+              <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expandedPriceUnits ? "rotate(180deg)" : "rotate(0deg)", marginLeft: 4 }}>▾</span>
+            </div>
+
+            {expandedPriceUnits && (
+              <div style={{ padding: "20px 24px" }}>
+                {/* Form */}
+                {showPuForm && (
+                  <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 18, marginBottom: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>EXCHANGE <span style={{ color: COLORS.red }}>*</span></label>
+                        <select value={puForm.exchange} onChange={e => setPuForm(f => ({ ...f, exchange: e.target.value }))}
+                          style={{ background: COLORS.card, border: `1px solid ${!puForm.exchange ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: puForm.exchange ? COLORS.text : COLORS.textMuted, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
+                          <option value="">— Sélectionner —</option>
+                          {(config.derivExchanges || []).map(ex => <option key={ex.value} value={ex.value}>{ex.label}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>UNIT <span style={{ color: COLORS.red }}>*</span></label>
+                        <input type="number" step="any" value={puForm.unit} onChange={e => setPuForm(f => ({ ...f, unit: e.target.value }))}
+                          placeholder="ex: 0.25"
+                          style={{ background: COLORS.card, border: `1px solid ${String(puForm.unit).trim() === "" ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "'DM Mono', monospace" }}
+                          onFocus={e => e.target.style.borderColor = COLORS.accent}
+                          onBlur={e => e.target.style.borderColor = String(puForm.unit).trim() === "" ? COLORS.red + "60" : COLORS.border} />
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "flex-end" }}>
+                      <Btn variant="secondary" onClick={() => { setShowPuForm(false); setPuForm(EMPTY_PU); setEditPuId(null); }}>Annuler</Btn>
+                      <Btn onClick={savePriceUnit} disabled={!isPuFormValid()}>Enregistrer</Btn>
+                    </div>
+                  </div>
+                )}
+
+                {/* List */}
+                {priceUnits.length === 0 && !showPuForm && (
+                  <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 32, fontSize: 13 }}>Aucune entrée — cliquez sur "+ Ajouter" pour commencer</div>
+                )}
+                {priceUnits.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {[...priceUnits].sort((a, b) => (a.exchange || "").localeCompare(b.exchange || "")).map(pu => {
+                      const exLabel = (config.derivExchanges || []).find(e => e.value === pu.exchange)?.label || pu.exchange;
+                      return (
+                        <div key={pu.id} style={{ display: "flex", alignItems: "center", gap: 14, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: `${COLORS.blue}18`, border: `1px solid ${COLORS.blue}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>💲</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{exLabel}</div>
+                            <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2, fontFamily: "'DM Mono', monospace" }}>Unit : <span style={{ color: COLORS.accent }}>{pu.unit}</span></div>
+                          </div>
+                          <button onClick={() => { setPuForm({ exchange: pu.exchange, unit: pu.unit }); setEditPuId(pu.id); setShowPuForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                          <button onClick={() => deletePriceUnit(pu.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Financial Brokers — lecture seule, alimenté par Companies */}
           {(() => {

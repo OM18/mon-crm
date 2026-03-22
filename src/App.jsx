@@ -7343,7 +7343,7 @@ const DerivativesDashboard = () => {
   const pnlColor = (n) => n > 0 ? COLORS.green : n < 0 ? COLORS.red : COLORS.textMuted;
 
   // Build all FIFO computations — re-runs when ops or lotSizes are loaded
-  const { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions } = useMemo(() => {
+  const { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions, bucketsCount } = useMemo(() => {
     const buckets = {};
     for (const op of ops) {
       const normKey = `${(op.account || "").toLowerCase().trim()}||${(op.instrument || "").toLowerCase().trim()}`;
@@ -7405,7 +7405,7 @@ const DerivativesDashboard = () => {
     }
     const openPositions = positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);
 
-    return { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions };
+    return { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions, bucketsCount: Object.keys(buckets).length };
   }, [ops, lotSizes, derivAccounts]);
 
   const OPEN_GRID = "1fr 80px 1fr 70px 80px 110px 110px 110px 130px";
@@ -7439,7 +7439,7 @@ const DerivativesDashboard = () => {
         <KpiCard label="REALISED P&L (FIFO)" value={totalSells > 0 ? fmt(grandPnl) : "—"} color={totalSells > 0 ? pnlColor(grandPnl) : COLORS.textMuted} sub={totalSells > 0 ? `${rows.length} compte${rows.length > 1 ? "s" : ""}` : "Aucun SELL enregistré"} />
         <KpiCard label="TOTAL OPÉRATIONS" value={ops.length} sub={`${totalBuys} BUY · ${totalSells} SELL`} />
         <KpiCard label="LOTS OUVERTS" value={fmtLots(grandOpenLots)} color={COLORS.orange} sub="position nette non clôturée" />
-        <KpiCard label="MATCHES FIFO" value={totalMatches} sub={`sur ${Object.keys(buckets).length} bucket${Object.keys(buckets).length > 1 ? "s" : ""}`} />
+        <KpiCard label="MATCHES FIFO" value={totalMatches} sub={`sur ${bucketsCount} bucket${bucketsCount > 1 ? "s" : ""}`} />
       </div>
 
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>

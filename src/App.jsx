@@ -7413,6 +7413,11 @@ const DerivativesDashboard = () => {
   const GRID = "32px 1fr 70px 70px 120px 90px 170px";
   const MATCH_GRID = "1fr 1fr 1fr 1fr 100px 100px 100px 130px";
 
+  const [expandedAccounts, setExpandedAccounts] = useState({});
+  const [expandedInstruments, setExpandedInstruments] = useState({});
+  const toggle = (key) => setExpandedAccounts(p => ({ ...p, [key]: !p[key] }));
+  const toggleInst = (key) => setExpandedInstruments(p => ({ ...p, [key]: !p[key] }));
+
   const KpiCard = ({ label, value, sub, color }) => (
     <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 14, padding: "20px 24px" }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, marginBottom: 8 }}>{label}</div>

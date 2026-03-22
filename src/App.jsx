@@ -7320,10 +7320,13 @@ const DerivativesDashboard = () => {
   const getLotSize = (exchange, instrument) => {
     if (!exchange && !instrument) return 1;
     const norm = v => (v || "").toLowerCase().trim();
+    // Try exact match on exchange+instrument (value or label)
     const match = lotSizes.find(l =>
       norm(l.exchange) === norm(exchange) &&
-      norm(l.instrument) === norm(instrument)
+      (norm(l.instrument) === norm(instrument) || norm(l.instrument).replace(/_/g, " ") === norm(instrument).replace(/_/g, " "))
     ) || lotSizes.find(l => norm(l.exchange) === norm(exchange));
+    if (match) console.log("[getLotSize] match:", match.exchange, match.instrument, "qty:", match.quantity);
+    else console.log("[getLotSize] NO match for exchange:", exchange, "instrument:", instrument, "available:", lotSizes.map(l => `${l.exchange}/${l.instrument}`));
     return match ? (parseFloat(match.quantity) || 1) : 1;
   };
 

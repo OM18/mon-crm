@@ -7324,7 +7324,7 @@ const DerivativesDashboard = () => {
       norm(l.exchange) === norm(exchange) &&
       norm(l.instrument) === norm(instrument)
     ) || lotSizes.find(l => norm(l.exchange) === norm(exchange));
-    return match ? (parseFloat(match.lotSize) || 1) : 1;
+    return match ? (parseFloat(match.quantity) || 1) : 1;
   };
 
   const saveMarketPrice = async (key, value) => {

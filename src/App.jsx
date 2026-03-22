@@ -7342,43 +7342,46 @@ const DerivativesDashboard = () => {
   };
   const pnlColor = (n) => n > 0 ? COLORS.green : n < 0 ? COLORS.red : COLORS.textMuted;
 
-  // Build buckets keyed by "account||instrument" — normalized to avoid case/space mismatches
-  const buckets = {};
-  for (const op of ops) {
-    const normKey = `${(op.account || "").toLowerCase().trim()}||${(op.instrument || "").toLowerCase().trim()}`;
-    if (!buckets[normKey]) buckets[normKey] = { account: op.account || "", instrument: op.instrument || "", ops: [] };
-    buckets[normKey].ops.push(op);
-  }
+  // Build all FIFO computations — re-runs when ops or lotSizes are loaded
+  const { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches } = useMemo(() => {
+    const buckets = {};
+    for (const op of ops) {
+      const normKey = `${(op.account || "").toLowerCase().trim()}||${(op.instrument || "").toLowerCase().trim()}`;
+      if (!buckets[normKey]) buckets[normKey] = { account: op.account || "", instrument: op.instrument || "", ops: [] };
+      buckets[normKey].ops.push(op);
+    }
 
-  const bucketResults = Object.values(buckets).map(b => {
-    const exchange = b.ops[0]?.exchange || "";
-    const ls = getLotSize(exchange, b.instrument);
-    return { ...b, exchange, lotSize: ls, ...runFIFO(b.ops, ls) };
-  });
-
-  // Aggregate by account
-  const accountMap = {};
-  for (const b of bucketResults) {
-    if (!accountMap[b.account]) accountMap[b.account] = { account: b.account, realizedPnl: 0, openLots: 0, instruments: [] };
-    accountMap[b.account].realizedPnl += b.realizedPnl;
-    accountMap[b.account].openLots += b.openLots;
-    accountMap[b.account].instruments.push({
-      instrument: b.instrument,
-      realizedPnl: b.realizedPnl,
-      openLots: b.openLots,
-      openAvgPrice: b.openAvgPrice,
-      matches: b.matches,
-      buyCount: b.ops.filter(o => (o.side || "").toUpperCase() === "BUY").length,
-      sellCount: b.ops.filter(o => (o.side || "").toUpperCase() === "SELL").length,
+    const bucketResults = Object.values(buckets).map(b => {
+      const exchange = b.ops[0]?.exchange || "";
+      const ls = getLotSize(exchange, b.instrument);
+      return { ...b, exchange, lotSize: ls, ...runFIFO(b.ops, ls) };
     });
-  }
 
-  const rows = Object.values(accountMap).sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl));
-  const grandPnl = rows.reduce((s, r) => s + r.realizedPnl, 0);
-  const grandOpenLots = rows.reduce((s, r) => s + r.openLots, 0);
-  const totalBuys = ops.filter(o => (o.side || "").toUpperCase() === "BUY").length;
-  const totalSells = ops.filter(o => (o.side || "").toUpperCase() === "SELL").length;
-  const totalMatches = bucketResults.reduce((s, b) => s + b.matches.length, 0);
+    const accountMap = {};
+    for (const b of bucketResults) {
+      if (!accountMap[b.account]) accountMap[b.account] = { account: b.account, realizedPnl: 0, openLots: 0, instruments: [] };
+      accountMap[b.account].realizedPnl += b.realizedPnl;
+      accountMap[b.account].openLots += b.openLots;
+      accountMap[b.account].instruments.push({
+        instrument: b.instrument,
+        realizedPnl: b.realizedPnl,
+        openLots: b.openLots,
+        openAvgPrice: b.openAvgPrice,
+        matches: b.matches,
+        buyCount: b.ops.filter(o => (o.side || "").toUpperCase() === "BUY").length,
+        sellCount: b.ops.filter(o => (o.side || "").toUpperCase() === "SELL").length,
+      });
+    }
+
+    const rows = Object.values(accountMap).sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl));
+    const grandPnl = rows.reduce((s, r) => s + r.realizedPnl, 0);
+    const grandOpenLots = rows.reduce((s, r) => s + r.openLots, 0);
+    const totalBuys = ops.filter(o => (o.side || "").toUpperCase() === "BUY").length;
+    const totalSells = ops.filter(o => (o.side || "").toUpperCase() === "SELL").length;
+    const totalMatches = bucketResults.reduce((s, b) => s + b.matches.length, 0);
+
+    return { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches };
+  }, [ops, lotSizes]);
 
   const [expandedAccounts, setExpandedAccounts] = useState({});
   const [expandedInstruments, setExpandedInstruments] = useState({});

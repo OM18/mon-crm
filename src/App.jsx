@@ -7343,7 +7343,7 @@ const DerivativesDashboard = () => {
   const pnlColor = (n) => n > 0 ? COLORS.green : n < 0 ? COLORS.red : COLORS.textMuted;
 
   // Build all FIFO computations — re-runs when ops or lotSizes are loaded
-  const { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches } = useMemo(() => {
+  const { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions } = useMemo(() => {
     const buckets = {};
     for (const op of ops) {
       const normKey = `${(op.account || "").toLowerCase().trim()}||${(op.instrument || "").toLowerCase().trim()}`;
@@ -7380,30 +7380,15 @@ const DerivativesDashboard = () => {
     const totalSells = ops.filter(o => (o.side || "").toUpperCase() === "SELL").length;
     const totalMatches = bucketResults.reduce((s, b) => s + b.matches.length, 0);
 
-    return { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches };
-  }, [ops, lotSizes]);
-
-  const [expandedAccounts, setExpandedAccounts] = useState({});
-  const [expandedInstruments, setExpandedInstruments] = useState({});
-  const toggle = (key) => setExpandedAccounts(p => ({ ...p, [key]: !p[key] }));
-  const toggleInst = (key) => setExpandedInstruments(p => ({ ...p, [key]: !p[key] }));
-
-  // Open positions: buckets with openLots != 0
-  const openPositions = useMemo(() => {
+    // Open positions
     const positions = [];
     for (const b of bucketResults) {
       if (!b.openLots || b.openLots === 0) continue;
-      const allBuyLots  = b.ops.filter(o => (o.side||"").toUpperCase() === "BUY").reduce((s,o)  => s + (parseFloat(o.quantity)||0), 0);
+      const allBuyLots  = b.ops.filter(o => (o.side||"").toUpperCase() === "BUY").reduce((s,o) => s + (parseFloat(o.quantity)||0), 0);
       const allSellLots = b.ops.filter(o => (o.side||"").toUpperCase() === "SELL").reduce((s,o) => s + (parseFloat(o.quantity)||0), 0);
       const side = allBuyLots >= allSellLots ? "BUY" : "SELL";
       const openPositionSide = side === "BUY" ? "LONG" : "SHORT";
-      // Get trade and financing bank from the account record
       const accRecord = derivAccounts.find(a => a.accountNumber === b.account);
-      const trade = accRecord?.trade || "";
-      const bank  = accRecord?.financingBank || "";
-      // Get lot size for this exchange+instrument
-      const exchange = b.ops[0]?.exchange || "";
-      const lotSize = getLotSize(exchange, b.instrument);
       positions.push({
         key: `${b.account}||${b.instrument}`,
         account: b.account,
@@ -7412,14 +7397,16 @@ const DerivativesDashboard = () => {
         openPositionSide,
         openLots: b.openLots,
         avgOpenPrice: b.openAvgPrice || 0,
-        trade,
-        bank,
-        lotSize,
-        exchange,
+        trade: accRecord?.trade || "",
+        bank: accRecord?.financingBank || "",
+        lotSize: b.lotSize,
+        exchange: b.exchange,
       });
     }
-    return positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);
-  }, [bucketResults, derivAccounts, lotSizes]);
+    const openPositions = positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);
+
+    return { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions };
+  }, [ops, lotSizes, derivAccounts]);
 
   const OPEN_GRID = "1fr 80px 1fr 70px 80px 110px 110px 110px 130px";
 

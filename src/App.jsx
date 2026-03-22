@@ -6146,6 +6146,8 @@ const setOps = async (val) => {
   const [selected, setSelected] = useState(null);
   const [search, setSearch]     = useState("");
   const [accountSearch, setAccountSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo]     = useState("");
   const [editingFeesId, setEditingFeesId] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filterMode, setFilterMode]   = useState("AND");
@@ -6214,6 +6216,8 @@ const setOps = async (val) => {
     if (!ms) return false;
     const aq = accountSearch.toLowerCase().trim();
     if (aq && (!o.account || o.account.toLowerCase() !== aq)) return false;
+    if (dateFrom && (o.tradeDate || "") < dateFrom) return false;
+    if (dateTo   && (o.tradeDate || "") > dateTo)   return false;
     const tagChecks = [
       !activeFilters.type.length         || activeFilters.type.includes(o.type),
       !activeFilters.opType.length       || activeFilters.opType.includes(o.opType),
@@ -6328,9 +6332,18 @@ const setOps = async (val) => {
         </div>
 
         {/* Barre recherche + filtres */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
           <input placeholder="Search by ref, instrument, broker, notes…" value={search} onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.card, border: `1px solid ${(dateFrom || dateTo) ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "6px 12px", transition: "border-color 0.2s" }}>
+            <span style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600, whiteSpace: "nowrap" }}>DATE</span>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              style={{ background: "transparent", border: "none", color: dateFrom ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", cursor: "pointer" }} />
+            <span style={{ color: COLORS.textMuted, fontSize: 12 }}>→</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              style={{ background: "transparent", border: "none", color: dateTo ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", cursor: "pointer" }} />
+            {(dateFrom || dateTo) && <span onClick={() => { setDateFrom(""); setDateTo(""); }} style={{ cursor: "pointer", color: COLORS.textMuted, fontSize: 14, lineHeight: 1 }}>✕</span>}
+          </div>
           <input placeholder="Account…" value={accountSearch} onChange={e => setAccountSearch(e.target.value)}
             style={{ width: 160, background: COLORS.card, border: `1px solid ${accountSearch ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }} />
           <div style={{ position: "relative" }}>

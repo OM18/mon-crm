@@ -7335,7 +7335,7 @@ const DerivativesDashboard = () => {
           const pnlPerLot = (mktPrice !== null && pos.avgOpenPrice)
             ? (pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice)
             : null;
-          const pnl = pnlPerLot !== null ? pnlPerLot * pos.openLots : null;
+          const pnl = pnlPerLot !== null ? pnlPerLot * Math.abs(pos.openLots) : null;
           const sideColor = pos.side === "BUY" ? COLORS.green : COLORS.red;
 
           return (
@@ -7349,7 +7349,7 @@ const DerivativesDashboard = () => {
                 <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sideColor}20`, color: sideColor }}>{pos.openPositionSide}</span>
               </div>
               {/* Quantity */}
-              <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.orange, fontWeight: 700 }}>{fmtLots(pos.openLots)}</div>
+              <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.orange, fontWeight: 700 }}>{fmtLots(Math.abs(pos.openLots))}</div>
               {/* Avg open price */}
               <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{pos.avgOpenPrice > 0 ? pos.avgOpenPrice.toFixed(2) : "—"}</div>
               {/* Market price — editable */}
@@ -7388,7 +7388,7 @@ const DerivativesDashboard = () => {
             const mktPrice = marketPrices[pos.key] !== undefined ? parseFloat(marketPrices[pos.key]) : null;
             if (mktPrice === null || !pos.avgOpenPrice) return s;
             const pnlPerLot = pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice;
-            return s + pnlPerLot * pos.openLots;
+            return s + pnlPerLot * Math.abs(pos.openLots);
           }, 0);
           const hasAnyPrice = openPositions.some(pos => marketPrices[pos.key] !== undefined);
           return (

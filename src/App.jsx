@@ -7402,6 +7402,7 @@ const DerivativesDashboard = () => {
       const side = allBuyLots >= allSellLots ? "BUY" : "SELL";
       const openPositionSide = side === "BUY" ? "LONG" : "SHORT";
       const accRecord = derivAccounts.find(a => a.accountNumber === b.account);
+      const product = products.find(p => (p.label || "").toLowerCase().trim() === (b.instrument || "").toLowerCase().trim());
       positions.push({
         key: `${b.account}||${b.instrument}`,
         account: b.account,
@@ -7414,6 +7415,7 @@ const DerivativesDashboard = () => {
         bank: accRecord?.financingBank || "",
         lotSize: b.lotSize,
         exchange: b.exchange,
+        currency: (product?.currency || "").toUpperCase(),
       });
     }
     const openPositions = positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);
@@ -7493,6 +7495,13 @@ const DerivativesDashboard = () => {
             : null;
           const pnl = pnlPerLot !== null ? pnlPerLot * Math.abs(pos.openLots) * pos.lotSize : null;
           const sideColor = pos.side === "BUY" ? COLORS.green : COLORS.red;
+          const CURRENCY_SYMBOLS = { EUR: "€", USD: "$", GBP: "£", MAD: "MAD", UAH: "₴", CHF: "CHF" };
+          const sym = pos.currency ? (CURRENCY_SYMBOLS[pos.currency] || pos.currency) : "";
+          const fmtPnl = (n) => {
+            const rounded = Math.round(n);
+            const abs = Math.abs(rounded).toLocaleString("en-US");
+            return (n >= 0 ? "+ " : "− ") + abs + (sym ? " " + sym : "");
+          };
 
           return (
             <div key={pos.key} style={{ display: "grid", gridTemplateColumns: OPEN_GRID, padding: "12px 20px", borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}>
@@ -7540,11 +7549,11 @@ const DerivativesDashboard = () => {
               </div>
               {/* P&L per lot */}
               <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: pnlPerLot !== null ? pnlColor(pnlPerLot) : COLORS.textMuted, fontWeight: 600 }}>
-                {pnlPerLot !== null ? fmt(pnlPerLot) : "—"}
+                {pnlPerLot !== null ? fmtPnl(pnlPerLot) : "—"}
               </div>
               {/* P&L total (× lots × lotSize) */}
               <div style={{ textAlign: "right", fontSize: 14, fontFamily: "'DM Mono', monospace", color: pnl !== null ? pnlColor(pnl) : COLORS.textMuted, fontWeight: 800 }}>
-                {pnl !== null ? fmt(pnl) : "—"}
+                {pnl !== null ? fmtPnl(pnl) : "—"}
               </div>
             </div>
           );

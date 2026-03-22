@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createContext, useContext } from "react";
+import { useState, useEffect, useRef, createContext, useContext, useMemo } from "react";
 import { supabase } from './supabase';
 
 // ─── SAFE SUPABASE SAVE ───────────────────────────────────────
@@ -6210,7 +6210,7 @@ const setOps = async (val) => {
     setSelected(data.id);
   };
 
-  const filtered = ops.filter(o => {
+  const filtered = useMemo(() => ops.filter(o => {
     const q = search.toLowerCase();
     const ms = !q || o.ref?.toLowerCase().includes(q) || o.instrument?.toLowerCase().includes(q) || o.broker?.toLowerCase().includes(q) || o.exchange?.toLowerCase().includes(q) || o.contract?.toLowerCase().includes(q) || o.notes?.toLowerCase().includes(q);
     if (!ms) return false;
@@ -6233,7 +6233,7 @@ const setOps = async (val) => {
       const val = o[cf.key];
       if (cf.op === "empty")    return !val || String(val).trim() === "";
       if (cf.op === "notempty") return !!val && String(val).trim() !== "";
-      if (!cf.value && cf.value !== 0) return true; // skip filter if no value entered
+      if (!cf.value && cf.value !== 0) return true;
       if (cf.op === "eq")       return String(val || "").toLowerCase() === String(cf.value || "").toLowerCase();
       if (cf.op === "gt")       return Number(val) > Number(cf.value);
       if (cf.op === "lt")       return Number(val) < Number(cf.value);
@@ -6242,7 +6242,8 @@ const setOps = async (val) => {
     });
     const allChecks = [...tagChecks, ...customChecks];
     return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
-  }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
+  }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || "")),
+  [ops, search, accountSearch, dateFrom, dateTo, activeFilters, customFilters, filterMode]);
 
   const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };

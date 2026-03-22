@@ -6223,6 +6223,7 @@ const setOps = async (val) => {
     if (!ms) return false;
     const aq = accountSearch.toLowerCase().trim();
     if (aq && !o.account?.toLowerCase().includes(aq)) return false;
+    if (aq) console.log("[PASS]", JSON.stringify(o.account), "| search:", aq);
     const tagChecks = [
       !activeFilters.type.length         || activeFilters.type.includes(o.type),
       !activeFilters.opType.length       || activeFilters.opType.includes(o.opType),

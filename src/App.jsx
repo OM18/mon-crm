@@ -6222,8 +6222,7 @@ const setOps = async (val) => {
     const ms = !q || o.ref?.toLowerCase().includes(q) || o.instrument?.toLowerCase().includes(q) || o.broker?.toLowerCase().includes(q) || o.exchange?.toLowerCase().includes(q) || o.contract?.toLowerCase().includes(q) || o.notes?.toLowerCase().includes(q);
     if (!ms) return false;
     const aq = accountSearch.toLowerCase().trim();
-    if (aq && !o.account?.toLowerCase().includes(aq)) return false;
-    if (aq) console.log("[PASS]", JSON.stringify(o.account), "| search:", aq);
+    if (aq && (!o.account || !o.account.toLowerCase().includes(aq))) return false;
     const tagChecks = [
       !activeFilters.type.length         || activeFilters.type.includes(o.type),
       !activeFilters.opType.length       || activeFilters.opType.includes(o.opType),

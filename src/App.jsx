@@ -6154,6 +6154,7 @@ const setOps = async (val) => {
   const [form, setForm]         = useState(makeEmpty());
   const [selected, setSelected] = useState(null);
   const [search, setSearch]     = useState("");
+  const [accountSearch, setAccountSearch] = useState("");
   const [editingFeesId, setEditingFeesId] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filterMode, setFilterMode]   = useState("AND");
@@ -6220,6 +6221,8 @@ const setOps = async (val) => {
     const q = search.toLowerCase();
     const ms = !q || o.ref?.toLowerCase().includes(q) || o.instrument?.toLowerCase().includes(q) || o.broker?.toLowerCase().includes(q) || o.exchange?.toLowerCase().includes(q) || o.contract?.toLowerCase().includes(q) || o.notes?.toLowerCase().includes(q);
     if (!ms) return false;
+    const aq = accountSearch.toLowerCase().trim();
+    if (aq && !o.account?.toLowerCase().includes(aq)) return false;
     const tagChecks = [
       !activeFilters.type.length         || activeFilters.type.includes(o.type),
       !activeFilters.opType.length       || activeFilters.opType.includes(o.opType),
@@ -6337,6 +6340,8 @@ const setOps = async (val) => {
         <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
           <input placeholder="Search by ref, instrument, broker, notes…" value={search} onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+          <input placeholder="Account…" value={accountSearch} onChange={e => setAccountSearch(e.target.value)}
+            style={{ width: 160, background: COLORS.card, border: `1px solid ${accountSearch ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }} />
           <div style={{ position: "relative" }}>
             <Btn variant="secondary" onClick={() => setShowFilters(v => !v)}>
               ▼ FILTER {(Object.values(activeFilters).flat().length + customFilters.length) > 0 && <span style={{ background: COLORS.accent, color: "#fff", borderRadius: 10, fontSize: 11, padding: "1px 7px", marginLeft: 6 }}>{Object.values(activeFilters).flat().length + customFilters.length}</span>}

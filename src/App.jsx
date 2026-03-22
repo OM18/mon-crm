@@ -7271,6 +7271,7 @@ const DerivativesDashboard = () => {
   const [ops, setOps] = useState([]);
   const [derivAccounts, setDerivAccounts] = useState([]);
   const [lotSizes, setLotSizes] = useState([]);
+  const [products, setProducts] = useState([]);
   const [marketPrices, setMarketPrices] = useState({});
   const [editingMktKey, setEditingMktKey] = useState(null);
 
@@ -7279,6 +7280,7 @@ const DerivativesDashboard = () => {
       const { data: accData } = await supabase.from('deriv_accounts').select('*');
       const { data: lsData }  = await supabase.from('deriv_lot_sizes').select('data');
       const { data: mpData }  = await supabase.from('deriv_market_prices').select('*');
+      const { data: prodData } = await supabase.from('deriv_products').select('data');
       // Load all derivatives pages
       const PAGE = 1000;
       let allOps = [];
@@ -7299,6 +7301,7 @@ const DerivativesDashboard = () => {
         return acc;
       }));
       if (lsData?.length) setLotSizes(lsData.map(r => r.data ?? r));
+      if (prodData?.length) setProducts(prodData.map(r => r.data ?? r));
       if (mpData?.length) {
         const prices = {};
         mpData.forEach(r => { prices[r.key] = r.value; });
@@ -7318,15 +7321,22 @@ const DerivativesDashboard = () => {
 
   // Get lot size for a given exchange+instrument combo
   const getLotSize = (exchange, instrument) => {
-    if (!exchange && !instrument) return 1;
     const norm = v => (v || "").toLowerCase().trim();
-    // Try exact match on exchange+instrument (value or label)
-    const match = lotSizes.find(l =>
-      norm(l.exchange) === norm(exchange) &&
-      (norm(l.instrument) === norm(instrument) || norm(l.instrument).replace(/_/g, " ") === norm(instrument).replace(/_/g, " "))
-    ) || lotSizes.find(l => norm(l.exchange) === norm(exchange));
-    if (match) console.log("[getLotSize] match:", match.exchange, match.instrument, "qty:", match.quantity);
-    else console.log("[getLotSize] NO match for exchange:", exchange, "instrument:", instrument, "available:", lotSizes.map(l => `${l.exchange}/${l.instrument}`));
+    // Resolve underlying and exchange from deriv_products using instrument label
+    const product = products.find(p => norm(p.label) === norm(instrument));
+    const underlying = product?.underlying || instrument;
+    const resolvedExchange = product?.stoxxExchange || exchange;
+    const normUnderlying = norm(underlying);
+    const normExchange = norm(resolvedExchange);
+    // 1. Match on exchange + underlying
+    let match = lotSizes.find(l =>
+      norm(l.exchange) === normExchange &&
+      norm(l.instrument) === normUnderlying
+    );
+    // 2. Fallback: underlying only
+    if (!match) match = lotSizes.find(l => norm(l.instrument) === normUnderlying);
+    // 3. Fallback: exchange only
+    if (!match && normExchange) match = lotSizes.find(l => norm(l.exchange) === normExchange);
     return match ? (parseFloat(match.quantity) || 1) : 1;
   };
 
@@ -7409,7 +7419,7 @@ const DerivativesDashboard = () => {
     const openPositions = positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);
 
     return { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions, bucketsCount: Object.keys(buckets).length };
-  }, [ops, lotSizes, derivAccounts]);
+  }, [ops, lotSizes, derivAccounts, products]);
 
   const OPEN_GRID = "1fr 80px 1fr 70px 80px 110px 110px 110px 130px";
 

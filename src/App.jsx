@@ -7241,8 +7241,34 @@ const DerivativesDashboard = () => {
 
   const [expandedAccounts, setExpandedAccounts] = useState({});
   const [expandedInstruments, setExpandedInstruments] = useState({});
+  const [marketPrices, setMarketPrices] = useState({});
+  const [editingMktKey, setEditingMktKey] = useState(null);
   const toggle = (key) => setExpandedAccounts(p => ({ ...p, [key]: !p[key] }));
   const toggleInst = (key) => setExpandedInstruments(p => ({ ...p, [key]: !p[key] }));
+
+  // Open positions: buckets with openLots > 0, grouped by account+instrument, with side inferred from net
+  const openPositions = useMemo(() => {
+    const positions = [];
+    for (const b of bucketResults) {
+      if (!b.openLots || b.openLots === 0) continue;
+      // Determine open side from remaining open ops (FIFO leaves unmatched buys or sells)
+      const allBuyLots  = b.ops.filter(o => (o.side||"").toUpperCase() === "BUY").reduce((s,o)  => s + (parseFloat(o.quantity)||0), 0);
+      const allSellLots = b.ops.filter(o => (o.side||"").toUpperCase() === "SELL").reduce((s,o) => s + (parseFloat(o.quantity)||0), 0);
+      const side = allBuyLots >= allSellLots ? "BUY" : "SELL";
+      positions.push({
+        key: `${b.account}||${b.instrument}`,
+        account: b.account,
+        instrument: b.instrument,
+        side,
+        openLots: b.openLots,
+        avgOpenPrice: b.openAvgPrice || 0,
+      });
+    }
+    // Sort by side: BUY first, then SELL
+    return positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);
+  }, [bucketResults]);
+
+  const OPEN_GRID = "1fr 1fr 70px 80px 110px 110px 110px 130px";
 
   const GRID = "32px 1fr 70px 70px 120px 90px 170px";
   const MATCH_GRID = "1fr 1fr 1fr 1fr 100px 100px 100px 130px";
@@ -7274,6 +7300,105 @@ const DerivativesDashboard = () => {
         <KpiCard label="TOTAL OPÉRATIONS" value={ops.length} sub={`${totalBuys} BUY · ${totalSells} SELL`} />
         <KpiCard label="LOTS OUVERTS" value={fmtLots(grandOpenLots)} color={COLORS.orange} sub="position nette non clôturée" />
         <KpiCard label="MATCHES FIFO" value={totalMatches} sub={`sur ${Object.keys(buckets).length} bucket${Object.keys(buckets).length > 1 ? "s" : ""}`} />
+      </div>
+
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ background: COLORS.tableHeader, padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>POSITIONS OUVERTES</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>Market price éditable — P&amp;L latent calculé automatiquement</div>
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.orange, fontWeight: 700, background: `${COLORS.orange}15`, border: `1px solid ${COLORS.orange}30`, borderRadius: 8, padding: "4px 12px" }}>
+            {openPositions.length} position{openPositions.length > 1 ? "s" : ""}
+          </div>
+        </div>
+
+        {/* Header */}
+        <div style={{ display: "grid", gridTemplateColumns: OPEN_GRID, padding: "10px 20px", background: `${COLORS.tableHeader}99`, borderBottom: `1px solid ${COLORS.border}` }}>
+          {["ACCOUNT", "INSTRUMENT", "SIDE", "QUANTITY", "AVG OPEN PRICE", "MARKET PRICE", "P&L / LOT", "P&L"].map((h, i) => (
+            <div key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.7, textAlign: i >= 3 ? "right" : "left" }}>{h}</div>
+          ))}
+        </div>
+
+        {openPositions.length === 0 && (
+          <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "40px 0", fontSize: 13 }}>
+            Aucune position ouverte — toutes les opérations sont équilibrées.
+          </div>
+        )}
+
+        {openPositions.map((pos, i) => {
+          const mktRaw = marketPrices[pos.key];
+          const mktPrice = mktRaw !== undefined ? parseFloat(mktRaw) : null;
+          const isEditing = editingMktKey === pos.key;
+          const pnlPerLot = (mktPrice !== null && pos.avgOpenPrice)
+            ? (pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice)
+            : null;
+          const pnl = pnlPerLot !== null ? pnlPerLot * pos.openLots : null;
+          const sideColor = pos.side === "BUY" ? COLORS.green : COLORS.red;
+
+          return (
+            <div key={pos.key} style={{ display: "grid", gridTemplateColumns: OPEN_GRID, padding: "12px 20px", borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}>
+              {/* Account */}
+              <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{pos.account || "—"}</div>
+              {/* Instrument */}
+              <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 600 }}>{pos.instrument || "—"}</div>
+              {/* Side */}
+              <div style={{ textAlign: "right" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sideColor}20`, color: sideColor }}>{pos.side}</span>
+              </div>
+              {/* Quantity */}
+              <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.orange, fontWeight: 700 }}>{fmtLots(pos.openLots)}</div>
+              {/* Avg open price */}
+              <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{pos.avgOpenPrice > 0 ? pos.avgOpenPrice.toFixed(2) : "—"}</div>
+              {/* Market price — editable */}
+              <div style={{ textAlign: "right" }}>
+                {isEditing ? (
+                  <input
+                    autoFocus
+                    defaultValue={mktRaw ?? ""}
+                    onBlur={e => { const v = e.target.value.replace(/[^\d.-]/g, ""); setMarketPrices(p => ({ ...p, [pos.key]: v === "" ? undefined : v })); setEditingMktKey(null); }}
+                    onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditingMktKey(null); }}
+                    style={{ width: 90, background: COLORS.bg, border: `1px solid ${COLORS.accent}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none", textAlign: "right" }}
+                  />
+                ) : (
+                  <span
+                    onClick={() => setEditingMktKey(pos.key)}
+                    title="Cliquez pour éditer"
+                    style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", color: mktPrice !== null ? COLORS.accent : COLORS.textMuted, cursor: "pointer", borderBottom: `1px dashed ${COLORS.textMuted}`, paddingBottom: 1 }}>
+                    {mktPrice !== null ? mktPrice.toFixed(2) : "— éditer"}
+                  </span>
+                )}
+              </div>
+              {/* P&L per lot */}
+              <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: pnlPerLot !== null ? pnlColor(pnlPerLot) : COLORS.textMuted, fontWeight: 600 }}>
+                {pnlPerLot !== null ? fmt(pnlPerLot) : "—"}
+              </div>
+              {/* P&L total */}
+              <div style={{ textAlign: "right", fontSize: 14, fontFamily: "'DM Mono', monospace", color: pnl !== null ? pnlColor(pnl) : COLORS.textMuted, fontWeight: 800 }}>
+                {pnl !== null ? fmt(pnl) : "—"}
+              </div>
+            </div>
+          );
+        })}
+
+        {openPositions.length > 0 && (() => {
+          const totalPnl = openPositions.reduce((s, pos) => {
+            const mktPrice = marketPrices[pos.key] !== undefined ? parseFloat(marketPrices[pos.key]) : null;
+            if (mktPrice === null || !pos.avgOpenPrice) return s;
+            const pnlPerLot = pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice;
+            return s + pnlPerLot * pos.openLots;
+          }, 0);
+          const hasAnyPrice = openPositions.some(pos => marketPrices[pos.key] !== undefined);
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: OPEN_GRID, padding: "12px 20px", background: `${COLORS.accent}08`, borderTop: `2px solid ${COLORS.accent}30` }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.accent, gridColumn: "1 / 5" }}>TOTAL P&amp;L LATENT</div>
+              <div /><div /><div />
+              <div style={{ textAlign: "right", fontSize: 16, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: hasAnyPrice ? pnlColor(totalPnl) : COLORS.textMuted }}>
+                {hasAnyPrice ? fmt(totalPnl) : "—"}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>

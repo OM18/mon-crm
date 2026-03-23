@@ -7517,6 +7517,10 @@ const DerivativesDashboard = () => {
             const abs = Math.abs(rounded).toLocaleString("en-US");
             return (n >= 0 ? "+ " : "− ") + abs + (sym ? " " + sym : "");
           };
+          const fmtPnlLot = (n) => {
+            const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return (n >= 0 ? "+ " : "− ") + abs + (sym ? " " + sym : "");
+          };
 
           return (
             <div key={pos.key} style={{ display: "grid", gridTemplateColumns: OPEN_GRID, padding: "12px 20px", borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}>
@@ -7564,7 +7568,7 @@ const DerivativesDashboard = () => {
               </div>
               {/* P&L per lot */}
               <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: pnlPerLot !== null ? pnlColor(pnlPerLot) : COLORS.textMuted, fontWeight: 600 }}>
-                {pnlPerLot !== null ? fmtPnl(pnlPerLot) : "—"}
+                {pnlPerLot !== null ? fmtPnlLot(pnlPerLot) : "—"}
               </div>
               {/* P&L total (× lots × lotSize) */}
               <div style={{ textAlign: "right", fontSize: 14, fontFamily: "'DM Mono', monospace", color: pnl !== null ? pnlColor(pnl) : COLORS.textMuted, fontWeight: 800 }}>

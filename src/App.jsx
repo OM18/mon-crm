@@ -6406,7 +6406,7 @@ useEffect(() => {
     let all = [];
     let from = 0;
     while (true) {
-      const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
+      const { data, error } = await supabase.from('derivatives').select('data').order('id', { ascending: true }).range(from, from + PAGE - 1);
       if (error || !data || data.length === 0) break;
       all = [...all, ...data.map(r => r.data ?? r)];
       if (data.length < PAGE) break;
@@ -6454,7 +6454,7 @@ const reloadOps = async () => {
   let all = [];
   let from = 0;
   while (true) {
-    const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
+    const { data, error } = await supabase.from('derivatives').select('data').order('id', { ascending: true }).range(from, from + PAGE - 1);
     if (error || !data || data.length === 0) break;
     all = [...all, ...data.map(r => r.data ?? r)];
     if (data.length < PAGE) break;
@@ -7513,7 +7513,7 @@ const DerivativesDashboard = () => {
       let allOps = [];
       let from = 0;
       while (true) {
-        const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
+        const { data, error } = await supabase.from('derivatives').select('data').order('id', { ascending: true }).range(from, from + PAGE - 1);
         if (error || !data || data.length === 0) break;
         allOps = [...allOps, ...data.map(r => r.data ?? r)];
         if (data.length < PAGE) break;

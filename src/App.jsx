@@ -1447,7 +1447,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
   );
 };
 
-const EMPTY_PROD = { label: "", stoxxExchange: "", instrumentType: "", underlyingCategory: "", underlying: "", underlyingOrigin: "", volumeSizePerLot: "", volumeUnit: "", currency: "EUR", decimals: "decimal", expiryDate: "", firstNoticeDay: "", lastTradingDate: "" };
+const EMPTY_PROD = { label: "", stoxxExchange: "", instrumentType: "", underlyingCategory: "", underlying: "", underlyingOrigin: "", volumeSizePerLot: "", volumeUnit: "", currency: "EUR", decimals: "decimal", expiryDate: "", firstNoticeDay: "", lastTradingDate: "", quotationUnit: "" };
 
 const DerivFormField = ({ label, field, type = "text", placeholder, form, setForm }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -1473,6 +1473,7 @@ const DerivSelectField = ({ label, field, options, form, setForm }) => (
 const DerivProductEditor = ({ config }) => {
   const [products, setProducts] = useState([]);
   const [lotSizes, setLotSizes] = useState([]);
+  const [quotationUnits, setQuotationUnits] = useState([]);
 
 useEffect(() => {
   async function loadProducts() {
@@ -1489,6 +1490,14 @@ useEffect(() => {
   }
   loadLotSizes();
 }, []);
+
+useEffect(() => {
+  async function loadQuotationUnits() {
+    const { data } = await supabase.from('deriv_quotation_units').select('data');
+    if (data?.length) setQuotationUnits(data.map(r => r.data));
+  }
+  loadQuotationUnits();
+}, []);
   const { config: cfg } = useConfig();
   const [form, setForm] = useState(EMPTY_PROD);
   const [instrumentType, setInstrumentType] = useState("");
@@ -1504,11 +1513,32 @@ useEffect(() => {
 
   const save = async () => {
     if (!isValid()) return;
-    const updated = editId ? products.map(p => p.id === editId ? { ...form, id: editId } : p) : [...products, { ...form, id: Date.now() }];
+    // Compute quotationUnit at save time
+    const quMatch = (form.underlying && form.stoxxExchange)
+      ? quotationUnits.find(q => q.underlying === form.underlying && q.exchange === form.stoxxExchange)
+      : null;
+    const enriched = { ...form, quotationUnit: quMatch?.quotationUnit || form.quotationUnit || "" };
+    const updated = editId ? products.map(p => p.id === editId ? { ...enriched, id: editId } : p) : [...products, { ...enriched, id: Date.now() }];
     setProducts(updated);
     await safeSave('deriv_products', updated, setProducts, products);
     setForm(EMPTY_PROD); setInstrumentType(""); setEditId(null); setShowForm(false);
   };
+
+  // Migrate existing products when quotationUnits are loaded
+  useEffect(() => {
+    if (!quotationUnits.length || !products.length) return;
+    const needsMigration = products.some(p => {
+      const match = quotationUnits.find(q => q.underlying === p.underlying && q.exchange === p.stoxxExchange);
+      return match && p.quotationUnit !== match.quotationUnit;
+    });
+    if (!needsMigration) return;
+    const updated = products.map(p => {
+      const match = quotationUnits.find(q => q.underlying === p.underlying && q.exchange === p.stoxxExchange);
+      return match ? { ...p, quotationUnit: match.quotationUnit } : p;
+    });
+    setProducts(updated);
+    safeSave('deriv_products', updated, setProducts, products);
+  }, [quotationUnits, products.length]);
 
   const remove = async (id) => { const u = products.filter(p => p.id !== id); setProducts(u); await safeSave('deriv_products', u, setProducts, products); };
 
@@ -1586,6 +1616,23 @@ useEffect(() => {
                       {!autoUnit && <span style={{ fontSize: 10, color: COLORS.textMuted }}>Définir un Lot Size pour cet exchange</span>}
                     </div>
                   </>
+                );
+              })()}
+              {/* Quotation Unit — auto depuis Quotation Units (underlying + exchange) */}
+              {(() => {
+                const quMatch = (form.underlying && form.stoxxExchange)
+                  ? quotationUnits.find(q => q.underlying === form.underlying && q.exchange === form.stoxxExchange)
+                  : null;
+                const autoQU = quMatch?.quotationUnit || "";
+                if (autoQU && form.quotationUnit !== autoQU) setTimeout(() => setForm(f => ({ ...f, quotationUnit: autoQU })), 0);
+                if (!autoQU && form.quotationUnit) setTimeout(() => setForm(f => ({ ...f, quotationUnit: "" })), 0);
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>QUOTATION UNIT</label>
+                    <input value={autoQU || form.quotationUnit || ""} readOnly
+                      style={{ background: autoQU ? `${COLORS.gold}10` : COLORS.bg, border: `1px solid ${autoQU ? COLORS.gold + "50" : COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: autoQU ? COLORS.gold : COLORS.textMuted, fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none", fontWeight: autoQU ? 700 : 400 }} />
+                    {!autoQU && <span style={{ fontSize: 10, color: COLORS.textMuted }}>Définir une Quotation Unit pour cet underlying/exchange</span>}
+                  </div>
                 );
               })()}
               <DerivSelectField label="Currency" field="currency" options={(config.derivCurrencies || []).map(c => ({ value: c.value, label: c.label }))} form={form} setForm={setForm} />
@@ -1686,6 +1733,7 @@ useEffect(() => {
                     {p.underlyingOrigin && <span style={{ color: COLORS.textSub }}>🌍 {p.underlyingOrigin}</span>}
                     <span style={{ fontFamily: "'DM Mono', monospace" }}>×{p.volumeSizePerLot}{p.volumeUnit ? ` ${p.volumeUnit}` : ""}</span>
                     <span style={{ color: COLORS.gold }}>💱 {p.currency}</span>
+                    {p.quotationUnit && <span style={{ color: COLORS.gold, background: `${COLORS.gold}15`, padding: "1px 7px", borderRadius: 5, fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>📐 {p.quotationUnit}</span>}
                     {p.firstNoticeDay && <span>📅 FND: {p.firstNoticeDay}</span>}
                     {p.lastTradingDate && <span>🔚 LTD: {p.lastTradingDate}</span>}
                     {p.instrumentType?.toLowerCase() === "option" && p.expiryDate && <span style={{ color: COLORS.purple }}>⏱ EXP: {p.expiryDate}</span>}

@@ -7594,6 +7594,7 @@ const DerivativesDashboard = () => {
         priceUnit: b.priceUnit,
         exchange: b.exchange,
         currency: (product?.currency || "").toUpperCase(),
+        quotationUnit: product?.quotationUnit || "",
       });
     }
     const openPositions = positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);
@@ -7669,9 +7670,9 @@ const DerivativesDashboard = () => {
           const mktPrice = mktRaw !== undefined ? parseFloat(mktRaw) : null;
           const isEditing = editingMktKey === pos.key;
           const pnlPerLot = (mktPrice !== null && pos.avgOpenPrice)
-            ? (pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice) * (pos.priceUnit || 1)
+            ? (pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice)
             : null;
-          const pnl = pnlPerLot !== null ? pnlPerLot * Math.abs(pos.openLots) * pos.lotSize : null;
+          const pnl = pnlPerLot !== null ? pnlPerLot * Math.abs(pos.openLots) * pos.lotSize * (pos.priceUnit || 1) : null;
           const sideColor = pos.side === "BUY" ? COLORS.green : COLORS.red;
           const CURRENCY_SYMBOLS = { EUR: "€", USD: "$", GBP: "£", MAD: "MAD", UAH: "₴", CHF: "CHF" };
           const sym = pos.currency ? (CURRENCY_SYMBOLS[pos.currency] || pos.currency) : "";
@@ -7682,7 +7683,8 @@ const DerivativesDashboard = () => {
           };
           const fmtPnlLot = (n) => {
             const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            return (n >= 0 ? "+ " : "− ") + abs + (sym ? " " + sym : "");
+            const unit = pos.quotationUnit || sym;
+            return (n >= 0 ? "+ " : "− ") + abs + (unit ? " " + unit : "");
           };
 
           return (

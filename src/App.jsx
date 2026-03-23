@@ -1717,37 +1717,37 @@ useEffect(() => {
             await safeSave('deriv_products', updated, setProducts, products);
           };
 
-          const validExchanges   = new Set((config.derivExchanges || []).map(e => e.value));
-          const validInstTypes   = new Set((config.derivInstrumentTypes || []).map(t => t.label?.toLowerCase()));
-          const validUndCats     = new Set(["commodity", "fx"]);
-          const validUnderlyings = new Set((config.derivCommodities || []).map(c => c.value));
-          const validOrigins     = new Set((config.derivUnderlyingOrigins || []));
-          const validVolumeUnits = new Set((config.derivVolumeUnits || []).map(u => u.value));
-          const validCurrencies  = new Set((config.derivCurrencies || []).map(c => c.value));
+          const chkExchanges   = new Set((config.derivExchanges || []).map(e => e.value));
+          const chkInstTypes   = new Set((config.derivInstrumentTypes || []).map(t => t.label?.toLowerCase()));
+          const chkUndCats     = new Set(["commodity", "fx"]);
+          const chkUnderlyings = new Set((config.derivCommodities || []).map(c => c.value));
+          const chkOrigins     = new Set((config.derivUnderlyingOrigins || []));
+          const chkVolumeUnits = new Set((config.derivVolumeUnits || []).map(u => u.value));
+          const chkCurrencies  = new Set((config.derivCurrencies || []).map(c => c.value));
 
           const isProdValid = (p) =>
             !!(p.label?.trim()) &&
-            validExchanges.has(p.stoxxExchange) &&
-            validInstTypes.has(p.instrumentType?.toLowerCase()) &&
-            validUndCats.has(p.underlyingCategory?.toLowerCase()) &&
-            validUnderlyings.has(p.underlying) &&
-            validOrigins.has(p.underlyingOrigin) &&
+            chkExchanges.has(p.stoxxExchange) &&
+            chkInstTypes.has(p.instrumentType?.toLowerCase()) &&
+            chkUndCats.has(p.underlyingCategory?.toLowerCase()) &&
+            chkUnderlyings.has(p.underlying) &&
+            chkOrigins.has(p.underlyingOrigin) &&
             !!(String(p.volumeSizePerLot ?? "").trim()) &&
-            validVolumeUnits.has(p.volumeUnit) &&
-            validCurrencies.has(p.currency) &&
+            chkVolumeUnits.has(p.volumeUnit) &&
+            chkCurrencies.has(p.currency) &&
             !!(p.lastTradingDate) &&
             (p.instrumentType?.toLowerCase() !== "option" || !!(p.expiryDate));
 
           const REQUIRED_FIELDS = [
             { key: "label",              label: "Label",               check: p => !!(p.label?.trim()) },
-            { key: "stoxxExchange",      label: "Exchange",            check: p => validExchanges.has(p.stoxxExchange) },
-            { key: "instrumentType",     label: "Instrument Type",     check: p => validInstTypes.has(p.instrumentType?.toLowerCase()) },
-            { key: "underlyingCategory", label: "Underlying Category", check: p => validUndCats.has(p.underlyingCategory?.toLowerCase()) },
-            { key: "underlying",         label: "Underlying",          check: p => validUnderlyings.has(p.underlying) },
-            { key: "underlyingOrigin",   label: "Underlying Origin",   check: p => validOrigins.has(p.underlyingOrigin) },
+            { key: "stoxxExchange",      label: "Exchange",            check: p => chkExchanges.has(p.stoxxExchange) },
+            { key: "instrumentType",     label: "Instrument Type",     check: p => chkInstTypes.has(p.instrumentType?.toLowerCase()) },
+            { key: "underlyingCategory", label: "Underlying Category", check: p => chkUndCats.has(p.underlyingCategory?.toLowerCase()) },
+            { key: "underlying",         label: "Underlying",          check: p => chkUnderlyings.has(p.underlying) },
+            { key: "underlyingOrigin",   label: "Underlying Origin",   check: p => chkOrigins.has(p.underlyingOrigin) },
             { key: "volumeSizePerLot",   label: "Volume Size / Lot",   check: p => !!(String(p.volumeSizePerLot ?? "").trim()) },
-            { key: "volumeUnit",         label: "Volume Unit",         check: p => validVolumeUnits.has(p.volumeUnit) },
-            { key: "currency",           label: "Currency",            check: p => validCurrencies.has(p.currency) },
+            { key: "volumeUnit",         label: "Volume Unit",         check: p => chkVolumeUnits.has(p.volumeUnit) },
+            { key: "currency",           label: "Currency",            check: p => chkCurrencies.has(p.currency) },
             { key: "lastTradingDate",    label: "Last Trading Date",   check: p => !!(p.lastTradingDate) },
           ];
 

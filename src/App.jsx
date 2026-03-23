@@ -6878,7 +6878,7 @@ const setOps = async (val) => {
             { label: "TRADE DATE",      value: sel.tradeDate },
             sel.type?.toLowerCase() === "option" ? { label: "EXPIRY DATE", value: sel.expiryDate } : null,
             { label: "BROKER",          value: sel.broker },
-            { label: "EXCHANGE",        value: sel.exchange ? sel.exchange.toUpperCase() : null },
+            { label: "EXCHANGE",        value: sel.exchange ? ((config.derivExchanges || []).find(e => e.value === sel.exchange)?.label || sel.exchange).toUpperCase() : null },
             { label: "ACCOUNT",         value: sel.account || null },
             { label: "CONTRACT",        value: sel.contract },
             { label: "TRADE",           value: sel.trade },

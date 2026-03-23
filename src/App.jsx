@@ -7658,7 +7658,7 @@ const DerivativesDashboard = () => {
         {/* Header */}
         <div style={{ display: "grid", gridTemplateColumns: OPEN_GRID, padding: "10px 20px", background: `${COLORS.tableHeader}99`, borderBottom: `1px solid ${COLORS.border}` }}>
           {["ACCOUNT", "TRADE", "BANQUE", "SIDE", "QUANTITY", "AVG OPEN PRICE", "MARKET PRICE", "P&L / LOT", "P&L"].map((h, i) => (
-            <div key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.7, textAlign: i >= 3 ? "right" : "left", paddingLeft: i === 2 ? 32 : 0 }}>{h}</div>
+            <div key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.7, textAlign: i >= 3 ? "right" : "left", paddingLeft: i === 2 ? 48 : 0 }}>{h}</div>
           ))}
         </div>
 
@@ -7700,7 +7700,7 @@ const DerivativesDashboard = () => {
               {/* Trade */}
               <div style={{ fontSize: 12, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{pos.trade || "—"}</div>
               {/* Banque */}
-              <div style={{ fontSize: 12, color: COLORS.textSub, paddingLeft: 32 }}>{pos.bank || "—"}</div>
+              <div style={{ fontSize: 12, color: COLORS.textSub, paddingLeft: 48 }}>{pos.bank || "—"}</div>
               {/* Side */}
               <div style={{ textAlign: "right" }}>
                 <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sideColor}20`, color: sideColor }}>{pos.openPositionSide}</span>

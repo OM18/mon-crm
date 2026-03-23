@@ -7597,7 +7597,7 @@ const DerivativesDashboard = () => {
         priceUnit: b.priceUnit,
         exchange: b.exchange,
         currency: (product?.currency || "").toUpperCase(),
-        quotationUnit: product?.quotationUnit || quotationUnits.find(q => q.underlying === product?.underlying && q.exchange === product?.stoxxExchange)?.quotationUnit || "",
+        quotationUnit: quotationUnits.find(q => q.underlying === product?.underlying && q.exchange === product?.stoxxExchange)?.quotationUnit || product?.quotationUnit || "",
       });
     }
     const openPositions = positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);

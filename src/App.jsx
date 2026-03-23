@@ -7605,7 +7605,7 @@ const DerivativesDashboard = () => {
     return { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions, bucketsCount: Object.keys(buckets).length };
   }, [ops, lotSizes, derivAccounts, products, priceUnits, quotationUnits]);
 
-  const OPEN_GRID = "1fr 110px 150px 70px 80px 110px 110px 110px 130px";
+  const OPEN_GRID = "0.55fr 110px 150px 70px 80px 110px 110px 110px 130px";
 
   const GRID = "32px 1fr 70px 70px 120px 90px 170px";
   const MATCH_GRID = "1fr 1fr 1fr 1fr 100px 100px 100px 130px";

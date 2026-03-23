@@ -4231,6 +4231,9 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
           if (!found) {
             const key = `derivProducts:${obj.instrument}`;
             if (!unknowns[key]) unknowns[key] = { fieldKey: "instrument", configKey: "derivProducts", fieldLabel: "Instrument", value: obj.instrument };
+          } else if (!obj.exchange && found.stoxxExchange) {
+            // Auto-fill exchange from product if not provided
+            obj.exchange = found.stoxxExchange;
           }
         }
         // Validate broker against companies list
@@ -6533,7 +6536,9 @@ const setOps = async (val) => {
       return;
     }
     setFormErrors({});
-    const data = { ...form, id: editOp ? editOp.id : Date.now() };
+    const norm = v => (v || "").toString().toLowerCase().trim();
+    const resolvedExchange = form.exchange || products.find(p => norm(p.label) === norm(form.instrument))?.stoxxExchange || "";
+    const data = { ...form, exchange: resolvedExchange, id: editOp ? editOp.id : Date.now() };
     if (editOp) { setOpsRaw(ops.map(o => o.id === editOp.id ? data : o)); await saveOneDerivative(data); }
     else        { setOpsRaw([...ops, data]); await saveOneDerivative(data); }
     setShowForm(false);

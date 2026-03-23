@@ -1717,10 +1717,39 @@ useEffect(() => {
             await safeSave('deriv_products', updated, setProducts, products);
           };
 
+          const isProdValid = (p) =>
+            !!(p.label?.trim()) &&
+            !!(p.stoxxExchange) &&
+            !!(p.instrumentType) &&
+            !!(p.underlyingCategory) &&
+            !!(p.underlying) &&
+            !!(p.underlyingOrigin) &&
+            !!(String(p.volumeSizePerLot ?? "").trim()) &&
+            !!(p.volumeUnit) &&
+            !!(p.currency) &&
+            !!(p.lastTradingDate) &&
+            (p.instrumentType?.toLowerCase() !== "option" || !!(p.expiryDate));
+
+          const REQUIRED_FIELDS = [
+            { key: "label",             label: "Label" },
+            { key: "stoxxExchange",     label: "Exchange" },
+            { key: "instrumentType",    label: "Instrument Type" },
+            { key: "underlyingCategory",label: "Underlying Category" },
+            { key: "underlying",        label: "Underlying" },
+            { key: "underlyingOrigin",  label: "Underlying Origin" },
+            { key: "volumeSizePerLot",  label: "Volume Size / Lot" },
+            { key: "volumeUnit",        label: "Volume Unit" },
+            { key: "currency",          label: "Currency" },
+            { key: "lastTradingDate",   label: "Last Trading Date" },
+          ];
+
           const renderRow = (p) => {
             const isInactive = p.active === false;
+            const valid = isProdValid(p);
+            const missingFields = REQUIRED_FIELDS.filter(f => !String(p[f.key] ?? "").trim()).map(f => f.label);
+            if (p.instrumentType?.toLowerCase() === "option" && !p.expiryDate) missingFields.push("Expiry Date");
             return (
-              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: isInactive ? "transparent" : COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px", opacity: isInactive ? 0.55 : 1 }}>
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: isInactive ? "transparent" : COLORS.bg, border: `1px solid ${valid ? COLORS.border : COLORS.red + "50"}`, borderRadius: 10, padding: "12px 16px", opacity: isInactive ? 0.55 : 1 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: isInactive ? COLORS.surface : `${COLORS.blue}18`, border: `1px solid ${isInactive ? COLORS.border : COLORS.blue + "30"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>🌾</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: isInactive ? COLORS.textMuted : COLORS.text }}>{p.label}</div>
@@ -1738,7 +1767,15 @@ useEffect(() => {
                     {p.lastTradingDate && <span>🔚 LTD: {p.lastTradingDate}</span>}
                     {p.instrumentType?.toLowerCase() === "option" && p.expiryDate && <span style={{ color: COLORS.purple }}>⏱ EXP: {p.expiryDate}</span>}
                   </div>
+                  {!valid && missingFields.length > 0 && (
+                    <div style={{ marginTop: 5, fontSize: 10, color: COLORS.red, fontWeight: 600 }}>
+                      ⚠ Manquant : {missingFields.join(", ")}
+                    </div>
+                  )}
                 </div>
+                {/* Validity indicator */}
+                <div title={valid ? "Tous les champs obligatoires sont remplis" : `Champs manquants : ${missingFields.join(", ")}`}
+                  style={{ width: 10, height: 10, borderRadius: "50%", background: valid ? COLORS.green : COLORS.red, flexShrink: 0, boxShadow: `0 0 6px ${valid ? COLORS.green : COLORS.red}80` }} />
                 <div onClick={() => toggleActive(p)} title={isInactive ? "Réactiver" : "Désactiver"}
                   style={{ cursor: "pointer", flexShrink: 0, width: 36, height: 20, borderRadius: 10, background: isInactive ? COLORS.border : COLORS.green, border: `1px solid ${isInactive ? COLORS.textMuted : COLORS.green}`, position: "relative", transition: "background 0.2s" }}>
                   <div style={{ position: "absolute", top: 2, left: isInactive ? 2 : 18, width: 14, height: 14, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0004" }} />

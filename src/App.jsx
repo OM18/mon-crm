@@ -2543,6 +2543,40 @@ useEffect(() => {
     await safeSave('deriv_price_units', updated, setPriceUnits, priceUnits);
   };
 
+  // ── Quotation Units state ──
+  const EMPTY_QU = { underlying: "", exchange: "", quotationUnit: "" };
+  const [quotationUnits, setQuotationUnits] = useState([]);
+  const [quForm, setQuForm] = useState(EMPTY_QU);
+  const [editQuId, setEditQuId] = useState(null);
+  const [showQuForm, setShowQuForm] = useState(false);
+  const [expandedQuotationUnits, setExpandedQuotationUnits] = useState(false);
+
+  useEffect(() => {
+    async function loadQuotationUnits() {
+      const { data } = await supabase.from('deriv_quotation_units').select('data');
+      if (data?.length) setQuotationUnits(data.map(r => r.data));
+    }
+    loadQuotationUnits();
+  }, []);
+
+  const isQuFormValid = () => quForm.underlying !== "" && quForm.exchange !== "" && quForm.quotationUnit.trim() !== "";
+
+  const saveQuotationUnit = async () => {
+    if (!isQuFormValid()) return;
+    const updated = editQuId
+      ? quotationUnits.map(q => q.id === editQuId ? { ...quForm, id: editQuId } : q)
+      : [...quotationUnits, { ...quForm, id: Date.now() }];
+    setQuotationUnits(updated);
+    await safeSave('deriv_quotation_units', updated, setQuotationUnits, quotationUnits);
+    setQuForm(EMPTY_QU); setEditQuId(null); setShowQuForm(false);
+  };
+
+  const deleteQuotationUnit = async (id) => {
+    const updated = quotationUnits.filter(q => q.id !== id);
+    setQuotationUnits(updated);
+    await safeSave('deriv_quotation_units', updated, setQuotationUnits, quotationUnits);
+  };
+
   useEffect(() => {
     async function loadExchangeTarifs() {
       const { data } = await supabase.from('deriv_exchange_tarifs').select('data');
@@ -3341,6 +3375,87 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                           </div>
                           <button onClick={() => { setPuForm({ exchange: pu.exchange, unit: pu.unit }); setEditPuId(pu.id); setShowPuForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
                           <button onClick={() => deletePriceUnit(pu.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Quotation Units */}
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+            <div onClick={() => setExpandedQuotationUnits(v => !v)}
+              style={{ padding: "18px 24px", borderBottom: expandedQuotationUnits ? `1px solid ${COLORS.border}` : "none", background: `${COLORS.blue}08`, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", userSelect: "none" }}
+              onMouseOver={e => e.currentTarget.style.background = `${COLORS.blue}14`}
+              onMouseOut={e => e.currentTarget.style.background = `${COLORS.blue}08`}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📐</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Quotation Units</div>
+                <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Unité de cotation par underlying et exchange</div>
+              </div>
+              <div style={{ fontSize: 12, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", marginRight: 8 }}>{quotationUnits.length} entrée{quotationUnits.length !== 1 ? "s" : ""}</div>
+              <Btn onClick={e => { e.stopPropagation(); setQuForm(EMPTY_QU); setEditQuId(null); setShowQuForm(true); if (!expandedQuotationUnits) setExpandedQuotationUnits(true); }} style={{ padding: "7px 14px", fontSize: 13 }}>+ Ajouter</Btn>
+              <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expandedQuotationUnits ? "rotate(180deg)" : "rotate(0deg)", marginLeft: 4 }}>▾</span>
+            </div>
+
+            {expandedQuotationUnits && (
+              <div style={{ padding: "20px 24px" }}>
+                {/* Form */}
+                {showQuForm && (
+                  <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 18, marginBottom: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>UNDERLYING <span style={{ color: COLORS.red }}>*</span></label>
+                        <select value={quForm.underlying} onChange={e => setQuForm(f => ({ ...f, underlying: e.target.value }))}
+                          style={{ background: COLORS.card, border: `1px solid ${!quForm.underlying ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: quForm.underlying ? COLORS.text : COLORS.textMuted, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
+                          <option value="">— Sélectionner —</option>
+                          {(config.derivCommodities || []).map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>EXCHANGE <span style={{ color: COLORS.red }}>*</span></label>
+                        <select value={quForm.exchange} onChange={e => setQuForm(f => ({ ...f, exchange: e.target.value }))}
+                          style={{ background: COLORS.card, border: `1px solid ${!quForm.exchange ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: quForm.exchange ? COLORS.text : COLORS.textMuted, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
+                          <option value="">— Sélectionner —</option>
+                          {(config.derivExchanges || []).map(ex => <option key={ex.value} value={ex.value}>{ex.label}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>QUOTATION UNIT <span style={{ color: COLORS.red }}>*</span></label>
+                        <input value={quForm.quotationUnit} onChange={e => setQuForm(f => ({ ...f, quotationUnit: e.target.value }))}
+                          placeholder="ex: USD/MT, ¢/bu…"
+                          style={{ background: COLORS.card, border: `1px solid ${!quForm.quotationUnit.trim() ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "'DM Mono', monospace" }}
+                          onFocus={e => e.target.style.borderColor = COLORS.accent}
+                          onBlur={e => e.target.style.borderColor = !quForm.quotationUnit.trim() ? COLORS.red + "60" : COLORS.border} />
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "flex-end" }}>
+                      <Btn variant="secondary" onClick={() => { setShowQuForm(false); setQuForm(EMPTY_QU); setEditQuId(null); }}>Annuler</Btn>
+                      <Btn onClick={saveQuotationUnit} disabled={!isQuFormValid()}>Enregistrer</Btn>
+                    </div>
+                  </div>
+                )}
+
+                {/* List */}
+                {quotationUnits.length === 0 && !showQuForm && (
+                  <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 32, fontSize: 13 }}>Aucune entrée — cliquez sur "+ Ajouter" pour commencer</div>
+                )}
+                {quotationUnits.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {[...quotationUnits].sort((a, b) => (a.underlying || "").localeCompare(b.underlying || "")).map(qu => {
+                      const underlyingLabel = (config.derivCommodities || []).find(c => c.value === qu.underlying)?.label || qu.underlying;
+                      const exchangeLabel = (config.derivExchanges || []).find(e => e.value === qu.exchange)?.label || qu.exchange;
+                      return (
+                        <div key={qu.id} style={{ display: "flex", alignItems: "center", gap: 14, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: `${COLORS.blue}18`, border: `1px solid ${COLORS.blue}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📐</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{underlyingLabel} · {exchangeLabel}</div>
+                            <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2, fontFamily: "'DM Mono', monospace" }}>Unit : <span style={{ color: COLORS.accent }}>{qu.quotationUnit}</span></div>
+                          </div>
+                          <button onClick={() => { setQuForm({ underlying: qu.underlying, exchange: qu.exchange, quotationUnit: qu.quotationUnit }); setEditQuId(qu.id); setShowQuForm(true); if (!expandedQuotationUnits) setExpandedQuotationUnits(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                          <button onClick={() => deleteQuotationUnit(qu.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
                         </div>
                       );
                     })}

@@ -6417,6 +6417,28 @@ useEffect(() => {
   loadOps();
 }, []);
 
+// ── Migrate: backfill exchange from product on existing ops ──
+useEffect(() => {
+  if (!ops.length || !products.length) return;
+  const norm = v => (v || "").toString().toLowerCase().trim();
+  const toMigrate = ops.filter(o => !o.exchange && o.instrument);
+  if (toMigrate.length === 0) return;
+  const updated = ops.map(o => {
+    if (o.exchange || !o.instrument) return o;
+    const product = products.find(p => norm(p.label) === norm(o.instrument));
+    if (!product?.stoxxExchange) return o;
+    return { ...o, exchange: product.stoxxExchange };
+  });
+  setOpsRaw(updated);
+  // Save each migrated op individually to avoid wiping the whole table
+  toMigrate.forEach(o => {
+    const product = products.find(p => norm(p.label) === norm(o.instrument));
+    if (product?.stoxxExchange) {
+      saveOneDerivative({ ...o, exchange: product.stoxxExchange });
+    }
+  });
+}, [ops.length, products.length]);
+
 // ── Save ALL derivatives (import only) ─────────────────────
 const saveAllDerivatives = async (items, setOpsRaw, onComplete) => {
   if (!items || items.length === 0) return;

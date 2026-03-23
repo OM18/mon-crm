@@ -6338,7 +6338,9 @@ useEffect(() => {
       if (!tarifs || tarifs.length === 0 || !op) return "";
       const norm = v => (v || "").toString().toLowerCase().trim();
       const opBroker = norm(op.broker);
-      const opExchange = norm(op.exchange);
+      // Resolve exchange from product if not set on the operation
+      const resolvedExchange = op.exchange || products.find(p => norm(p.label) === norm(op.instrument))?.stoxxExchange || "";
+      const opExchange = norm(resolvedExchange);
       const opTrans = norm(op.orderTransmissionType);
 
       const matching = tarifs.filter(t => {

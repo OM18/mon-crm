@@ -1717,36 +1717,44 @@ useEffect(() => {
             await safeSave('deriv_products', updated, setProducts, products);
           };
 
+          const validExchanges   = new Set((config.derivExchanges || []).map(e => e.value));
+          const validInstTypes   = new Set((config.derivInstrumentTypes || []).map(t => t.label?.toLowerCase()));
+          const validUndCats     = new Set(["commodity", "fx"]);
+          const validUnderlyings = new Set((config.derivCommodities || []).map(c => c.value));
+          const validOrigins     = new Set((config.derivUnderlyingOrigins || []));
+          const validVolumeUnits = new Set((config.derivVolumeUnits || []).map(u => u.value));
+          const validCurrencies  = new Set((config.derivCurrencies || []).map(c => c.value));
+
           const isProdValid = (p) =>
             !!(p.label?.trim()) &&
-            !!(p.stoxxExchange) &&
-            !!(p.instrumentType) &&
-            !!(p.underlyingCategory) &&
-            !!(p.underlying) &&
-            !!(p.underlyingOrigin) &&
+            validExchanges.has(p.stoxxExchange) &&
+            validInstTypes.has(p.instrumentType?.toLowerCase()) &&
+            validUndCats.has(p.underlyingCategory?.toLowerCase()) &&
+            validUnderlyings.has(p.underlying) &&
+            validOrigins.has(p.underlyingOrigin) &&
             !!(String(p.volumeSizePerLot ?? "").trim()) &&
-            !!(p.volumeUnit) &&
-            !!(p.currency) &&
+            validVolumeUnits.has(p.volumeUnit) &&
+            validCurrencies.has(p.currency) &&
             !!(p.lastTradingDate) &&
             (p.instrumentType?.toLowerCase() !== "option" || !!(p.expiryDate));
 
           const REQUIRED_FIELDS = [
-            { key: "label",             label: "Label" },
-            { key: "stoxxExchange",     label: "Exchange" },
-            { key: "instrumentType",    label: "Instrument Type" },
-            { key: "underlyingCategory",label: "Underlying Category" },
-            { key: "underlying",        label: "Underlying" },
-            { key: "underlyingOrigin",  label: "Underlying Origin" },
-            { key: "volumeSizePerLot",  label: "Volume Size / Lot" },
-            { key: "volumeUnit",        label: "Volume Unit" },
-            { key: "currency",          label: "Currency" },
-            { key: "lastTradingDate",   label: "Last Trading Date" },
+            { key: "label",              label: "Label",               check: p => !!(p.label?.trim()) },
+            { key: "stoxxExchange",      label: "Exchange",            check: p => validExchanges.has(p.stoxxExchange) },
+            { key: "instrumentType",     label: "Instrument Type",     check: p => validInstTypes.has(p.instrumentType?.toLowerCase()) },
+            { key: "underlyingCategory", label: "Underlying Category", check: p => validUndCats.has(p.underlyingCategory?.toLowerCase()) },
+            { key: "underlying",         label: "Underlying",          check: p => validUnderlyings.has(p.underlying) },
+            { key: "underlyingOrigin",   label: "Underlying Origin",   check: p => validOrigins.has(p.underlyingOrigin) },
+            { key: "volumeSizePerLot",   label: "Volume Size / Lot",   check: p => !!(String(p.volumeSizePerLot ?? "").trim()) },
+            { key: "volumeUnit",         label: "Volume Unit",         check: p => validVolumeUnits.has(p.volumeUnit) },
+            { key: "currency",           label: "Currency",            check: p => validCurrencies.has(p.currency) },
+            { key: "lastTradingDate",    label: "Last Trading Date",   check: p => !!(p.lastTradingDate) },
           ];
 
           const renderRow = (p) => {
             const isInactive = p.active === false;
             const valid = isProdValid(p);
-            const missingFields = REQUIRED_FIELDS.filter(f => !String(p[f.key] ?? "").trim()).map(f => f.label);
+            const missingFields = REQUIRED_FIELDS.filter(f => !f.check(p)).map(f => f.label);
             if (p.instrumentType?.toLowerCase() === "option" && !p.expiryDate) missingFields.push("Expiry Date");
             return (
               <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: isInactive ? "transparent" : COLORS.bg, border: `1px solid ${valid ? COLORS.border : COLORS.red + "50"}`, borderRadius: 10, padding: "12px 16px", opacity: isInactive ? 0.55 : 1 }}>

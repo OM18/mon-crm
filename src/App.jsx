@@ -7438,7 +7438,7 @@ const DerivativesDashboard = () => {
     return { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions, bucketsCount: Object.keys(buckets).length };
   }, [ops, lotSizes, derivAccounts, products, priceUnits]);
 
-  const OPEN_GRID = "1fr 80px 1fr 70px 80px 110px 110px 110px 130px";
+  const OPEN_GRID = "1fr 80px 120px 70px 80px 110px 110px 110px 130px";
 
   const GRID = "32px 1fr 70px 70px 120px 90px 170px";
   const MATCH_GRID = "1fr 1fr 1fr 1fr 100px 100px 100px 130px";
@@ -7491,7 +7491,7 @@ const DerivativesDashboard = () => {
         {/* Header */}
         <div style={{ display: "grid", gridTemplateColumns: OPEN_GRID, padding: "10px 20px", background: `${COLORS.tableHeader}99`, borderBottom: `1px solid ${COLORS.border}` }}>
           {["ACCOUNT", "TRADE", "BANQUE", "SIDE", "QUANTITY", "AVG OPEN PRICE", "MARKET PRICE", "P&L / LOT", "P&L"].map((h, i) => (
-            <div key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.7, textAlign: i >= 3 ? "right" : "left" }}>{h}</div>
+            <div key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.7, textAlign: i >= 3 ? "right" : "left", paddingLeft: i === 2 ? 16 : 0 }}>{h}</div>
           ))}
         </div>
 
@@ -7506,9 +7506,9 @@ const DerivativesDashboard = () => {
           const mktPrice = mktRaw !== undefined ? parseFloat(mktRaw) : null;
           const isEditing = editingMktKey === pos.key;
           const pnlPerLot = (mktPrice !== null && pos.avgOpenPrice)
-            ? (pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice)
+            ? (pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice) * (pos.priceUnit || 1)
             : null;
-          const pnl = pnlPerLot !== null ? pnlPerLot * Math.abs(pos.openLots) * pos.lotSize * (pos.priceUnit || 1) : null;
+          const pnl = pnlPerLot !== null ? pnlPerLot * Math.abs(pos.openLots) * pos.lotSize : null;
           const sideColor = pos.side === "BUY" ? COLORS.green : COLORS.red;
           const CURRENCY_SYMBOLS = { EUR: "€", USD: "$", GBP: "£", MAD: "MAD", UAH: "₴", CHF: "CHF" };
           const sym = pos.currency ? (CURRENCY_SYMBOLS[pos.currency] || pos.currency) : "";
@@ -7528,7 +7528,7 @@ const DerivativesDashboard = () => {
               {/* Trade */}
               <div style={{ fontSize: 12, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{pos.trade || "—"}</div>
               {/* Banque */}
-              <div style={{ fontSize: 12, color: COLORS.textSub }}>{pos.bank || "—"}</div>
+              <div style={{ fontSize: 12, color: COLORS.textSub, paddingLeft: 16 }}>{pos.bank || "—"}</div>
               {/* Side */}
               <div style={{ textAlign: "right" }}>
                 <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sideColor}20`, color: sideColor }}>{pos.openPositionSide}</span>

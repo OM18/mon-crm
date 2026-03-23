@@ -7436,6 +7436,7 @@ const DerivativesDashboard = () => {
   const [lotSizes, setLotSizes] = useState([]);
   const [products, setProducts] = useState([]);
   const [priceUnits, setPriceUnits] = useState([]);
+  const [quotationUnits, setQuotationUnits] = useState([]);
   const [marketPrices, setMarketPrices] = useState({});
   const [editingMktKey, setEditingMktKey] = useState(null);
 
@@ -7446,6 +7447,7 @@ const DerivativesDashboard = () => {
       const { data: mpData }  = await supabase.from('deriv_market_prices').select('*');
       const { data: prodData } = await supabase.from('deriv_products').select('data');
       const { data: puData }  = await supabase.from('deriv_price_units').select('data');
+      const { data: quData }  = await supabase.from('deriv_quotation_units').select('data');
       // Load all derivatives pages
       const PAGE = 1000;
       let allOps = [];
@@ -7468,6 +7470,7 @@ const DerivativesDashboard = () => {
       if (lsData?.length) setLotSizes(lsData.map(r => r.data ?? r));
       if (prodData?.length) setProducts(prodData.map(r => r.data ?? r));
       if (puData?.length) setPriceUnits(puData.map(r => r.data ?? r));
+      if (quData?.length) setQuotationUnits(quData.map(r => r.data ?? r));
       if (mpData?.length) {
         const prices = {};
         mpData.forEach(r => { prices[r.key] = r.value; });
@@ -7594,13 +7597,13 @@ const DerivativesDashboard = () => {
         priceUnit: b.priceUnit,
         exchange: b.exchange,
         currency: (product?.currency || "").toUpperCase(),
-        quotationUnit: product?.quotationUnit || "",
+        quotationUnit: product?.quotationUnit || quotationUnits.find(q => q.underlying === product?.underlying && q.exchange === product?.stoxxExchange)?.quotationUnit || "",
       });
     }
     const openPositions = positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);
 
     return { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions, bucketsCount: Object.keys(buckets).length };
-  }, [ops, lotSizes, derivAccounts, products, priceUnits]);
+  }, [ops, lotSizes, derivAccounts, products, priceUnits, quotationUnits]);
 
   const OPEN_GRID = "1fr 80px 120px 70px 80px 110px 110px 110px 130px";
 

@@ -2602,7 +2602,7 @@ useEffect(() => {
   const [expandedExchangeTarifs, setExpandedExchangeTarifs] = useState(false);
 
   // ── Price Units state ──
-  const EMPTY_PU = { exchange: "", unit: "" };
+  const EMPTY_PU = { exchange: "", underlying: "", unit: "" };
   const [priceUnits, setPriceUnits] = useState([]);
   const [puForm, setPuForm] = useState(EMPTY_PU);
   const [editPuId, setEditPuId] = useState(null);
@@ -3426,13 +3426,21 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                 {/* Form */}
                 {showPuForm && (
                   <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 18, marginBottom: 16 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>EXCHANGE <span style={{ color: COLORS.red }}>*</span></label>
                         <select value={puForm.exchange} onChange={e => setPuForm(f => ({ ...f, exchange: e.target.value }))}
                           style={{ background: COLORS.card, border: `1px solid ${!puForm.exchange ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: puForm.exchange ? COLORS.text : COLORS.textMuted, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
                           <option value="">— Sélectionner —</option>
                           {(config.derivExchanges || []).map(ex => <option key={ex.value} value={ex.value}>{ex.label}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>UNDERLYING <span style={{ color: COLORS.textMuted, fontWeight: 400 }}>(optionnel)</span></label>
+                        <select value={puForm.underlying || ""} onChange={e => setPuForm(f => ({ ...f, underlying: e.target.value }))}
+                          style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: puForm.underlying ? COLORS.text : COLORS.textMuted, fontSize: 14, fontFamily: "inherit", outline: "none" }}>
+                          <option value="">— Tous —</option>
+                          {(config.derivCommodities || []).map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                         </select>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -3457,16 +3465,21 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                 )}
                 {priceUnits.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {[...priceUnits].sort((a, b) => (a.exchange || "").localeCompare(b.exchange || "")).map(pu => {
+                    {[...priceUnits].sort((a, b) => (a.exchange || "").localeCompare(b.exchange || "") || (a.underlying || "").localeCompare(b.underlying || "")).map(pu => {
                       const exLabel = (config.derivExchanges || []).find(e => e.value === pu.exchange)?.label || pu.exchange;
+                      const undLabel = pu.underlying ? ((config.derivCommodities || []).find(c => c.value === pu.underlying)?.label || pu.underlying) : null;
                       return (
                         <div key={pu.id} style={{ display: "flex", alignItems: "center", gap: 14, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
                           <div style={{ width: 36, height: 36, borderRadius: 10, background: `${COLORS.blue}18`, border: `1px solid ${COLORS.blue}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>💲</div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{exLabel}</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>
+                              {exLabel}
+                              {undLabel && <span style={{ marginLeft: 8, fontSize: 11, color: COLORS.green, background: `${COLORS.green}15`, padding: "1px 7px", borderRadius: 5, fontWeight: 600 }}>📦 {undLabel}</span>}
+                              {!undLabel && <span style={{ marginLeft: 8, fontSize: 11, color: COLORS.textMuted }}>tous underlyings</span>}
+                            </div>
                             <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2, fontFamily: "'DM Mono', monospace" }}>Unit : <span style={{ color: COLORS.accent }}>{pu.unit}</span></div>
                           </div>
-                          <button onClick={() => { setPuForm({ exchange: pu.exchange, unit: pu.unit }); setEditPuId(pu.id); setShowPuForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                          <button onClick={() => { setPuForm({ exchange: pu.exchange, underlying: pu.underlying || "", unit: pu.unit }); setEditPuId(pu.id); setShowPuForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
                           <button onClick={() => deletePriceUnit(pu.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
                         </div>
                       );
@@ -7558,9 +7571,17 @@ const DerivativesDashboard = () => {
     const norm = v => (v || "").toLowerCase().trim();
     const product = products.find(p => norm(p.label) === norm(instrument));
     const resolvedExchange = product?.stoxxExchange || exchange;
+    const resolvedUnderlying = product?.underlying || "";
     const normExchange = norm(resolvedExchange);
-    // 1. Match on exchange
-    let match = priceUnits.find(p => norm(p.exchange) === normExchange);
+    const normUnderlying = norm(resolvedUnderlying);
+    // 1. Precise match: exchange + underlying
+    let match = normUnderlying
+      ? priceUnits.find(p => norm(p.exchange) === normExchange && norm(p.underlying || "") === normUnderlying)
+      : null;
+    // 2. Fallback: exchange only (underlying empty or no precise match)
+    if (!match) match = priceUnits.find(p => norm(p.exchange) === normExchange && !p.underlying);
+    // 3. Fallback: any entry for this exchange
+    if (!match) match = priceUnits.find(p => norm(p.exchange) === normExchange);
     return match ? (parseFloat(match.unit) || 1) : 1;
   };
 

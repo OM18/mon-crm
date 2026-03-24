@@ -6574,9 +6574,7 @@ const setOps = async (val) => {
     // Fallback: if product not found via resolveProduct, try direct case-insensitive match
     const productFinal = product || products.find(p => p.label?.toLowerCase().trim() === (o.instrument || "").toLowerCase().trim());
     const opUnderlying = resolveUnderlying(productFinal?.underlying || "");
-    if (o.instrument === "CBOT CORN MAR 2026" && activeFilters.underlying.length > 0) {
-      console.warn("MAR2026:", "product=", product?.label, "productFinal=", productFinal?.label, "underlying=", productFinal?.underlying, "opUnderlying=", opUnderlying, "passes=", !activeFilters.underlying.length || activeFilters.underlying.some(u => (opUnderlying||"").toLowerCase().replace(/[_\s-]/g,"") === (u||"").toLowerCase().replace(/[_\s-]/g,"")));
-    }
+
 
 
     const tagChecks = [
@@ -6923,7 +6921,7 @@ const setOps = async (val) => {
               const isSelected = selected === o.id;
               return (
                 <div key={o.id} onClick={() => setSelected(o.id === selected ? null : o.id)}
-                  style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}
+                  style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: activeFilters.underlying.length > 0 ? "#003300" : isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}
                   onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
                   onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`; }}>
                   <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.ref || "—"}</div>

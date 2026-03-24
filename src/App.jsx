@@ -1700,10 +1700,11 @@ useEffect(() => {
           const hasFilters = prodSearch || filterUnderlying || filterYear;
 
           // ── Apply filters ──
+          const normU = v => (v || "").toLowerCase().trim().replace(/[\s_-]/g, "");
           const applyFilters = (list) => list.filter(p => {
             const q = prodSearch.toLowerCase().trim();
             if (q && !p.label?.toLowerCase().includes(q) && !p.underlying?.toLowerCase().includes(q) && !p.stoxxExchange?.toLowerCase().includes(q)) return false;
-            if (filterUnderlying && p.underlying !== filterUnderlying) return false;
+            if (filterUnderlying && normU(p.underlying) !== normU(filterUnderlying)) return false;
             if (filterYear) {
               const yr = (p.lastTradingDate || p.expiryDate || p.firstNoticeDay || "").slice(0, 4);
               if (yr !== filterYear) return false;
@@ -6550,22 +6551,8 @@ const setOps = async (val) => {
     const resolveProduct = (instrument) => {
       if (!instrument) return null;
       const n = norm(instrument);
-      // Exact match first (label or value)
-      const exact = products.find(p => norm(p.label) === n || norm(p.value) === n);
-      if (exact) return exact;
-      // Fallback: instrument label starts with product label (e.g. "CBOT CORN DEC 2025" → "corn")
-      // Use word-boundary check to avoid "corn" matching inside "unicorn" etc.
-      return products.find(p => {
-        const pl = norm(p.label);
-        if (!pl) return false;
-        if (n.startsWith(pl)) return true;
-        // Match as a whole word within the instrument name
-        const idx = n.indexOf(pl);
-        if (idx === -1) return false;
-        const before = n[idx - 1];
-        const after  = n[idx + pl.length];
-        return (before === undefined || /\W/.test(before)) && (after === undefined || /\W/.test(after));
-      });
+      return products.find(p => norm(p.label) === n || norm(p.value) === n)
+          || products.find(p => n.startsWith(norm(p.label)) || n.includes(norm(p.label)));
     };
     const commodities = config.derivCommodities || [];
     const resolveUnderlying = (raw) => {
@@ -6793,18 +6780,8 @@ const setOps = async (val) => {
                   const resolveProduct = (instrument) => {
                     if (!instrument) return null;
                     const n = norm(instrument);
-                    const exact = products.find(p => norm(p.label) === n || norm(p.value) === n);
-                    if (exact) return exact;
-                    return products.find(p => {
-                      const pl = norm(p.label);
-                      if (!pl) return false;
-                      if (n.startsWith(pl)) return true;
-                      const idx = n.indexOf(pl);
-                      if (idx === -1) return false;
-                      const before = n[idx - 1];
-                      const after  = n[idx + pl.length];
-                      return (before === undefined || /\W/.test(before)) && (after === undefined || /\W/.test(after));
-                    });
+                    return products.find(p => norm(p.label) === n || norm(p.value) === n)
+                        || products.find(p => n.startsWith(norm(p.label)) || n.includes(norm(p.label)));
                   };
                   const commodities = config.derivCommodities || [];
                   const resolveUnderlying = (raw) => {

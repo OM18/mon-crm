@@ -6558,7 +6558,12 @@ const setOps = async (val) => {
     const resolveUnderlying = (raw) => {
       if (!raw) return null;
       const match = commodities.find(c => norm(c.value) === norm(raw) || norm(c.label) === norm(raw));
-      return match ? match.value : raw;
+      // If no exact match, try prefix match (handles soybean_meal vs soybean_meals etc.)
+      if (!match) {
+        const approx = commodities.find(c => norm(c.value).startsWith(norm(raw)) || norm(raw).startsWith(norm(c.value)));
+        return approx ? approx.value : raw;
+      }
+      return match.value;
     };
     return ops.filter(o => {
     const q = search.toLowerCase();
@@ -6571,9 +6576,7 @@ const setOps = async (val) => {
     const accRecord = derivAccounts.find(a => a.accountNumber === o.account);
     const opFinancingBank = accRecord?.financingBank || "";
     const product = resolveProduct(o.instrument);
-    // Fallback: if product not found via resolveProduct, try direct case-insensitive match
-    const productFinal = product || products.find(p => p.label?.toLowerCase().trim() === (o.instrument || "").toLowerCase().trim());
-    const opUnderlying = resolveUnderlying(productFinal?.underlying || "");
+    const opUnderlying = resolveUnderlying(product?.underlying || "");
 
 
 
@@ -6606,23 +6609,6 @@ const setOps = async (val) => {
     return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
-
-  // Debug: log distinct underlyings in filtered result
-  if (activeFilters.underlying.length > 0 && filtered.length > 0) {
-    const norm = v => (v || "").toString().toLowerCase().trim().replace(/[_\s-]/g, "");
-    const commodities = config.derivCommodities || [];
-    const resolveProductDebug = (instrument) => {
-      const n = norm(instrument);
-      return products.find(p => norm(p.label) === n) || products.find(p => { const pl = norm(p.label); return pl.length >= 4 && n.startsWith(pl); });
-    };
-    const distinct = {};
-    filtered.forEach(o => {
-      const p = resolveProductDebug(o.instrument);
-      const u = p?.underlying || "NOT_FOUND";
-      distinct[u] = (distinct[u] || 0) + 1;
-    });
-    console.warn("FILTERED UNDERLYINGS:", JSON.stringify(distinct));
-  }
 
   const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };

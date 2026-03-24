@@ -6547,7 +6547,6 @@ const setOps = async (val) => {
 
   const filtered = useMemo(() => {
     const norm = v => (v || "").toString().toLowerCase().trim().replace(/[_\s-]/g, "");
-    // Resolve a product from an instrument value — exact match first, then partial
     const resolveProduct = (instrument) => {
       if (!instrument) return null;
       const n = norm(instrument);
@@ -6571,8 +6570,7 @@ const setOps = async (val) => {
     const accRecord = derivAccounts.find(a => a.accountNumber === o.account);
     const opFinancingBank = accRecord?.financingBank || "";
     const product = resolveProduct(o.instrument);
-    const rawUnderlying = product?.underlying || "";
-    const opUnderlying = resolveUnderlying(rawUnderlying);
+    const opUnderlying = resolveUnderlying(product?.underlying || "");
     const tagChecks = [
       !activeFilters.type.length          || activeFilters.type.includes(o.type),
       !activeFilters.opType.length        || activeFilters.opType.includes(o.opType),
@@ -6600,7 +6598,7 @@ const setOps = async (val) => {
     });
     const allChecks = [...tagChecks, ...customChecks];
     return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
-  }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || "")));
+  }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   }, [ops, search, accountSearch, dateFrom, dateTo, activeFilters, customFilters, filterMode, derivAccounts, products, config]);
 
   const sel = ops.find(o => o.id === selected);

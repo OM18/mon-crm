@@ -6558,12 +6558,7 @@ const setOps = async (val) => {
     const resolveUnderlying = (raw) => {
       if (!raw) return null;
       const match = commodities.find(c => norm(c.value) === norm(raw) || norm(c.label) === norm(raw));
-      // If no exact match, try prefix match (handles soybean_meal vs soybean_meals etc.)
-      if (!match) {
-        const approx = commodities.find(c => norm(c.value).startsWith(norm(raw)) || norm(raw).startsWith(norm(c.value)));
-        return approx ? approx.value : raw;
-      }
-      return match.value;
+      return match ? match.value : raw;
     };
     return ops.filter(o => {
     const q = search.toLowerCase();
@@ -6610,9 +6605,6 @@ const setOps = async (val) => {
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
-  // Count ref 6643 in filtered
-  const _count6643 = filtered.filter(o => o.ref === "6643").length;
-  if (_count6643 > 0) console.warn("REF 6643 IN FILTERED:", _count6643, filtered.filter(o => o.ref === "6643").map(o => ({instrument: o.instrument, id: o.id})));
   const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
 

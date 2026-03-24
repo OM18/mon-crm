@@ -6573,6 +6573,9 @@ const setOps = async (val) => {
     // Fallback: if product not found via resolveProduct, try direct case-insensitive match
     const productFinal = product || products.find(p => p.label?.toLowerCase().trim() === (o.instrument || "").toLowerCase().trim());
     const opUnderlying = resolveUnderlying(productFinal?.underlying || "");
+    if (o.ref === "6643" && activeFilters.underlying.length > 0) {
+      console.warn("6643 DEBUG: products.length=", products.length, "| product=", product?.label, "| productFinal=", productFinal?.label, "| productFinal.underlying=", productFinal?.underlying, "| opUnderlying=", opUnderlying, "| activeFilters.underlying=", JSON.stringify(activeFilters.underlying));
+    }
 
     const tagChecks = [
       !activeFilters.type.length          || activeFilters.type.includes(o.type),
@@ -6604,9 +6607,6 @@ const setOps = async (val) => {
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
-  // Debug op 6643
-  const _op6643 = ops.find(o => String(o.id) === "6643" || o.ref === "6643");
-  if (_op6643) console.warn("OP 6643 RAW:", JSON.stringify(_op6643));
   const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
 

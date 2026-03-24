@@ -6573,9 +6573,7 @@ const setOps = async (val) => {
     // Fallback: if product not found via resolveProduct, try direct case-insensitive match
     const productFinal = product || products.find(p => p.label?.toLowerCase().trim() === (o.instrument || "").toLowerCase().trim());
     const opUnderlying = resolveUnderlying(productFinal?.underlying || "");
-    if (o.ref === "6643" && activeFilters.underlying.length > 0) {
-      console.warn("6643 DEBUG: products.length=", products.length, "| product=", product?.label, "| productFinal=", productFinal?.label, "| productFinal.underlying=", productFinal?.underlying, "| opUnderlying=", opUnderlying, "| activeFilters.underlying=", JSON.stringify(activeFilters.underlying));
-    }
+
 
     const tagChecks = [
       !activeFilters.type.length          || activeFilters.type.includes(o.type),
@@ -6603,6 +6601,9 @@ const setOps = async (val) => {
       return true;
     });
     const allChecks = [...tagChecks, ...customChecks];
+    if (o.ref === "6643" && activeFilters.underlying.length > 0) {
+      console.warn("6643 CHECKS: tagChecks=", JSON.stringify(tagChecks), "| allChecks=", JSON.stringify(allChecks), "| filterMode=", filterMode, "| result=", filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean));
+    }
     return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();

@@ -6920,7 +6920,7 @@ const setOps = async (val) => {
               const sc = getStatusCfg(o.status);
               const isSelected = selected === o.id;
               return (
-                <div key={o.id} onClick={() => setSelected(o.id === selected ? null : o.id)}
+                <div key={String(o.id) + "_" + i} onClick={() => setSelected(o.id === selected ? null : o.id)}
                   style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: activeFilters.underlying.length > 0 ? "#003300" : isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}
                   onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
                   onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`; }}>

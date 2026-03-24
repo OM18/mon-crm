@@ -874,9 +874,7 @@ const DerivAutocomplete = ({ form, setForm, requiredError, products = [] }) => {
     ? derivProds.filter(p => p.label.toUpperCase().includes(query.toUpperCase()))
     : derivProds;
   const isValid = derivProds.some(p => p.label.toUpperCase() === query.toUpperCase());
-  if (query && !isValid && query.toUpperCase().includes("CORN")) {
-    console.warn("INVALID INSTRUMENT:", JSON.stringify(query), "| derivProds corn labels:", derivProds.filter(p => p.label?.toUpperCase().includes("CORN")).map(p => JSON.stringify(p.label)));
-  }
+
 
   const pick = (p) => {
     setForm(f => ({ ...f, instrument: p.label, exchange: p.stoxxExchange || f.exchange, expiryDate: p.expiryDate || "" }));

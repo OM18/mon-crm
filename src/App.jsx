@@ -1700,11 +1700,10 @@ useEffect(() => {
           const hasFilters = prodSearch || filterUnderlying || filterYear;
 
           // ── Apply filters ──
-          const normU = v => (v || "").toLowerCase().trim().replace(/[\s_-]/g, "");
           const applyFilters = (list) => list.filter(p => {
             const q = prodSearch.toLowerCase().trim();
             if (q && !p.label?.toLowerCase().includes(q) && !p.underlying?.toLowerCase().includes(q) && !p.stoxxExchange?.toLowerCase().includes(q)) return false;
-            if (filterUnderlying && normU(p.underlying) !== normU(filterUnderlying)) return false;
+            if (filterUnderlying && p.underlying !== filterUnderlying) return false;
             if (filterYear) {
               const yr = (p.lastTradingDate || p.expiryDate || p.firstNoticeDay || "").slice(0, 4);
               if (yr !== filterYear) return false;
@@ -6552,7 +6551,7 @@ const setOps = async (val) => {
       if (!instrument) return null;
       const n = norm(instrument);
       return products.find(p => norm(p.label) === n || norm(p.value) === n)
-          || products.find(p => n.startsWith(norm(p.label)) || n.includes(norm(p.label)));
+          || products.find(p => { const pl = norm(p.label); return pl.length >= 4 && n.startsWith(pl) && (n.length === pl.length || !/[a-z0-9]/.test(n[pl.length] || "")); });
     };
     const commodities = config.derivCommodities || [];
     const resolveUnderlying = (raw) => {
@@ -6781,7 +6780,7 @@ const setOps = async (val) => {
                     if (!instrument) return null;
                     const n = norm(instrument);
                     return products.find(p => norm(p.label) === n || norm(p.value) === n)
-                        || products.find(p => n.startsWith(norm(p.label)) || n.includes(norm(p.label)));
+                        || products.find(p => { const pl = norm(p.label); return pl.length >= 4 && n.startsWith(pl) && (n.length === pl.length || !/[a-z0-9]/.test(n[pl.length] || "")); });
                   };
                   const commodities = config.derivCommodities || [];
                   const resolveUnderlying = (raw) => {

@@ -6571,6 +6571,9 @@ const setOps = async (val) => {
     const opFinancingBank = accRecord?.financingBank || "";
     const product = resolveProduct(o.instrument);
     const opUnderlying = resolveUnderlying(product?.underlying || "");
+    if (activeFilters.underlying.length > 0 && o.instrument?.toLowerCase().includes("corn")) {
+      console.log("[FILTER DEBUG] instrument:", o.instrument, "| product:", product?.label, "| product.underlying:", product?.underlying, "| opUnderlying:", opUnderlying, "| filters:", JSON.stringify(activeFilters.underlying), "| check:", activeFilters.underlying.some(u => (opUnderlying||"").toLowerCase().replace(/[_\s-]/g,"") === (u||"").toLowerCase().replace(/[_\s-]/g,"")));
+    }
     const tagChecks = [
       !activeFilters.type.length          || activeFilters.type.includes(o.type),
       !activeFilters.opType.length        || activeFilters.opType.includes(o.opType),

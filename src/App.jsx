@@ -776,22 +776,40 @@ const DerivOpStatusEditor = ({ config, updateField }) => {
 
 // ─── DERIV DECIMALS EDITOR ────────────────────────────────────
 const DerivDecimalsEditor = ({ config, updateField }) => {
+  // New structure: each entry = { id, exchange, underlying, displayFormat, tickSize }
+  // Keeps backward compat: old entries { value, label, example } are shown as legacy
   const items = config.derivDecimals || [];
   const [localItems, setLocalItems] = useState(items);
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [newLabel, setNewLabel] = useState("");
-  const [newExample, setNewExample] = useState("");
+  const EMPTY_ENTRY = { exchange: "", underlying: "", displayFormat: "decimal", tickSize: "" };
+  const [newEntry, setNewEntry] = useState(EMPTY_ENTRY);
 
   useEffect(() => { setLocalItems(items); setDirty(false); }, [config.derivDecimals]);
 
   const mark = (next) => { setLocalItems(next); setDirty(true); };
+  const normV = v => (v || "").toLowerCase().trim();
 
-  const add = () => {
-    if (!newLabel.trim()) return;
-    mark([...localItems, { value: newLabel.trim().replace(/\s/g, ""), label: newLabel.trim(), example: newExample.trim() || newLabel.trim() }]);
-    setNewLabel(""); setNewExample("");
+  // Detect if entry is new-style (has exchange/underlying) or legacy
+  const isNewStyle = entry => entry.exchange !== undefined || entry.underlying !== undefined;
+
+  const addEntry = () => {
+    if (!newEntry.exchange || !newEntry.underlying || !newEntry.displayFormat) return;
+    // Check duplicate
+    const exists = localItems.some(i => normV(i.exchange) === normV(newEntry.exchange) && normV(i.underlying) === normV(newEntry.underlying));
+    if (exists) return;
+    mark([...localItems, { ...newEntry, id: Date.now() }]);
+    setNewEntry(EMPTY_ENTRY);
   };
+
+  const updateEntry = (idx, field, val) => mark(localItems.map((x, i) => i === idx ? { ...x, [field]: val } : x));
+  const removeEntry = (idx) => mark(localItems.filter((_, i) => i !== idx));
+
+  const newItems = localItems.filter(isNewStyle);
+  const legacyItems = localItems.filter(i => !isNewStyle(i));
+
+  const inputStyle = { background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5px 8px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit" };
+  const monoStyle = { ...inputStyle, fontFamily: "'DM Mono', monospace" };
 
   return (
     <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
@@ -801,16 +819,12 @@ const DerivDecimalsEditor = ({ config, updateField }) => {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>⅛</span>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Decimals</div>
-            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Formats de cotation : décimal standard ou fractions (1/8, 1/32…)</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Decimals & Tick Size</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Format d'affichage et tick minimum par exchange/underlying</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ display: "flex", gap: 6 }}>
-            {localItems.map(d => (
-              <span key={d.value} style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "1px 6px", color: COLORS.textSub }}>{d.label}</span>
-            ))}
-          </div>
+          <span style={{ fontSize: 11, color: COLORS.textMuted }}>{newItems.length} règle{newItems.length !== 1 ? "s" : ""}</span>
           {dirty && (
             <div onClick={e => { e.stopPropagation(); updateField("derivDecimals", localItems); setDirty(false); }}
               style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -823,37 +837,86 @@ const DerivDecimalsEditor = ({ config, updateField }) => {
 
       {expanded && (
         <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
-            {localItems.map((d, idx) => (
-              <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, borderRadius: 10, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
-                <div style={{ width: 70, fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 13, color: COLORS.blue }}>{d.label}</div>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 11, color: COLORS.textMuted }}>ex:</span>
-                  <input value={d.example} onChange={e => { const v = e.target.value; mark(localItems.map((x, i) => i === idx ? { ...x, example: v } : x)); }}
-                    placeholder="ex: 200 1/8"
-                    style={{ flex: 1, background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none" }} />
-                </div>
-                <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
-                  style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
-                  onMouseOver={e => e.currentTarget.style.color = COLORS.red}
-                  onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
-              </div>
+
+          {/* Table header */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 90px 90px 36px", gap: 8, padding: "6px 10px", marginBottom: 6 }}>
+            {["Exchange", "Underlying", "Affichage", "Tick min", ""].map(h => (
+              <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.5, textTransform: "uppercase" }}>{h}</div>
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px" }}>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>FORMAT *</label>
-              <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="ex: 1/8" onKeyDown={e => e.key === "Enter" && add()}
-                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace" }} />
-            </div>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>EXEMPLE</label>
-              <input value={newExample} onChange={e => setNewExample(e.target.value)} placeholder="ex: 200 1/8" onKeyDown={e => e.key === "Enter" && add()}
-                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace" }} />
-            </div>
-            <Btn onClick={add} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>+ Ajouter</Btn>
+          {/* Existing new-style entries */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+            {newItems.map((entry, idx) => {
+              const realIdx = localItems.indexOf(entry);
+              const excLabel = (config.derivExchanges || []).find(e => normV(e.value) === normV(entry.exchange))?.label || entry.exchange;
+              const undLabel = (config.derivCommodities || []).find(c => normV(c.value) === normV(entry.underlying))?.label || entry.underlying;
+              return (
+                <div key={entry.id || idx} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 90px 90px 36px", gap: 8, alignItems: "center", background: COLORS.card, borderRadius: 8, padding: "8px 10px", border: `1px solid ${COLORS.border}` }}>
+                  <select value={entry.exchange} onChange={e => updateEntry(realIdx, "exchange", e.target.value)} style={inputStyle}>
+                    <option value="">— Exchange —</option>
+                    {(config.derivExchanges || []).map(ex => <option key={ex.value} value={ex.value}>{ex.label}</option>)}
+                  </select>
+                  <select value={entry.underlying} onChange={e => updateEntry(realIdx, "underlying", e.target.value)} style={inputStyle}>
+                    <option value="">— Underlying —</option>
+                    {(config.derivCommodities || []).map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                  <input value={entry.displayFormat} onChange={e => updateEntry(realIdx, "displayFormat", e.target.value)} placeholder="ex: 1/8" style={monoStyle} />
+                  <input value={entry.tickSize || ""} onChange={e => updateEntry(realIdx, "tickSize", e.target.value)} placeholder="ex: 2/8" style={monoStyle} />
+                  <button onClick={() => removeEntry(realIdx)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18 }}
+                    onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                    onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+                </div>
+              );
+            })}
+            {newItems.length === 0 && (
+              <div style={{ textAlign: "center", color: COLORS.textMuted, fontSize: 12, padding: "12px 0" }}>Aucune règle définie — ajoutez-en ci-dessous</div>
+            )}
           </div>
+
+          {/* Add new entry */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 90px 90px 90px", gap: 8, alignItems: "flex-end", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px", marginBottom: legacyItems.length > 0 ? 16 : 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>EXCHANGE *</label>
+              <select value={newEntry.exchange} onChange={e => setNewEntry(n => ({ ...n, exchange: e.target.value }))} style={inputStyle}>
+                <option value="">— Choisir —</option>
+                {(config.derivExchanges || []).map(ex => <option key={ex.value} value={ex.value}>{ex.label}</option>)}
+              </select>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>UNDERLYING *</label>
+              <select value={newEntry.underlying} onChange={e => setNewEntry(n => ({ ...n, underlying: e.target.value }))} style={inputStyle}>
+                <option value="">— Choisir —</option>
+                {(config.derivCommodities || []).map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>AFFICHAGE *</label>
+              <input value={newEntry.displayFormat} onChange={e => setNewEntry(n => ({ ...n, displayFormat: e.target.value }))} placeholder="ex: 1/8" style={monoStyle} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>TICK MIN</label>
+              <input value={newEntry.tickSize} onChange={e => setNewEntry(n => ({ ...n, tickSize: e.target.value }))} placeholder="ex: 2/8" style={monoStyle} />
+            </div>
+            <Btn onClick={addEntry} disabled={!newEntry.exchange || !newEntry.underlying || !newEntry.displayFormat} style={{ padding: "8px 10px", fontSize: 12 }}>+ Ajouter</Btn>
+          </div>
+
+          {/* Legacy entries */}
+          {legacyItems.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 6 }}>Anciens formats (sans exchange/underlying) — migration recommandée</div>
+              {legacyItems.map((d, idx) => {
+                const realIdx = localItems.indexOf(d);
+                return (
+                  <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, borderRadius: 8, padding: "8px 12px", border: `1px solid ${COLORS.border}`, marginBottom: 4 }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 12, color: COLORS.textSub, minWidth: 60 }}>{d.label}</span>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, flex: 1 }}>ex: {d.example}</span>
+                    <button onClick={() => removeEntry(realIdx)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16 }}>×</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1447,7 +1510,7 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
   );
 };
 
-const EMPTY_PROD = { label: "", stoxxExchange: "", instrumentType: "", underlyingCategory: "", underlying: "", underlyingOrigin: "", volumeSizePerLot: "", volumeUnit: "", currency: "EUR", decimals: "decimal", expiryDate: "", firstNoticeDay: "", lastTradingDate: "", quotationUnit: "" };
+const EMPTY_PROD = { label: "", stoxxExchange: "", instrumentType: "", underlyingCategory: "", underlying: "", underlyingOrigin: "", volumeSizePerLot: "", volumeUnit: "", currency: "EUR", decimals: "decimal", tickSize: "", expiryDate: "", firstNoticeDay: "", lastTradingDate: "", quotationUnit: "" };
 
 const DerivFormField = ({ label, field, type = "text", placeholder, form, setForm }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -1515,7 +1578,7 @@ useEffect(() => {
     if (!isValid()) return;
     // Compute quotationUnit at save time
     const quMatch = (form.underlying && form.stoxxExchange)
-      ? quotationUnits.find(q => (q.underlying||'').toLowerCase().trim() === (form.underlying||'').toLowerCase().trim() && (q.exchange||'').toLowerCase().trim() === (form.stoxxExchange||'').toLowerCase().trim())
+      ? quotationUnits.find(q => q.underlying === form.underlying && q.exchange === form.stoxxExchange)
       : null;
     const enriched = { ...form, quotationUnit: quMatch?.quotationUnit || form.quotationUnit || "" };
     const updated = editId ? products.map(p => p.id === editId ? { ...enriched, id: editId } : p) : [...products, { ...enriched, id: Date.now() }];
@@ -1524,23 +1587,30 @@ useEffect(() => {
     setForm(EMPTY_PROD); setInstrumentType(""); setEditId(null); setShowForm(false);
   };
 
-  // Migrate existing products when quotationUnits are loaded
+  // Migrate existing products when quotationUnits or decimals config are loaded
   useEffect(() => {
-    if (!quotationUnits.length || !products.length) return;
+    if (!products.length) return;
+    const normM = v => (v || '').toLowerCase().trim();
+    const decRules = (config.derivDecimals || []).filter(d => d.exchange !== undefined || d.underlying !== undefined);
     const needsMigration = products.some(p => {
-      const normM = v => (v || '').toLowerCase().trim();
-      const match = quotationUnits.find(q => normM(q.underlying) === normM(p.underlying) && normM(q.exchange) === normM(p.stoxxExchange));
-      return match && p.quotationUnit !== match.quotationUnit;
+      const quMatch = quotationUnits.find(q => normM(q.underlying) === normM(p.underlying) && normM(q.exchange) === normM(p.stoxxExchange));
+      const decMatch = decRules.find(d => normM(d.underlying) === normM(p.underlying) && normM(d.exchange) === normM(p.stoxxExchange));
+      return (quMatch && p.quotationUnit !== quMatch.quotationUnit) ||
+             (decMatch && (p.decimals !== decMatch.displayFormat || p.tickSize !== (decMatch.tickSize || "")));
     });
     if (!needsMigration) return;
     const updated = products.map(p => {
-      const normM = v => (v || '').toLowerCase().trim();
-      const match = quotationUnits.find(q => normM(q.underlying) === normM(p.underlying) && normM(q.exchange) === normM(p.stoxxExchange));
-      return match ? { ...p, quotationUnit: match.quotationUnit } : p;
+      const quMatch = quotationUnits.find(q => normM(q.underlying) === normM(p.underlying) && normM(q.exchange) === normM(p.stoxxExchange));
+      const decMatch = decRules.find(d => normM(d.underlying) === normM(p.underlying) && normM(d.exchange) === normM(p.stoxxExchange));
+      return {
+        ...p,
+        ...(quMatch ? { quotationUnit: quMatch.quotationUnit } : {}),
+        ...(decMatch ? { decimals: decMatch.displayFormat, tickSize: decMatch.tickSize || "" } : {}),
+      };
     });
     setProducts(updated);
     safeSave('deriv_products', updated, setProducts, products);
-  }, [quotationUnits, products.length]);
+  }, [quotationUnits, products.length, config.derivDecimals]);
 
   const remove = async (id) => { const u = products.filter(p => p.id !== id); setProducts(u); await safeSave('deriv_products', u, setProducts, products); };
 
@@ -1622,9 +1692,8 @@ useEffect(() => {
               })()}
               {/* Quotation Unit — auto depuis Quotation Units (underlying + exchange) */}
               {(() => {
-                const normQ = v => (v || '').toLowerCase().trim();
                 const quMatch = (form.underlying && form.stoxxExchange)
-                  ? quotationUnits.find(q => normQ(q.underlying) === normQ(form.underlying) && normQ(q.exchange) === normQ(form.stoxxExchange))
+                  ? quotationUnits.find(q => q.underlying === form.underlying && q.exchange === form.stoxxExchange)
                   : null;
                 const autoQU = quMatch?.quotationUnit || "";
                 if (autoQU && form.quotationUnit !== autoQU) setTimeout(() => setForm(f => ({ ...f, quotationUnit: autoQU })), 0);
@@ -1639,15 +1708,44 @@ useEffect(() => {
                 );
               })()}
               <DerivSelectField label="Currency" field="currency" options={(config.derivCurrencies || []).map(c => ({ value: c.value, label: c.label }))} form={form} setForm={setForm} />
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DECIMALS <span style={{ color: COLORS.red }}>*</span></label>
-                <select value={form.decimals} onChange={e => setForm(f => ({ ...f, decimals: e.target.value }))}
-                  style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }}>
-                  {(config.derivDecimals || []).map(d => (
-                    <option key={d.value} value={d.value}>{d.label} — ex: {d.example}</option>
-                  ))}
-                </select>
-              </div>
+              {/* Decimals — auto depuis Decimal Rules (exchange + underlying) */}
+              {(() => {
+                const normD = v => (v || '').toLowerCase().trim();
+                const decRules = (config.derivDecimals || []).filter(d => d.exchange !== undefined || d.underlying !== undefined);
+                const autoRule = (form.underlying && form.stoxxExchange)
+                  ? decRules.find(d => normD(d.underlying) === normD(form.underlying) && normD(d.exchange) === normD(form.stoxxExchange))
+                  : null;
+                const autoFormat = autoRule?.displayFormat || "";
+                const autoTick = autoRule?.tickSize || "";
+                // Auto-update form if rule changed
+                if (autoFormat && form.decimals !== autoFormat) setTimeout(() => setForm(f => ({ ...f, decimals: autoFormat, tickSize: autoTick })), 0);
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DECIMALS</label>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <div style={{ flex: 1, background: autoFormat ? `${COLORS.gold}10` : COLORS.card, border: `1px solid ${autoFormat ? COLORS.gold + "50" : COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: autoFormat ? COLORS.gold : COLORS.textMuted, fontSize: 13, fontFamily: "'DM Mono', monospace", fontWeight: autoFormat ? 700 : 400 }}>
+                        {autoFormat || form.decimals || "decimal"}
+                        {autoFormat && <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 8, fontWeight: 400 }}>auto</span>}
+                      </div>
+                      {(autoTick || form.tickSize) && (
+                        <div style={{ background: `${COLORS.blue}10`, border: `1px solid ${COLORS.blue}40`, borderRadius: 8, padding: "9px 12px", color: COLORS.blue, fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, whiteSpace: "nowrap" }}>
+                          tick: {autoTick || form.tickSize}
+                        </div>
+                      )}
+                    </div>
+                    {!autoFormat && (
+                      <select value={form.decimals} onChange={e => setForm(f => ({ ...f, decimals: e.target.value }))}
+                        style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "6px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit" }}>
+                        <option value="decimal">Décimal</option>
+                        {(config.derivDecimals || []).filter(d => !d.exchange && !d.underlying).map(d => (
+                          <option key={d.value || d.label} value={d.value || d.label}>{d.label}</option>
+                        ))}
+                      </select>
+                    )}
+                    {!autoFormat && <span style={{ fontSize: 10, color: COLORS.textMuted }}>Définir une règle Decimals pour cet exchange/underlying</span>}
+                  </div>
+                );
+              })()}
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>FIRST NOTICE DAY</label>
                 <input type="date" value={form.firstNoticeDay} onChange={e => { const v = e.target.value; setForm(f => ({ ...f, firstNoticeDay: v })); }}
@@ -7123,14 +7221,18 @@ const setOps = async (val) => {
               const derivProds = products;
               const instrument = derivProds.find(p => p.label === form.instrument);
               const decimalsFormat = instrument?.decimals || "decimal";
-              const decConfig = (config.derivDecimals || []).find(d => d.value === decimalsFormat);
-              const isFraction = decimalsFormat !== "decimal";
+              const tickSize = instrument?.tickSize || "";
+              const decConfig = (config.derivDecimals || []).find(d => d.value === decimalsFormat || d.displayFormat === decimalsFormat);
+              const isFraction = decimalsFormat !== "decimal" && decimalsFormat.includes("/");
+              // Compute fraction options from tickSize if available, else from displayFormat
               const fractionOptions = isFraction
                 ? (() => {
-                    const [num, den] = decimalsFormat.split("/").map(Number);
-                    return Array.from({ length: den / num }, (_, i) => `${(i + 1) * num}/${den}`).filter((_, i, a) => {
-                      const [n, d] = a[i].split("/").map(Number); return n < d;
-                    });
+                    const den = parseInt((decimalsFormat.split("/")[1] || "8"));
+                    // tickSize determines step: e.g. tickSize="2/8" → step=2, so options are 2/8, 4/8, 6/8
+                    const tickNum = tickSize && tickSize.includes("/") ? parseInt(tickSize.split("/")[0]) : 1;
+                    const options = [];
+                    for (let n = tickNum; n < den; n += tickNum) options.push(`${n}/${den}`);
+                    return options;
                   })()
                 : [];
               const [intPart, fracPart] = isFraction

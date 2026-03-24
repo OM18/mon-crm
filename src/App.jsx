@@ -6939,7 +6939,7 @@ const setOps = async (val) => {
               const isSelected = selected === o.id;
               return (
                 <div key={o.id} onClick={() => setSelected(o.id === selected ? null : o.id)}
-                  style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}
+                  style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: "#FF0000", alignItems: "center" }}
                   onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
                   onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`; }}>
                   <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.ref || "—"}</div>

@@ -6557,8 +6557,14 @@ const setOps = async (val) => {
     const commodities = config.derivCommodities || [];
     const resolveUnderlying = (raw) => {
       if (!raw) return null;
+      // Exact norm match
       const match = commodities.find(c => norm(c.value) === norm(raw) || norm(c.label) === norm(raw));
-      return match ? match.value : raw;
+      if (match) return match.value;
+      // Singular/plural match: strip trailing 's' and retry
+      const rawSingular = norm(raw).replace(/s$/, "");
+      const matchSingular = commodities.find(c => norm(c.value).replace(/s$/, "") === rawSingular || norm(c.label).replace(/s$/, "") === rawSingular);
+      if (matchSingular) return matchSingular.value;
+      return raw;
     };
     return ops.filter(o => {
     const q = search.toLowerCase();
@@ -6803,7 +6809,6 @@ const setOps = async (val) => {
                     }
                   });
                   underlyings.sort();
-                  console.warn("CHIP VALUES:", underlyings, "| commodities:", commodities.map(c => c.value));
                   if (underlyings.length === 0) return null;
                   const UNDERLYING_COLORS = { wheat: "#F2C94C", corn: "#F2994A", soybean: "#6FCF97", soybeanmeal: "#4ECDC4", rapeseed: "#BB6BD9", sunflower: "#FFB347", barley: "#E2B96F", sugar: COLORS.blue, cotton: COLORS.textSub, coffee: "#9B7653", cocoa: "#7B4F2E", palmoil: COLORS.green, rice: COLORS.accent };
                   return (

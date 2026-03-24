@@ -7254,7 +7254,7 @@ const setOps = async (val) => {
               const decimalsFormat = instrument?.decimals || "decimal";
               const tickSize = instrument?.tickSize || "";
               const decConfig = (config.derivDecimals || []).find(d => d.value === decimalsFormat || d.displayFormat === decimalsFormat);
-              const isFraction = decimalsFormat !== "decimal" && decimalsFormat.includes("/");
+              const isFraction = decimalsFormat.includes("/") && !decimalsFormat.startsWith("decimal");
               // Compute fraction options from tickSize if available, else from displayFormat
               const fractionOptions = isFraction
                 ? (() => {
@@ -7281,19 +7281,13 @@ const setOps = async (val) => {
                       style={{ background: COLORS.bg, border: `1px solid ${formErrors.price ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
                   ) : (
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <input value={intPart} onChange={e => { setForm(f => ({ ...f, price: e.target.value + (fracPart ? ` ${fracPart}` : "") })); setFormErrors(er => ({ ...er, price: undefined })); }}
-                        placeholder="200" type="number"
+                      <input value={intPart} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setForm(f => ({ ...f, price: v + (fracPart ? ` ${fracPart}` : "") })); setFormErrors(er => ({ ...er, price: undefined })); }}
+                        placeholder="200" type="text" inputMode="numeric"
                         style={{ flex: 1, background: COLORS.bg, border: `1px solid ${formErrors.price ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "'DM Mono', monospace" }} />
                       <select value={fracPart || ""} onChange={e => { setForm(f => ({ ...f, price: (intPart || "0") + (e.target.value ? ` ${e.target.value}` : "") })); setFormErrors(er => ({ ...er, price: undefined })); }}
                         style={{ width: 90, background: COLORS.bg, border: `1px solid ${formErrors.price ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 10px", color: fracPart ? COLORS.text : COLORS.textMuted, fontSize: 14, outline: "none", fontFamily: "'DM Mono', monospace" }}>
                         <option value="">— frac —</option>
-                        {(() => {
-                          const den = parseInt(decimalsFormat.split("/")[1]);
-                          return Array.from({ length: den - 1 }, (_, i) => {
-                            const num = i + 1;
-                            return <option key={num} value={`${num}/${den}`}>{num}/{den}</option>;
-                          });
-                        })()}
+                        {fractionOptions.map(f => <option key={f} value={f}>{f}</option>)}
                       </select>
                     </div>
                   )}

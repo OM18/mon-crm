@@ -6616,7 +6616,12 @@ const setOps = async (val) => {
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
-    const sel = ops.find(o => o.id === selected);
+    // Direct instrument check
+  if (activeFilters.underlying.length > 0) {
+    const cornOps = filteredOps.filter(o => (o.instrument || "").toUpperCase().includes("CORN"));
+    console.warn("DIRECT CORN CHECK:", cornOps.length, cornOps.map(o => o.ref + ":" + o.instrument));
+  }
+  const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
 
   const pendingCount = ops.filter(o => o.status === "pending").length;
@@ -6924,13 +6929,7 @@ const setOps = async (val) => {
               {HEADERS.map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: "center" }}>{h}</div>)}
             </div>
             {/* Lignes */}
-            {filteredOps.filter(o => {
-                if (!activeFilters.underlying.length) return true;
-                const _norm = v => (v||"").toLowerCase().replace(/[_\s-]/g,"");
-                const _prod = products.find(p => _norm(p.label) === _norm(o.instrument));
-                const _und = _prod?.underlying || "";
-                return activeFilters.underlying.some(u => _norm(_und) === _norm(u));
-              }).map((o, i) => {
+            {filteredOps.map((o, i) => {
               const sc = getStatusCfg(o.status);
               const isSelected = selected === o.id;
               return (

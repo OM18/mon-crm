@@ -863,7 +863,7 @@ const DerivDecimalsEditor = ({ config, updateField }) => {
 // ─── DERIV BUSINESS UNITS EDITOR ─────────────────────────────
 const DerivAutocomplete = ({ form, setForm, requiredError, products = [] }) => {
   const [open, setOpen] = useState(false);
-  const allProds = (products.length > 0 ? products : JSON.parse(localStorage.getItem("crm_deriv_products") || "[]"))
+  const allProds = products
     .filter(p => p.active !== false && String(p.active).toLowerCase() !== "false");
   // Filtrer par instrument type si renseigné
   const derivProds = form.type
@@ -6288,7 +6288,6 @@ const MultiToggle = ({ label, options, values, onChange }) => (
 );
 
 const Derivatives = ({ companies }) => {
-  console.warn("DERIVATIVES COMPONENT LOADED - version TEST_123");
   const { config } = useConfig();
   const [products, setProducts] = useState([]);
 
@@ -6571,12 +6570,10 @@ const setOps = async (val) => {
     const accRecord = derivAccounts.find(a => a.accountNumber === o.account);
     const opFinancingBank = accRecord?.financingBank || "";
     const product = resolveProduct(o.instrument);
-    const opUnderlying = resolveUnderlying(product?.underlying || "");
-    if (o.instrument?.toUpperCase().includes("CORN") && activeFilters.underlying.length > 0) {
-      if (opUnderlying !== "corn") {
-        console.warn("CORN WRONG UNDERLYING:", o.instrument, "-> product:", product?.label, "underlying:", product?.underlying, "-> opUnderlying:", opUnderlying);
-      }
-    }
+    // Fallback: if product not found via resolveProduct, try direct case-insensitive match
+    const productFinal = product || products.find(p => p.label?.toLowerCase().trim() === (o.instrument || "").toLowerCase().trim());
+    const opUnderlying = resolveUnderlying(productFinal?.underlying || "");
+
     const tagChecks = [
       !activeFilters.type.length          || activeFilters.type.includes(o.type),
       !activeFilters.opType.length        || activeFilters.opType.includes(o.opType),
@@ -6603,11 +6600,7 @@ const setOps = async (val) => {
       return true;
     });
     const allChecks = [...tagChecks, ...customChecks];
-    const _result = filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
-    if (_result && o.instrument?.toLowerCase().includes("corn")) {
-      console.warn("CORN PASSES:", o.instrument, "| product:", product?.label, "| opUnderlying:", opUnderlying, "| activeFilters.underlying:", JSON.stringify(activeFilters.underlying), "| tagChecks len:", tagChecks.length, "| allChecks:", JSON.stringify(allChecks), "| filterMode:", filterMode);
-    }
-    return _result;
+    return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
@@ -6657,7 +6650,6 @@ const setOps = async (val) => {
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Derivatives</h1>
-          <div style={{color:'red',fontSize:12}}>DEBUG activeFilters.underlying: {JSON.stringify(activeFilters.underlying)} | filtered: {filtered.length}</div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             {ops.length > 0 && (
               <button onClick={async () => {

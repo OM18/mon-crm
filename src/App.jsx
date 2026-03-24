@@ -6581,7 +6581,7 @@ const setOps = async (val) => {
     const opFinancingBank = accRecord?.financingBank || "";
     const product = resolveProduct(o.instrument);
     const opUnderlying = resolveUnderlying(product?.underlying || "");
-    if (o.ref === "6643") console.warn("6643 IN FILTER: opUnderlying=", opUnderlying, "activeFilters.underlying=", JSON.stringify(activeFilters.underlying), "product=", product?.label, "product.underlying=", product?.underlying);
+
 
 
 
@@ -6615,17 +6615,6 @@ const setOps = async (val) => {
     return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
-
-  // Debug: check config.derivProducts and corn in table
-  if (activeFilters.underlying.length > 0) {
-    const cornProds = (config.derivProducts || []).filter(p => (p.label || p.value || "").toUpperCase().includes("CORN"));
-    console.warn("DERIV_PRODUCTS CORN:", JSON.stringify(cornProds));
-    const cornInFiltered = filteredOps.filter(o => {
-      const prod = (config.derivProducts || []).find(p => p.value === o.instrument);
-      return (prod?.label || o.instrument || "").toUpperCase().includes("CORN");
-    });
-    console.warn("CORN IN TABLE:", cornInFiltered.length, JSON.stringify(cornInFiltered.map(o => ({ref: o.ref, instrument: o.instrument}))));
-  }
 
     const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
@@ -6935,7 +6924,13 @@ const setOps = async (val) => {
               {HEADERS.map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: "center" }}>{h}</div>)}
             </div>
             {/* Lignes */}
-            {filteredOps.map((o, i) => {
+            {filteredOps.filter(o => {
+                if (!activeFilters.underlying.length) return true;
+                const _norm = v => (v||"").toLowerCase().replace(/[_\s-]/g,"");
+                const _prod = products.find(p => _norm(p.label) === _norm(o.instrument));
+                const _und = _prod?.underlying || "";
+                return activeFilters.underlying.some(u => _norm(_und) === _norm(u));
+              }).map((o, i) => {
               const sc = getStatusCfg(o.status);
               const isSelected = selected === o.id;
               return (

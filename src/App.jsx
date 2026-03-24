@@ -6798,8 +6798,9 @@ const setOps = async (val) => {
                   const commodities = config.derivCommodities || [];
                   const resolveUnderlying = (raw) => {
                     if (!raw) return null;
-                    const match = commodities.find(c => norm(c.value) === norm(raw) || norm(c.label) === norm(raw));
-                    return match ? match.value : raw;
+                    const normalized = raw === 'soybean_meals' ? 'soybean_meal' : raw;
+                    const match = commodities.find(c => norm(c.value) === norm(normalized) || norm(c.label) === norm(normalized));
+                    return match ? match.value : normalized;
                   };
                   const seen = new Set();
                   const underlyings = [];

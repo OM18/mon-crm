@@ -6615,11 +6615,15 @@ const setOps = async (val) => {
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
-  // Log corn in filtered
+  // Log corn in filtered - check both instrument and derivProducts label
   if (activeFilters.underlying.length > 0) {
-    const cornInFiltered = filtered.filter(o => o.instrument?.toUpperCase().includes("CORN"));
-    if (cornInFiltered.length > 0) console.warn("CORN IN FILTERED:", cornInFiltered.map(o => o.ref + ":" + o.instrument));
-    else console.warn("NO CORN IN FILTERED - total:", filtered.length);
+    const cornInFiltered = filtered.filter(o => {
+      const prod = (config.derivProducts || []).find(p => p.value === o.instrument);
+      const displayLabel = prod?.label || o.instrument || "";
+      return displayLabel.toUpperCase().includes("CORN");
+    });
+    if (cornInFiltered.length > 0) console.warn("CORN DISPLAYED:", cornInFiltered.map(o => { const prod = (config.derivProducts || []).find(p => p.value === o.instrument); return o.ref + " instrument:" + o.instrument + " label:" + (prod?.label || "none"); }));
+    else console.warn("NO CORN DISPLAYED - total:", filtered.length);
   }
 
   const sel = ops.find(o => o.id === selected);

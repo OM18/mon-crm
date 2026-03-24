@@ -6295,7 +6295,15 @@ const Derivatives = ({ companies }) => {
 useEffect(() => {
   async function loadProducts() {
     const { data } = await supabase.from('deriv_products').select('data');
-    if (data?.length) setProducts(data.map(r => r.data));
+    if (data?.length) {
+      const normalized = data.map(r => {
+        const p = r.data;
+        // Normalize underlying: soybean_meals → soybean_meal
+        if (p && p.underlying === 'soybean_meals') p.underlying = 'soybean_meal';
+        return p;
+      });
+      setProducts(normalized);
+    }
   }
   loadProducts();
 }, []);
@@ -6557,14 +6565,9 @@ const setOps = async (val) => {
     const commodities = config.derivCommodities || [];
     const resolveUnderlying = (raw) => {
       if (!raw) return null;
-      // Exact norm match
-      const match = commodities.find(c => norm(c.value) === norm(raw) || norm(c.label) === norm(raw));
-      if (match) return match.value;
-      // Singular/plural match: strip trailing 's' and retry
-      const rawSingular = norm(raw).replace(/s$/, "");
-      const matchSingular = commodities.find(c => norm(c.value).replace(/s$/, "") === rawSingular || norm(c.label).replace(/s$/, "") === rawSingular);
-      if (matchSingular) return matchSingular.value;
-      return raw;
+      const normalized = raw === 'soybean_meals' ? 'soybean_meal' : raw;
+      const match = commodities.find(c => norm(c.value) === norm(normalized) || norm(c.label) === norm(normalized));
+      return match ? match.value : normalized;
     };
     return ops.filter(o => {
     const q = search.toLowerCase();
@@ -6802,7 +6805,9 @@ const setOps = async (val) => {
                   const underlyings = [];
                   ops.forEach(o => {
                     const product = resolveProduct(o.instrument);
-                    const canonical = resolveUnderlying(product?.underlying);
+                    let canonical = resolveUnderlying(product?.underlying);
+                    // Normalize plural variants
+                    if (canonical === 'soybean_meals') canonical = 'soybean_meal';
                     if (canonical && !seen.has(norm(canonical))) {
                       seen.add(norm(canonical));
                       underlyings.push(canonical);

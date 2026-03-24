@@ -861,7 +861,18 @@ const DerivDecimalsEditor = ({ config, updateField }) => {
                     <option value="">— Underlying —</option>
                     {(config.derivCommodities || []).map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </select>
-                  <input value={entry.displayFormat} onChange={e => updateEntry(realIdx, "displayFormat", e.target.value)} placeholder="ex: 1/8" style={monoStyle} />
+                  <select value={entry.displayFormat} onChange={e => updateEntry(realIdx, "displayFormat", e.target.value)} style={inputStyle}>
+                    <option value="decimal">Décimal libre</option>
+                    <option value="decimal1">0.1 (1 déc.)</option>
+                    <option value="decimal2">0.01 (2 déc.)</option>
+                    <option value="decimal3">0.001 (3 déc.)</option>
+                    <option value="1/2">Fractions /2</option>
+                    <option value="1/4">Fractions /4</option>
+                    <option value="1/8">Fractions /8</option>
+                    <option value="1/16">Fractions /16</option>
+                    <option value="1/32">Fractions /32</option>
+                    <option value="1/64">Fractions /64</option>
+                  </select>
                   <input value={entry.tickSize || ""} onChange={e => updateEntry(realIdx, "tickSize", e.target.value)} placeholder="ex: 2/8" style={monoStyle} />
                   <button onClick={() => removeEntry(realIdx)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18 }}
                     onMouseOver={e => e.currentTarget.style.color = COLORS.red}
@@ -892,7 +903,18 @@ const DerivDecimalsEditor = ({ config, updateField }) => {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>AFFICHAGE *</label>
-              <input value={newEntry.displayFormat} onChange={e => setNewEntry(n => ({ ...n, displayFormat: e.target.value }))} placeholder="ex: 1/8" style={monoStyle} />
+              <select value={newEntry.displayFormat} onChange={e => setNewEntry(n => ({ ...n, displayFormat: e.target.value }))} style={inputStyle}>
+                <option value="decimal">Décimal libre</option>
+                <option value="decimal1">0.1 (1 déc.)</option>
+                <option value="decimal2">0.01 (2 déc.)</option>
+                <option value="decimal3">0.001 (3 déc.)</option>
+                <option value="1/2">Fractions /2</option>
+                <option value="1/4">Fractions /4</option>
+                <option value="1/8">Fractions /8</option>
+                <option value="1/16">Fractions /16</option>
+                <option value="1/32">Fractions /32</option>
+                <option value="1/64">Fractions /64</option>
+              </select>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>TICK MIN</label>
@@ -1724,7 +1746,11 @@ useEffect(() => {
                     <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DECIMALS</label>
                     <div style={{ display: "flex", gap: 6 }}>
                       <div style={{ flex: 1, background: autoFormat ? `${COLORS.gold}10` : COLORS.card, border: `1px solid ${autoFormat ? COLORS.gold + "50" : COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: autoFormat ? COLORS.gold : COLORS.textMuted, fontSize: 13, fontFamily: "'DM Mono', monospace", fontWeight: autoFormat ? 700 : 400 }}>
-                        {autoFormat || form.decimals || "decimal"}
+                        {(() => {
+                          const fmt = autoFormat || form.decimals || "decimal";
+                          const labels = { decimal: "Décimal libre", decimal1: "0._ (1 déc.)", decimal2: "0.__ (2 déc.)", decimal3: "0.___ (3 déc.)" };
+                          return labels[fmt] || fmt;
+                        })()}
                         {autoFormat && <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 8, fontWeight: 400 }}>auto</span>}
                       </div>
                       {(autoTick || form.tickSize) && (
@@ -7222,33 +7248,46 @@ const setOps = async (val) => {
               const instrument = derivProds.find(p => p.label === form.instrument);
               const decimalsFormat = instrument?.decimals || "decimal";
               const tickSize = instrument?.tickSize || "";
+
+              // Detect format type
+              const isFraction = decimalsFormat.includes("/");
+              // decimal1, decimal2, decimal3 → fixed decimal places
+              const decimalPlacesMatch = decimalsFormat.match(/^decimal(\d)$/);
+              const decimalPlaces = decimalPlacesMatch ? parseInt(decimalPlacesMatch[1]) : null;
+              // Step from tickSize: "0.1" → 0.1, "2/8" → handled in fraction mode
+              const decimalStep = tickSize && !tickSize.includes("/") ? tickSize : decimalPlaces ? (1 / Math.pow(10, decimalPlaces)).toFixed(decimalPlaces) : "any";
+
               const decConfig = (config.derivDecimals || []).find(d => d.value === decimalsFormat || d.displayFormat === decimalsFormat);
-              const isFraction = decimalsFormat !== "decimal" && decimalsFormat.includes("/");
-              // Compute fraction options from tickSize if available, else from displayFormat
+
+              // Fraction options from tickSize
               const fractionOptions = isFraction
                 ? (() => {
                     const den = parseInt((decimalsFormat.split("/")[1] || "8"));
-                    // tickSize determines step: e.g. tickSize="2/8" → step=2, so options are 2/8, 4/8, 6/8
                     const tickNum = tickSize && tickSize.includes("/") ? parseInt(tickSize.split("/")[0]) : 1;
                     const options = [];
                     for (let n = tickNum; n < den; n += tickNum) options.push(`${n}/${den}`);
                     return options;
                   })()
                 : [];
+
               const [intPart, fracPart] = isFraction
                 ? (form.price || "").split(" ")
                 : [form.price || "", ""];
+
+              // Format hint label
+              const formatHint = isFraction
+                ? `fractions de ${decimalsFormat.split("/")[1]}${tickSize ? `, tick ${tickSize}` : ""}`
+                : decimalPlaces !== null
+                  ? `${decimalPlaces} décimale${decimalPlaces > 1 ? "s" : ""}${tickSize ? `, tick ${tickSize}` : ""}`
+                  : tickSize ? `tick ${tickSize}` : null;
 
               return (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label style={{ fontSize: 11, color: formErrors.price ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
                     PRICE <span style={{ color: COLORS.red }}>*</span>
-                    {decConfig && <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.blue, fontWeight: 400, fontFamily: "'DM Mono', monospace" }}>format: {decConfig.example}</span>}
+                    {formatHint && <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.blue, fontWeight: 400, fontFamily: "'DM Mono', monospace" }}>{formatHint}</span>}
                   </label>
-                  {!isFraction ? (
-                    <input value={form.price} onChange={e => { setForm(f => ({ ...f, price: e.target.value })); setFormErrors(er => ({ ...er, price: undefined })); }} placeholder="0.00"
-                      style={{ background: COLORS.bg, border: `1px solid ${formErrors.price ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
-                  ) : (
+                  {isFraction ? (
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <input value={intPart} onChange={e => { setForm(f => ({ ...f, price: e.target.value + (fracPart ? ` ${fracPart}` : "") })); setFormErrors(er => ({ ...er, price: undefined })); }}
                         placeholder="200" type="number"
@@ -7256,15 +7295,18 @@ const setOps = async (val) => {
                       <select value={fracPart || ""} onChange={e => { setForm(f => ({ ...f, price: (intPart || "0") + (e.target.value ? ` ${e.target.value}` : "") })); setFormErrors(er => ({ ...er, price: undefined })); }}
                         style={{ width: 90, background: COLORS.bg, border: `1px solid ${formErrors.price ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 10px", color: fracPart ? COLORS.text : COLORS.textMuted, fontSize: 14, outline: "none", fontFamily: "'DM Mono', monospace" }}>
                         <option value="">— frac —</option>
-                        {(() => {
-                          const den = parseInt(decimalsFormat.split("/")[1]);
-                          return Array.from({ length: den - 1 }, (_, i) => {
-                            const num = i + 1;
-                            return <option key={num} value={`${num}/${den}`}>{num}/{den}</option>;
-                          });
-                        })()}
+                        {fractionOptions.map(f => <option key={f} value={f}>{f}</option>)}
                       </select>
                     </div>
+                  ) : (
+                    <input
+                      value={form.price}
+                      onChange={e => { setForm(f => ({ ...f, price: e.target.value })); setFormErrors(er => ({ ...er, price: undefined })); }}
+                      placeholder={decimalPlaces !== null ? (0).toFixed(decimalPlaces) : "0.00"}
+                      type="number"
+                      step={decimalStep}
+                      style={{ background: COLORS.bg, border: `1px solid ${formErrors.price ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "'DM Mono', monospace" }}
+                    />
                   )}
                   {formErrors.price && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.price}</span>}
                 </div>

@@ -6571,9 +6571,6 @@ const setOps = async (val) => {
     const opFinancingBank = accRecord?.financingBank || "";
     const product = resolveProduct(o.instrument);
     const opUnderlying = resolveUnderlying(product?.underlying || "");
-    if (activeFilters.underlying.length > 0 && o.instrument?.toLowerCase().includes("corn")) {
-      console.log("[FILTER DEBUG] instrument:", o.instrument, "| product:", product?.label, "| product.underlying:", product?.underlying, "| opUnderlying:", opUnderlying, "| filters:", JSON.stringify(activeFilters.underlying), "| check:", activeFilters.underlying.some(u => (opUnderlying||"").toLowerCase().replace(/[_\s-]/g,"") === (u||"").toLowerCase().replace(/[_\s-]/g,"")));
-    }
     const tagChecks = [
       !activeFilters.type.length          || activeFilters.type.includes(o.type),
       !activeFilters.opType.length        || activeFilters.opType.includes(o.opType),
@@ -6600,13 +6597,9 @@ const setOps = async (val) => {
       return true;
     });
     const allChecks = [...tagChecks, ...customChecks];
-    const result = filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
-    if (activeFilters.underlying.length > 0 && result && o.instrument?.toLowerCase().includes("corn")) {
-      console.log("[PASSES FILTER] instrument:", o.instrument, "| allChecks:", allChecks, "| tagChecks:", tagChecks, "| filterMode:", filterMode);
-    }
-    return result;
+    return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
-  }, [ops, search, accountSearch, dateFrom, dateTo, activeFilters, customFilters, filterMode, derivAccounts, products, config]);
+  }, [ops, search, accountSearch, dateFrom, dateTo, JSON.stringify(activeFilters), JSON.stringify(customFilters), filterMode, derivAccounts, products, config]);
 
   const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };

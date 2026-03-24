@@ -6574,6 +6574,9 @@ const setOps = async (val) => {
     // Fallback: if product not found via resolveProduct, try direct case-insensitive match
     const productFinal = product || products.find(p => p.label?.toLowerCase().trim() === (o.instrument || "").toLowerCase().trim());
     const opUnderlying = resolveUnderlying(productFinal?.underlying || "");
+    if (o.instrument === "CBOT CORN MAR 2026" && activeFilters.underlying.length > 0) {
+      console.warn("MAR2026:", "product=", product?.label, "productFinal=", productFinal?.label, "underlying=", productFinal?.underlying, "opUnderlying=", opUnderlying, "passes=", !activeFilters.underlying.length || activeFilters.underlying.some(u => (opUnderlying||"").toLowerCase().replace(/[_\s-]/g,"") === (u||"").toLowerCase().replace(/[_\s-]/g,"")));
+    }
 
 
     const tagChecks = [

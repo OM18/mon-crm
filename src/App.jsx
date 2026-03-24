@@ -6632,6 +6632,35 @@ const setOps = async (val) => {
       const isEmpty = val === null || val === undefined || val === "" || (Array.isArray(val) && val.length === 0);
       if (isEmpty) errors[key] = `${label} est obligatoire`;
     });
+    // Validate price against tick size
+    if (!errors.price && form.price && form.instrument) {
+      const prod = products.find(p => p.label === form.instrument);
+      const fmt = prod?.decimals || "decimal";
+      const tick = prod?.tickSize || "";
+      if (tick && !fmt.includes("/")) {
+        // Decimal tick validation
+        const tickVal = parseFloat(tick);
+        const priceVal = parseFloat(form.price);
+        if (!isNaN(tickVal) && tickVal > 0 && !isNaN(priceVal)) {
+          // Check if price is a multiple of tick (within floating point tolerance)
+          const remainder = Math.abs(priceVal % tickVal);
+          const tolerance = tickVal * 0.0001;
+          if (remainder > tolerance && Math.abs(remainder - tickVal) > tolerance) {
+            errors.price = `Prix invalide — le tick minimum est ${tick} (ex: ${(Math.round(priceVal / tickVal) * tickVal).toFixed(tick.includes(".") ? tick.split(".")[1].length : 0)})`;
+          }
+        }
+      } else if (tick && fmt.includes("/") && form.price.includes(" ")) {
+        // Fraction tick validation
+        const [tickNum, tickDen] = tick.split("/").map(Number);
+        const [, fracStr] = form.price.split(" ");
+        if (fracStr) {
+          const [fracNum] = fracStr.split("/").map(Number);
+          if (fracNum % tickNum !== 0) {
+            errors.price = `Prix invalide — le tick minimum est ${tick}`;
+          }
+        }
+      }
+    }
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;

@@ -6588,7 +6588,7 @@ const setOps = async (val) => {
       !activeFilters.businessUnit.length  || activeFilters.businessUnit.includes(o.businessUnit),
       !activeFilters.internalDeal.length  || activeFilters.internalDeal.includes(String(o.internalDeal)),
       !activeFilters.exchange.length      || activeFilters.exchange.some(ex => norm(o.exchange) === norm(ex)),
-      !activeFilters.underlying.length    || activeFilters.underlying.some(u => norm(opUnderlying) === norm(u)),
+      !activeFilters.underlying.length    || (!!opUnderlying && activeFilters.underlying.some(u => norm(opUnderlying) === norm(u))),
       !activeFilters.financingBank.length || activeFilters.financingBank.some(fb => norm(opFinancingBank) === norm(fb)),
     ].filter((_, i) => {
       const keys = ["type","opType","side","status","businessUnit","internalDeal","exchange","underlying","financingBank"];
@@ -6610,6 +6610,9 @@ const setOps = async (val) => {
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
+  // Count ref 6643 in filtered
+  const _count6643 = filtered.filter(o => o.ref === "6643").length;
+  if (_count6643 > 0) console.warn("REF 6643 IN FILTERED:", _count6643, filtered.filter(o => o.ref === "6643").map(o => ({instrument: o.instrument, id: o.id})));
   const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
 

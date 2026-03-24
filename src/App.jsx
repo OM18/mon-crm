@@ -3116,7 +3116,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
           <DerivPillsEditor configKey="derivCurrencies" label="Currencies" icon="💱" description="Devises disponibles dans le module Derivatives" config={config} updateField={updateField} />
 
-          <DerivPillsEditor configKey="derivDecimals" label="Decimals" icon="⅛" description="Formats de cotation : décimal standard ou fractions (1/8, 1/32…)" config={config} updateField={updateField} />
+          <DerivDecimalsEditor config={config} updateField={updateField} />
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <DerivBUEditor config={config} updateField={updateField} />

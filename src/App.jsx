@@ -6288,6 +6288,7 @@ const MultiToggle = ({ label, options, values, onChange }) => (
 );
 
 const Derivatives = ({ companies }) => {
+  console.warn("DERIVATIVES COMPONENT LOADED - version TEST_123");
   const { config } = useConfig();
   const [products, setProducts] = useState([]);
 
@@ -6597,7 +6598,11 @@ const setOps = async (val) => {
       return true;
     });
     const allChecks = [...tagChecks, ...customChecks];
-    return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
+    const _result = filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
+    if (_result && o.instrument?.toLowerCase().includes("corn")) {
+      console.warn("CORN PASSES:", o.instrument, "| product:", product?.label, "| opUnderlying:", opUnderlying, "| activeFilters.underlying:", JSON.stringify(activeFilters.underlying), "| tagChecks len:", tagChecks.length, "| allChecks:", JSON.stringify(allChecks), "| filterMode:", filterMode);
+    }
+    return _result;
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 

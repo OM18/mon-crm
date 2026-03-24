@@ -6615,18 +6615,18 @@ const setOps = async (val) => {
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
-  // Log corn in filteredOps - check both instrument and derivProducts label
+  // Debug: check config.derivProducts and corn in table
   if (activeFilters.underlying.length > 0) {
+    const cornProds = (config.derivProducts || []).filter(p => (p.label || p.value || "").toUpperCase().includes("CORN"));
+    console.warn("DERIV_PRODUCTS CORN:", JSON.stringify(cornProds));
     const cornInFiltered = filteredOps.filter(o => {
       const prod = (config.derivProducts || []).find(p => p.value === o.instrument);
-      const displayLabel = prod?.label || o.instrument || "";
-      return displayLabel.toUpperCase().includes("CORN");
+      return (prod?.label || o.instrument || "").toUpperCase().includes("CORN");
     });
-    if (cornInFiltered.length > 0) console.warn("CORN DISPLAYED:", cornInFiltered.map(o => { const prod = (config.derivProducts || []).find(p => p.value === o.instrument); return o.ref + " instrument:" + o.instrument + " label:" + (prod?.label || "none"); }));
-    else console.warn("NO CORN DISPLAYED - total:", filteredOps.length);
+    console.warn("CORN IN TABLE:", cornInFiltered.length, JSON.stringify(cornInFiltered.map(o => ({ref: o.ref, instrument: o.instrument}))));
   }
 
-  const sel = ops.find(o => o.id === selected);
+    const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
 
   const pendingCount = ops.filter(o => o.status === "pending").length;

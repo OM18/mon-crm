@@ -6545,7 +6545,22 @@ const setOps = async (val) => {
     setSelected(data.id);
   };
 
-  const filtered = useMemo(() => ops.filter(o => {
+  const filtered = useMemo(() => {
+    const norm = v => (v || "").toString().toLowerCase().trim().replace(/[_\s-]/g, "");
+    // Resolve a product from an instrument value — exact match first, then partial
+    const resolveProduct = (instrument) => {
+      if (!instrument) return null;
+      const n = norm(instrument);
+      return products.find(p => norm(p.label) === n || norm(p.value) === n)
+          || products.find(p => n.startsWith(norm(p.label)) || n.includes(norm(p.label)));
+    };
+    const commodities = config.derivCommodities || [];
+    const resolveUnderlying = (raw) => {
+      if (!raw) return null;
+      const match = commodities.find(c => norm(c.value) === norm(raw) || norm(c.label) === norm(raw));
+      return match ? match.value : raw;
+    };
+    return ops.filter(o => {
     const q = search.toLowerCase();
     const ms = !q || o.ref?.toLowerCase().includes(q) || o.instrument?.toLowerCase().includes(q) || o.broker?.toLowerCase().includes(q) || o.exchange?.toLowerCase().includes(q) || o.contract?.toLowerCase().includes(q) || o.notes?.toLowerCase().includes(q);
     if (!ms) return false;
@@ -6553,13 +6568,11 @@ const setOps = async (val) => {
     if (aq && (!o.account || o.account.toLowerCase() !== aq)) return false;
     if (dateFrom && (o.tradeDate || "") < dateFrom) return false;
     if (dateTo   && (o.tradeDate || "") > dateTo)   return false;
-    const norm = v => (v || "").toString().toLowerCase().trim().replace(/[_\s-]/g, "");
     const accRecord = derivAccounts.find(a => a.accountNumber === o.account);
     const opFinancingBank = accRecord?.financingBank || "";
-    const rawUnderlying = products.find(p => norm(p.label) === norm(o.instrument))?.underlying || "";
-    const commodities = config.derivCommodities || [];
-    const matchCommodity = commodities.find(c => norm(c.value) === norm(rawUnderlying) || norm(c.label) === norm(rawUnderlying));
-    const opUnderlying = matchCommodity ? matchCommodity.value : rawUnderlying;
+    const product = resolveProduct(o.instrument);
+    const rawUnderlying = product?.underlying || "";
+    const opUnderlying = resolveUnderlying(rawUnderlying);
     const tagChecks = [
       !activeFilters.type.length          || activeFilters.type.includes(o.type),
       !activeFilters.opType.length        || activeFilters.opType.includes(o.opType),
@@ -6587,8 +6600,8 @@ const setOps = async (val) => {
     });
     const allChecks = [...tagChecks, ...customChecks];
     return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
-  }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || "")),
-  [ops, search, accountSearch, dateFrom, dateTo, activeFilters, customFilters, filterMode, derivAccounts, products, config]);
+  }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || "")));
+  }, [ops, search, accountSearch, dateFrom, dateTo, activeFilters, customFilters, filterMode, derivAccounts, products, config]);
 
   const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
@@ -6762,9 +6775,15 @@ const setOps = async (val) => {
                   );
                 })()}
 
-                {/* Underlying filter — canonical dedup via config */}
+                {/* Underlying filter — fuzzy product resolution + canonical dedup */}
                 {(() => {
                   const norm = v => (v || "").toString().toLowerCase().trim().replace(/[_\s-]/g, "");
+                  const resolveProduct = (instrument) => {
+                    if (!instrument) return null;
+                    const n = norm(instrument);
+                    return products.find(p => norm(p.label) === n || norm(p.value) === n)
+                        || products.find(p => n.startsWith(norm(p.label)) || n.includes(norm(p.label)));
+                  };
                   const commodities = config.derivCommodities || [];
                   const resolveUnderlying = (raw) => {
                     if (!raw) return null;
@@ -6774,8 +6793,8 @@ const setOps = async (val) => {
                   const seen = new Set();
                   const underlyings = [];
                   ops.forEach(o => {
-                    const raw = products.find(p => norm(p.label) === norm(o.instrument))?.underlying;
-                    const canonical = resolveUnderlying(raw);
+                    const product = resolveProduct(o.instrument);
+                    const canonical = resolveUnderlying(product?.underlying);
                     if (canonical && !seen.has(norm(canonical))) {
                       seen.add(norm(canonical));
                       underlyings.push(canonical);

@@ -6663,7 +6663,7 @@ const setOps = async (val) => {
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Derivatives</h1>
+          <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Derivatives v99</h1>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             {ops.length > 0 && (
               <button onClick={async () => {

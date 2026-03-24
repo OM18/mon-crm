@@ -863,7 +863,7 @@ const DerivDecimalsEditor = ({ config, updateField }) => {
 // ─── DERIV BUSINESS UNITS EDITOR ─────────────────────────────
 const DerivAutocomplete = ({ form, setForm, requiredError, products = [] }) => {
   const [open, setOpen] = useState(false);
-  const allProds = products
+  const allProds = (products.length > 0 ? products : JSON.parse(localStorage.getItem("crm_deriv_products") || "[]"))
     .filter(p => p.active !== false && String(p.active).toLowerCase() !== "false");
   // Filtrer par instrument type si renseigné
   const derivProds = form.type
@@ -874,7 +874,6 @@ const DerivAutocomplete = ({ form, setForm, requiredError, products = [] }) => {
     ? derivProds.filter(p => p.label.toUpperCase().includes(query.toUpperCase()))
     : derivProds;
   const isValid = derivProds.some(p => p.label.toUpperCase() === query.toUpperCase());
-
 
   const pick = (p) => {
     setForm(f => ({ ...f, instrument: p.label, exchange: p.stoxxExchange || f.exchange, expiryDate: p.expiryDate || "" }));
@@ -1516,7 +1515,7 @@ useEffect(() => {
     if (!isValid()) return;
     // Compute quotationUnit at save time
     const quMatch = (form.underlying && form.stoxxExchange)
-      ? quotationUnits.find(q => q.underlying === form.underlying && q.exchange === form.stoxxExchange)
+      ? quotationUnits.find(q => (q.underlying||'').toLowerCase().trim() === (form.underlying||'').toLowerCase().trim() && (q.exchange||'').toLowerCase().trim() === (form.stoxxExchange||'').toLowerCase().trim())
       : null;
     const enriched = { ...form, quotationUnit: quMatch?.quotationUnit || form.quotationUnit || "" };
     const updated = editId ? products.map(p => p.id === editId ? { ...enriched, id: editId } : p) : [...products, { ...enriched, id: Date.now() }];
@@ -1529,12 +1528,14 @@ useEffect(() => {
   useEffect(() => {
     if (!quotationUnits.length || !products.length) return;
     const needsMigration = products.some(p => {
-      const match = quotationUnits.find(q => q.underlying === p.underlying && q.exchange === p.stoxxExchange);
+      const normM = v => (v || '').toLowerCase().trim();
+      const match = quotationUnits.find(q => normM(q.underlying) === normM(p.underlying) && normM(q.exchange) === normM(p.stoxxExchange));
       return match && p.quotationUnit !== match.quotationUnit;
     });
     if (!needsMigration) return;
     const updated = products.map(p => {
-      const match = quotationUnits.find(q => q.underlying === p.underlying && q.exchange === p.stoxxExchange);
+      const normM = v => (v || '').toLowerCase().trim();
+      const match = quotationUnits.find(q => normM(q.underlying) === normM(p.underlying) && normM(q.exchange) === normM(p.stoxxExchange));
       return match ? { ...p, quotationUnit: match.quotationUnit } : p;
     });
     setProducts(updated);
@@ -1621,8 +1622,9 @@ useEffect(() => {
               })()}
               {/* Quotation Unit — auto depuis Quotation Units (underlying + exchange) */}
               {(() => {
+                const normQ = v => (v || '').toLowerCase().trim();
                 const quMatch = (form.underlying && form.stoxxExchange)
-                  ? quotationUnits.find(q => q.underlying === form.underlying && q.exchange === form.stoxxExchange)
+                  ? quotationUnits.find(q => normQ(q.underlying) === normQ(form.underlying) && normQ(q.exchange) === normQ(form.stoxxExchange))
                   : null;
                 const autoQU = quMatch?.quotationUnit || "";
                 if (autoQU && form.quotationUnit !== autoQU) setTimeout(() => setForm(f => ({ ...f, quotationUnit: autoQU })), 0);
@@ -6295,15 +6297,7 @@ const Derivatives = ({ companies }) => {
 useEffect(() => {
   async function loadProducts() {
     const { data } = await supabase.from('deriv_products').select('data');
-    if (data?.length) {
-      const normalized = data.map(r => {
-        const p = r.data;
-        // Normalize underlying: soybean_meals → soybean_meal
-        if (p && p.underlying === 'soybean_meals') p.underlying = 'soybean_meal';
-        return p;
-      });
-      setProducts(normalized);
-    }
+    if (data?.length) setProducts(data.map(r => r.data));
   }
   loadProducts();
 }, []);
@@ -6554,7 +6548,7 @@ const setOps = async (val) => {
     setSelected(data.id);
   };
 
-  const filteredOps = (() => {
+  const filtered = useMemo(() => {
     const norm = v => (v || "").toString().toLowerCase().trim().replace(/[_\s-]/g, "");
     const resolveProduct = (instrument) => {
       if (!instrument) return null;
@@ -6565,9 +6559,8 @@ const setOps = async (val) => {
     const commodities = config.derivCommodities || [];
     const resolveUnderlying = (raw) => {
       if (!raw) return null;
-      const normalized = raw === 'soybean_meals' ? 'soybean_meal' : raw;
-      const match = commodities.find(c => norm(c.value) === norm(normalized) || norm(c.label) === norm(normalized));
-      return match ? match.value : normalized;
+      const match = commodities.find(c => norm(c.value) === norm(raw) || norm(c.label) === norm(raw));
+      return match ? match.value : raw;
     };
     return ops.filter(o => {
     const q = search.toLowerCase();
@@ -6581,11 +6574,6 @@ const setOps = async (val) => {
     const opFinancingBank = accRecord?.financingBank || "";
     const product = resolveProduct(o.instrument);
     const opUnderlying = resolveUnderlying(product?.underlying || "");
-
-
-
-
-
     const tagChecks = [
       !activeFilters.type.length          || activeFilters.type.includes(o.type),
       !activeFilters.opType.length        || activeFilters.opType.includes(o.opType),
@@ -6594,7 +6582,7 @@ const setOps = async (val) => {
       !activeFilters.businessUnit.length  || activeFilters.businessUnit.includes(o.businessUnit),
       !activeFilters.internalDeal.length  || activeFilters.internalDeal.includes(String(o.internalDeal)),
       !activeFilters.exchange.length      || activeFilters.exchange.some(ex => norm(o.exchange) === norm(ex)),
-      !activeFilters.underlying.length    || (!!opUnderlying && activeFilters.underlying.some(u => norm(opUnderlying) === norm(u))),
+      !activeFilters.underlying.length    || activeFilters.underlying.some(u => norm(opUnderlying) === norm(u)),
       !activeFilters.financingBank.length || activeFilters.financingBank.some(fb => norm(opFinancingBank) === norm(fb)),
     ].filter((_, i) => {
       const keys = ["type","opType","side","status","businessUnit","internalDeal","exchange","underlying","financingBank"];
@@ -6614,9 +6602,9 @@ const setOps = async (val) => {
     const allChecks = [...tagChecks, ...customChecks];
     return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
-  })();
+  }, [ops, search, accountSearch, dateFrom, dateTo, JSON.stringify(activeFilters), JSON.stringify(customFilters), filterMode, derivAccounts, products, config]);
 
-    const sel = ops.find(o => o.id === selected);
+  const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
 
   const pendingCount = ops.filter(o => o.status === "pending").length;
@@ -6800,17 +6788,14 @@ const setOps = async (val) => {
                   const commodities = config.derivCommodities || [];
                   const resolveUnderlying = (raw) => {
                     if (!raw) return null;
-                    const normalized = raw === 'soybean_meals' ? 'soybean_meal' : raw;
-                    const match = commodities.find(c => norm(c.value) === norm(normalized) || norm(c.label) === norm(normalized));
-                    return match ? match.value : normalized;
+                    const match = commodities.find(c => norm(c.value) === norm(raw) || norm(c.label) === norm(raw));
+                    return match ? match.value : raw;
                   };
                   const seen = new Set();
                   const underlyings = [];
                   ops.forEach(o => {
                     const product = resolveProduct(o.instrument);
-                    let canonical = resolveUnderlying(product?.underlying);
-                    // Normalize plural variants
-                    if (canonical === 'soybean_meals') canonical = 'soybean_meal';
+                    const canonical = resolveUnderlying(product?.underlying);
                     if (canonical && !seen.has(norm(canonical))) {
                       seen.add(norm(canonical));
                       underlyings.push(canonical);
@@ -6829,7 +6814,7 @@ const setOps = async (val) => {
                           const cfg = commodities.find(c => norm(c.value) === norm(u) || norm(c.label) === norm(u));
                           const label = cfg?.label || u.charAt(0).toUpperCase() + u.slice(1);
                           return (
-                            <span key={u} onClick={() => { setActiveFilters(f => ({ ...f, underlying: isActive ? f.underlying.filter(v => v !== u) : [...f.underlying, u] })); }}
+                            <span key={u} onClick={() => setActiveFilters(f => ({ ...f, underlying: isActive ? f.underlying.filter(v => v !== u) : [...f.underlying, u] }))}
                               style={{ cursor: "pointer", fontSize: 11, padding: "3px 10px", borderRadius: 8, fontWeight: 600, transition: "all 0.15s",
                                 background: isActive ? col : `${col}22`,
                                 color: isActive ? "#fff" : col,
@@ -6924,11 +6909,11 @@ const setOps = async (val) => {
               {HEADERS.map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: "center" }}>{h}</div>)}
             </div>
             {/* Lignes */}
-            {filteredOps.map((o, i) => {
+            {filtered.map((o, i) => {
               const sc = getStatusCfg(o.status);
               const isSelected = selected === o.id;
               return (
-                <div key={String(o.id) + "_" + i} onClick={() => setSelected(o.id === selected ? null : o.id)}
+                <div key={o.id} onClick={() => setSelected(o.id === selected ? null : o.id)}
                   style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}
                   onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
                   onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`; }}>
@@ -6988,7 +6973,7 @@ const setOps = async (val) => {
                 </div>
               );
             })}
-            {filteredOps.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48, background: COLORS.card, borderRadius: "0 0 10px 10px" }}>Aucune opération</div>}
+            {filtered.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48, background: COLORS.card, borderRadius: "0 0 10px 10px" }}>Aucune opération</div>}
           </div>
         </div>
       </div>

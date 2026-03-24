@@ -6616,12 +6616,7 @@ const setOps = async (val) => {
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
-    // Direct instrument check
-  if (activeFilters.underlying.length > 0) {
-    const cornOps = filteredOps.filter(o => (o.instrument || "").toUpperCase().includes("CORN"));
-    console.warn("DIRECT CORN CHECK:", cornOps.length, cornOps.map(o => o.ref + ":" + o.instrument));
-  }
-  const sel = ops.find(o => o.id === selected);
+    const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
 
   const pendingCount = ops.filter(o => o.status === "pending").length;
@@ -6666,7 +6661,7 @@ const setOps = async (val) => {
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Derivatives v99</h1>
+          <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Derivatives</h1>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             {ops.length > 0 && (
               <button onClick={async () => {
@@ -6934,7 +6929,7 @@ const setOps = async (val) => {
               const isSelected = selected === o.id;
               return (
                 <div key={String(o.id) + "_" + i} onClick={() => setSelected(o.id === selected ? null : o.id)}
-                  style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: "#FF0000", alignItems: "center" }}
+                  style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}
                   onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
                   onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`; }}>
                   <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.ref || "—"}</div>

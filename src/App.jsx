@@ -6607,6 +6607,23 @@ const setOps = async (val) => {
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
+  // Debug: log distinct underlyings in filtered result
+  if (activeFilters.underlying.length > 0 && filtered.length > 0) {
+    const norm = v => (v || "").toString().toLowerCase().trim().replace(/[_\s-]/g, "");
+    const commodities = config.derivCommodities || [];
+    const resolveProductDebug = (instrument) => {
+      const n = norm(instrument);
+      return products.find(p => norm(p.label) === n) || products.find(p => { const pl = norm(p.label); return pl.length >= 4 && n.startsWith(pl); });
+    };
+    const distinct = {};
+    filtered.forEach(o => {
+      const p = resolveProductDebug(o.instrument);
+      const u = p?.underlying || "NOT_FOUND";
+      distinct[u] = (distinct[u] || 0) + 1;
+    });
+    console.warn("FILTERED UNDERLYINGS:", JSON.stringify(distinct));
+  }
+
   const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
 
@@ -6907,10 +6924,6 @@ const setOps = async (val) => {
         {/* Tableau */}
         <div style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
           <div style={{ minWidth: 1100 }}>
-            {/* Debug counter */}
-            <div style={{color:"red",fontSize:13,padding:"4px 16px",fontWeight:700}}>
-              FILTRE ACTIF: {JSON.stringify(activeFilters.underlying)} — {filtered.length} lignes affichées
-            </div>
             {/* Header */}
             <div style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, background: COLORS.tableHeader, borderRadius: "10px 10px 0 0", padding: "10px 16px" }}>
               {HEADERS.map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: "center" }}>{h}</div>)}
@@ -6920,8 +6933,8 @@ const setOps = async (val) => {
               const sc = getStatusCfg(o.status);
               const isSelected = selected === o.id;
               return (
-                <div key={String(o.id) + "_" + i} onClick={() => setSelected(o.id === selected ? null : o.id)}
-                  style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: activeFilters.underlying.length > 0 ? "#003300" : isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}
+                <div key={o.id} onClick={() => setSelected(o.id === selected ? null : o.id)}
+                  style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}
                   onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
                   onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`; }}>
                   <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.ref || "—"}</div>

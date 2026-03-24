@@ -6581,6 +6581,7 @@ const setOps = async (val) => {
     const opFinancingBank = accRecord?.financingBank || "";
     const product = resolveProduct(o.instrument);
     const opUnderlying = resolveUnderlying(product?.underlying || "");
+    if (o.ref === "6643") console.warn("6643 IN FILTER: opUnderlying=", opUnderlying, "activeFilters.underlying=", JSON.stringify(activeFilters.underlying), "product=", product?.label, "product.underlying=", product?.underlying);
 
 
 

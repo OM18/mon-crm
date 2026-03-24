@@ -6605,6 +6605,8 @@ const setOps = async (val) => {
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
+  // Debug commodities config
+  if (ops.length > 0) console.warn("COMMODITIES CONFIG:", JSON.stringify(config.derivCommodities?.map(c => ({value: c.value, label: c.label}))));
   const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
 

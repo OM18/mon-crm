@@ -6484,7 +6484,7 @@ const setOps = async (val) => {
   const [editingFeesId, setEditingFeesId] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filterMode, setFilterMode]   = useState("AND");
-  const EMPTY_FILTERS = { type: [], opType: [], side: [], status: [], businessUnit: [], internalDeal: [] };
+  const EMPTY_FILTERS = { type: [], opType: [], side: [], status: [], businessUnit: [], internalDeal: [], exchange: [], financingBank: [] };
   const [activeFilters, setActiveFilters] = useState(EMPTY_FILTERS);
   const [customFilters, setCustomFilters] = useState([]);
   const [filterSearch, setFilterSearch]   = useState("");
@@ -6553,6 +6553,8 @@ const setOps = async (val) => {
     if (aq && (!o.account || o.account.toLowerCase() !== aq)) return false;
     if (dateFrom && (o.tradeDate || "") < dateFrom) return false;
     if (dateTo   && (o.tradeDate || "") > dateTo)   return false;
+    const accRecord = derivAccounts.find(a => a.accountNumber === o.account);
+    const opFinancingBank = accRecord?.financingBank || "";
     const tagChecks = [
       !activeFilters.type.length         || activeFilters.type.includes(o.type),
       !activeFilters.opType.length       || activeFilters.opType.includes(o.opType),
@@ -6560,8 +6562,10 @@ const setOps = async (val) => {
       !activeFilters.status.length       || activeFilters.status.includes(o.status) || activeFilters.status.some(s => o.status?.toLowerCase() === s?.toLowerCase()),
       !activeFilters.businessUnit.length || activeFilters.businessUnit.includes(o.businessUnit),
       !activeFilters.internalDeal.length || activeFilters.internalDeal.includes(String(o.internalDeal)),
+      !activeFilters.exchange.length     || activeFilters.exchange.some(ex => (o.exchange || "").toLowerCase() === ex.toLowerCase()),
+      !activeFilters.financingBank.length || activeFilters.financingBank.some(fb => opFinancingBank.toLowerCase() === fb.toLowerCase()),
     ].filter((_, i) => {
-      const keys = ["type","opType","side","status","businessUnit","internalDeal"];
+      const keys = ["type","opType","side","status","businessUnit","internalDeal","exchange","financingBank"];
       return activeFilters[keys[i]].length > 0;
     });
     const customChecks = customFilters.map(cf => {
@@ -6578,7 +6582,7 @@ const setOps = async (val) => {
     const allChecks = [...tagChecks, ...customChecks];
     return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || "")),
-  [ops, search, accountSearch, dateFrom, dateTo, activeFilters, customFilters, filterMode]);
+  [ops, search, accountSearch, dateFrom, dateTo, activeFilters, customFilters, filterMode, derivAccounts]);
 
   const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
@@ -6724,6 +6728,57 @@ const setOps = async (val) => {
                     </div>
                   </div>
                 ))}
+
+                {/* Exchange filter — dynamic from ops */}
+                {(() => {
+                  const exchanges = [...new Set(ops.map(o => o.exchange).filter(Boolean))].sort();
+                  if (exchanges.length === 0) return null;
+                  return (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSub, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Exchange</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {exchanges.map(ex => {
+                          const isActive = activeFilters.exchange.includes(ex);
+                          const label = (config.derivExchanges || []).find(e => e.value === ex)?.label || ex;
+                          return (
+                            <span key={ex} onClick={() => setActiveFilters(f => ({ ...f, exchange: isActive ? f.exchange.filter(v => v !== ex) : [...f.exchange, ex] }))}
+                              style={{ cursor: "pointer", fontSize: 11, padding: "3px 10px", borderRadius: 8, fontWeight: 600, transition: "all 0.15s",
+                                background: isActive ? COLORS.blue : `${COLORS.blue}22`,
+                                color: isActive ? "#fff" : COLORS.blue,
+                                border: `1px solid ${COLORS.blue}55` }}>
+                              {label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Financing Bank filter — resolved from deriv accounts */}
+                {(() => {
+                  const banks = [...new Set(ops.map(o => derivAccounts.find(a => a.accountNumber === o.account)?.financingBank).filter(Boolean))].sort();
+                  if (banks.length === 0) return null;
+                  return (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSub, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Financing Bank</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {banks.map(bank => {
+                          const isActive = activeFilters.financingBank.includes(bank);
+                          return (
+                            <span key={bank} onClick={() => setActiveFilters(f => ({ ...f, financingBank: isActive ? f.financingBank.filter(v => v !== bank) : [...f.financingBank, bank] }))}
+                              style={{ cursor: "pointer", fontSize: 11, padding: "3px 10px", borderRadius: 8, fontWeight: 600, transition: "all 0.15s",
+                                background: isActive ? COLORS.accent : `${COLORS.accent}22`,
+                                color: isActive ? COLORS.textOnAccent : COLORS.accent,
+                                border: `1px solid ${COLORS.accent}55` }}>
+                              {bank}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Filtres personnalisés */}
                 <div style={{ marginTop: 4, borderTop: `1px solid ${COLORS.border}`, paddingTop: 12 }}>

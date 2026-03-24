@@ -6600,7 +6600,11 @@ const setOps = async (val) => {
       return true;
     });
     const allChecks = [...tagChecks, ...customChecks];
-    return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
+    const result = filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
+    if (activeFilters.underlying.length > 0 && result && o.instrument?.toLowerCase().includes("corn")) {
+      console.log("[PASSES FILTER] instrument:", o.instrument, "| allChecks:", allChecks, "| tagChecks:", tagChecks, "| filterMode:", filterMode);
+    }
+    return result;
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   }, [ops, search, accountSearch, dateFrom, dateTo, activeFilters, customFilters, filterMode, derivAccounts, products, config]);
 

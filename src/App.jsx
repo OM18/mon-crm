@@ -6611,12 +6611,16 @@ const setOps = async (val) => {
       return true;
     });
     const allChecks = [...tagChecks, ...customChecks];
-    if (o.ref === "6643" || o.ref === "6581") {
-      console.warn("REF", o.ref, "activeFilters.underlying:", JSON.stringify(activeFilters.underlying), "tagChecks:", JSON.stringify(tagChecks), "allChecks:", JSON.stringify(allChecks), "result:", filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean));
-    }
     return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
+
+  // Log corn in filtered
+  if (activeFilters.underlying.length > 0) {
+    const cornInFiltered = filtered.filter(o => o.instrument?.toUpperCase().includes("CORN"));
+    if (cornInFiltered.length > 0) console.warn("CORN IN FILTERED:", cornInFiltered.map(o => o.ref + ":" + o.instrument));
+    else console.warn("NO CORN IN FILTERED - total:", filtered.length);
+  }
 
   const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };

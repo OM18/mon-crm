@@ -874,6 +874,9 @@ const DerivAutocomplete = ({ form, setForm, requiredError, products = [] }) => {
     ? derivProds.filter(p => p.label.toUpperCase().includes(query.toUpperCase()))
     : derivProds;
   const isValid = derivProds.some(p => p.label.toUpperCase() === query.toUpperCase());
+  if (query && !isValid && query.toUpperCase().includes("CORN")) {
+    console.warn("INVALID INSTRUMENT:", JSON.stringify(query), "| derivProds corn labels:", derivProds.filter(p => p.label?.toUpperCase().includes("CORN")).map(p => JSON.stringify(p.label)));
+  }
 
   const pick = (p) => {
     setForm(f => ({ ...f, instrument: p.label, exchange: p.stoxxExchange || f.exchange, expiryDate: p.expiryDate || "" }));
@@ -6601,11 +6604,7 @@ const setOps = async (val) => {
       return true;
     });
     const allChecks = [...tagChecks, ...customChecks];
-    const _result = filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
-    if (o.ref === "6643") {
-      console.warn("6643 CHECKS: instrument=", o.instrument, "| opUnderlying=", opUnderlying, "| allChecks=", JSON.stringify(allChecks), "| result=", _result, "| id=", o.id);
-    }
-    return _result;
+    return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
@@ -6909,6 +6908,10 @@ const setOps = async (val) => {
         {/* Tableau */}
         <div style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
           <div style={{ minWidth: 1100 }}>
+            {/* Debug counter */}
+            <div style={{color:"red",fontSize:13,padding:"4px 16px",fontWeight:700}}>
+              FILTRE ACTIF: {JSON.stringify(activeFilters.underlying)} — {filtered.length} lignes affichées
+            </div>
             {/* Header */}
             <div style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, background: COLORS.tableHeader, borderRadius: "10px 10px 0 0", padding: "10px 16px" }}>
               {HEADERS.map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: "center" }}>{h}</div>)}

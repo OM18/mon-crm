@@ -6554,7 +6554,7 @@ const setOps = async (val) => {
     setSelected(data.id);
   };
 
-  const filtered = (() => {
+  const filteredOps = (() => {
     const norm = v => (v || "").toString().toLowerCase().trim().replace(/[_\s-]/g, "");
     const resolveProduct = (instrument) => {
       if (!instrument) return null;
@@ -6615,15 +6615,15 @@ const setOps = async (val) => {
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
-  // Log corn in filtered - check both instrument and derivProducts label
+  // Log corn in filteredOps - check both instrument and derivProducts label
   if (activeFilters.underlying.length > 0) {
-    const cornInFiltered = filtered.filter(o => {
+    const cornInFiltered = filteredOps.filter(o => {
       const prod = (config.derivProducts || []).find(p => p.value === o.instrument);
       const displayLabel = prod?.label || o.instrument || "";
       return displayLabel.toUpperCase().includes("CORN");
     });
     if (cornInFiltered.length > 0) console.warn("CORN DISPLAYED:", cornInFiltered.map(o => { const prod = (config.derivProducts || []).find(p => p.value === o.instrument); return o.ref + " instrument:" + o.instrument + " label:" + (prod?.label || "none"); }));
-    else console.warn("NO CORN DISPLAYED - total:", filtered.length);
+    else console.warn("NO CORN DISPLAYED - total:", filteredOps.length);
   }
 
   const sel = ops.find(o => o.id === selected);
@@ -6934,7 +6934,7 @@ const setOps = async (val) => {
               {HEADERS.map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: "center" }}>{h}</div>)}
             </div>
             {/* Lignes */}
-            {filtered.map((o, i) => {
+            {filteredOps.map((o, i) => {
               const sc = getStatusCfg(o.status);
               const isSelected = selected === o.id;
               return (
@@ -6998,7 +6998,7 @@ const setOps = async (val) => {
                 </div>
               );
             })}
-            {filtered.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48, background: COLORS.card, borderRadius: "0 0 10px 10px" }}>Aucune opération</div>}
+            {filteredOps.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48, background: COLORS.card, borderRadius: "0 0 10px 10px" }}>Aucune opération</div>}
           </div>
         </div>
       </div>

@@ -6581,9 +6581,7 @@ const setOps = async (val) => {
     const opFinancingBank = accRecord?.financingBank || "";
     const product = resolveProduct(o.instrument);
     const opUnderlying = resolveUnderlying(product?.underlying || "");
-    if ((o.ref === "6643" || o.ref === "6581") && activeFilters.underlying.length > 0) {
-      console.warn("REF", o.ref, "instrument:", o.instrument, "-> product:", product?.label, "underlying:", product?.underlying, "opUnderlying:", opUnderlying);
-    }
+
 
 
 
@@ -6613,6 +6611,9 @@ const setOps = async (val) => {
       return true;
     });
     const allChecks = [...tagChecks, ...customChecks];
+    if (o.ref === "6643" || o.ref === "6581") {
+      console.warn("REF", o.ref, "activeFilters.underlying:", JSON.stringify(activeFilters.underlying), "tagChecks:", JSON.stringify(tagChecks), "allChecks:", JSON.stringify(allChecks), "result:", filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean));
+    }
     return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();

@@ -6601,10 +6601,11 @@ const setOps = async (val) => {
       return true;
     });
     const allChecks = [...tagChecks, ...customChecks];
-    if (o.ref === "6643" && activeFilters.underlying.length > 0) {
-      console.warn("6643 CHECKS: tagChecks=", JSON.stringify(tagChecks), "| allChecks=", JSON.stringify(allChecks), "| filterMode=", filterMode, "| result=", filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean));
+    const _result = filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
+    if (o.ref === "6643") {
+      console.warn("6643 CHECKS: instrument=", o.instrument, "| opUnderlying=", opUnderlying, "| allChecks=", JSON.stringify(allChecks), "| result=", _result, "| id=", o.id);
     }
-    return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
+    return _result;
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 

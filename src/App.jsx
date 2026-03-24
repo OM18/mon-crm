@@ -6604,6 +6604,9 @@ const setOps = async (val) => {
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   })();
 
+  // Debug op 6643
+  const _op6643 = ops.find(o => String(o.id) === "6643" || o.ref === "6643");
+  if (_op6643) console.warn("OP 6643 RAW:", JSON.stringify(_op6643));
   const sel = ops.find(o => o.id === selected);
   const getStatusCfg = (v) => (config.derivOpStatuses || []).find(s => s.value === v || s.label.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
 
@@ -6814,7 +6817,7 @@ const setOps = async (val) => {
                           const cfg = commodities.find(c => norm(c.value) === norm(u) || norm(c.label) === norm(u));
                           const label = cfg?.label || u.charAt(0).toUpperCase() + u.slice(1);
                           return (
-                            <span key={u} onClick={() => { console.warn("CHIP CLICKED - label:", label, "value u:", u, "norm(u):", (u||"").toLowerCase().replace(/[_\s-]/g,"")); setActiveFilters(f => ({ ...f, underlying: isActive ? f.underlying.filter(v => v !== u) : [...f.underlying, u] })); }}
+                            <span key={u} onClick={() => { setActiveFilters(f => ({ ...f, underlying: isActive ? f.underlying.filter(v => v !== u) : [...f.underlying, u] })); }}
                               style={{ cursor: "pointer", fontSize: 11, padding: "3px 10px", borderRadius: 8, fontWeight: 600, transition: "all 0.15s",
                                 background: isActive ? col : `${col}22`,
                                 color: isActive ? "#fff" : col,

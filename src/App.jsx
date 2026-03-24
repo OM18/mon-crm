@@ -6572,6 +6572,9 @@ const setOps = async (val) => {
     const opFinancingBank = accRecord?.financingBank || "";
     const product = resolveProduct(o.instrument);
     const opUnderlying = resolveUnderlying(product?.underlying || "");
+    if (o.instrument?.toUpperCase().includes("CORN") && activeFilters.underlying.length > 0) {
+      console.warn("CORN:", o.instrument, "-> product:", product?.label, "underlying:", product?.underlying, "-> opUnderlying:", opUnderlying);
+    }
     const tagChecks = [
       !activeFilters.type.length          || activeFilters.type.includes(o.type),
       !activeFilters.opType.length        || activeFilters.opType.includes(o.opType),

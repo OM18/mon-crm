@@ -6814,7 +6814,7 @@ const setOps = async (val) => {
                           const cfg = commodities.find(c => norm(c.value) === norm(u) || norm(c.label) === norm(u));
                           const label = cfg?.label || u.charAt(0).toUpperCase() + u.slice(1);
                           return (
-                            <span key={u} onClick={() => setActiveFilters(f => ({ ...f, underlying: isActive ? f.underlying.filter(v => v !== u) : [...f.underlying, u] }))}
+                            <span key={u} onClick={() => { console.warn("CHIP CLICKED - label:", label, "value u:", u, "norm(u):", (u||"").toLowerCase().replace(/[_\s-]/g,"")); setActiveFilters(f => ({ ...f, underlying: isActive ? f.underlying.filter(v => v !== u) : [...f.underlying, u] })); }}
                               style={{ cursor: "pointer", fontSize: 11, padding: "3px 10px", borderRadius: 8, fontWeight: 600, transition: "all 0.15s",
                                 background: isActive ? col : `${col}22`,
                                 color: isActive ? "#fff" : col,

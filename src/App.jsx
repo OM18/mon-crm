@@ -7921,47 +7921,19 @@ function TradingHoursIndicator() {
 // ─── EXPIRY ROW ───────────────────────────────────────────────
 const EURONEXT_EXCHANGES = ["euronext", "matif"];
 
-function ExpiryRow({ instrument, exchange, index }) {
-  const [fnd, setFnd] = useState("");
-  const [ltd, setLtd] = useState("");
-  const key = `${(exchange || "").toLowerCase()}||${instrument}`;
+function ExpiryRow({ instrument, exchange, index, products }) {
   const isEuronext = EURONEXT_EXCHANGES.includes((exchange || "").toLowerCase());
+  const norm = v => (v || "").toLowerCase().trim();
+  const product = products.find(p => norm(p.label) === norm(instrument));
+  const fnd = product?.firstNoticeDay || "";
+  const ltd = product?.lastTradingDate || "";
 
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from('deriv_expiries')
-        .select('*')
-        .eq('key', key)
-        .maybeSingle();
-      if (data) {
-        setFnd(data.first_notice_day || "");
-        setLtd(data.last_trading_day || "");
-      }
-    }
-    load();
-  }, [key]);
-
-  const save = async (field, value) => {
-    await supabase.from('deriv_expiries').upsert(
-      { key, instrument, exchange: (exchange || "").toLowerCase(), [field]: value || null },
-      { onConflict: 'key' }
-    );
+  const fmtDate = (d) => {
+    if (!d) return "";
+    const date = new Date(d);
+    if (isNaN(date)) return d;
+    return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
   };
-
-  const inputStyle = (hasValue) => ({
-    background: "transparent",
-    border: "none",
-    borderBottom: `1px dashed ${COLORS.border}`,
-    color: hasValue ? COLORS.accent : COLORS.textMuted,
-    fontSize: 13,
-    fontFamily: "'DM Mono', monospace",
-    padding: "2px 4px",
-    width: 140,
-    textAlign: "right",
-    outline: "none",
-    cursor: "text",
-  });
 
   return (
     <div style={{
@@ -7976,29 +7948,11 @@ function ExpiryRow({ instrument, exchange, index }) {
         <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{instrument}</div>
         <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 1 }}>{exchange || "—"}</div>
       </div>
-      <div style={{ textAlign: "right" }}>
-        {isEuronext ? (
-          <span style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>N/A</span>
-        ) : (
-          <input
-            type="text"
-            placeholder="ex: 28 Feb 2025"
-            value={fnd}
-            onChange={e => setFnd(e.target.value)}
-            onBlur={e => save('first_notice_day', e.target.value)}
-            style={inputStyle(!!fnd)}
-          />
-        )}
+      <div style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", textAlign: "right", color: (fnd && !isEuronext) ? COLORS.orange : COLORS.textMuted, fontStyle: (!fnd || isEuronext) ? "italic" : "normal" }}>
+        {isEuronext ? "N/A" : (fnd ? fmtDate(fnd) : "—")}
       </div>
-      <div style={{ textAlign: "right" }}>
-        <input
-          type="text"
-          placeholder="ex: 14 Mar 2025"
-          value={ltd}
-          onChange={e => setLtd(e.target.value)}
-          onBlur={e => save('last_trading_day', e.target.value)}
-          style={{ ...inputStyle(!!ltd), color: ltd ? COLORS.orange : COLORS.textMuted }}
-        />
+      <div style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", textAlign: "right", color: ltd ? COLORS.accent : COLORS.textMuted, fontStyle: !ltd ? "italic" : "normal" }}>
+        {ltd ? fmtDate(ltd) : "—"}
       </div>
     </div>
   );
@@ -8374,7 +8328,7 @@ const DerivativesDashboard = () => {
               ))}
             </div>
             {uniquePositions.map(({ instrument, exchange }, i) => (
-              <ExpiryRow key={`${(exchange||"").toLowerCase()}||${instrument}`} instrument={instrument} exchange={exchange} index={i} />
+              <ExpiryRow key={`${(exchange||"").toLowerCase()}||${instrument}`} instrument={instrument} exchange={exchange} index={i} products={products} />
             ))}
           </div>
         );

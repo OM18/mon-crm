@@ -7778,6 +7778,146 @@ const runFIFO = (bucketOps, lotSize = 1) => {
 };
 
 // ─── DERIVATIVES DASHBOARD ───────────────────────────────────
+// ─── TRADING HOURS INDICATOR ─────────────────────────────────
+const _thPad = n => String(n).padStart(2, '0');
+const _thToM  = (h, m) => h * 60 + m;
+
+function _thLocalDate(tz) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
+}
+function _thLocalMins(tz) {
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(new Date());
+  return parseInt(p.find(x => x.type === 'hour').value) * 60 + parseInt(p.find(x => x.type === 'minute').value);
+}
+function _thLocalDay(tz) {
+  return new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(new Date());
+}
+
+function _thGetStatus(exchange, sessions, holidays) {
+  const exSessions = sessions.filter(s => s.exchange_id === exchange.id).sort((a, b) => a.sort_order - b.sort_order);
+  const today = _thLocalDate(exchange.timezone);
+  const isHoliday = holidays.some(h => h.exchange_id === exchange.id && h.date === today);
+  const nextOpen = (cur) => {
+    let best = Infinity;
+    exSessions.forEach(s => { let d = _thToM(s.open_hour, s.open_minute) - cur; if (d <= 0) d += 1440; if (d < best) best = d; });
+    return best;
+  };
+  if (isHoliday) return { kind: 'holiday', diffMins: nextOpen(_thLocalMins(exchange.timezone)) + 1440 };
+  const day = _thLocalDay(exchange.timezone);
+  if (day === 'Sat' || day === 'Sun') {
+    const cur = _thLocalMins(exchange.timezone);
+    const daysToMon = day === 'Sat' ? 2 : 1;
+    const firstOpen = _thToM(exSessions[0]?.open_hour || 8, exSessions[0]?.open_minute || 0);
+    return { kind: 'weekend', diffMins: daysToMon * 1440 - cur + firstOpen };
+  }
+  const cur = _thLocalMins(exchange.timezone);
+  for (const s of exSessions) {
+    const o = _thToM(s.open_hour, s.open_minute), c = _thToM(s.close_hour, s.close_minute);
+    if (s.overnight) { if (cur >= o || cur < c) return { kind: 'open', session: s.name, diffMins: cur >= o ? 1440 - cur + c : c - cur }; }
+    else { if (cur >= o && cur < c) return { kind: 'open', session: s.name, diffMins: c - cur }; }
+  }
+  return { kind: 'closed', diffMins: nextOpen(cur) };
+}
+
+function _thFmt(m) {
+  const h = Math.floor(m / 60), mn = m % 60;
+  return h === 0 ? `${mn}min` : `${h}h ${_thPad(mn)}min`;
+}
+
+function _thShortLabel(st) {
+  if (st.kind === 'open')    return `Closes in ${_thFmt(st.diffMins)}`;
+  if (st.kind === 'holiday') return `Holiday`;
+  if (st.kind === 'weekend') return `Opens Mon`;
+  return `Opens in ${_thFmt(st.diffMins)}`;
+}
+
+function TradingHoursIndicator() {
+  const [exchanges, setExchanges] = useState([]);
+  const [sessions, setSessions]   = useState([]);
+  const [holidays, setHolidays]   = useState([]);
+  const [tick, setTick]           = useState(0);
+
+  useEffect(() => {
+    async function load() {
+      const [{ data: ex }, { data: se }, { data: ho }] = await Promise.all([
+        supabase.from('exchanges').select('*').eq('active', true).order('id'),
+        supabase.from('exchange_sessions').select('*').order('sort_order'),
+        supabase.from('exchange_holidays').select('*'),
+      ]);
+      if (ex) setExchanges(ex);
+      if (se) setSessions(se);
+      if (ho) setHolidays(ho);
+    }
+    load();
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (!exchanges.length) return null;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+      <style>{`
+        @keyframes th-ripple { 0%{opacity:.8;transform:scale(1);}70%{opacity:0;transform:scale(1.9);}100%{opacity:0;transform:scale(1.9);} }
+        .th-pill:hover .th-tip { display: block !important; }
+        .th-pill:hover { border-color: #444 !important; }
+      `}</style>
+      {exchanges.map(ex => {
+        const st = _thGetStatus(ex, sessions, holidays);
+        const dotColor = st.kind === 'open' ? '#1D9E75' : st.kind === 'holiday' ? '#EF9F27' : '#E24B4A';
+        const txtColor = st.kind === 'open' ? '#5DCAA5' : st.kind === 'holiday' ? '#FAC775' : '#F09595';
+        const badgeBg  = st.kind === 'open' ? '#0F6E5622' : st.kind === 'holiday' ? '#854F0B22' : '#A32D2D22';
+        const badgeBdr = st.kind === 'open' ? '#0F6E5644' : st.kind === 'holiday' ? '#854F0B44' : '#A32D2D44';
+        const badgeTxt = st.kind === 'open' ? '#5DCAA5'   : st.kind === 'holiday' ? '#FAC775'   : '#F09595';
+        const badgeLbl = st.kind === 'open' ? 'Open' : st.kind === 'holiday' ? 'Holiday' : st.kind === 'weekend' ? 'Weekend' : 'Closed';
+        const tipMsg   = st.kind === 'open'    ? `Closes in ${_thFmt(st.diffMins)}`
+                       : st.kind === 'holiday' ? `Holiday · opens in ${_thFmt(st.diffMins)}`
+                       : st.kind === 'weekend' ? `Opens Monday in ${_thFmt(st.diffMins)}`
+                       : `Opens in ${_thFmt(st.diffMins)}`;
+        const exSessions = sessions.filter(s => s.exchange_id === ex.id).sort((a, b) => a.sort_order - b.sort_order);
+        const showTag = st.kind === 'open' && exSessions.length > 1;
+        return (
+          <div key={ex.id} className="th-pill" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, position: 'relative', cursor: 'default' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1e1e1e', border: '0.5px solid #2e2e2e', borderRadius: 20, padding: '4px 10px 4px 7px', transition: 'border-color 0.15s' }}>
+              <span style={{ position: 'relative', display: 'inline-block', width: 9, height: 9, flexShrink: 0 }}>
+                <span style={{ display: 'block', width: 9, height: 9, borderRadius: '50%', background: dotColor }} />
+                <span style={{ position: 'absolute', inset: -3, borderRadius: '50%', border: `1.5px solid ${dotColor}`, animation: 'th-ripple 2s infinite' }} />
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#d0d0d0' }}>{ex.name}</span>
+              {showTag && <span style={{ fontSize: 10, color: '#666', background: '#252525', borderRadius: 4, padding: '1px 5px' }}>{st.session}</span>}
+            </div>
+            <span style={{ fontSize: 10, color: txtColor, whiteSpace: 'nowrap' }}>{_thShortLabel(st)}</span>
+            <div className="th-tip" style={{ display: 'none', position: 'absolute', top: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)', background: '#1a1a1a', border: '0.5px solid #333', borderRadius: 8, padding: '10px 14px', minWidth: 210, zIndex: 100, pointerEvents: 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: '#e0e0e0' }}>{ex.name} · {ex.city}</span>
+                <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, fontWeight: 500, background: badgeBg, color: badgeTxt, border: `0.5px solid ${badgeBdr}` }}>{badgeLbl}</span>
+              </div>
+              <div style={{ fontSize: 11, color: '#777', marginBottom: 8, lineHeight: 1.5 }}>{tipMsg}</div>
+              <div style={{ borderTop: '0.5px solid #2a2a2a', paddingTop: 7 }}>
+                {exSessions.map(s => {
+                  const active = st.kind === 'open' && s.name === st.session;
+                  return (
+                    <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
+                      <span style={{ fontSize: 11, color: '#666', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {active && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }} />}
+                        {s.name}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 500, color: '#aaa' }}>{_thPad(s.open_hour)}:{_thPad(s.open_minute)} – {_thPad(s.close_hour)}:{_thPad(s.close_minute)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── EXPIRY ROW ───────────────────────────────────────────────
 const EURONEXT_EXCHANGES = ["euronext", "matif"];
 
@@ -8070,9 +8210,12 @@ const DerivativesDashboard = () => {
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Derivatives Dashboard</h1>
-          <div style={{ fontSize: 13, color: COLORS.textMuted, marginTop: 4 }}>Realised P&amp;L — FIFO par compte × instrument</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Derivatives Dashboard</h1>
+            <TradingHoursIndicator />
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.textMuted }}>Realised P&amp;L — FIFO par compte × instrument</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <div style={{ background: `${COLORS.green}15`, border: `1px solid ${COLORS.green}30`, borderRadius: 10, padding: "8px 16px", fontSize: 13, color: COLORS.green, fontWeight: 700 }}>▲ {totalBuys} BUY</div>

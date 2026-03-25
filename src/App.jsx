@@ -44,6 +44,34 @@ const saveLargeTable = async (table, items) => {
 };
 
 // ─── COLORS ───────────────────────────────────────────────────
+const saveProducts = async (items, setStateFn, prevItems) => {
+  if (!items) return;
+  if (items.length === 0 && prevItems && prevItems.length > 0) {
+    console.warn('[saveProducts] Blocked empty save', prevItems.length, 'items preserved');
+    return;
+  }
+  try {
+    const { data: existing } = await supabase.from('deriv_products').select('id, data');
+    const supabaseIdByJsonId = {};
+    (existing || []).forEach(row => { if (row.data?.id) supabaseIdByJsonId[String(row.data.id)] = row.id; });
+    const CHUNK = 50;
+    for (let i = 0; i < items.length; i += CHUNK) {
+      const chunk = items.slice(i, i + CHUNK).map(item => {
+        const sid = supabaseIdByJsonId[String(item.id)];
+        return sid ? { id: sid, data: item, updated_at: new Date().toISOString() } : { data: item, updated_at: new Date().toISOString() };
+      });
+      const { error } = await supabase.from('deriv_products').upsert(chunk, { onConflict: 'id' });
+      if (error) console.error('[saveProducts] upsert error:', error);
+    }
+    const currentIds = new Set(items.map(p => String(p.id)));
+    const toDelete = (existing || []).filter(r => r.data?.id && !currentIds.has(String(r.data.id))).map(r => r.id);
+    if (toDelete.length > 0) await supabase.from('deriv_products').delete().in('id', toDelete);
+  } catch (err) {
+    console.error('[saveProducts] Error:', err);
+    if (setStateFn && prevItems) setStateFn(prevItems);
+  }
+};
+
 const COLORS = {
   bg: "#0B0B0B",
   surface: "#141414",
@@ -1609,7 +1637,7 @@ useEffect(() => {
       };
     });
     setProducts(updated);
-    await saveProducts(updated, setProducts, products);
+    saveProducts(updated, setProducts, products);
   }, [quotationUnits, products.length, config.derivDecimals]);
 
   const remove = async (id) => { const u = products.filter(p => p.id !== id); setProducts(u); await saveProducts(u, setProducts, products); };
@@ -7921,54 +7949,24 @@ function TradingHoursIndicator() {
 // ─── EXPIRY ROW ───────────────────────────────────────────────
 const EURONEXT_EXCHANGES = ["euronext", "matif"];
 
-function ExpiryRow({ instrument, exchange, index }) {
-  const [fnd, setFnd] = useState("");
-  const [ltd, setLtd] = useState("");
-  const key = `${(exchange || "").toLowerCase()}||${instrument}`;
+function ExpiryRow({ instrument, exchange, index, products }) {
   const isEuronext = EURONEXT_EXCHANGES.includes((exchange || "").toLowerCase());
+  const norm = v => (v || "").toLowerCase().trim();
+  const product = products.find(p => norm(p.label) === norm(instrument));
+  const fnd = product?.firstNoticeDay || "";
+  const ltd = product?.lastTradingDate || "";
 
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from('deriv_expiries')
-        .select('*')
-        .eq('key', key)
-        .maybeSingle();
-      if (data) {
-        setFnd(data.first_notice_day || "");
-        setLtd(data.last_trading_day || "");
-      }
-    }
-    load();
-  }, [key]);
-
-  const save = async (field, value) => {
-    await supabase.from('deriv_expiries').upsert(
-      { key, instrument, exchange: (exchange || "").toLowerCase(), [field]: value || null },
-      { onConflict: 'key' }
-    );
+  const fmtDate = (d) => {
+    if (!d) return "";
+    const date = new Date(d);
+    if (isNaN(date)) return d;
+    return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
   };
-
-  const inputStyle = (hasValue) => ({
-    background: "transparent",
-    border: "none",
-    borderBottom: `1px dashed ${COLORS.border}`,
-    color: hasValue ? COLORS.accent : COLORS.textMuted,
-    fontSize: 13,
-    fontFamily: "'DM Mono', monospace",
-    padding: "2px 4px",
-    width: 140,
-    textAlign: "right",
-    outline: "none",
-    cursor: "text",
-  });
 
   return (
     <div style={{
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr",
-      padding: "12px 20px",
-      borderBottom: `1px solid ${COLORS.border}`,
+      display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+      padding: "12px 20px", borderBottom: `1px solid ${COLORS.border}`,
       background: index % 2 === 0 ? COLORS.card : `${COLORS.card}BB`,
       alignItems: "center",
     }}>
@@ -7976,29 +7974,11 @@ function ExpiryRow({ instrument, exchange, index }) {
         <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{instrument}</div>
         <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 1 }}>{exchange || "—"}</div>
       </div>
-      <div style={{ textAlign: "right" }}>
-        {isEuronext ? (
-          <span style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>—</span>
-        ) : (
-          <input
-            type="text"
-            placeholder="ex: 28 Feb 2025"
-            value={fnd}
-            onChange={e => setFnd(e.target.value)}
-            onBlur={e => save('first_notice_day', e.target.value)}
-            style={inputStyle(!!fnd)}
-          />
-        )}
+      <div style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", textAlign: "right", color: (fnd && !isEuronext) ? COLORS.orange : COLORS.textMuted, fontStyle: (!fnd || isEuronext) ? "italic" : "normal" }}>
+        {isEuronext ? "—" : (fnd ? fmtDate(fnd) : "—")}
       </div>
-      <div style={{ textAlign: "right" }}>
-        <input
-          type="text"
-          placeholder="ex: 14 Mar 2025"
-          value={ltd}
-          onChange={e => setLtd(e.target.value)}
-          onBlur={e => save('last_trading_day', e.target.value)}
-          style={{ ...inputStyle(!!ltd), color: ltd ? COLORS.orange : COLORS.textMuted }}
-        />
+      <div style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", textAlign: "right", color: ltd ? COLORS.accent : COLORS.textMuted, fontStyle: !ltd ? "italic" : "normal" }}>
+        {ltd ? fmtDate(ltd) : "—"}
       </div>
     </div>
   );
@@ -8374,7 +8354,7 @@ const DerivativesDashboard = () => {
               ))}
             </div>
             {uniquePositions.map(({ instrument, exchange }, i) => (
-              <ExpiryRow key={`${(exchange||"").toLowerCase()}||${instrument}`} instrument={instrument} exchange={exchange} index={i} />
+              <ExpiryRow key={`${(exchange||"").toLowerCase()}||${instrument}`} instrument={instrument} exchange={exchange} index={i} products={products} />
             ))}
           </div>
         );

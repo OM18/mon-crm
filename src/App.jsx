@@ -1583,7 +1583,7 @@ useEffect(() => {
     const enriched = { ...form, quotationUnit: quMatch?.quotationUnit || form.quotationUnit || "" };
     const updated = editId ? products.map(p => p.id === editId ? { ...enriched, id: editId } : p) : [...products, { ...enriched, id: Date.now() }];
     setProducts(updated);
-    await safeSave('deriv_products', updated, setProducts, products);
+    await saveProducts(updated, setProducts, products);
     setForm(EMPTY_PROD); setInstrumentType(""); setEditId(null); setShowForm(false);
   };
 
@@ -1609,10 +1609,10 @@ useEffect(() => {
       };
     });
     setProducts(updated);
-    safeSave('deriv_products', updated, setProducts, products);
+    await saveProducts(updated, setProducts, products);
   }, [quotationUnits, products.length, config.derivDecimals]);
 
-  const remove = async (id) => { const u = products.filter(p => p.id !== id); setProducts(u); await safeSave('deriv_products', u, setProducts, products); };
+  const remove = async (id) => { const u = products.filter(p => p.id !== id); setProducts(u); await saveProducts(u, setProducts, products); };
 
   return (
     <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
@@ -1815,7 +1815,7 @@ useEffect(() => {
           const toggleActive = async (prod) => {
             const updated = products.map(p => p.id === prod.id ? { ...p, active: p.active === false ? true : false } : p);
             setProducts(updated);
-            await safeSave('deriv_products', updated, setProducts, products);
+            await saveProducts(updated, setProducts, products);
           };
 
           const chkExchanges   = new Set((config.derivExchanges || []).map(e => e.value));
@@ -1961,7 +1961,7 @@ useEffect(() => {
           onImport={async (newItems) => {
             const updated = [...products, ...newItems];
             setProducts(updated);
-            await safeSave('deriv_products', updated, setProducts, products);
+            await saveProducts(updated, setProducts, products);
           }}
         />
       )}

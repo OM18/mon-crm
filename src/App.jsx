@@ -1637,7 +1637,8 @@ useEffect(() => {
       };
     });
     setProducts(updated);
-    saveProducts(updated, setProducts, products);
+    // Note: migration only updates local state, not persisted to DB automatically
+    // Products are saved explicitly when user makes a change in the admin panel
   }, [quotationUnits, products.length, config.derivDecimals]);
 
   const remove = async (id) => { const u = products.filter(p => p.id !== id); setProducts(u); await saveProducts(u, setProducts, products); };

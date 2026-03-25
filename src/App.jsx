@@ -7779,16 +7779,20 @@ const runFIFO = (bucketOps, lotSize = 1) => {
 
 // ─── DERIVATIVES DASHBOARD ───────────────────────────────────
 // ─── EXPIRY ROW ───────────────────────────────────────────────
-function ExpiryRow({ instrument, index }) {
+const EURONEXT_EXCHANGES = ["euronext", "matif"];
+
+function ExpiryRow({ instrument, exchange, index }) {
   const [fnd, setFnd] = useState("");
   const [ltd, setLtd] = useState("");
+  const key = `${(exchange || "").toLowerCase()}||${instrument}`;
+  const isEuronext = EURONEXT_EXCHANGES.includes((exchange || "").toLowerCase());
 
   useEffect(() => {
     async function load() {
       const { data } = await supabase
         .from('deriv_expiries')
         .select('*')
-        .eq('instrument', instrument)
+        .eq('key', key)
         .maybeSingle();
       if (data) {
         setFnd(data.first_notice_day || "");
@@ -7796,20 +7800,20 @@ function ExpiryRow({ instrument, index }) {
       }
     }
     load();
-  }, [instrument]);
+  }, [key]);
 
   const save = async (field, value) => {
     await supabase.from('deriv_expiries').upsert(
-      { instrument, [field]: value || null },
-      { onConflict: 'instrument' }
+      { key, instrument, exchange: (exchange || "").toLowerCase(), [field]: value || null },
+      { onConflict: 'key' }
     );
   };
 
-  const inputStyle = {
+  const inputStyle = (hasValue) => ({
     background: "transparent",
     border: "none",
     borderBottom: `1px dashed ${COLORS.border}`,
-    color: COLORS.text,
+    color: hasValue ? COLORS.accent : COLORS.textMuted,
     fontSize: 13,
     fontFamily: "'DM Mono', monospace",
     padding: "2px 4px",
@@ -7817,28 +7821,34 @@ function ExpiryRow({ instrument, index }) {
     textAlign: "right",
     outline: "none",
     cursor: "text",
-  };
+  });
 
   return (
     <div style={{
-      display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr 1fr",
       padding: "12px 20px",
       borderBottom: `1px solid ${COLORS.border}`,
       background: index % 2 === 0 ? COLORS.card : `${COLORS.card}BB`,
       alignItems: "center",
     }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>
-        {instrument}
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{instrument}</div>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 1 }}>{exchange || "—"}</div>
       </div>
       <div style={{ textAlign: "right" }}>
-        <input
-          type="text"
-          placeholder="ex: 28 Feb 2025"
-          value={fnd}
-          onChange={e => setFnd(e.target.value)}
-          onBlur={e => save('first_notice_day', e.target.value)}
-          style={{ ...inputStyle, color: fnd ? COLORS.orange : COLORS.textMuted }}
-        />
+        {isEuronext ? (
+          <span style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>N/A</span>
+        ) : (
+          <input
+            type="text"
+            placeholder="ex: 28 Feb 2025"
+            value={fnd}
+            onChange={e => setFnd(e.target.value)}
+            onBlur={e => save('first_notice_day', e.target.value)}
+            style={inputStyle(!!fnd)}
+          />
+        )}
       </div>
       <div style={{ textAlign: "right" }}>
         <input
@@ -7847,7 +7857,7 @@ function ExpiryRow({ instrument, index }) {
           value={ltd}
           onChange={e => setLtd(e.target.value)}
           onBlur={e => save('last_trading_day', e.target.value)}
-          style={{ ...inputStyle, color: ltd ? COLORS.accent : COLORS.textMuted }}
+          style={{ ...inputStyle(!!ltd), color: ltd ? COLORS.orange : COLORS.textMuted }}
         />
       </div>
     </div>
@@ -8201,7 +8211,9 @@ const DerivativesDashboard = () => {
 
       {/* ── EXPIRIES ── */}
       {openPositions.length > 0 && (() => {
-        const uniqueInstruments = [...new Set(openPositions.map(p => p.instrument).filter(Boolean))].sort();
+        const uniquePositions = [...new Map(
+          openPositions.map(p => [`${(p.exchange||"").toLowerCase()}||${p.instrument}`, { instrument: p.instrument, exchange: p.exchange }])
+        ).values()].sort((a, b) => a.instrument.localeCompare(b.instrument));
         return (
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
             <div style={{ background: COLORS.tableHeader, padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -8210,22 +8222,16 @@ const DerivativesDashboard = () => {
                 <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>First Notice Day &amp; Last Trading Day par instrument ouvert</div>
               </div>
               <div style={{ fontSize: 12, color: COLORS.accent, fontWeight: 700, background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}30`, borderRadius: 8, padding: "4px 12px" }}>
-                {uniqueInstruments.length} instrument{uniqueInstruments.length > 1 ? "s" : ""}
+                {uniquePositions.length} instrument{uniquePositions.length > 1 ? "s" : ""}
               </div>
             </div>
-            {/* Header */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "10px 20px", background: `${COLORS.tableHeader}99`, borderBottom: `1px solid ${COLORS.border}` }}>
               {["INSTRUMENT", "FIRST NOTICE DAY", "LAST TRADING DAY"].map((h, i) => (
                 <div key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.7, textAlign: i === 0 ? "left" : "right" }}>{h}</div>
               ))}
             </div>
-            {/* Rows */}
-            {uniqueInstruments.map((instrument, i) => (
-              <ExpiryRow
-                key={instrument}
-                instrument={instrument}
-                index={i}
-              />
+            {uniquePositions.map(({ instrument, exchange }, i) => (
+              <ExpiryRow key={`${(exchange||"").toLowerCase()}||${instrument}`} instrument={instrument} exchange={exchange} index={i} />
             ))}
           </div>
         );

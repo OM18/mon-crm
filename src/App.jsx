@@ -1595,6 +1595,7 @@ useEffect(() => {
   const [editId, setEditId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [prodSearch, setProdSearch] = useState("");
   const [filterUnderlying, setFilterUnderlying] = useState("");
@@ -3145,7 +3146,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
           <DerivPillsEditor configKey="derivCurrencies" label="Currencies" icon="💱" description="Devises disponibles dans le module Derivatives" config={config} updateField={updateField} />
 
-          <DerivDecimalsEditor config={config} updateField={updateField} />
+          <DerivPillsEditor configKey="derivDecimals" label="Decimals" icon="⅛" description="Formats de cotation : décimal standard ou fractions (1/8, 1/32…)" config={config} updateField={updateField} />
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <DerivBUEditor config={config} updateField={updateField} />
@@ -4026,6 +4027,98 @@ if (aliases.some(a => { console.log("COMPARE:", JSON.stringify(norm), JSON.strin
   }
   
   return null;
+};
+
+// ─── DERIV EXPORT MODAL ──────────────────────────────────────
+const DerivExportModal = ({ ops, filtered, onClose }) => {
+  const [scope, setScope] = useState("filtered"); // "all" | "filtered"
+  const [exporting, setExporting] = useState(false);
+
+  const COLUMNS = [
+    { key: "ref",                   label: "Ref" },
+    { key: "tradeDate",             label: "Trade Date" },
+    { key: "type",                  label: "Type" },
+    { key: "opType",                label: "Op Type" },
+    { key: "side",                  label: "Side" },
+    { key: "instrument",            label: "Instrument" },
+    { key: "exchange",              label: "Exchange" },
+    { key: "underlying",            label: "Underlying" },
+    { key: "quantity",              label: "Quantity" },
+    { key: "price",                 label: "Price" },
+    { key: "strike",                label: "Strike" },
+    { key: "optionType",            label: "Option Type" },
+    { key: "expiryDate",            label: "Expiry Date" },
+    { key: "account",               label: "Account" },
+    { key: "broker",                label: "Broker" },
+    { key: "businessUnit",          label: "Business Unit" },
+    { key: "contract",              label: "Contract" },
+    { key: "trade",                 label: "Trade" },
+    { key: "lotSize",               label: "Lot Size" },
+    { key: "orderTransmissionType", label: "Order Transmission" },
+    { key: "fees",                  label: "Fees" },
+    { key: "status",                label: "Status" },
+    { key: "internalDeal",         label: "Internal Deal" },
+    { key: "notes",                 label: "Notes" },
+  ];
+
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      const XLSX = await import("xlsx");
+      const data = scope === "all" ? ops : filtered;
+      const rows = data.map(op =>
+        Object.fromEntries(COLUMNS.map(c => [c.label, op[c.key] ?? ""]))
+      );
+      const ws = XLSX.utils.json_to_sheet(rows, { header: COLUMNS.map(c => c.label) });
+      // Column widths
+      ws["!cols"] = COLUMNS.map(c => ({ wch: Math.max(c.label.length + 2, 14) }));
+      // Header style
+      COLUMNS.forEach((c, i) => {
+        const cell = ws[XLSX.utils.encode_cell({ r: 0, c: i })];
+        if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: "222222" } } };
+      });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Operations");
+      const date = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `derivatives_export_${date}.xlsx`);
+    } catch (e) {
+      console.error("[export] error:", e);
+    }
+    setExporting(false);
+    onClose();
+  };
+
+  return (
+    <Modal title="Exporter les opérations" onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ fontSize: 13, color: COLORS.textSub }}>Choisissez les opérations à exporter :</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {[
+            { value: "filtered", label: `Opérations filtrées`, sub: `${filtered.length} opération${filtered.length !== 1 ? "s" : ""} visibles à l'écran` },
+            { value: "all",      label: `Toutes les opérations`, sub: `${ops.length} opération${ops.length !== 1 ? "s" : ""} au total` },
+          ].map(opt => (
+            <div key={opt.value} onClick={() => setScope(opt.value)}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 10, border: `1px solid ${scope === opt.value ? COLORS.accent : COLORS.border}`, background: scope === opt.value ? `${COLORS.accent}10` : COLORS.card, cursor: "pointer", transition: "all 0.15s" }}>
+              <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${scope === opt.value ? COLORS.accent : COLORS.border}`, background: scope === opt.value ? COLORS.accent : "transparent", flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{opt.label}</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted }}>{opt.sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.card, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
+          📋 {COLUMNS.length} colonnes exportées : {COLUMNS.map(c => c.label).join(", ")}
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+          <Btn variant="secondary" onClick={onClose}>Annuler</Btn>
+          <Btn onClick={doExport} disabled={exporting}>
+            {exporting ? "Export en cours…" : "⬇ Exporter Excel"}
+          </Btn>
+        </div>
+      </div>
+    </Modal>
+  );
 };
 
 const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivProducts = [], derivCompanies = [] }) => {
@@ -6849,6 +6942,11 @@ const setOps = async (val) => {
                 🗑 Effacer tout ({ops.length})
               </button>
             )}
+            <button onClick={() => setShowExport(true)}
+              title="Exporter en Excel"
+              style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: "pointer", fontSize: 18, padding: "10px 14px", color: COLORS.green, transition: "color 0.2s" }}>
+              ⬇
+            </button>
             <div onClick={() => setShowImport(true)} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent" }}>
               <img src="/logoxl.png" style={{ width: 32, height: 32, objectFit: "contain" }} />
             </div>
@@ -7476,6 +7574,13 @@ const setOps = async (val) => {
             <Btn onClick={save}>Enregistrer</Btn>
           </div>
         </Modal>
+      )}
+      {showExport && (
+        <DerivExportModal
+          ops={ops}
+          filtered={filtered}
+          onClose={() => setShowExport(false)}
+        />
       )}
       {showImport && (
         <ExcelImportModal type="derivatives" derivAccounts={derivAccounts} derivProducts={products} derivCompanies={companies} onClose={() => setShowImport(false)}

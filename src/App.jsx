@@ -2643,6 +2643,7 @@ const FinancingBanksEditor = ({ companies = [], config, updateField }) => {
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState(null); // null | "running" | { fixed, total }
   const [adminTab, setAdminTab] = useState("fields");
   const [employees, setEmployees] = useState([]);
 
@@ -2893,6 +2894,28 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <p style={{ margin: 0, color: COLORS.textSub, fontSize: 14 }}>Gérez les valeurs prédéfinies de vos champs CRM sans toucher au code</p>
         </div>
         <Btn variant="danger" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => setShowResetConfirm(true)}>↺ Réinitialiser les défauts</Btn>
+        <Btn variant="secondary" style={{ padding: "8px 14px", fontSize: 12 }} onClick={async () => {
+          setMigrationStatus("running");
+          try {
+            const { data } = await supabase.from('derivatives').select('id, data');
+            if (!data) { setMigrationStatus({ fixed: 0, total: 0 }); return; }
+            const toFix = data.filter(r => (r.data?.exchange || "").toLowerCase().trim() === "cme");
+            for (const row of toFix) {
+              const updated = { ...row.data, exchange: "cbot" };
+              await supabase.from('derivatives').delete().eq('data->>id', String(row.data.id));
+              await supabase.from('derivatives').insert({ data: updated });
+            }
+            setMigrationStatus({ fixed: toFix.length, total: data.length });
+          } catch(e) {
+            console.error("Migration error:", e);
+            setMigrationStatus({ error: true });
+          }
+        }}>🔧 Migrer CME → CBOT</Btn>
+        {migrationStatus === "running" && <span style={{ fontSize: 12, color: COLORS.textMuted }}>Migration en cours…</span>}
+        {migrationStatus && migrationStatus !== "running" && !migrationStatus.error && (
+          <span style={{ fontSize: 12, color: COLORS.green }}>✓ {migrationStatus.fixed} opération(s) corrigée(s) sur {migrationStatus.total} — supprimez ce bouton une fois la migration terminée</span>
+        )}
+        {migrationStatus?.error && <span style={{ fontSize: 12, color: COLORS.red }}>Erreur lors de la migration</span>}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>

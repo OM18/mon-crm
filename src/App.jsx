@@ -1595,7 +1595,6 @@ useEffect(() => {
   const [editId, setEditId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [showExport, setShowExport] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [prodSearch, setProdSearch] = useState("");
   const [filterUnderlying, setFilterUnderlying] = useState("");
@@ -6696,6 +6695,7 @@ const setOps = async (val) => {
 };
   const [showForm, setShowForm]   = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
   const [editOp, setEditOp]       = useState(null);
   const [form, setForm]         = useState(makeEmpty());

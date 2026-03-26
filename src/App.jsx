@@ -4029,7 +4029,7 @@ if (aliases.some(a => { console.log("COMPARE:", JSON.stringify(norm), JSON.strin
 };
 
 // ─── DERIV EXPORT MODAL ──────────────────────────────────────
-const DerivExportModal = ({ ops, filtered, onClose }) => {
+const DerivExportModal = ({ ops, filtered, onClose, products = [] }) => {
   const [scope, setScope] = useState("filtered"); // "all" | "filtered"
   const [exporting, setExporting] = useState(false);
 
@@ -4065,9 +4065,15 @@ const DerivExportModal = ({ ops, filtered, onClose }) => {
     try {
       const XLSX = await import("xlsx");
       const data = scope === "all" ? ops : filtered;
-      const rows = data.map(op =>
-        Object.fromEntries(COLUMNS.map(c => [c.label, op[c.key] ?? ""]))
-      );
+      const norm = v => (v || "").toLowerCase().trim();
+      const rows = data.map(op => {
+        const product = products.find(p => norm(p.label) === norm(op.instrument));
+        const underlying = product?.underlying || op.underlying || "";
+        return Object.fromEntries(COLUMNS.map(c => {
+          if (c.key === "underlying") return [c.label, underlying];
+          return [c.label, op[c.key] ?? ""];
+        }));
+      });
       const ws = XLSX.utils.json_to_sheet(rows, { header: COLUMNS.map(c => c.label) });
       // Column widths
       ws["!cols"] = COLUMNS.map(c => ({ wch: Math.max(c.label.length + 2, 14) }));
@@ -7579,6 +7585,7 @@ const setOps = async (val) => {
         <DerivExportModal
           ops={ops}
           filtered={filtered}
+          products={products}
           onClose={() => setShowExport(false)}
         />
       )}

@@ -186,6 +186,10 @@ const DEFAULT_CONFIG = {
     { value: "FEED", label: "FEED", color: COLORS.orange },
     { value: "FOOD_FEED", label: "FOOD + FEED", color: COLORS.blue },
   ],
+  derivUnderlyingCategories: [
+    { value: "commodity", label: "COMMODITY" },
+    { value: "fx", label: "FX" },
+  ],
   derivExchanges: [
     { value: "cme", label: "CME Group" },
     { value: "euronext", label: "Euronext" },
@@ -1136,6 +1140,81 @@ const DerivBUEditor = ({ config, updateField }) => {
 };
 
 // ─── UNDERLYING EDITOR ────────────────────────────────────────
+// ─── UNDERLYING CATEGORY EDITOR ─────────────────────────────
+const UnderlyingCategoryEditor = ({ config, updateField }) => {
+  const items = config.derivUnderlyingCategories || [];
+  const [localItems, setLocalItems] = useState(items);
+  const [newLabel, setNewLabel] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => { setLocalItems(items); setDirty(false); }, [config.derivUnderlyingCategories]);
+
+  const markDirty = (updated) => { setLocalItems(updated); setDirty(true); };
+  const addItem = () => {
+    if (!newLabel.trim()) return;
+    const value = newLabel.toLowerCase().trim().replace(/\s+/g, "_");
+    if (localItems.some(i => i.value === value)) return;
+    markDirty([...localItems, { value, label: newLabel.trim().toUpperCase() }]);
+    setNewLabel("");
+  };
+  const removeItem = (idx) => markDirty(localItems.filter((_, i) => i !== idx));
+
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
+      <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
+        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>🏷</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Underlying Categories</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Catégories disponibles pour les sous-jacents (ex: COMMODITY, FX)</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {localItems.map(i => (
+              <span key={i.value} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: COLORS.card, color: COLORS.text, border: `1px solid ${COLORS.border}` }}>{i.label}</span>
+            ))}
+          </div>
+          {dirty && (
+            <div onClick={e => { e.stopPropagation(); updateField("derivUnderlyingCategories", localItems); setDirty(false); }}
+              style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              ✓ Sauvegarder
+            </div>
+          )}
+          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+        </div>
+      </div>
+      {expanded && (
+        <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+            {localItems.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, fontSize: 13, padding: "16px 0" }}>Aucune catégorie — ajoutez-en ci-dessous</div>}
+            {localItems.map((item, idx) => (
+              <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, background: COLORS.card, borderRadius: 10, padding: "8px 12px", border: `1px solid ${COLORS.border}` }}>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{item.label}</span>
+                <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{item.value}</span>
+                <button onClick={() => removeItem(idx)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                  onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                  onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>LABEL *</label>
+              <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="ex: COMMODITY" onKeyDown={e => e.key === "Enter" && addItem()}
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+            </div>
+            <Btn onClick={addItem} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>+ Ajouter</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const UnderlyingEditor = ({ config, updateField }) => {
   const items = config.derivCommodities || [];
   const [newLabel, setNewLabel] = useState("");
@@ -1203,8 +1282,9 @@ const UnderlyingEditor = ({ config, updateField }) => {
               <select value={item.underlyingCategory || ""} onChange={e => updateItem(idx, "underlyingCategory", e.target.value)}
                 style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: item.underlyingCategory ? (CAT_COLORS[item.underlyingCategory] || COLORS.text) : COLORS.textMuted, fontSize: 12, fontWeight: 600, outline: "none", fontFamily: "inherit" }}>
                 <option value="">— Catégorie —</option>
-                <option value="commodity">COMMODITY</option>
-                <option value="fx">FX</option>
+                {(config.derivUnderlyingCategories || [{ value: "commodity", label: "COMMODITY" }, { value: "fx", label: "FX" }]).map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
               </select>
               {item.underlyingCategory && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 5, fontWeight: 700, background: `${CAT_COLORS[item.underlyingCategory]}18`, color: CAT_COLORS[item.underlyingCategory] }}>{CAT_LABELS[item.underlyingCategory]}</span>}
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -3150,6 +3230,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <DerivBUEditor config={config} updateField={updateField} />
           </div>
+
+          <UnderlyingCategoryEditor config={config} updateField={updateField} />
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <UnderlyingEditor config={config} updateField={updateField} />

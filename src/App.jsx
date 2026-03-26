@@ -8215,6 +8215,268 @@ function ExpiryRow({ instrument, exchange, index, products }) {
   );
 }
 
+// ─── DERIV STATISTICS ────────────────────────────────────────
+const DerivStatistics = () => {
+  const { config } = useConfig();
+  const [ops, setOps] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadAll() {
+      setLoading(true);
+      // Load ops
+      const PAGE = 1000;
+      let allOps = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
+        if (error || !data || data.length === 0) break;
+        allOps = [...allOps, ...data.map(r => r.data ?? r)];
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      setOps(allOps);
+      const { data: accData } = await supabase.from('deriv_accounts').select('*');
+      if (accData?.length) setAccounts(accData.map(r => r.data ?? r));
+      const { data: prodData } = await supabase.from('deriv_products').select('data');
+      if (prodData?.length) setProducts(prodData.map(r => r.data ?? r));
+      setLoading(false);
+    }
+    loadAll();
+  }, []);
+
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear - 2, currentYear - 1, currentYear];
+
+  // Filter only speculative accounts
+  const specAccNums = new Set(
+    accounts.filter(a => (a.accountType || "").toLowerCase() === "speculative").map(a => a.accountNumber)
+  );
+
+  // Filter ops for speculative accounts
+  const specOps = ops.filter(o => specAccNums.has(o.account));
+
+  // FIFO per bucket (account × instrument) — returns realizedPnl
+  const runFIFOPnl = (bucketOps, lotSize = 1) => {
+    const parseP = v => { const n = parseFloat(String(v ?? "").replace(/,/g, ".")); return isNaN(n) ? 0 : n; };
+    const sorted = [...bucketOps].sort((a, b) => {
+      const da = a.tradeDate || "9999", db = b.tradeDate || "9999";
+      if (da !== db) return da < db ? -1 : 1;
+      const sa = (a.side || "").toUpperCase() === "BUY" ? 0 : 1;
+      const sb = (b.side || "").toUpperCase() === "BUY" ? 0 : 1;
+      return sa - sb;
+    });
+    const buyQueue = [], sellQueue = [];
+    let realizedPnl = 0;
+    for (const op of sorted) {
+      const side = (op.side || "").toUpperCase();
+      const lots = parseP(op.quantity);
+      const price = parseP(op.price);
+      if (side === "BUY") {
+        let rem = lots;
+        while (rem > 0 && sellQueue.length > 0) {
+          const h = sellQueue[0];
+          const matched = Math.min(rem, h.remaining);
+          realizedPnl += (h.price - price) * matched * lotSize;
+          h.remaining -= matched; rem -= matched;
+          if (h.remaining <= 0) sellQueue.shift();
+        }
+        if (rem > 0) buyQueue.push({ price, remaining: rem });
+      } else if (side === "SELL") {
+        let rem = lots;
+        while (rem > 0 && buyQueue.length > 0) {
+          const h = buyQueue[0];
+          const matched = Math.min(rem, h.remaining);
+          realizedPnl += (price - h.price) * matched * lotSize;
+          h.remaining -= matched; rem -= matched;
+          if (h.remaining <= 0) buyQueue.shift();
+        }
+        if (rem > 0) sellQueue.push({ price, remaining: rem });
+      }
+    }
+    return realizedPnl;
+  };
+
+  // Compute P&L per op filtered by year
+  const getPnlByYear = (opsSubset) => {
+    const norm = v => (v || "").toLowerCase().trim();
+    // Group by account × instrument
+    const buckets = {};
+    for (const op of opsSubset) {
+      const key = `${op.account}||${(op.instrument || "").toLowerCase()}`;
+      if (!buckets[key]) buckets[key] = { account: op.account, instrument: op.instrument, ops: [] };
+      buckets[key].ops.push(op);
+    }
+    const pnlByYear = {};
+    for (const year of years) pnlByYear[year] = 0;
+
+    for (const b of Object.values(buckets)) {
+      const product = products.find(p => norm(p.label) === norm(b.instrument));
+      const lotSize = product ? (parseFloat(product.volumeSizePerLot) || 1) : 1;
+      // Run FIFO per year — only ops up to end of year, incremental
+      for (const year of years) {
+        const opsUpToYear = b.ops.filter(o => o.tradeDate && parseInt(o.tradeDate.slice(0, 4)) <= year);
+        const opsUpToPrevYear = b.ops.filter(o => o.tradeDate && parseInt(o.tradeDate.slice(0, 4)) <= year - 1);
+        const pnlTotal = runFIFOPnl(opsUpToYear, lotSize);
+        const pnlPrev  = runFIFOPnl(opsUpToPrevYear, lotSize);
+        pnlByYear[year] += pnlTotal - pnlPrev;
+      }
+    }
+    return pnlByYear;
+  };
+
+  // ── TABLE 1: by BU × Underlying Category ──
+  const table1 = useMemo(() => {
+    const norm = v => (v || "").toLowerCase().trim();
+    const result = {};
+    for (const op of specOps) {
+      const acc = accounts.find(a => a.accountNumber === op.account);
+      const bu = acc?.businessUnit || op.businessUnit || "—";
+      const product = products.find(p => norm(p.label) === norm(op.instrument));
+      const underlyingCat = product?.underlyingCategory || "—";
+      const key = `${bu}||${underlyingCat}`;
+      if (!result[key]) result[key] = { bu, underlyingCat, ops: [] };
+      result[key].ops.push(op);
+    }
+    return Object.values(result).map(r => ({ ...r, pnlByYear: getPnlByYear(r.ops) }))
+      .sort((a, b) => a.bu.localeCompare(b.bu) || a.underlyingCat.localeCompare(b.underlyingCat));
+  }, [ops, accounts, products]);
+
+  // ── TABLE 2: by BU × Account ──
+  const table2 = useMemo(() => {
+    const result = {};
+    for (const op of specOps) {
+      const acc = accounts.find(a => a.accountNumber === op.account);
+      const bu = acc?.businessUnit || op.businessUnit || "—";
+      const account = op.account || "—";
+      const key = `${bu}||${account}`;
+      if (!result[key]) result[key] = { bu, account, ops: [] };
+      result[key].ops.push(op);
+    }
+    return Object.values(result).map(r => ({ ...r, pnlByYear: getPnlByYear(r.ops) }))
+      .sort((a, b) => a.bu.localeCompare(b.bu) || a.account.localeCompare(b.account));
+  }, [ops, accounts, products]);
+
+  const fmtPnl = (n) => {
+    if (n === 0 || n === undefined) return "—";
+    const abs = Math.abs(Math.round(n)).toLocaleString("en-US");
+    return (n >= 0 ? "+ " : "− ") + abs;
+  };
+  const pnlColor = (n) => !n || n === 0 ? COLORS.textMuted : n > 0 ? COLORS.green : COLORS.red;
+
+  const totalRow1 = years.reduce((acc, y) => ({ ...acc, [y]: table1.reduce((s, r) => s + (r.pnlByYear[y] || 0), 0) }), {});
+  const totalRow2 = years.reduce((acc, y) => ({ ...acc, [y]: table2.reduce((s, r) => s + (r.pnlByYear[y] || 0), 0) }), {});
+
+  const TableHeader = ({ cols }) => (
+    <div style={{ display: "grid", gridTemplateColumns: cols, background: COLORS.tableHeader, padding: "10px 20px", borderRadius: "10px 10px 0 0" }}>
+      {["BU", "Category / Account", ...years.map(String)].map(h => (
+        <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: h === "BU" || h === "Category / Account" ? "left" : "right" }}>{h}</div>
+      ))}
+    </div>
+  );
+
+  const COLS = "80px 1fr repeat(3, 140px)";
+
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, color: COLORS.textMuted, fontSize: 14 }}>
+      Chargement des données…
+    </div>
+  );
+
+  // Group rows by BU for display
+  const renderTable = (rows, labelKey, totalRow) => {
+    const bus = [...new Set(rows.map(r => r.bu))];
+    return (
+      <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <TableHeader cols={COLS} />
+        {bus.map(bu => {
+          const buRows = rows.filter(r => r.bu === bu);
+          const buTotal = years.reduce((acc, y) => ({ ...acc, [y]: buRows.reduce((s, r) => s + (r.pnlByYear[y] || 0), 0) }), {});
+          return (
+            <div key={bu}>
+              {/* BU subtotal row */}
+              <div style={{ display: "grid", gridTemplateColumns: COLS, padding: "9px 20px", background: `${COLORS.accent}10`, borderBottom: `1px solid ${COLORS.border}` }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.accent, fontFamily: "'DM Mono', monospace" }}>{(bu || "—").toUpperCase()}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSub }}>{buRows.length} ligne{buRows.length > 1 ? "s" : ""}</div>
+                {years.map(y => (
+                  <div key={y} style={{ textAlign: "right", fontSize: 13, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: pnlColor(buTotal[y]) }}>{fmtPnl(buTotal[y])}</div>
+                ))}
+              </div>
+              {/* Detail rows */}
+              {buRows.map((row, i) => (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: COLS, padding: "9px 20px", borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 0 ? COLORS.card : `${COLORS.card}BB` }}>
+                  <div />
+                  <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 500 }}>{row[labelKey] || "—"}</div>
+                  {years.map(y => (
+                    <div key={y} style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: pnlColor(row.pnlByYear[y]), fontWeight: 600 }}>{fmtPnl(row.pnlByYear[y])}</div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+        {/* Grand total */}
+        <div style={{ display: "grid", gridTemplateColumns: COLS, padding: "12px 20px", background: COLORS.tableHeader, borderTop: `2px solid ${COLORS.border}` }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.text }}>TOTAL</div>
+          <div />
+          {years.map(y => (
+            <div key={y} style={{ textAlign: "right", fontSize: 14, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: pnlColor(totalRow[y]) }}>{fmtPnl(totalRow[y])}</div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+      {/* Header */}
+      <div>
+        <div style={{ fontSize: 26, fontWeight: 800, color: COLORS.text, fontFamily: "'Playfair Display', serif", letterSpacing: 0.5 }}>Statistics</div>
+        <div style={{ fontSize: 13, color: COLORS.textMuted, marginTop: 4 }}>Analyse P&L des comptes spéculatifs — {years.join(", ")}</div>
+      </div>
+
+      {/* SPEC ACCOUNT block */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 4, height: 28, borderRadius: 2, background: COLORS.accent }} />
+          <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>SPEC ACCOUNT</div>
+          <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "2px 10px" }}>
+            {specAccNums.size} compte{specAccNums.size > 1 ? "s" : ""} spéculatif{specAccNums.size > 1 ? "s" : ""}
+          </span>
+        </div>
+
+        {specAccNums.size === 0 ? (
+          <div style={{ textAlign: "center", color: COLORS.textMuted, fontSize: 14, padding: "40px 0", background: COLORS.card, borderRadius: 12, border: `1px solid ${COLORS.border}` }}>
+            Aucun compte de type "Speculative" trouvé
+          </div>
+        ) : (
+          <>
+            {/* Table 1: BU × Underlying Category */}
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textSub, marginBottom: 12, letterSpacing: 0.5 }}>P&L PAR BU × UNDERLYING CATEGORY</div>
+              {table1.length === 0
+                ? <div style={{ textAlign: "center", color: COLORS.textMuted, fontSize: 13, padding: 24, background: COLORS.card, borderRadius: 12, border: `1px solid ${COLORS.border}` }}>Aucune opération</div>
+                : renderTable(table1, "underlyingCat", totalRow1)
+              }
+            </div>
+
+            {/* Table 2: BU × Account */}
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textSub, marginBottom: 12, letterSpacing: 0.5 }}>P&L PAR BU × ACCOUNT</div>
+              {table2.length === 0
+                ? <div style={{ textAlign: "center", color: COLORS.textMuted, fontSize: 13, padding: 24, background: COLORS.card, borderRadius: 12, border: `1px solid ${COLORS.border}` }}>Aucune opération</div>
+                : renderTable(table2, "account", totalRow2)
+              }
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DerivativesDashboard = () => {
   const { config } = useConfig();
   const [ops, setOps] = useState([]);
@@ -8939,6 +9201,15 @@ export default function CRM() {
               <span style={{ fontSize: 10 }}>◇</span>
               <span style={{ fontSize: 12, fontWeight: page === "derivatives-dashboard" ? 700 : 400 }}>Dashboard</span>
             </div>
+            <div onClick={() => setPage("derivatives-statistics")} style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "7px 24px 7px 46px", cursor: "pointer", transition: "all 0.15s",
+              background: page === "derivatives-statistics" ? `${COLORS.accent}18` : "transparent",
+              borderRight: page === "derivatives-statistics" ? `3px solid ${COLORS.accent}` : "3px solid transparent",
+              color: page === "derivatives-statistics" ? "#FFFFFF" : "#D4AF37",
+            }}>
+              <span style={{ fontSize: 10 }}>◇</span>
+              <span style={{ fontSize: 12, fontWeight: page === "derivatives-statistics" ? 700 : 400 }}>Statistics</span>
+            </div>
             <div style={{ height: 1, background: COLORS.border, margin: "16px 24px" }} />
             <div style={{ padding: "0 24px 10px", fontSize: 14, color: "#D4AF37", fontWeight: 700, letterSpacing: 1 }}>ACTIVITÉ</div>
             {[{ id: "dashboard", label: "Dashboard", icon: "◇" }, { id: "tasks", label: "Tâches", icon: "◎" }, { id: "pipeline", label: "Pipeline", icon: "◈" }].map(n => <NavItem key={n.id} n={n} />)}
@@ -8968,6 +9239,7 @@ export default function CRM() {
           {page === "companies-dashboard" && <CompaniesDashboard companies={companies} setCompanies={setCompanies} />}
           {page === "derivatives" && <Derivatives companies={companies} />}
           {page === "derivatives-dashboard" && <DerivativesDashboard />}
+          {page === "derivatives-statistics" && <DerivStatistics />}
           {page === "admin" && <AdminPanel companies={companies} />}
         </div>
       </div>

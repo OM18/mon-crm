@@ -4029,7 +4029,7 @@ if (aliases.some(a => { console.log("COMPARE:", JSON.stringify(norm), JSON.strin
 };
 
 // ─── DERIV EXPORT MODAL ──────────────────────────────────────
-const DerivExportModal = ({ ops, filtered, onClose, products = [] }) => {
+const DerivExportModal = ({ ops, filtered, onClose, products = [], config = {} }) => {
   const [scope, setScope] = useState("filtered"); // "all" | "filtered"
   const [exporting, setExporting] = useState(false);
 
@@ -4066,11 +4066,14 @@ const DerivExportModal = ({ ops, filtered, onClose, products = [] }) => {
       const XLSX = await import("xlsx");
       const data = scope === "all" ? ops : filtered;
       const norm = v => (v || "").toLowerCase().trim();
+      const commodities = config.derivCommodities || [];
       const rows = data.map(op => {
         const product = products.find(p => norm(p.label) === norm(op.instrument));
-        const underlying = product?.underlying || op.underlying || "";
+        const underlyingValue = product?.underlying || op.underlying || "";
+        // Resolve to human-readable label from config
+        const underlyingLabel = commodities.find(c => norm(c.value) === norm(underlyingValue))?.label || underlyingValue;
         return Object.fromEntries(COLUMNS.map(c => {
-          if (c.key === "underlying") return [c.label, underlying];
+          if (c.key === "underlying") return [c.label, underlyingLabel];
           return [c.label, op[c.key] ?? ""];
         }));
       });
@@ -7586,6 +7589,7 @@ const setOps = async (val) => {
           ops={ops}
           filtered={filtered}
           products={products}
+          config={config}
           onClose={() => setShowExport(false)}
         />
       )}

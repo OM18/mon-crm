@@ -1149,7 +1149,7 @@ const UnderlyingCategoryEditor = ({ config, updateField }) => {
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => { setLocalItems(items); setDirty(false); }, [config.derivUnderlyingCategories]);
+  useEffect(() => { setLocalItems(config.derivUnderlyingCategories || []); setDirty(false); }, [JSON.stringify(config.derivUnderlyingCategories)]);
 
   const markDirty = (updated) => { setLocalItems(updated); setDirty(true); };
   const addItem = () => {

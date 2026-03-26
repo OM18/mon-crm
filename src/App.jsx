@@ -3145,7 +3145,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
           <DerivPillsEditor configKey="derivCurrencies" label="Currencies" icon="💱" description="Devises disponibles dans le module Derivatives" config={config} updateField={updateField} />
 
-          <DerivPillsEditor configKey="derivDecimals" label="Decimals" icon="⅛" description="Formats de cotation : décimal standard ou fractions (1/8, 1/32…)" config={config} updateField={updateField} />
+          <DerivDecimalsEditor config={config} updateField={updateField} />
 
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "20px 24px" }}>
             <DerivBUEditor config={config} updateField={updateField} />
@@ -6472,8 +6472,7 @@ useEffect(() => {
       const norm = v => (v || "").toString().toLowerCase().trim();
       const opBroker = norm(op.broker);
       // Resolve exchange from product if not set on the operation
-      // Product stoxxExchange takes priority — it is always up to date vs stored op.exchange
-      const resolvedExchange = products.find(p => norm(p.label) === norm(op.instrument))?.stoxxExchange || op.exchange || "";
+      const resolvedExchange = op.exchange || products.find(p => norm(p.label) === norm(op.instrument))?.stoxxExchange || "";
       const opExchange = norm(resolvedExchange);
       const opTrans = norm(op.orderTransmissionType);
 
@@ -6697,8 +6696,7 @@ const setOps = async (val) => {
     }
     setFormErrors({});
     const norm = v => (v || "").toString().toLowerCase().trim();
-    // Always resolve exchange from the product — never rely on a stored string that can go stale
-    const resolvedExchange = products.find(p => norm(p.label) === norm(form.instrument))?.stoxxExchange || form.exchange || "";
+    const resolvedExchange = form.exchange || products.find(p => norm(p.label) === norm(form.instrument))?.stoxxExchange || "";
     const data = { ...form, exchange: resolvedExchange, id: editOp ? editOp.id : Date.now() };
     if (editOp) { setOpsRaw(ops.map(o => o.id === editOp.id ? data : o)); await saveOneDerivative(data); }
     else        { setOpsRaw([...ops, data]); await saveOneDerivative(data); }
@@ -7482,31 +7480,14 @@ const setOps = async (val) => {
       {showImport && (
         <ExcelImportModal type="derivatives" derivAccounts={derivAccounts} derivProducts={products} derivCompanies={companies} onClose={() => setShowImport(false)}
           onImport={async (items) => {
-            // Reload from Supabase first to get exact current state — avoids dedup against stale memory
-            const PAGE = 1000;
-            let currentOps = [];
-            let from = 0;
-            while (true) {
-              const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
-              if (error || !data || data.length === 0) break;
-              currentOps = [...currentOps, ...data.map(r => r.data ?? r)];
-              if (data.length < PAGE) break;
-              from += PAGE;
-            }
-            // Strict dedup by ref against what is actually in DB
-            const ex = new Set(currentOps.map(o => o.ref?.toLowerCase()).filter(Boolean));
-            const toAdd = items
-              .map(i => ({ ...makeEmpty(), ...i, id: Date.now() + Math.random(), internalDeal: String(i.internalDeal).toLowerCase() === "true" }))
+            const ex = new Set(ops.map(o => o.ref?.toLowerCase()).filter(Boolean));
+            const toAdd = items.map(i => ({ ...makeEmpty(), ...i, id: Date.now() + Math.random(), internalDeal: String(i.internalDeal).toLowerCase() === "true" }))
               .filter(i => !i.ref || !ex.has(i.ref?.toLowerCase()));
-            if (toAdd.length === 0) { reloadOps(); return; }
-            // Insert only new ops — never wipe existing data
-            const CHUNK = 50;
-            for (let i = 0; i < toAdd.length; i += CHUNK) {
-              const chunk = toAdd.slice(i, i + CHUNK).map(item => ({ data: item }));
-              const { error } = await supabase.from('derivatives').insert(chunk);
-              if (error) console.error('[import] insert error:', error);
-            }
-            reloadOps();
+            const next = [...ops, ...toAdd];
+            setOpsRaw(next);
+            await saveAllDerivatives(next, setOpsRaw, () => {});
+            // Reload after a short delay to get confirmed data from Supabase
+            setTimeout(() => reloadOps(), 2000);
           }} />
       )}
     </div>
@@ -8127,7 +8108,6 @@ const DerivativesDashboard = () => {
     }
 
     const bucketResults = Object.values(buckets).map(b => {
-      // Always prefer product stoxxExchange — ops[0].exchange may be stale from old imports
       const exchange = products.find(p => (p.label || "").toLowerCase().trim() === (b.instrument || "").toLowerCase().trim())?.stoxxExchange || b.ops[0]?.exchange || "";
       const ls = getLotSize(exchange, b.instrument);
       const pu = getPriceUnit(exchange, b.instrument);

@@ -1310,8 +1310,9 @@ const UnderlyingEditor = ({ config, updateField }) => {
             <select value={newCategory} onChange={e => setNewCategory(e.target.value)}
               style={{ background: COLORS.bg, border: `1px solid ${!newCategory && newLabel ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: newCategory ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit" }}>
               <option value="">— Sélectionner —</option>
-              <option value="commodity">COMMODITY</option>
-              <option value="fx">FX</option>
+              {(config.derivUnderlyingCategories || [{ value: "commodity", label: "COMMODITY" }, { value: "fx", label: "FX" }]).map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
             </select>
           </div>
           <Btn onClick={addItem} disabled={!newLabel.trim() || !newCategory} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>+ Ajouter</Btn>
@@ -1757,7 +1758,7 @@ useEffect(() => {
                   {(config.derivInstrumentTypes || []).map(t => <option key={t.label} value={t.label}>{t.label}</option>)}
                 </select>
               </div>
-              <DerivSelectField label="Underlying Category" field="underlyingCategory" options={[{ value: "commodity", label: "Commodity" }, { value: "fx", label: "FX" }]} form={form} setForm={setForm} />
+              <DerivSelectField label="Underlying Category" field="underlyingCategory" options={(config.derivUnderlyingCategories || [{ value: "commodity", label: "COMMODITY" }, { value: "fx", label: "FX" }]).map(c => ({ value: c.value, label: c.label }))} form={form} setForm={setForm} />
               <DerivSelectField label="Underlying" field="underlying" options={(config.derivCommodities || []).map(c => ({ value: c.value, label: c.label }))} form={form} setForm={setForm} />
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>UNDERLYING ORIGIN <span style={{ color: COLORS.red }}>*</span></label>

@@ -4032,7 +4032,6 @@ if (aliases.some(a => { console.log("COMPARE:", JSON.stringify(norm), JSON.strin
 const DerivExportModal = ({ ops, filtered, onClose, products = [], config = {} }) => {
   const [scope, setScope] = useState("filtered");
   const [exporting, setExporting] = useState(false);
-
   const COLUMNS = [
     { key: "ref",                   label: "Ref" },
     { key: "tradeDate",             label: "Trade Date" },
@@ -4059,7 +4058,6 @@ const DerivExportModal = ({ ops, filtered, onClose, products = [], config = {} }
     { key: "internalDeal",          label: "Internal Deal" },
     { key: "notes",                 label: "Notes" },
   ];
-
   const doExport = async () => {
     setExporting(true);
     try {
@@ -4082,13 +4080,10 @@ const DerivExportModal = ({ ops, filtered, onClose, products = [], config = {} }
       XLSX.utils.book_append_sheet(wb, ws, "Operations");
       const date = new Date().toISOString().slice(0, 10);
       XLSX.writeFile(wb, `derivatives_export_${date}.xlsx`);
-    } catch (e) {
-      console.error("[export] error:", e);
-    }
+    } catch (e) { console.error("[export] error:", e); }
     setExporting(false);
     onClose();
   };
-
   return (
     <Modal title="Exporter les opérations" onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -8242,6 +8237,37 @@ const DerivativesDashboard = () => {
     }
   };
 
+  const formatMktPrice = (price, instrument) => {
+    if (price === null || price === undefined || price === "") return "— éditer";
+    const prod = products.find(p => p.label === instrument);
+    const fmt = prod?.decimals || "decimal";
+    if (fmt.includes("/")) {
+      const den = parseInt(fmt.split("/")[1] || "8");
+      const num = parseFloat(price);
+      if (isNaN(num)) return String(price);
+      const intPart = Math.floor(num);
+      const fracNum = Math.round((num - intPart) * den);
+      if (fracNum === 0) return String(intPart);
+      if (fracNum === den) return String(intPart + 1);
+      return `${intPart} ${fracNum}/${den}`;
+    }
+    const dpMatch = fmt.match(/^decimal(\d)$/);
+    if (dpMatch) return parseFloat(price).toFixed(parseInt(dpMatch[1]));
+    return String(price);
+  };
+  const roundToTick = (val, instrument) => {
+    const prod = products.find(p => p.label === instrument);
+    const tick = prod?.tickSize || "";
+    if (!tick) return val;
+    if (tick.includes("/")) {
+      const [num, den] = tick.split("/").map(Number);
+      const tickVal = num / den;
+      return Math.round(val / tickVal) * tickVal;
+    }
+    const tickVal = parseFloat(tick);
+    if (!tickVal || isNaN(tickVal)) return val;
+    return Math.round(val / tickVal) * tickVal;
+  };
   const fmtLots = (n) => Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
   const fmt = (n) => {
     const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -8426,7 +8452,7 @@ const DerivativesDashboard = () => {
               {/* Quantity */}
               <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.orange, fontWeight: 700 }}>{fmtLots(Math.abs(pos.openLots))}</div>
               {/* Avg open price */}
-              <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{pos.avgOpenPrice > 0 ? pos.avgOpenPrice.toFixed(2) : "—"}</div>
+              <div style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{pos.avgOpenPrice > 0 ? formatMktPrice(pos.avgOpenPrice, pos.instrument) : "—"}</div>
               {/* Market price — editable, persisted */}
               <div style={{ textAlign: "right" }}>
                 {isEditing ? (
@@ -8435,9 +8461,15 @@ const DerivativesDashboard = () => {
                     defaultValue={mktRaw ?? ""}
                     onBlur={e => {
                       const v = e.target.value.replace(/[^\d.-]/g, "");
-                      const newVal = v === "" ? undefined : v;
-                      setMarketPrices(p => ({ ...p, [pos.key]: newVal }));
-                      saveMarketPrice(pos.key, newVal);
+                      if (v === "") {
+                        setMarketPrices(p => ({ ...p, [pos.key]: undefined }));
+                        saveMarketPrice(pos.key, undefined);
+                      } else {
+                        const rounded = roundToTick(parseFloat(v), pos.instrument);
+                        const newVal = String(rounded);
+                        setMarketPrices(p => ({ ...p, [pos.key]: newVal }));
+                        saveMarketPrice(pos.key, newVal);
+                      }
                       setEditingMktKey(null);
                     }}
                     onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditingMktKey(null); }}
@@ -8448,7 +8480,7 @@ const DerivativesDashboard = () => {
                     onClick={() => setEditingMktKey(pos.key)}
                     title="Cliquez pour éditer"
                     style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", color: mktPrice !== null ? COLORS.accent : COLORS.textMuted, cursor: "pointer", borderBottom: `1px dashed ${COLORS.textMuted}`, paddingBottom: 1 }}>
-                    {mktPrice !== null ? mktPrice.toFixed(2) : "— éditer"}
+                    {mktPrice !== null ? formatMktPrice(mktPrice, pos.instrument) : "— éditer"}
                   </span>
                 )}
               </div>

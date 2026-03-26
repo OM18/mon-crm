@@ -302,6 +302,7 @@ const ConfigProvider = ({ children }) => {
         // Normalize fields that must be arrays but may have been saved as objects
         if (!Array.isArray(loaded.derivAccountTypes)) loaded.derivAccountTypes = DEFAULT_CONFIG.derivAccountTypes;
         if (!Array.isArray(loaded.derivFinancingBanks)) loaded.derivFinancingBanks = DEFAULT_CONFIG.derivFinancingBanks;
+        if (!Array.isArray(loaded.derivUnderlyingCategories)) loaded.derivUnderlyingCategories = DEFAULT_CONFIG.derivUnderlyingCategories;
         setConfig(loaded);
       }
       setLoaded(true);

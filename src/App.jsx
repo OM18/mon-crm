@@ -4028,107 +4028,6 @@ if (aliases.some(a => { console.log("COMPARE:", JSON.stringify(norm), JSON.strin
   return null;
 };
 
-// ─── DERIV EXPORT MODAL ──────────────────────────────────────
-const DerivExportModal = ({ ops, filtered, onClose, products = [], config = {} }) => {
-  const [scope, setScope] = useState("filtered"); // "all" | "filtered"
-  const [exporting, setExporting] = useState(false);
-
-  const COLUMNS = [
-    { key: "ref",                   label: "Ref" },
-    { key: "tradeDate",             label: "Trade Date" },
-    { key: "type",                  label: "Type" },
-    { key: "opType",                label: "Op Type" },
-    { key: "side",                  label: "Side" },
-    { key: "instrument",            label: "Instrument" },
-    { key: "exchange",              label: "Exchange" },
-    { key: "underlying",            label: "Underlying" },
-    { key: "quantity",              label: "Quantity" },
-    { key: "price",                 label: "Price" },
-    { key: "strike",                label: "Strike" },
-    { key: "optionType",            label: "Option Type" },
-    { key: "expiryDate",            label: "Expiry Date" },
-    { key: "account",               label: "Account" },
-    { key: "broker",                label: "Broker" },
-    { key: "businessUnit",          label: "Business Unit" },
-    { key: "contract",              label: "Contract" },
-    { key: "trade",                 label: "Trade" },
-    { key: "lotSize",               label: "Lot Size" },
-    { key: "orderTransmissionType", label: "Order Transmission" },
-    { key: "fees",                  label: "Fees" },
-    { key: "status",                label: "Status" },
-    { key: "internalDeal",         label: "Internal Deal" },
-    { key: "notes",                 label: "Notes" },
-  ];
-
-  const doExport = async () => {
-    setExporting(true);
-    try {
-      const XLSX = await import("xlsx");
-      const data = scope === "all" ? ops : filtered;
-      const norm = v => (v || "").toLowerCase().trim();
-      const commodities = config.derivCommodities || [];
-      const rows = data.map(op => {
-        const product = products.find(p => norm(p.label) === norm(op.instrument));
-        const underlyingValue = product?.underlying || op.underlying || "";
-        // Resolve to human-readable label from config
-        const underlyingLabel = commodities.find(c => norm(c.value) === norm(underlyingValue))?.label || underlyingValue;
-        return Object.fromEntries(COLUMNS.map(c => {
-          if (c.key === "underlying") return [c.label, underlyingLabel];
-          return [c.label, op[c.key] ?? ""];
-        }));
-      });
-      const ws = XLSX.utils.json_to_sheet(rows, { header: COLUMNS.map(c => c.label) });
-      // Column widths
-      ws["!cols"] = COLUMNS.map(c => ({ wch: Math.max(c.label.length + 2, 14) }));
-      // Header style
-      COLUMNS.forEach((c, i) => {
-        const cell = ws[XLSX.utils.encode_cell({ r: 0, c: i })];
-        if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: "222222" } } };
-      });
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Operations");
-      const date = new Date().toISOString().slice(0, 10);
-      XLSX.writeFile(wb, `derivatives_export_${date}.xlsx`);
-    } catch (e) {
-      console.error("[export] error:", e);
-    }
-    setExporting(false);
-    onClose();
-  };
-
-  return (
-    <Modal title="Exporter les opérations" onClose={onClose}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontSize: 13, color: COLORS.textSub }}>Choisissez les opérations à exporter :</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {[
-            { value: "filtered", label: `Opérations filtrées`, sub: `${filtered.length} opération${filtered.length !== 1 ? "s" : ""} visibles à l'écran` },
-            { value: "all",      label: `Toutes les opérations`, sub: `${ops.length} opération${ops.length !== 1 ? "s" : ""} au total` },
-          ].map(opt => (
-            <div key={opt.value} onClick={() => setScope(opt.value)}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 10, border: `1px solid ${scope === opt.value ? COLORS.accent : COLORS.border}`, background: scope === opt.value ? `${COLORS.accent}10` : COLORS.card, cursor: "pointer", transition: "all 0.15s" }}>
-              <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${scope === opt.value ? COLORS.accent : COLORS.border}`, background: scope === opt.value ? COLORS.accent : "transparent", flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{opt.label}</div>
-                <div style={{ fontSize: 11, color: COLORS.textMuted }}>{opt.sub}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.card, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
-          📋 {COLUMNS.length} colonnes exportées : {COLUMNS.map(c => c.label).join(", ")}
-        </div>
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
-          <Btn variant="secondary" onClick={onClose}>Annuler</Btn>
-          <Btn onClick={doExport} disabled={exporting}>
-            {exporting ? "Export en cours…" : "⬇ Exporter Excel"}
-          </Btn>
-        </div>
-      </div>
-    </Modal>
-  );
-};
-
 const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivProducts = [], derivCompanies = [] }) => {
   const { config, updateField } = useConfig();
   const [step, setStep] = useState("guide");
@@ -6704,7 +6603,6 @@ const setOps = async (val) => {
 };
   const [showForm, setShowForm]   = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [showExport, setShowExport] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
   const [editOp, setEditOp]       = useState(null);
   const [form, setForm]         = useState(makeEmpty());
@@ -6857,8 +6755,14 @@ const setOps = async (val) => {
       if (cf.op === "contains") return String(val || "").toLowerCase().includes(String(cf.value).toLowerCase());
       return true;
     });
-    const allChecks = [...tagChecks, ...customChecks];
-    return filterMode === "OR" ? (allChecks.length === 0 || allChecks.some(Boolean)) : allChecks.every(Boolean);
+    // tagChecks and customChecks are evaluated independently:
+    // customChecks always use AND (a ref filter must always match exactly)
+    // tagChecks use the selected filterMode (AND/OR)
+    const tagPass = filterMode === "OR"
+      ? (tagChecks.length === 0 || tagChecks.some(Boolean))
+      : tagChecks.every(Boolean);
+    const customPass = customChecks.every(Boolean);
+    return tagPass && customPass;
   }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   }, [ops, search, accountSearch, dateFrom, dateTo, JSON.stringify(activeFilters), JSON.stringify(customFilters), filterMode, derivAccounts, products, config]);
 
@@ -6951,42 +6855,9 @@ const setOps = async (val) => {
                 🗑 Effacer tout ({ops.length})
               </button>
             )}
-            {/* Excel import/export button */}
-            {(() => {
-              const [xlOpen, setXlOpen] = useState(false);
-              const ref = useRef(null);
-              useEffect(() => {
-                if (!xlOpen) return;
-                const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setXlOpen(false); };
-                document.addEventListener("mousedown", handler);
-                return () => document.removeEventListener("mousedown", handler);
-              }, [xlOpen]);
-              return (
-                <div ref={ref} style={{ position: "relative" }}>
-                  <div onClick={() => setXlOpen(o => !o)}
-                    style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${xlOpen ? COLORS.accent + "80" : COLORS.border}`, background: xlOpen ? `${COLORS.accent}10` : "transparent", transition: "all 0.15s" }}>
-                    <img src="/logoxl.png" style={{ width: 28, height: 28, objectFit: "contain" }} />
-                  </div>
-                  {xlOpen && (
-                    <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", minWidth: 150 }}>
-                      <div onClick={() => { setXlOpen(false); setShowImport(true); }}
-                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", cursor: "pointer", color: COLORS.text, fontSize: 13, fontWeight: 600 }}
-                        onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
-                        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-                        <span style={{ fontSize: 16 }}>⬆</span> IMPORT
-                      </div>
-                      <div style={{ height: 1, background: COLORS.border }} />
-                      <div onClick={() => { setXlOpen(false); setShowExport(true); }}
-                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", cursor: "pointer", color: COLORS.text, fontSize: 13, fontWeight: 600 }}
-                        onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
-                        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-                        <span style={{ fontSize: 16 }}>⬇</span> EXPORT
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            <div onClick={() => setShowImport(true)} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent" }}>
+              <img src="/logoxl.png" style={{ width: 32, height: 32, objectFit: "contain" }} />
+            </div>
             <button onClick={reloadOps} disabled={isReloading} title="Recharger depuis Supabase"
               style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: isReloading ? "wait" : "pointer", fontSize: 18, padding: "10px 14px", color: isReloading ? COLORS.textMuted : COLORS.textSub, transition: "color 0.2s" }}>
               {isReloading ? "⟳" : "↺"}
@@ -7611,15 +7482,6 @@ const setOps = async (val) => {
             <Btn onClick={save}>Enregistrer</Btn>
           </div>
         </Modal>
-      )}
-      {showExport && (
-        <DerivExportModal
-          ops={ops}
-          filtered={filtered}
-          products={products}
-          config={config}
-          onClose={() => setShowExport(false)}
-        />
       )}
       {showImport && (
         <ExcelImportModal type="derivatives" derivAccounts={derivAccounts} derivProducts={products} derivCompanies={companies} onClose={() => setShowImport(false)}

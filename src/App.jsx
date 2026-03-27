@@ -1726,7 +1726,7 @@ useEffect(() => {
   const remove = async (id) => { const u = products.filter(p => p.id !== id); setProducts(u); await saveProducts(u, setProducts, products); };
 
   return (
-    <div className="glow-card" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
       <div onClick={() => setExpanded(!expanded)} style={{ padding: "18px 24px", borderBottom: expanded ? `1px solid ${COLORS.border}` : "none", display: "flex", alignItems: "center", gap: 14, background: `${COLORS.blue}08`, cursor: "pointer", userSelect: "none" }}
         onMouseOver={e => e.currentTarget.style.background = `${COLORS.blue}14`}
         onMouseOut={e => e.currentTarget.style.background = `${COLORS.blue}08`}>
@@ -2987,7 +2987,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
           {/* Accounts CRUD */}
-          <div className="glow-card" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
             <div onClick={() => setExpandedAccounts(!expandedAccounts)} style={{ padding: "18px 24px", borderBottom: expandedAccounts ? `1px solid ${COLORS.border}` : "none", display: "flex", alignItems: "center", gap: 14, background: `${COLORS.blue}08`, cursor: "pointer", userSelect: "none" }}
               onMouseOver={e => e.currentTarget.style.background = `${COLORS.blue}14`}
               onMouseOut={e => e.currentTarget.style.background = `${COLORS.blue}08`}>
@@ -3244,7 +3244,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <DerivPillsEditor configKey="derivTarifTypes" label="Tarif Types" icon="🏷" description="Types de tarifs de référence pour les opérations sur dérivés" config={config} updateField={updateField} />
 
           {/* Lot Sizes */}
-          <div className="glow-card" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
             <div onClick={() => setExpandedLotSizes(v => !v)}
               style={{ padding: "18px 24px", borderBottom: expandedLotSizes ? `1px solid ${COLORS.border}` : "none", background: `${COLORS.green}08`, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", userSelect: "none" }}
               onMouseOver={e => e.currentTarget.style.background = `${COLORS.green}14`}
@@ -3341,7 +3341,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           </div>
 
           {/* Exchange Tarifs */}
-          <div className="glow-card" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
             <div onClick={() => setExpandedExchangeTarifs(v => !v)}
               style={{ padding: "18px 24px", borderBottom: expandedExchangeTarifs ? `1px solid ${COLORS.border}` : "none", background: `${COLORS.purple}08`, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", userSelect: "none" }}
               onMouseOver={e => e.currentTarget.style.background = `${COLORS.purple}14`}
@@ -3620,7 +3620,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <DerivPillsEditor configKey="derivOrderTransmissionTypes" label="Order Transmission Types" icon="📡" description="Modes de transmission des ordres (Electronic, Manual…)" config={config} updateField={updateField} defaultKey="derivOrderTransmissionDefault" onSetDefault={v => updateField("derivOrderTransmissionDefault", v)} />
 
           {/* Price Units */}
-          <div className="glow-card" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
             <div onClick={() => setExpandedPriceUnits(v => !v)}
               style={{ padding: "18px 24px", borderBottom: expandedPriceUnits ? `1px solid ${COLORS.border}` : "none", background: `${COLORS.blue}08`, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", userSelect: "none" }}
               onMouseOver={e => e.currentTarget.style.background = `${COLORS.blue}14`}
@@ -3705,7 +3705,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           </div>
 
           {/* Quotation Units */}
-          <div className="glow-card" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
             <div onClick={() => setExpandedQuotationUnits(v => !v)}
               style={{ padding: "18px 24px", borderBottom: expandedQuotationUnits ? `1px solid ${COLORS.border}` : "none", background: `${COLORS.blue}08`, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", userSelect: "none" }}
               onMouseOver={e => e.currentTarget.style.background = `${COLORS.blue}14`}
@@ -3793,7 +3793,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             const currentDefault = config.derivDefaultBroker || "";
             const defaultStillValid = financialBrokers.some(c => c.name === currentDefault);
             return (
-              <div className="glow-card" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
                 <div onClick={() => setExpandedFinancialBrokers(v => !v)}
                   style={{ padding: "18px 24px", borderBottom: expandedFinancialBrokers ? `1px solid ${COLORS.border}` : "none", background: `${COLORS.orange}08`, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", userSelect: "none" }}
                   onMouseOver={e => e.currentTarget.style.background = `${COLORS.orange}14`}
@@ -3861,7 +3861,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
       )}
 
       {adminTab === "company" && (
-        <div className="glow-card" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
           <div style={{ padding: "18px 24px", borderBottom: `1px solid ${COLORS.border}`, background: `${COLORS.accent}06` }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>🏢 Company</div>
             <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>Paramètres spécifiques aux sociétés</div>
@@ -3918,7 +3918,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
         {/* Bloc CRM */}
-        <div className="glow-card" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
           <div style={{ padding: "18px 24px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 14, background: `${COLORS.accent}06` }}>
             <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📋</div>
             <div style={{ flex: 1 }}>
@@ -8734,7 +8734,7 @@ const DerivativesDashboard = () => {
         <KpiCard label="MATCHES FIFO" value={totalMatches} sub={`sur ${bucketsCount} bucket${bucketsCount > 1 ? "s" : ""}`} />
       </div>
 
-      <div className="glow-card" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
         <div style={{ background: COLORS.tableHeader, padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>POSITIONS OUVERTES</div>
@@ -8868,7 +8868,7 @@ const DerivativesDashboard = () => {
           openPositions.map(p => [`${(p.exchange||"").toLowerCase()}||${p.instrument}`, { instrument: p.instrument, exchange: p.exchange }])
         ).values()].sort((a, b) => a.instrument.localeCompare(b.instrument));
         return (
-          <div className="glow-card" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
             <div style={{ background: COLORS.tableHeader, padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>EXPIRIES</div>
@@ -8890,7 +8890,7 @@ const DerivativesDashboard = () => {
         );
       })()}
 
-      <div className="glow-card" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
         <div style={{ background: COLORS.tableHeader, padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}` }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>P&amp;L PAR COMPTE</div>
           <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>Cliquez sur un compte pour voir le détail par instrument</div>
@@ -9164,21 +9164,6 @@ export default function CRM() {
           ::-webkit-scrollbar-track { background: transparent; }
           ::-webkit-scrollbar-thumb { background: ${COLORS.border}; border-radius: 3px; }
           option { background: ${COLORS.card}; }
-          .glow-card {
-            position: relative;
-            background: radial-gradient(ellipse at 50% 35%, #2A2A2A 0%, #181818 40%, #0D0D0D 100%) !important;
-          }
-          .glow-card::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: inherit;
-            pointer-events: none;
-            opacity: 0.12;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-            background-repeat: repeat;
-            background-size: 180px 180px;
-          }
         `}</style>
 
         {/* Sidebar */}

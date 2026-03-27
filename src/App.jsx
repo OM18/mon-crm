@@ -9156,7 +9156,7 @@ export default function CRM() {
 
   return (
     <ConfigProvider>
-      <div style={{ display: "flex", minHeight: "100vh", width: "100vw", overflow: "hidden", background: COLORS.bg, fontFamily: "'Inter', 'Segoe UI', sans-serif", color: COLORS.text }}>
+      <div style={{ position: "relative", display: "flex", minHeight: "100vh", width: "100vw", overflow: "hidden", background: COLORS.bg, fontFamily: "'Inter', 'Segoe UI', sans-serif", color: COLORS.text }}>
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&family=DM+Mono:wght@400;600&display=swap');
           * { box-sizing: border-box; }
@@ -9164,7 +9164,16 @@ export default function CRM() {
           ::-webkit-scrollbar-track { background: transparent; }
           ::-webkit-scrollbar-thumb { background: ${COLORS.border}; border-radius: 3px; }
           option { background: ${COLORS.card}; }
+          .grain-overlay {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            opacity: 0.08;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-repeat: repeat;
+            background-size: 200px 200px;
+          }
+          .grain-overlay ~ * { position: relative; z-index: 1; }
         `}</style>
+        <div className="grain-overlay" />
 
         {/* Sidebar */}
         <div style={{ width: 220, background: COLORS.surface, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", padding: "28px 0", flexShrink: 0 }}>

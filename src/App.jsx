@@ -9165,7 +9165,19 @@ export default function CRM() {
           ::-webkit-scrollbar-thumb { background: ${COLORS.border}; border-radius: 3px; }
           option { background: ${COLORS.card}; }
           .glow-card {
-            background: radial-gradient(ellipse at 50% 30%, #2E2A1E 0%, #1C1C1C 45%, #111111 100%) !important;
+            position: relative;
+            background: radial-gradient(ellipse at 50% 35%, #2A2A2A 0%, #181818 40%, #0D0D0D 100%) !important;
+          }
+          .glow-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            opacity: 0.12;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-repeat: repeat;
+            background-size: 180px 180px;
           }
         `}</style>
 

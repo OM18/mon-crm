@@ -969,7 +969,8 @@ const DerivAutocomplete = ({ form, setForm, requiredError, products = [] }) => {
   const suggestions = query.length > 0
     ? derivProds.filter(p => p.label.toUpperCase().includes(query.toUpperCase()))
     : derivProds;
-  const isValid = derivProds.some(p => p.label.toUpperCase() === query.toUpperCase());
+  // Valid if found in active products OR if it's an existing value (legacy instrument no longer in list)
+  const isValid = derivProds.some(p => p.label.toUpperCase() === query.toUpperCase()) || (query.length > 0 && !!form._isEdit);
 
   const pick = (p) => {
     setForm(f => ({ ...f, instrument: p.label, exchange: p.stoxxExchange || f.exchange, expiryDate: p.expiryDate || "" }));
@@ -6810,7 +6811,7 @@ const setOps = async (val) => {
   const [formErrors, setFormErrors] = useState({});
 
   const openNew  = () => { setForm({ ...makeEmpty(), ref: genRef() }); setEditOp(null); setFormErrors({}); setShowForm(true); };
-  const openEdit = (op) => { setForm({ ...op }); setEditOp(op); setFormErrors({}); setShowForm(true); };
+  const openEdit = (op) => { setForm({ ...op, _isEdit: true }); setEditOp(op); setFormErrors({}); setShowForm(true); };
   const del      = (id) => { setOpsRaw(ops.filter(o => o.id !== id)); deleteOneDerivative(id); setSelected(null); };
 
   const REQUIRED_FIELDS = [
@@ -8221,13 +8222,12 @@ const DerivStatistics = () => {
   const [ops, setOps] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [products, setProducts] = useState([]);
-  const [lotSizes, setLotSizes] = useState([]);
-  const [priceUnits, setPriceUnits] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadAll() {
       setLoading(true);
+      // Load ops
       const PAGE = 1000;
       let allOps = [];
       let from = 0;
@@ -8243,10 +8243,6 @@ const DerivStatistics = () => {
       if (accData?.length) setAccounts(accData.map(r => r.data ?? r));
       const { data: prodData } = await supabase.from('deriv_products').select('data');
       if (prodData?.length) setProducts(prodData.map(r => r.data ?? r));
-      const { data: lsData } = await supabase.from('deriv_lot_sizes').select('data');
-      if (lsData?.length) setLotSizes(lsData.map(r => r.data ?? r));
-      const { data: puData } = await supabase.from('deriv_price_units').select('data');
-      if (puData?.length) setPriceUnits(puData.map(r => r.data ?? r));
       setLoading(false);
     }
     loadAll();
@@ -8263,48 +8259,15 @@ const DerivStatistics = () => {
   // Filter ops for speculative accounts
   const specOps = ops.filter(o => specAccNums.has(o.account));
 
-  // Helpers to get lotSize and priceUnit — same as Dashboard
-  const norm = v => (v || "").toLowerCase().trim();
-  const getLotSizeStat = (exchange, instrument) => {
-    const product = products.find(p => norm(p.label) === norm(instrument));
-    const underlying = product?.underlying || instrument;
-    const resolvedExchange = product?.stoxxExchange || exchange;
-    let match = lotSizes.find(l => norm(l.exchange) === norm(resolvedExchange) && norm(l.instrument) === norm(underlying));
-    if (!match) match = lotSizes.find(l => norm(l.instrument) === norm(underlying));
-    if (!match && resolvedExchange) match = lotSizes.find(l => norm(l.exchange) === norm(resolvedExchange));
-    return match ? (parseFloat(match.quantity) || 1) : 1;
-  };
-  const getPriceUnitStat = (exchange, instrument) => {
-    const product = products.find(p => norm(p.label) === norm(instrument));
-    const resolvedExchange = product?.stoxxExchange || exchange;
-    const resolvedUnderlying = product?.underlying || "";
-    let match = resolvedUnderlying
-      ? priceUnits.find(p => norm(p.exchange) === norm(resolvedExchange) && norm(p.underlying || "") === norm(resolvedUnderlying))
-      : null;
-    if (!match) match = priceUnits.find(p => norm(p.exchange) === norm(resolvedExchange) && !p.underlying);
-    if (!match) match = priceUnits.find(p => norm(p.exchange) === norm(resolvedExchange));
-    return match ? (parseFloat(match.unit) || 1) : 1;
-  };
-
-  // FIFO — same logic as Dashboard (sort by date, BUY before SELL, then id)
+  // FIFO per bucket (account × instrument) — returns realizedPnl
   const runFIFOPnl = (bucketOps, lotSize = 1) => {
-    const parseP = v => {
-      const s = String(v ?? "").trim();
-      if (/^\d+\s+\d+\/\d+$/.test(s)) {
-        const [intPart, frac] = s.split(" ");
-        const [num, den] = frac.split("/").map(Number);
-        return parseInt(intPart) + num / den;
-      }
-      const n = parseFloat(s.replace(/,/g, "."));
-      return isNaN(n) ? 0 : n;
-    };
+    const parseP = v => { const n = parseFloat(String(v ?? "").replace(/,/g, ".")); return isNaN(n) ? 0 : n; };
     const sorted = [...bucketOps].sort((a, b) => {
       const da = a.tradeDate || "9999", db = b.tradeDate || "9999";
       if (da !== db) return da < db ? -1 : 1;
-      const sideA = (a.side || "").toUpperCase() === "BUY" ? 0 : 1;
-      const sideB = (b.side || "").toUpperCase() === "BUY" ? 0 : 1;
-      if (sideA !== sideB) return sideA - sideB;
-      return (a.id || 0) < (b.id || 0) ? -1 : 1;
+      const sa = (a.side || "").toUpperCase() === "BUY" ? 0 : 1;
+      const sb = (b.side || "").toUpperCase() === "BUY" ? 0 : 1;
+      return sa - sb;
     });
     const buyQueue = [], sellQueue = [];
     let realizedPnl = 0;
@@ -8339,6 +8302,7 @@ const DerivStatistics = () => {
 
   // Compute P&L per op filtered by year
   const getPnlByYear = (opsSubset) => {
+    const norm = v => (v || "").toLowerCase().trim();
     // Group by account × instrument
     const buckets = {};
     for (const op of opsSubset) {
@@ -8350,10 +8314,8 @@ const DerivStatistics = () => {
     for (const year of years) pnlByYear[year] = 0;
 
     for (const b of Object.values(buckets)) {
-      const exchange = products.find(p => norm(p.label) === norm(b.instrument))?.stoxxExchange || b.ops[0]?.exchange || "";
-      const ls = getLotSizeStat(exchange, b.instrument);
-      const pu = getPriceUnitStat(exchange, b.instrument);
-      const lotSize = ls * pu;
+      const product = products.find(p => norm(p.label) === norm(b.instrument));
+      const lotSize = product ? (parseFloat(product.volumeSizePerLot) || 1) : 1;
       // Run FIFO per year — only ops up to end of year, incremental
       for (const year of years) {
         const opsUpToYear = b.ops.filter(o => o.tradeDate && parseInt(o.tradeDate.slice(0, 4)) <= year);

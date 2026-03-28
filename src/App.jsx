@@ -3035,14 +3035,12 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ACCOUNT CURRENCY <span style={{ color: COLORS.red }}>*</span></label>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         {(config.contractsCurrency || []).map(c => {
-                          const selected = Array.isArray(accForm.currency) && accForm.currency.some(v => v.toUpperCase() === c.value.toUpperCase());
+                          const selected = Array.isArray(accForm.currency) && accForm.currency.includes(c.value);
                           const col = c.color || COLORS.accent;
                           return (
                             <div key={c.value} onClick={() => {
                               const cur = Array.isArray(accForm.currency) ? accForm.currency : [];
-                              const next = selected
-                                ? cur.filter(v => v.toUpperCase() !== c.value.toUpperCase())
-                                : [...cur.filter(v => v.toUpperCase() !== c.value.toUpperCase()), c.value.toUpperCase()];
+                              const next = selected ? cur.filter(v => v !== c.value) : [...cur, c.value];
                               setAccForm(f => ({ ...f, currency: next }));
                             }}
                               style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontWeight: selected ? 700 : 500, fontSize: 12, transition: "all 0.15s", border: `1.5px solid ${selected ? col : COLORS.border}`, background: selected ? `${col}18` : COLORS.bg, color: selected ? col : COLORS.textSub, userSelect: "none" }}>
@@ -8223,12 +8221,13 @@ const DerivStatistics = () => {
   const [ops, setOps] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [products, setProducts] = useState([]);
+  const [lotSizes, setLotSizes] = useState([]);
+  const [priceUnits, setPriceUnits] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadAll() {
       setLoading(true);
-      // Load ops
       const PAGE = 1000;
       let allOps = [];
       let from = 0;
@@ -8244,6 +8243,10 @@ const DerivStatistics = () => {
       if (accData?.length) setAccounts(accData.map(r => r.data ?? r));
       const { data: prodData } = await supabase.from('deriv_products').select('data');
       if (prodData?.length) setProducts(prodData.map(r => r.data ?? r));
+      const { data: lsData } = await supabase.from('deriv_lot_sizes').select('data');
+      if (lsData?.length) setLotSizes(lsData.map(r => r.data ?? r));
+      const { data: puData } = await supabase.from('deriv_price_units').select('data');
+      if (puData?.length) setPriceUnits(puData.map(r => r.data ?? r));
       setLoading(false);
     }
     loadAll();
@@ -8260,15 +8263,48 @@ const DerivStatistics = () => {
   // Filter ops for speculative accounts
   const specOps = ops.filter(o => specAccNums.has(o.account));
 
-  // FIFO per bucket (account × instrument) — returns realizedPnl
+  // Helpers to get lotSize and priceUnit — same as Dashboard
+  const norm = v => (v || "").toLowerCase().trim();
+  const getLotSizeStat = (exchange, instrument) => {
+    const product = products.find(p => norm(p.label) === norm(instrument));
+    const underlying = product?.underlying || instrument;
+    const resolvedExchange = product?.stoxxExchange || exchange;
+    let match = lotSizes.find(l => norm(l.exchange) === norm(resolvedExchange) && norm(l.instrument) === norm(underlying));
+    if (!match) match = lotSizes.find(l => norm(l.instrument) === norm(underlying));
+    if (!match && resolvedExchange) match = lotSizes.find(l => norm(l.exchange) === norm(resolvedExchange));
+    return match ? (parseFloat(match.quantity) || 1) : 1;
+  };
+  const getPriceUnitStat = (exchange, instrument) => {
+    const product = products.find(p => norm(p.label) === norm(instrument));
+    const resolvedExchange = product?.stoxxExchange || exchange;
+    const resolvedUnderlying = product?.underlying || "";
+    let match = resolvedUnderlying
+      ? priceUnits.find(p => norm(p.exchange) === norm(resolvedExchange) && norm(p.underlying || "") === norm(resolvedUnderlying))
+      : null;
+    if (!match) match = priceUnits.find(p => norm(p.exchange) === norm(resolvedExchange) && !p.underlying);
+    if (!match) match = priceUnits.find(p => norm(p.exchange) === norm(resolvedExchange));
+    return match ? (parseFloat(match.unit) || 1) : 1;
+  };
+
+  // FIFO — same logic as Dashboard (sort by date, BUY before SELL, then id)
   const runFIFOPnl = (bucketOps, lotSize = 1) => {
-    const parseP = v => { const n = parseFloat(String(v ?? "").replace(/,/g, ".")); return isNaN(n) ? 0 : n; };
+    const parseP = v => {
+      const s = String(v ?? "").trim();
+      if (/^\d+\s+\d+\/\d+$/.test(s)) {
+        const [intPart, frac] = s.split(" ");
+        const [num, den] = frac.split("/").map(Number);
+        return parseInt(intPart) + num / den;
+      }
+      const n = parseFloat(s.replace(/,/g, "."));
+      return isNaN(n) ? 0 : n;
+    };
     const sorted = [...bucketOps].sort((a, b) => {
       const da = a.tradeDate || "9999", db = b.tradeDate || "9999";
       if (da !== db) return da < db ? -1 : 1;
-      const sa = (a.side || "").toUpperCase() === "BUY" ? 0 : 1;
-      const sb = (b.side || "").toUpperCase() === "BUY" ? 0 : 1;
-      return sa - sb;
+      const sideA = (a.side || "").toUpperCase() === "BUY" ? 0 : 1;
+      const sideB = (b.side || "").toUpperCase() === "BUY" ? 0 : 1;
+      if (sideA !== sideB) return sideA - sideB;
+      return (a.id || 0) < (b.id || 0) ? -1 : 1;
     });
     const buyQueue = [], sellQueue = [];
     let realizedPnl = 0;
@@ -8303,7 +8339,6 @@ const DerivStatistics = () => {
 
   // Compute P&L per op filtered by year
   const getPnlByYear = (opsSubset) => {
-    const norm = v => (v || "").toLowerCase().trim();
     // Group by account × instrument
     const buckets = {};
     for (const op of opsSubset) {
@@ -8315,8 +8350,10 @@ const DerivStatistics = () => {
     for (const year of years) pnlByYear[year] = 0;
 
     for (const b of Object.values(buckets)) {
-      const product = products.find(p => norm(p.label) === norm(b.instrument));
-      const lotSize = product ? (parseFloat(product.volumeSizePerLot) || 1) : 1;
+      const exchange = products.find(p => norm(p.label) === norm(b.instrument))?.stoxxExchange || b.ops[0]?.exchange || "";
+      const ls = getLotSizeStat(exchange, b.instrument);
+      const pu = getPriceUnitStat(exchange, b.instrument);
+      const lotSize = ls * pu;
       // Run FIFO per year — only ops up to end of year, incremental
       for (const year of years) {
         const opsUpToYear = b.ops.filter(o => o.tradeDate && parseInt(o.tradeDate.slice(0, 4)) <= year);

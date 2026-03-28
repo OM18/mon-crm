@@ -3035,13 +3035,14 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ACCOUNT CURRENCY <span style={{ color: COLORS.red }}>*</span></label>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         {(config.contractsCurrency || []).map(c => {
-                          const selected = Array.isArray(accForm.currency) && accForm.currency.includes(c.value);
-                          console.log('[checkbox]', c.value, 'accForm.currency:', JSON.stringify(accForm.currency), 'selected:', selected);
+                          const selected = Array.isArray(accForm.currency) && accForm.currency.some(v => v.toUpperCase() === c.value.toUpperCase());
                           const col = c.color || COLORS.accent;
                           return (
                             <div key={c.value} onClick={() => {
                               const cur = Array.isArray(accForm.currency) ? accForm.currency : [];
-                              const next = selected ? cur.filter(v => v !== c.value) : [...cur, c.value];
+                              const next = selected
+                                ? cur.filter(v => v.toUpperCase() !== c.value.toUpperCase())
+                                : [...cur.filter(v => v.toUpperCase() !== c.value.toUpperCase()), c.value.toUpperCase()];
                               setAccForm(f => ({ ...f, currency: next }));
                             }}
                               style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontWeight: selected ? 700 : 500, fontSize: 12, transition: "all 0.15s", border: `1.5px solid ${selected ? col : COLORS.border}`, background: selected ? `${col}18` : COLORS.bg, color: selected ? col : COLORS.textSub, userSelect: "none" }}>

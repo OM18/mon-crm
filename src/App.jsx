@@ -216,16 +216,13 @@ const DEFAULT_CONFIG = {
     { value: "UAH", label: "UAH", color: COLORS.accent },
   ],
   derivDecimals: [
-    { value: "decimal",  label: "Décimal",    example: "200.25" },
-    { value: "decimal1", label: "Decimal 1",  example: "200.4" },
-    { value: "decimal2", label: "Decimal 2",  example: "200.45" },
-    { value: "decimal3", label: "Decimal 3",  example: "200.456" },
-    { value: "1/2",      label: "1/2",        example: "200 1/2" },
-    { value: "1/4",      label: "1/4",        example: "200 1/4" },
-    { value: "1/8",      label: "1/8",        example: "200 1/8" },
-    { value: "1/16",     label: "1/16",       example: "200 1/16" },
-    { value: "1/32",     label: "1/32",       example: "200 1/32" },
-    { value: "1/64",     label: "1/64",       example: "200 1/64" },
+    { value: "decimal",  label: "Décimal",  example: "200.25" },
+    { value: "1/2",      label: "1/2",      example: "200 1/2" },
+    { value: "1/4",      label: "1/4",      example: "200 1/4" },
+    { value: "1/8",      label: "1/8",      example: "200 1/8" },
+    { value: "1/16",     label: "1/16",     example: "200 1/16" },
+    { value: "1/32",     label: "1/32",     example: "200 1/32" },
+    { value: "1/64",     label: "1/64",     example: "200 1/64" },
   ],
   derivOpStatuses: [
     { value: "pending", label: "PENDING", color: "#F59E0B" },
@@ -2754,6 +2751,10 @@ useEffect(() => {
       if (typeof acc.isActive === "string") {
         acc.isActive = acc.isActive.trim().toLowerCase() !== "false" && acc.isActive.trim() !== "0";
       }
+      // Always ensure currency is an array of uppercase strings
+      if (!acc.currency) acc.currency = [];
+      else if (typeof acc.currency === "string") acc.currency = acc.currency.split(",").map(v => v.trim().toUpperCase()).filter(Boolean);
+      else if (Array.isArray(acc.currency)) acc.currency = acc.currency.map(v => String(v).toUpperCase()).filter(Boolean);
       return acc;
     }));
   }
@@ -6944,11 +6945,9 @@ const setOps = async (val) => {
   const formatPrice = (price, instrument) => {
     if (!price && price !== 0) return "—";
     const prod = products.find(p => p.label === instrument);
-    const fmtRaw = prod?.decimals || "decimal";
-    const fmt = fmtRaw.toLowerCase().replace(/\s+/g, "");
-    if (typeof price === "string" && /^\d+\s+\d+\/\d+$/.test(price.trim())) {
-      return price.trim();
-    }
+    const fmt = prod?.decimals || "decimal";
+    const tick = prod?.tickSize || "";
+    // Fraction format: e.g. "1/8"
     if (fmt.includes("/")) {
       const den = parseInt(fmt.split("/")[1] || "8");
       const num = parseFloat(price);
@@ -6960,6 +6959,7 @@ const setOps = async (val) => {
       if (fracNum === den) return String(intPart + 1);
       return `${intPart} ${fracNum}/${den}`;
     }
+    // decimal1/2/3 format
     const dpMatch = fmt.match(/^decimal(\d)$/);
     if (dpMatch) {
       const dp = parseInt(dpMatch[1]);
@@ -6967,6 +6967,7 @@ const setOps = async (val) => {
       if (isNaN(num)) return String(price);
       return num.toFixed(dp);
     }
+    // decimal or unknown: show as-is
     return String(price);
   };
 

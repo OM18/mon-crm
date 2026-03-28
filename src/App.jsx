@@ -2747,13 +2747,14 @@ useEffect(() => {
   async function loadAccounts() {
     const { data } = await supabase.from('deriv_accounts').select('*');
     if (data?.length) setDerivAccounts(data.map(r => {
-      if (typeof r.isActive === "string") {
-        r.isActive = r.isActive.trim().toLowerCase() !== "false" && r.isActive.trim() !== "0";
+      const acc = r.data ?? r;
+      if (typeof acc.isActive === "string") {
+        acc.isActive = acc.isActive.trim().toLowerCase() !== "false" && acc.isActive.trim() !== "0";
       }
-      if (!r.currency) r.currency = [];
-      else if (typeof r.currency === "string") r.currency = r.currency.split(",").map(v => v.trim().toUpperCase()).filter(Boolean);
-      else if (Array.isArray(r.currency)) r.currency = r.currency.map(v => String(v).toUpperCase()).filter(Boolean);
-      return r;
+      if (!acc.currency) acc.currency = [];
+      else if (typeof acc.currency === "string") acc.currency = acc.currency.split(",").map(v => v.trim().toUpperCase()).filter(Boolean);
+      else if (Array.isArray(acc.currency)) acc.currency = acc.currency.map(v => String(v).toUpperCase()).filter(Boolean);
+      return acc;
     }));
   }
   loadAccounts();
@@ -2934,8 +2935,8 @@ useEffect(() => {
       : [...derivAccounts, finalForm];
     setDerivAccounts(updated);
     try {
-      await supabase.from('deriv_accounts').delete().eq('id', finalForm.id);
-      await supabase.from('deriv_accounts').insert(finalForm);
+      await supabase.from('deriv_accounts').delete().eq('data->>id', String(finalForm.id));
+      await supabase.from('deriv_accounts').insert({ data: finalForm });
     } catch (err) { console.error('[saveAccount]', err); }
     setAccForm(EMPTY_ACC());
     setEditAccId(null);
@@ -2945,7 +2946,7 @@ useEffect(() => {
   const deleteAccount = async (id) => {
     const updated = derivAccounts.filter(a => a.id !== id);
     setDerivAccounts(updated);
-    try { await supabase.from('deriv_accounts').delete().eq('id', id); }
+    try { await supabase.from('deriv_accounts').delete().eq('data->>id', String(id)); }
     catch (err) { console.error('[deleteAccount]', err); }
   };
 
@@ -3017,7 +3018,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                   setDerivAccounts(updated);
                   try {
                     for (const item of newItems) {
-                      await supabase.from('deriv_accounts').insert(item);
+                      await supabase.from('deriv_accounts').insert({ data: item });
                     }
                   } catch(err) { console.error('[importAccounts]', err); }
                 }}
@@ -3178,7 +3179,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                               {a.trade && <span style={{ color: COLORS.textSub }}>🔀 {a.trade}</span>}
                             </div>
                           </div>
-                          <div onClick={async () => { const toggled = { ...a, isActive: !a.isActive }; const updated = derivAccounts.map(x => x.id === a.id ? toggled : x); setDerivAccounts(updated); try { await supabase.from('deriv_accounts').delete().eq('id', a.id); await supabase.from('deriv_accounts').insert(toggled); } catch(err) { console.error('[toggleActive]', err); } }}
+                          <div onClick={async () => { const toggled = { ...a, isActive: !a.isActive }; const updated = derivAccounts.map(x => x.id === a.id ? toggled : x); setDerivAccounts(updated); try { await supabase.from('deriv_accounts').delete().eq('data->>id', String(a.id)); await supabase.from('deriv_accounts').insert({ data: toggled }); } catch(err) { console.error('[toggleActive]', err); } }}
                             style={{ width: 40, height: 22, borderRadius: 11, background: a.isActive ? COLORS.green : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
                             <div style={{ position: "absolute", top: 3, left: a.isActive ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                           </div>

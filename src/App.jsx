@@ -2933,6 +2933,8 @@ useEffect(() => {
     const updated = editAccId
       ? derivAccounts.map(a => a.id === editAccId ? finalForm : a)
       : [...derivAccounts, finalForm];
+    console.log('[saveAccount] finalForm:', JSON.stringify(finalForm));
+    console.log('[saveAccount] updated:', JSON.stringify(updated));
     setDerivAccounts(updated);
     try {
       await supabase.from('deriv_accounts').delete().eq('data->>id', String(finalForm.id));
@@ -3179,7 +3181,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                             <div style={{ position: "absolute", top: 3, left: a.isActive ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                           </div>
                           <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, fontWeight: 600, minWidth: 58, textAlign: "center", background: a.isActive ? `${COLORS.green}22` : `${COLORS.red}22`, color: a.isActive ? COLORS.green : COLORS.red }}>{a.isActive ? "Active" : "Inactive"}</span>
-                          <button onClick={() => { const acc = { ...a, currency: Array.isArray(a.currency) ? a.currency : (a.currency ? [a.currency] : []) }; setAccForm(acc); setEditAccId(a.id); setShowAccForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                          <button onClick={() => { const acc = { ...a, currency: Array.isArray(a.currency) ? a.currency : (a.currency ? [a.currency] : []) }; console.log('[edit] account:', JSON.stringify(a)); console.log('[edit] accForm currency:', JSON.stringify(acc.currency)); setAccForm(acc); setEditAccId(a.id); setShowAccForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
                           <button onClick={() => deleteAccount(a.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
                         </div>
                       );

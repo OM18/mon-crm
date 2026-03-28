@@ -6942,8 +6942,15 @@ const setOps = async (val) => {
     if (!price && price !== 0) return "—";
     const prod = products.find(p => p.label === instrument);
     const fmt = prod?.decimals || "decimal";
-    const tick = prod?.tickSize || "";
-    // Fraction format: e.g. "1/8"
+    // If price is already stored as a fraction string like "452 6/8", return it directly
+    if (typeof price === "string" && /^\d+\s+\d+\/\d+$/.test(price.trim())) {
+      return price.trim();
+    }
+    // If price is a whole number string like "452" but format is fraction, return as-is
+    if (typeof price === "string" && /^\d+$/.test(price.trim()) && fmt.includes("/")) {
+      return price.trim();
+    }
+    // Fraction format: e.g. "1/8" — convert numeric value to fraction display
     if (fmt.includes("/")) {
       const den = parseInt(fmt.split("/")[1] || "8");
       const num = parseFloat(price);

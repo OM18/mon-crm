@@ -216,13 +216,16 @@ const DEFAULT_CONFIG = {
     { value: "UAH", label: "UAH", color: COLORS.accent },
   ],
   derivDecimals: [
-    { value: "decimal",  label: "Décimal",  example: "200.25" },
-    { value: "1/2",      label: "1/2",      example: "200 1/2" },
-    { value: "1/4",      label: "1/4",      example: "200 1/4" },
-    { value: "1/8",      label: "1/8",      example: "200 1/8" },
-    { value: "1/16",     label: "1/16",     example: "200 1/16" },
-    { value: "1/32",     label: "1/32",     example: "200 1/32" },
-    { value: "1/64",     label: "1/64",     example: "200 1/64" },
+    { value: "decimal",  label: "Décimal",    example: "200.25" },
+    { value: "decimal1", label: "Decimal 1",  example: "200.4" },
+    { value: "decimal2", label: "Decimal 2",  example: "200.45" },
+    { value: "decimal3", label: "Decimal 3",  example: "200.456" },
+    { value: "1/2",      label: "1/2",        example: "200 1/2" },
+    { value: "1/4",      label: "1/4",        example: "200 1/4" },
+    { value: "1/8",      label: "1/8",        example: "200 1/8" },
+    { value: "1/16",     label: "1/16",       example: "200 1/16" },
+    { value: "1/32",     label: "1/32",       example: "200 1/32" },
+    { value: "1/64",     label: "1/64",       example: "200 1/64" },
   ],
   derivOpStatuses: [
     { value: "pending", label: "PENDING", color: "#F59E0B" },
@@ -6941,16 +6944,11 @@ const setOps = async (val) => {
   const formatPrice = (price, instrument) => {
     if (!price && price !== 0) return "—";
     const prod = products.find(p => p.label === instrument);
-    const fmt = prod?.decimals || "decimal";
-    // If price is already stored as a fraction string like "452 6/8", return it directly
+    const fmtRaw = prod?.decimals || "decimal";
+    const fmt = fmtRaw.toLowerCase().replace(/\s+/g, "");
     if (typeof price === "string" && /^\d+\s+\d+\/\d+$/.test(price.trim())) {
       return price.trim();
     }
-    // If price is a whole number string like "452" but format is fraction, return as-is
-    if (typeof price === "string" && /^\d+$/.test(price.trim()) && fmt.includes("/")) {
-      return price.trim();
-    }
-    // Fraction format: e.g. "1/8" — convert numeric value to fraction display
     if (fmt.includes("/")) {
       const den = parseInt(fmt.split("/")[1] || "8");
       const num = parseFloat(price);
@@ -6962,7 +6960,6 @@ const setOps = async (val) => {
       if (fracNum === den) return String(intPart + 1);
       return `${intPart} ${fracNum}/${den}`;
     }
-    // decimal1/2/3 format
     const dpMatch = fmt.match(/^decimal(\d)$/);
     if (dpMatch) {
       const dp = parseInt(dpMatch[1]);
@@ -6970,7 +6967,6 @@ const setOps = async (val) => {
       if (isNaN(num)) return String(price);
       return num.toFixed(dp);
     }
-    // decimal or unknown: show as-is
     return String(price);
   };
 

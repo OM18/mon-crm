@@ -2751,7 +2751,6 @@ useEffect(() => {
       if (typeof acc.isActive === "string") {
         acc.isActive = acc.isActive.trim().toLowerCase() !== "false" && acc.isActive.trim() !== "0";
       }
-      // Always ensure currency is an array of uppercase strings
       if (!acc.currency) acc.currency = [];
       else if (typeof acc.currency === "string") acc.currency = acc.currency.split(",").map(v => v.trim().toUpperCase()).filter(Boolean);
       else if (Array.isArray(acc.currency)) acc.currency = acc.currency.map(v => String(v).toUpperCase()).filter(Boolean);
@@ -2930,11 +2929,15 @@ useEffect(() => {
     if (!isAccFormValid()) return;
     const cleanCurrency = [...new Set((Array.isArray(accForm.currency) ? accForm.currency : [accForm.currency]).map(v => v?.toUpperCase()).filter(Boolean))];
     const cleanForm = { ...accForm, currency: cleanCurrency };
+    const finalForm = { ...cleanForm, id: editAccId || Date.now() };
     const updated = editAccId
-      ? derivAccounts.map(a => a.id === editAccId ? { ...cleanForm, id: editAccId } : a)
-      : [...derivAccounts, { ...cleanForm, id: Date.now() }];
+      ? derivAccounts.map(a => a.id === editAccId ? finalForm : a)
+      : [...derivAccounts, finalForm];
     setDerivAccounts(updated);
-    await safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts);
+    try {
+      await supabase.from('deriv_accounts').delete().eq('data->>id', String(finalForm.id));
+      await supabase.from('deriv_accounts').insert({ data: finalForm });
+    } catch (err) { console.error('[saveAccount]', err); }
     setAccForm(EMPTY_ACC());
     setEditAccId(null);
     setShowAccForm(false);

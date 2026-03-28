@@ -2751,9 +2751,6 @@ useEffect(() => {
       if (typeof acc.isActive === "string") {
         acc.isActive = acc.isActive.trim().toLowerCase() !== "false" && acc.isActive.trim() !== "0";
       }
-      if (!acc.currency) acc.currency = [];
-      else if (typeof acc.currency === "string") acc.currency = acc.currency.split(",").map(v => v.trim().toUpperCase()).filter(Boolean);
-      else if (Array.isArray(acc.currency)) acc.currency = acc.currency.map(v => String(v).toUpperCase()).filter(Boolean);
       return acc;
     }));
   }
@@ -2929,15 +2926,11 @@ useEffect(() => {
     if (!isAccFormValid()) return;
     const cleanCurrency = [...new Set((Array.isArray(accForm.currency) ? accForm.currency : [accForm.currency]).map(v => v?.toUpperCase()).filter(Boolean))];
     const cleanForm = { ...accForm, currency: cleanCurrency };
-    const finalForm = { ...cleanForm, id: editAccId || Date.now() };
     const updated = editAccId
-      ? derivAccounts.map(a => a.id === editAccId ? finalForm : a)
-      : [...derivAccounts, finalForm];
+      ? derivAccounts.map(a => a.id === editAccId ? { ...cleanForm, id: editAccId } : a)
+      : [...derivAccounts, { ...cleanForm, id: Date.now() }];
     setDerivAccounts(updated);
-    try {
-      await supabase.from('deriv_accounts').delete().eq('data->>id', String(finalForm.id));
-      await supabase.from('deriv_accounts').insert({ data: finalForm });
-    } catch (err) { console.error('[saveAccount]', err); }
+    await safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts);
     setAccForm(EMPTY_ACC());
     setEditAccId(null);
     setShowAccForm(false);
@@ -2946,8 +2939,7 @@ useEffect(() => {
   const deleteAccount = async (id) => {
     const updated = derivAccounts.filter(a => a.id !== id);
     setDerivAccounts(updated);
-    try { await supabase.from('deriv_accounts').delete().eq('data->>id', String(id)); }
-    catch (err) { console.error('[deleteAccount]', err); }
+    await safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts);
   };
 
   const saveEmployee = async () => {
@@ -3016,11 +3008,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                 onImport={async (newItems) => {
                   const updated = [...derivAccounts, ...newItems];
                   setDerivAccounts(updated);
-                  try {
-                    for (const item of newItems) {
-                      await supabase.from('deriv_accounts').insert({ data: item });
-                    }
-                  } catch(err) { console.error('[importAccounts]', err); }
+                  await safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts);
                 }}
               />
             )}
@@ -3048,6 +3036,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         {(config.contractsCurrency || []).map(c => {
                           const selected = Array.isArray(accForm.currency) && accForm.currency.includes(c.value);
+                          console.log('[checkbox]', c.value, 'accForm.currency:', JSON.stringify(accForm.currency), 'selected:', selected);
                           const col = c.color || COLORS.accent;
                           return (
                             <div key={c.value} onClick={() => {
@@ -3179,7 +3168,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                               {a.trade && <span style={{ color: COLORS.textSub }}>🔀 {a.trade}</span>}
                             </div>
                           </div>
-                          <div onClick={async () => { const toggled = { ...a, isActive: !a.isActive }; const updated = derivAccounts.map(x => x.id === a.id ? toggled : x); setDerivAccounts(updated); try { await supabase.from('deriv_accounts').delete().eq('data->>id', String(a.id)); await supabase.from('deriv_accounts').insert({ data: toggled }); } catch(err) { console.error('[toggleActive]', err); } }}
+                          <div onClick={() => { const updated = derivAccounts.map(x => x.id === a.id ? { ...x, isActive: !x.isActive } : x); setDerivAccounts(updated); safeSave('deriv_accounts', updated, setDerivAccounts, derivAccounts); }}
                             style={{ width: 40, height: 22, borderRadius: 11, background: a.isActive ? COLORS.green : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
                             <div style={{ position: "absolute", top: 3, left: a.isActive ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                           </div>

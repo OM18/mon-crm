@@ -8882,6 +8882,7 @@ const DerivativesDashboard = () => {
   const [expandedInstruments, setExpandedInstruments] = useState({});
   const toggle = (key) => setExpandedAccounts(p => ({ ...p, [key]: !p[key] }));
   const toggleInst = (key) => setExpandedInstruments(p => ({ ...p, [key]: !p[key] }));
+  const [pnlAccountSearch, setPnlAccountSearch] = useState("");
 
   // ── P&L DETAIL MODAL ──
   const [pnlDetailAccount, setPnlDetailAccount] = useState(null); // row object
@@ -9105,9 +9106,19 @@ const DerivativesDashboard = () => {
       })()}
 
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ background: COLORS.tableHeader, padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}` }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>P&amp;L PAR COMPTE</div>
-          <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>Cliquez sur un compte pour voir le détail par instrument</div>
+        <div style={{ background: COLORS.tableHeader, padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>P&amp;L PAR COMPTE</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>Cliquez sur un compte pour voir le détail par instrument</div>
+          </div>
+          <input
+            placeholder="🔍 Rechercher un compte…"
+            value={pnlAccountSearch}
+            onChange={e => setPnlAccountSearch(e.target.value)}
+            style={{ width: 220, background: COLORS.bg, border: `1px solid ${pnlAccountSearch ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 8, padding: "8px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }}
+            onFocus={e => e.target.style.borderColor = COLORS.accent}
+            onBlur={e => e.target.style.borderColor = pnlAccountSearch ? COLORS.accent + "80" : COLORS.border}
+          />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "10px 20px", background: `${COLORS.tableHeader}99`, borderBottom: `1px solid ${COLORS.border}` }}>
@@ -9116,13 +9127,19 @@ const DerivativesDashboard = () => {
           ))}
         </div>
 
-        {rows.length === 0 && (
+        {(() => {
+          const q = pnlAccountSearch.toLowerCase().trim();
+          return q ? rows.filter(r => (r.account || "").toLowerCase().includes(q)) : rows;
+        })().length === 0 && (
           <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "48px 0", fontSize: 14 }}>
             Aucune opération. Ajoutez des BUY et des SELL dans Derivatives.
           </div>
         )}
 
-        {rows.map((row, idx) => {
+        {(() => {
+          const q = pnlAccountSearch.toLowerCase().trim();
+          const filteredRows = q ? rows.filter(r => (r.account || "").toLowerCase().includes(q)) : rows;
+          return filteredRows.map((row, idx) => {
           const expanded = expandedAccounts[row.account];
           const isLast = idx === rows.length - 1;
           const totalBuyCount = row.instruments.reduce((s, i) => s + i.buyCount, 0);
@@ -9262,7 +9279,7 @@ const DerivativesDashboard = () => {
               )}
             </div>
           );
-        })}
+        })()}
 
         {rows.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "14px 20px", background: `${COLORS.accent}08`, borderTop: `2px solid ${COLORS.accent}30` }}>

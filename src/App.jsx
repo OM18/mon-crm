@@ -9279,7 +9279,7 @@ const DerivativesDashboard = () => {
               )}
             </div>
           );
-        })()}
+        }); })()}
 
         {rows.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "14px 20px", background: `${COLORS.accent}08`, borderTop: `2px solid ${COLORS.accent}30` }}>

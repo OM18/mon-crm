@@ -8710,36 +8710,30 @@ const DerivativesDashboard = () => {
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1: Summary par instrument
-    const summaryData = [
-      ["INSTRUMENT", "BUY", "SELL", "LOTS OUVERTS", "MATCHES", "REALISED P&L"],
-      ...row.instruments.map(inst => [
-        inst.instrument,
-        inst.buyCount,
-        inst.sellCount,
-        inst.openLots,
-        inst.matches.length,
-        inst.realizedPnl,
-      ]),
-      ["TOTAL", row.instruments.reduce((s,i)=>s+i.buyCount,0), row.instruments.reduce((s,i)=>s+i.sellCount,0), row.openLots, row.instruments.reduce((s,i)=>s+i.matches.length,0), row.realizedPnl],
-    ];
-    const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
-    XLSX.utils.book_append_sheet(wb, ws1, "Résumé");
-
-    // Sheet 2: Matches FIFO détaillés
-    const matchData = [
-      ["INSTRUMENT", "BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS MATCHÉS", "PRIX ENTRÉE", "PRIX SORTIE", "P&L"],
-    ];
-    for (const inst of row.instruments) {
+    // Un onglet par instrument avec le tableau de détail exact
+    for (const inst of [...row.instruments].sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl))) {
+      const sheetData = [];
+      sheetData.push([inst.instrument]);
+      sheetData.push([`${inst.buyCount} BUY · ${inst.sellCount} SELL · ${inst.matches.length} matches`]);
+      sheetData.push([]);
+      sheetData.push(["BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "DELTA", "P&L"]);
       for (const m of inst.matches) {
-        matchData.push([inst.instrument, m.buyRef||"—", m.buyDate, m.sellRef||"—", m.sellDate, m.lots, m.entryPrice, m.exitPrice, m.pnl]);
+        sheetData.push([
+          m.buyRef || "—", m.buyDate,
+          m.sellRef || "—", m.sellDate,
+          m.lots, m.entryPrice, m.exitPrice,
+          m.exitPrice - m.entryPrice, m.pnl,
+        ]);
       }
+      sheetData.push([]);
+      sheetData.push([`SOUS-TOTAL ${inst.instrument}`, "", "", "", inst.matches.reduce((s, m) => s + m.lots, 0), "", "", "", inst.realizedPnl]);
+      const sheetName = inst.instrument.slice(0, 31);
+      const ws = XLSX.utils.aoa_to_sheet(sheetData);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
-    const ws2 = XLSX.utils.aoa_to_sheet(matchData);
-    XLSX.utils.book_append_sheet(wb, ws2, "Matches FIFO");
 
-    const date = new Date().toISOString().slice(0,10);
-    XLSX.writeFile(wb, `pnl_${(row.account||"compte").replace(/[^a-zA-Z0-9]/g,"_")}_${date}.xlsx`);
+    const date = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `pnl_${(row.account || "compte").replace(/[^a-zA-Z0-9]/g, "_")}_${date}.xlsx`);
   };
 
   const KpiCard = ({ label, value, sub, color }) => (

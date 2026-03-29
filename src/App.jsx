@@ -8367,6 +8367,56 @@ const DerivStatistics = () => {
   };
   const pnlColor = (n) => !n || n === 0 ? COLORS.textMuted : n > 0 ? COLORS.green : COLORS.red;
 
+  // ── P&L DETAIL MODAL (Statistics) ──
+  const [statDetailRow, setStatDetailRow] = useState(null); // { label, ops }
+
+  const getStatFifoDetail = (rowOps) => {
+    const norm = v => (v || "").toLowerCase().trim();
+    const buckets = {};
+    for (const op of rowOps) {
+      const key = `${op.account}||${norm(op.instrument)}`;
+      if (!buckets[key]) buckets[key] = { account: op.account, instrument: op.instrument, ops: [] };
+      buckets[key].ops.push(op);
+    }
+    return Object.values(buckets).map(b => {
+      const product = products.find(p => norm(p.label) === norm(b.instrument));
+      const lotSize = product ? (parseFloat(product.volumeSizePerLot) || 1) : 1;
+      const fifo = runFIFO(b.ops, lotSize);
+      return {
+        account: b.account,
+        instrument: b.instrument,
+        buyCount: b.ops.filter(o => (o.side||"").toUpperCase() === "BUY").length,
+        sellCount: b.ops.filter(o => (o.side||"").toUpperCase() === "SELL").length,
+        matches: fifo.matches,
+        realizedPnl: fifo.realizedPnl,
+        openLots: fifo.openLots,
+      };
+    }).filter(b => b.matches.length > 0 || b.buyCount > 0);
+  };
+
+  const exportStatDetailToExcel = async (label, rowOps) => {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    const buckets = getStatFifoDetail(rowOps);
+    const fmtNum = n => typeof n === "number" ? Math.round(n * 100) / 100 : n;
+    for (const b of buckets.sort((a, z) => Math.abs(z.realizedPnl) - Math.abs(a.realizedPnl))) {
+      const sheetData = [];
+      sheetData.push([`${b.account} — ${b.instrument}`]);
+      sheetData.push([`${b.buyCount} BUY · ${b.sellCount} SELL · ${b.matches.length} matches`]);
+      sheetData.push([]);
+      sheetData.push(["BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "DELTA", "P&L"]);
+      for (const m of b.matches) {
+        sheetData.push([m.buyRef||"—", m.buyDate, m.sellRef||"—", m.sellDate, m.lots, fmtNum(m.entryPrice), fmtNum(m.exitPrice), fmtNum(m.exitPrice - m.entryPrice), fmtNum(m.pnl)]);
+      }
+      sheetData.push([]);
+      sheetData.push([`SOUS-TOTAL`, "", "", "", b.matches.reduce((s,m)=>s+m.lots,0), "", "", "", fmtNum(b.realizedPnl)]);
+      const sheetName = `${b.account} ${b.instrument}`.slice(0, 31);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), sheetName);
+    }
+    const date = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `stats_pnl_${label.replace(/[^a-zA-Z0-9]/g,"_")}_${date}.xlsx`);
+  };
+
   const totalRow1 = years.reduce((acc, y) => ({ ...acc, [y]: table1.reduce((s, r) => s + (r.pnlByYear[y] || 0), 0) }), {});
   const totalRow2 = years.reduce((acc, y) => ({ ...acc, [y]: table2.reduce((s, r) => s + (r.pnlByYear[y] || 0), 0) }), {});
 
@@ -8407,9 +8457,24 @@ const DerivStatistics = () => {
               </div>
               {/* Detail rows */}
               {buRows.map((row, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: COLS, padding: "9px 20px", borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 0 ? COLORS.card : `${COLORS.card}BB` }}>
+                <div key={i} style={{ display: "grid", gridTemplateColumns: COLS, padding: "9px 20px", borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}>
                   <div />
-                  <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 500 }}>{row[labelKey] || "—"}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13, color: COLORS.text, fontWeight: 500 }}>{row[labelKey] || "—"}</span>
+                    {/* Excel icon — détail P&L */}
+                    <div
+                      onClick={() => setStatDetailRow({ label: row[labelKey] || "—", ops: row.ops })}
+                      title="Voir le détail du calcul P&L"
+                      style={{ width: 22, height: 22, borderRadius: 5, background: "#1D6F42", border: "1px solid #1a5c37", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" }}
+                      onMouseOver={e => e.currentTarget.style.opacity = "0.8"}
+                      onMouseOut={e => e.currentTarget.style.opacity = "1"}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                        <rect width="24" height="24" rx="3" fill="#1D6F42"/>
+                        <text x="3" y="17" fontSize="13" fill="white" fontWeight="bold">XLS</text>
+                      </svg>
+                    </div>
+                  </div>
                   {years.map(y => (
                     <div key={y} style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: pnlColor(row.pnlByYear[y]), fontWeight: 600 }}>{fmtPnl(row.pnlByYear[y])}</div>
                   ))}
@@ -8474,6 +8539,114 @@ const DerivStatistics = () => {
           </>
         )}
       </div>
+
+      {/* ── STAT P&L DETAIL MODAL ── */}
+      {statDetailRow && (() => {
+        const buckets = getStatFifoDetail(statDetailRow.ops);
+        const totalPnl = buckets.reduce((s, b) => s + b.realizedPnl, 0);
+        const MATCH_GRID = "1fr 1fr 1fr 1fr 80px 90px 90px 110px";
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "#00000099", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 24 }}
+               onClick={e => { if (e.target === e.currentTarget) setStatDetailRow(null); }}>
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, width: "100%", maxWidth: 940, maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+              {/* Header */}
+              <div style={{ background: COLORS.tableHeader, padding: "18px 24px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{statDetailRow.label}</div>
+                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>Détail du calcul P&L — méthode FIFO</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button
+                    onClick={() => exportStatDetailToExcel(statDetailRow.label, statDetailRow.ops)}
+                    style={{ display: "flex", alignItems: "center", gap: 7, background: "#1D6F42", border: "1px solid #1a5c37", borderRadius: 8, padding: "8px 14px", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                    onMouseOver={e => e.currentTarget.style.opacity = "0.85"}
+                    onMouseOut={e => e.currentTarget.style.opacity = "1"}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" fill="white" fillOpacity="0.2" stroke="white" strokeWidth="1.5"/>
+                      <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                      <path d="M8 13h8M8 17h5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                    Exporter Excel
+                  </button>
+                  <button onClick={() => setStatDetailRow(null)} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 24, lineHeight: 1, padding: 0 }}>×</button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div style={{ overflowY: "auto", flex: 1 }}>
+                <div style={{ margin: "16px 24px 0", background: `${COLORS.blue}10`, border: `1px solid ${COLORS.blue}30`, borderRadius: 10, padding: "12px 16px", fontSize: 12, color: COLORS.textSub, lineHeight: 1.7 }}>
+                  <strong style={{ color: COLORS.text }}>Formule appliquée :</strong>{" "}
+                  P&L réalisé = Σ <span style={{ color: COLORS.accent, fontFamily: "'DM Mono', monospace" }}>(Prix SELL − Prix BUY) × Lots matchés × Lot Size</span>. BUY consommés dans l'ordre chronologique (FIFO).
+                </div>
+
+                {buckets.sort((a, z) => Math.abs(z.realizedPnl) - Math.abs(a.realizedPnl)).map((b, j) => (
+                  <div key={j} style={{ margin: "16px 24px 0" }}>
+                    <div style={{ background: COLORS.tableHeader, borderRadius: "10px 10px 0 0", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${COLORS.border}`, borderBottom: "none" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.accent }} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{b.account}</span>
+                        <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.textSub }}>{b.instrument}</span>
+                        <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 4 }}>{b.buyCount} BUY · {b.sellCount} SELL · {b.matches.length} match{b.matches.length !== 1 ? "es" : ""}</span>
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: b.sellCount > 0 ? (b.realizedPnl >= 0 ? COLORS.green : COLORS.red) : COLORS.textMuted }}>
+                        {b.sellCount > 0 ? fmtPnl(b.realizedPnl) : "Pas de SELL"}
+                      </div>
+                    </div>
+                    {b.matches.length > 0 ? (
+                      <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: "0 0 10px 10px", overflow: "hidden" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: MATCH_GRID, padding: "8px 16px", background: `${COLORS.tableHeader}CC`, borderBottom: `1px solid ${COLORS.border}` }}>
+                          {["BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "P&L"].map((h, i) => (
+                            <div key={i} style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.5, textAlign: i >= 4 ? "right" : "left" }}>{h}</div>
+                          ))}
+                        </div>
+                        {b.matches.map((m, k) => (
+                          <div key={k} style={{ display: "grid", gridTemplateColumns: MATCH_GRID, padding: "9px 16px", borderBottom: k < b.matches.length - 1 ? `1px solid ${COLORS.border}20` : "none", background: k % 2 === 0 ? "transparent" : `${COLORS.card}40`, alignItems: "center" }}>
+                            <div style={{ fontSize: 11, color: COLORS.green, fontFamily: "'DM Mono', monospace", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.buyRef || "—"}</div>
+                            <div style={{ fontSize: 11, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{m.buyDate}</div>
+                            <div style={{ fontSize: 11, color: COLORS.red, fontFamily: "'DM Mono', monospace", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.sellRef || "—"}</div>
+                            <div style={{ fontSize: 11, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{m.sellDate}</div>
+                            <div style={{ textAlign: "right", fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.text, fontWeight: 600 }}>{m.lots}</div>
+                            <div style={{ textAlign: "right", fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{m.entryPrice.toFixed(2)}</div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{m.exitPrice.toFixed(2)}</div>
+                              <div style={{ fontSize: 9, color: m.exitPrice > m.entryPrice ? COLORS.green : COLORS.red, fontFamily: "'DM Mono', monospace" }}>
+                                {m.exitPrice > m.entryPrice ? "▲" : "▼"} {Math.abs(m.exitPrice - m.entryPrice).toFixed(2)}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontSize: 13, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: m.pnl >= 0 ? COLORS.green : COLORS.red }}>{fmtPnl(m.pnl)}</div>
+                              <div style={{ fontSize: 9, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>({m.exitPrice > m.entryPrice ? "+" : ""}{(m.exitPrice - m.entryPrice).toFixed(2)}) × {m.lots}</div>
+                            </div>
+                          </div>
+                        ))}
+                        <div style={{ display: "grid", gridTemplateColumns: MATCH_GRID, padding: "9px 16px", background: `${COLORS.accent}08`, borderTop: `1px solid ${COLORS.accent}25` }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.accent, gridColumn: "1 / 5" }}>SOUS-TOTAL {b.instrument}</div>
+                          <div style={{ textAlign: "right", fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.text, fontWeight: 700 }}>{b.matches.reduce((s,m)=>s+m.lots,0)}</div>
+                          <div /><div />
+                          <div style={{ textAlign: "right", fontSize: 14, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: b.realizedPnl >= 0 ? COLORS.green : COLORS.red }}>{fmtPnl(b.realizedPnl)}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: "0 0 10px 10px", padding: "16px", textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>
+                        Aucun match FIFO — position entièrement ouverte ({b.openLots} lots).
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* Grand total */}
+                <div style={{ margin: "16px 24px 24px", background: `${COLORS.accent}10`, border: `2px solid ${COLORS.accent}40`, borderRadius: 10, padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.accent }}>TOTAL — {statDetailRow.label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: totalPnl >= 0 ? COLORS.green : COLORS.red }}>{fmtPnl(totalPnl)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

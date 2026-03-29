@@ -1701,7 +1701,7 @@ useEffect(() => {
   // Migrate existing products when quotationUnits or decimals config are loaded
   useEffect(() => {
     if (!products.length) return;
-    const normM = v => (v || '').toLowerCase().trim();
+    const normM = v => (v || '').toLowerCase().trim().replace(/_/g, " ");
     const decRules = (config.derivDecimals || []).filter(d => d.exchange !== undefined || d.underlying !== undefined);
     const needsMigration = products.some(p => {
       const quMatch = quotationUnits.find(q => normM(q.underlying) === normM(p.underlying) && normM(q.exchange) === normM(p.stoxxExchange));
@@ -1720,8 +1720,7 @@ useEffect(() => {
       };
     });
     setProducts(updated);
-    // Note: migration only updates local state, not persisted to DB automatically
-    // Products are saved explicitly when user makes a change in the admin panel
+    saveProducts(updated, setProducts, products);
   }, [quotationUnits, products.length, config.derivDecimals]);
 
   const remove = async (id) => { const u = products.filter(p => p.id !== id); setProducts(u); await saveProducts(u, setProducts, products); };

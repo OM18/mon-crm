@@ -8233,6 +8233,8 @@ const DerivStatistics = () => {
   const [ops, setOps] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [products, setProducts] = useState([]);
+  const [lotSizes, setLotSizes] = useState([]);
+  const [priceUnits, setPriceUnits] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -8254,6 +8256,10 @@ const DerivStatistics = () => {
       if (accData?.length) setAccounts(accData.map(r => r.data ?? r));
       const { data: prodData } = await supabase.from('deriv_products').select('data');
       if (prodData?.length) setProducts(prodData.map(r => r.data ?? r));
+      const { data: lsData } = await supabase.from('deriv_lot_sizes').select('data');
+      if (lsData?.length) setLotSizes(lsData.map(r => r.data ?? r));
+      const { data: puData } = await supabase.from('deriv_price_units').select('data');
+      if (puData?.length) setPriceUnits(puData.map(r => r.data ?? r));
       setLoading(false);
     }
     loadAll();
@@ -8313,7 +8319,7 @@ const DerivStatistics = () => {
 
   // Compute P&L per op filtered by year
   const getPnlByYear = (opsSubset) => {
-    const norm = v => (v || "").toLowerCase().trim();
+    const norm = v => (v || "").toLowerCase().trim().replace(/_/g, " ");
     // Group by account × instrument
     const buckets = {};
     for (const op of opsSubset) {
@@ -8326,7 +8332,27 @@ const DerivStatistics = () => {
 
     for (const b of Object.values(buckets)) {
       const product = products.find(p => norm(p.label) === norm(b.instrument));
-      const lotSize = product ? (parseFloat(product.volumeSizePerLot) || 1) : 1;
+      const exchange = product?.stoxxExchange || b.ops[0]?.exchange || "";
+      const underlying = product?.underlying || b.instrument;
+      const normExchange = norm(exchange);
+      const normUnderlying = norm(underlying);
+
+      // Lot Size — from deriv_lot_sizes (same as Dashboard)
+      let lsMatch = lotSizes.find(l => norm(l.exchange) === normExchange && norm(l.instrument) === normUnderlying);
+      if (!lsMatch) lsMatch = lotSizes.find(l => norm(l.instrument) === normUnderlying);
+      if (!lsMatch && normExchange) lsMatch = lotSizes.find(l => norm(l.exchange) === normExchange);
+      const ls = lsMatch ? (parseFloat(lsMatch.quantity) || 1) : 1;
+
+      // Price Unit — from deriv_price_units (same as Dashboard)
+      let puMatch = normUnderlying
+        ? priceUnits.find(p => norm(p.exchange) === normExchange && norm(p.underlying || "") === normUnderlying)
+        : null;
+      if (!puMatch) puMatch = priceUnits.find(p => norm(p.exchange) === normExchange && !p.underlying);
+      if (!puMatch) puMatch = priceUnits.find(p => norm(p.exchange) === normExchange);
+      const pu = puMatch ? (parseFloat(puMatch.unit) || 1) : 1;
+
+      const lotSize = ls * pu;
+
       // Run FIFO per year — only ops up to end of year, incremental
       for (const year of years) {
         const opsUpToYear = b.ops.filter(o => o.tradeDate && parseInt(o.tradeDate.slice(0, 4)) <= year);

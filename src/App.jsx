@@ -831,12 +831,20 @@ const DerivDecimalsEditor = ({ config, updateField }) => {
     // Check duplicate
     const exists = localItems.some(i => normV(i.exchange) === normV(newEntry.exchange) && normV(i.underlying) === normV(newEntry.underlying));
     if (exists) return;
-    mark([...localItems, { ...newEntry, id: Date.now() }]);
+    const next = [...localItems, { ...newEntry, id: Date.now() }];
+    mark(next);
+    updateField("derivDecimals", next);
+    setDirty(false);
     setNewEntry(EMPTY_ENTRY);
   };
 
   const updateEntry = (idx, field, val) => mark(localItems.map((x, i) => i === idx ? { ...x, [field]: val } : x));
-  const removeEntry = (idx) => mark(localItems.filter((_, i) => i !== idx));
+  const removeEntry = (idx) => {
+    const next = localItems.filter((_, i) => i !== idx);
+    mark(next);
+    updateField("derivDecimals", next);
+    setDirty(false);
+  };
 
   const newItems = localItems.filter(isNewStyle);
   const legacyItems = localItems.filter(i => !isNewStyle(i));
@@ -1705,14 +1713,17 @@ useEffect(() => {
     const decRules = (config.derivDecimals || []).filter(d => d.exchange !== undefined || d.underlying !== undefined);
     const needsMigration = products.some(p => {
       const quMatch = quotationUnits.find(q => normM(q.underlying) === normM(p.underlying) && normM(q.exchange) === normM(p.stoxxExchange));
-      const decMatch = decRules.find(d => normM(d.underlying) === normM(p.underlying) && normM(d.exchange) === normM(p.stoxxExchange));
+      // Only auto-apply decimals if product has no decimals set or is still at default
+      const hasManualDecimals = p.decimals && p.decimals !== "decimal";
+      const decMatch = !hasManualDecimals ? decRules.find(d => normM(d.underlying) === normM(p.underlying) && normM(d.exchange) === normM(p.stoxxExchange)) : null;
       return (quMatch && p.quotationUnit !== quMatch.quotationUnit) ||
              (decMatch && (p.decimals !== decMatch.displayFormat || p.tickSize !== (decMatch.tickSize || "")));
     });
     if (!needsMigration) return;
     const updated = products.map(p => {
       const quMatch = quotationUnits.find(q => normM(q.underlying) === normM(p.underlying) && normM(q.exchange) === normM(p.stoxxExchange));
-      const decMatch = decRules.find(d => normM(d.underlying) === normM(p.underlying) && normM(d.exchange) === normM(p.stoxxExchange));
+      const hasManualDecimals = p.decimals && p.decimals !== "decimal";
+      const decMatch = !hasManualDecimals ? decRules.find(d => normM(d.underlying) === normM(p.underlying) && normM(d.exchange) === normM(p.stoxxExchange)) : null;
       return {
         ...p,
         ...(quMatch ? { quotationUnit: quMatch.quotationUnit } : {}),

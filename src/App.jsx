@@ -3322,10 +3322,11 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                     {lotSizes.map(l => {
                       const exchCfg = (config.derivExchanges || []).find(e => e.value === l.exchange);
                       const unitCfg = (config.derivVolumeUnits || []).find(u => u.value === l.volumeUnit);
+                      const commodityCfg = (config.derivCommodities || []).find(c => c.value === l.instrument);
                       return (
                         <div key={l.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px 80px 60px", gap: 8, alignItems: "center", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 12px" }}>
                           <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.blue }}>{exchCfg?.label || l.exchange}</span>
-                          <span style={{ fontSize: 13, color: COLORS.text }}>{l.instrument}</span>
+                          <span style={{ fontSize: 13, color: COLORS.text }}>{commodityCfg?.label || l.instrument}</span>
                           <span style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.green }}>{l.quantity}</span>
                           <span style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600 }}>{unitCfg?.label || l.volumeUnit}</span>
                           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -8705,7 +8706,7 @@ const DerivativesDashboard = () => {
 
   // Get lot size for a given exchange+instrument combo
   const getLotSize = (exchange, instrument) => {
-    const norm = v => (v || "").toLowerCase().trim();
+    const norm = v => (v || "").toLowerCase().trim().replace(/_/g, " ");
     // Resolve underlying and exchange from deriv_products using instrument label
     const product = products.find(p => norm(p.label) === norm(instrument));
     const underlying = product?.underlying || instrument;
@@ -8725,7 +8726,7 @@ const DerivativesDashboard = () => {
   };
 
   const getPriceUnit = (exchange, instrument) => {
-    const norm = v => (v || "").toLowerCase().trim();
+    const norm = v => (v || "").toLowerCase().trim().replace(/_/g, " ");
     const product = products.find(p => norm(p.label) === norm(instrument));
     const resolvedExchange = product?.stoxxExchange || exchange;
     const resolvedUnderlying = product?.underlying || "";

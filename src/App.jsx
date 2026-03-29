@@ -8465,14 +8465,11 @@ const DerivStatistics = () => {
                     <div
                       onClick={() => setStatDetailRow({ label: row[labelKey] || "—", ops: row.ops })}
                       title="Voir le détail du calcul P&L"
-                      style={{ width: 22, height: 22, borderRadius: 5, background: "#1D6F42", border: "1px solid #1a5c37", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" }}
-                      onMouseOver={e => e.currentTarget.style.opacity = "0.8"}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" }}
+                      onMouseOver={e => e.currentTarget.style.opacity = "0.7"}
                       onMouseOut={e => e.currentTarget.style.opacity = "1"}
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                        <rect width="24" height="24" rx="3" fill="#1D6F42"/>
-                        <text x="3" y="17" fontSize="13" fill="white" fontWeight="bold">XLS</text>
-                      </svg>
+                      <img src="/logoxl.png" style={{ width: 22, height: 22, objectFit: "contain" }} />
                     </div>
                   </div>
                   {years.map(y => (
@@ -8563,11 +8560,7 @@ const DerivStatistics = () => {
                     onMouseOver={e => e.currentTarget.style.opacity = "0.85"}
                     onMouseOut={e => e.currentTarget.style.opacity = "1"}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" fill="white" fillOpacity="0.2" stroke="white" strokeWidth="1.5"/>
-                      <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-                      <path d="M8 13h8M8 17h5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
+                    <img src="/logoxl.png" style={{ width: 18, height: 18, objectFit: "contain" }} />
                     Exporter Excel
                   </button>
                   <button onClick={() => setStatDetailRow(null)} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 24, lineHeight: 1, padding: 0 }}>×</button>
@@ -9143,20 +9136,11 @@ const DerivativesDashboard = () => {
                   <div
                     onClick={e => { e.stopPropagation(); setPnlDetailAccount(row); }}
                     title="Voir le détail du calcul P&L"
-                    style={{ marginLeft: 4, width: 28, height: 28, borderRadius: 6, background: "#1D6F42", border: "1px solid #1a5c37", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" }}
-                    onMouseOver={e => e.currentTarget.style.opacity = "0.8"}
+                    style={{ marginLeft: 4, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" }}
+                    onMouseOver={e => e.currentTarget.style.opacity = "0.7"}
                     onMouseOut={e => e.currentTarget.style.opacity = "1"}
                   >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                      <rect width="24" height="24" rx="3" fill="#1D6F42"/>
-                      <path d="M4 4h16v16H4z" fill="none"/>
-                      <path d="M13 4v6h6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      <rect x="3" y="11" width="18" height="10" rx="1" fill="white" fillOpacity="0.15" stroke="white" strokeWidth="1.2"/>
-                      <line x1="9" y1="11" x2="9" y2="21" stroke="white" strokeWidth="1"/>
-                      <line x1="15" y1="11" x2="15" y2="21" stroke="white" strokeWidth="1"/>
-                      <line x1="3" y1="15" x2="21" y2="15" stroke="white" strokeWidth="1"/>
-                      <text x="5.5" y="10" fontSize="7" fill="white" fontWeight="bold">XLS</text>
-                    </svg>
+                    <img src="/logoxl.png" style={{ width: 28, height: 28, objectFit: "contain" }} />
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
@@ -9318,11 +9302,7 @@ const DerivativesDashboard = () => {
                     onMouseOver={e => e.currentTarget.style.opacity = "0.85"}
                     onMouseOut={e => e.currentTarget.style.opacity = "1"}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" fill="white" fillOpacity="0.2" stroke="white" strokeWidth="1.5"/>
-                      <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-                      <path d="M8 13h8M8 17h5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
+                    <img src="/logoxl.png" style={{ width: 18, height: 18, objectFit: "contain" }} />
                     Exporter Excel
                   </button>
                   <button onClick={() => setPnlDetailAccount(null)} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 24, lineHeight: 1, padding: 0 }}>×</button>

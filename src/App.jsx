@@ -8703,6 +8703,45 @@ const DerivativesDashboard = () => {
   const toggle = (key) => setExpandedAccounts(p => ({ ...p, [key]: !p[key] }));
   const toggleInst = (key) => setExpandedInstruments(p => ({ ...p, [key]: !p[key] }));
 
+  // ── P&L DETAIL MODAL ──
+  const [pnlDetailAccount, setPnlDetailAccount] = useState(null); // row object
+
+  const exportPnlDetailToExcel = async (row) => {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Summary par instrument
+    const summaryData = [
+      ["INSTRUMENT", "BUY", "SELL", "LOTS OUVERTS", "MATCHES", "REALISED P&L"],
+      ...row.instruments.map(inst => [
+        inst.instrument,
+        inst.buyCount,
+        inst.sellCount,
+        inst.openLots,
+        inst.matches.length,
+        inst.realizedPnl,
+      ]),
+      ["TOTAL", row.instruments.reduce((s,i)=>s+i.buyCount,0), row.instruments.reduce((s,i)=>s+i.sellCount,0), row.openLots, row.instruments.reduce((s,i)=>s+i.matches.length,0), row.realizedPnl],
+    ];
+    const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, ws1, "Résumé");
+
+    // Sheet 2: Matches FIFO détaillés
+    const matchData = [
+      ["INSTRUMENT", "BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS MATCHÉS", "PRIX ENTRÉE", "PRIX SORTIE", "P&L"],
+    ];
+    for (const inst of row.instruments) {
+      for (const m of inst.matches) {
+        matchData.push([inst.instrument, m.buyRef||"—", m.buyDate, m.sellRef||"—", m.sellDate, m.lots, m.entryPrice, m.exitPrice, m.pnl]);
+      }
+    }
+    const ws2 = XLSX.utils.aoa_to_sheet(matchData);
+    XLSX.utils.book_append_sheet(wb, ws2, "Matches FIFO");
+
+    const date = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `pnl_${(row.account||"compte").replace(/[^a-zA-Z0-9]/g,"_")}_${date}.xlsx`);
+  };
+
   const KpiCard = ({ label, value, sub, color }) => (
     <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 14, padding: "20px 24px" }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, marginBottom: 8 }}>{label}</div>
@@ -8933,6 +8972,25 @@ const DerivativesDashboard = () => {
                     <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>{getAccountLabel(row.account)}</div>
                     <div style={{ fontSize: 11, color: COLORS.textMuted }}>{row.instruments.length} instrument{row.instruments.length > 1 ? "s" : ""}</div>
                   </div>
+                  {/* Excel icon — détail P&L */}
+                  <div
+                    onClick={e => { e.stopPropagation(); setPnlDetailAccount(row); }}
+                    title="Voir le détail du calcul P&L"
+                    style={{ marginLeft: 4, width: 28, height: 28, borderRadius: 6, background: "#1D6F42", border: "1px solid #1a5c37", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" }}
+                    onMouseOver={e => e.currentTarget.style.opacity = "0.8"}
+                    onMouseOut={e => e.currentTarget.style.opacity = "1"}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                      <rect width="24" height="24" rx="3" fill="#1D6F42"/>
+                      <path d="M4 4h16v16H4z" fill="none"/>
+                      <path d="M13 4v6h6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <rect x="3" y="11" width="18" height="10" rx="1" fill="white" fillOpacity="0.15" stroke="white" strokeWidth="1.2"/>
+                      <line x1="9" y1="11" x2="9" y2="21" stroke="white" strokeWidth="1"/>
+                      <line x1="15" y1="11" x2="15" y2="21" stroke="white" strokeWidth="1"/>
+                      <line x1="3" y1="15" x2="21" y2="15" stroke="white" strokeWidth="1"/>
+                      <text x="5.5" y="10" fontSize="7" fill="white" fontWeight="bold">XLS</text>
+                    </svg>
+                  </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.green }}>{totalBuyCount}</span>
@@ -9062,6 +9120,154 @@ const DerivativesDashboard = () => {
           P&amp;L réalisé = Σ (prix SELL − prix BUY) × lots matchés. Les lots sans SELL correspondant sont comptabilisés comme <span style={{ color: COLORS.orange }}>ouverts</span>.
         </div>
       </div>
+
+      {/* ── P&L DETAIL MODAL ── */}
+      {pnlDetailAccount && (() => {
+        const row = pnlDetailAccount;
+        const totalBuyCount = row.instruments.reduce((s, i) => s + i.buyCount, 0);
+        const totalSellCount = row.instruments.reduce((s, i) => s + i.sellCount, 0);
+        const totalMatchCount = row.instruments.reduce((s, i) => s + i.matches.length, 0);
+        const DETAIL_GRID = "1fr 60px 60px 90px 60px 130px";
+        const MATCH_DETAIL_GRID = "1fr 1fr 1fr 1fr 90px 90px 90px 120px";
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "#00000099", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 24 }}
+               onClick={e => { if (e.target === e.currentTarget) setPnlDetailAccount(null); }}>
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, width: "100%", maxWidth: 920, maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+              {/* Header */}
+              <div style={{ background: COLORS.tableHeader, padding: "18px 24px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 9, background: `${COLORS.accent}20`, border: `1px solid ${COLORS.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏦</div>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{getAccountLabel(row.account)}</div>
+                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>Détail du calcul P&amp;L — méthode FIFO</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {/* Export Excel button */}
+                  <button
+                    onClick={() => exportPnlDetailToExcel(row)}
+                    style={{ display: "flex", alignItems: "center", gap: 7, background: "#1D6F42", border: "1px solid #1a5c37", borderRadius: 8, padding: "8px 14px", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                    onMouseOver={e => e.currentTarget.style.opacity = "0.85"}
+                    onMouseOut={e => e.currentTarget.style.opacity = "1"}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" fill="white" fillOpacity="0.2" stroke="white" strokeWidth="1.5"/>
+                      <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                      <path d="M8 13h8M8 17h5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                    Exporter Excel
+                  </button>
+                  <button onClick={() => setPnlDetailAccount(null)} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 24, lineHeight: 1, padding: 0 }}>×</button>
+                </div>
+              </div>
+
+              {/* KPIs */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, padding: "16px 24px", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0, background: COLORS.surface }}>
+                {[
+                  { label: "INSTRUMENTS", value: row.instruments.length, color: COLORS.accent },
+                  { label: "BUY", value: totalBuyCount, color: COLORS.green },
+                  { label: "SELL", value: totalSellCount, color: COLORS.red },
+                  { label: "MATCHES FIFO", value: totalMatchCount, color: COLORS.blue },
+                  { label: "REALISED P&L", value: totalSellCount > 0 ? fmt(row.realizedPnl) : "—", color: totalSellCount > 0 ? pnlColor(row.realizedPnl) : COLORS.textMuted },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.7, marginBottom: 6 }}>{label}</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color, fontFamily: "'DM Mono', monospace" }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Body — scrollable */}
+              <div style={{ overflowY: "auto", flex: 1 }}>
+
+                {/* Formule FIFO */}
+                <div style={{ margin: "16px 24px 0", background: `${COLORS.blue}10`, border: `1px solid ${COLORS.blue}30`, borderRadius: 10, padding: "12px 16px", fontSize: 12, color: COLORS.textSub, lineHeight: 1.7 }}>
+                  <strong style={{ color: COLORS.text }}>Formule appliquée :</strong>{" "}
+                  P&amp;L réalisé = Σ <span style={{ color: COLORS.accent, fontFamily: "'DM Mono', monospace" }}>(Prix SELL − Prix BUY) × Lots matchés × Lot Size × Price Unit</span>.
+                  {" "}Les BUY sont consommés dans l'ordre chronologique (FIFO).
+                </div>
+
+                {/* Par instrument */}
+                {row.instruments.sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl)).map((inst, j) => {
+                  const hasMatches = inst.matches.length > 0;
+                  return (
+                    <div key={j} style={{ margin: "16px 24px 0" }}>
+                      {/* Instrument header */}
+                      <div style={{ background: COLORS.tableHeader, borderRadius: "10px 10px 0 0", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${COLORS.border}`, borderBottom: "none" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.accent }} />
+                          <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{inst.instrument || "—"}</span>
+                          <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 4 }}>{inst.buyCount} BUY · {inst.sellCount} SELL · {inst.matches.length} match{inst.matches.length !== 1 ? "es" : ""}</span>
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: inst.sellCount > 0 ? pnlColor(inst.realizedPnl) : COLORS.textMuted }}>
+                          {inst.sellCount > 0 ? fmt(inst.realizedPnl) : "Pas de SELL"}
+                        </div>
+                      </div>
+
+                      {/* Matches table */}
+                      {hasMatches ? (
+                        <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: "0 0 10px 10px", overflow: "hidden" }}>
+                          {/* Table header */}
+                          <div style={{ display: "grid", gridTemplateColumns: MATCH_DETAIL_GRID, padding: "8px 16px", background: `${COLORS.tableHeader}CC`, borderBottom: `1px solid ${COLORS.border}` }}>
+                            {["BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "P&L"].map((h, i) => (
+                              <div key={i} style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.5, textAlign: i >= 4 ? "right" : "left" }}>{h}</div>
+                            ))}
+                          </div>
+                          {/* Match rows */}
+                          {inst.matches.map((m, k) => (
+                            <div key={k} style={{ display: "grid", gridTemplateColumns: MATCH_DETAIL_GRID, padding: "9px 16px", borderBottom: k < inst.matches.length - 1 ? `1px solid ${COLORS.border}20` : "none", background: k % 2 === 0 ? "transparent" : `${COLORS.card}40`, alignItems: "center" }}>
+                              <div style={{ fontSize: 11, color: COLORS.green, fontFamily: "'DM Mono', monospace", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.buyRef || "—"}</div>
+                              <div style={{ fontSize: 11, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{m.buyDate}</div>
+                              <div style={{ fontSize: 11, color: COLORS.red, fontFamily: "'DM Mono', monospace", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.sellRef || "—"}</div>
+                              <div style={{ fontSize: 11, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{m.sellDate}</div>
+                              <div style={{ textAlign: "right", fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.text, fontWeight: 600 }}>{fmtLots(m.lots)}</div>
+                              <div style={{ textAlign: "right" }}>
+                                <div style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{m.entryPrice.toFixed(2)}</div>
+                              </div>
+                              <div style={{ textAlign: "right" }}>
+                                <div style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{m.exitPrice.toFixed(2)}</div>
+                                <div style={{ fontSize: 9, color: m.exitPrice > m.entryPrice ? COLORS.green : COLORS.red, fontFamily: "'DM Mono', monospace" }}>
+                                  {m.exitPrice > m.entryPrice ? "▲" : "▼"} {Math.abs(m.exitPrice - m.entryPrice).toFixed(2)}
+                                </div>
+                              </div>
+                              <div style={{ textAlign: "right" }}>
+                                <div style={{ fontSize: 13, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: pnlColor(m.pnl) }}>{fmt(m.pnl)}</div>
+                                <div style={{ fontSize: 9, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>
+                                  ({m.exitPrice > m.entryPrice ? "+" : ""}{(m.exitPrice - m.entryPrice).toFixed(2)}) × {fmtLots(m.lots)}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {/* Subtotal */}
+                          <div style={{ display: "grid", gridTemplateColumns: MATCH_DETAIL_GRID, padding: "9px 16px", background: `${COLORS.accent}08`, borderTop: `1px solid ${COLORS.accent}25` }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.accent, gridColumn: "1 / 5" }}>SOUS-TOTAL {inst.instrument}</div>
+                            <div style={{ textAlign: "right", fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.text, fontWeight: 700 }}>{fmtLots(inst.matches.reduce((s, m) => s + m.lots, 0))}</div>
+                            <div /><div />
+                            <div style={{ textAlign: "right", fontSize: 14, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: pnlColor(inst.realizedPnl) }}>{fmt(inst.realizedPnl)}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: "0 0 10px 10px", padding: "16px", textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>
+                          Aucun match FIFO — position entièrement ouverte ({fmtLots(inst.openLots)} lots).
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Grand total */}
+                <div style={{ margin: "16px 24px 24px", background: `${COLORS.accent}10`, border: `2px solid ${COLORS.accent}40`, borderRadius: 10, padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.accent }}>TOTAL COMPTE — {getAccountLabel(row.account)}</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: totalSellCount > 0 ? pnlColor(row.realizedPnl) : COLORS.textMuted }}>
+                    {totalSellCount > 0 ? fmt(row.realizedPnl) : "—"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

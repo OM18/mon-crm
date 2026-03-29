@@ -8228,6 +8228,35 @@ function ExpiryRow({ instrument, exchange, index, products }) {
 }
 
 // ─── DERIV STATISTICS ────────────────────────────────────────
+// ─── SHARED HELPERS (used by both Statistics and Dashboard) ──
+const _norm = v => (v || "").toLowerCase().trim().replace(/_/g, " ");
+
+const resolveLotSize = (exchange, instrument, products, lotSizes) => {
+  const product = products.find(p => _norm(p.label) === _norm(instrument));
+  const underlying = product?.underlying || instrument;
+  const resolvedExchange = product?.stoxxExchange || exchange;
+  const normUnderlying = _norm(underlying);
+  const normExchange = _norm(resolvedExchange);
+  let match = lotSizes.find(l => _norm(l.exchange) === normExchange && _norm(l.instrument) === normUnderlying);
+  if (!match) match = lotSizes.find(l => _norm(l.instrument) === normUnderlying);
+  if (!match && normExchange) match = lotSizes.find(l => _norm(l.exchange) === normExchange);
+  return match ? (parseFloat(match.quantity) || 1) : 1;
+};
+
+const resolvePriceUnit = (exchange, instrument, products, priceUnits) => {
+  const product = products.find(p => _norm(p.label) === _norm(instrument));
+  const resolvedExchange = product?.stoxxExchange || exchange;
+  const resolvedUnderlying = product?.underlying || "";
+  const normExchange = _norm(resolvedExchange);
+  const normUnderlying = _norm(resolvedUnderlying);
+  let match = normUnderlying
+    ? priceUnits.find(p => _norm(p.exchange) === normExchange && _norm(p.underlying || "") === normUnderlying)
+    : null;
+  if (!match) match = priceUnits.find(p => _norm(p.exchange) === normExchange && !p.underlying);
+  if (!match) match = priceUnits.find(p => _norm(p.exchange) === normExchange);
+  return match ? (parseFloat(match.unit) || 1) : 1;
+};
+
 const DerivStatistics = () => {
   const { config } = useConfig();
   const [ops, setOps] = useState([]);
@@ -8331,26 +8360,8 @@ const DerivStatistics = () => {
     for (const year of years) pnlByYear[year] = 0;
 
     for (const b of Object.values(buckets)) {
-      const product = products.find(p => norm(p.label) === norm(b.instrument));
-      const exchange = product?.stoxxExchange || b.ops[0]?.exchange || "";
-      const underlying = product?.underlying || b.instrument;
-      const normExchange = norm(exchange);
-      const normUnderlying = norm(underlying);
-
-      // Lot Size — from deriv_lot_sizes (same as Dashboard)
-      let lsMatch = lotSizes.find(l => norm(l.exchange) === normExchange && norm(l.instrument) === normUnderlying);
-      if (!lsMatch) lsMatch = lotSizes.find(l => norm(l.instrument) === normUnderlying);
-      if (!lsMatch && normExchange) lsMatch = lotSizes.find(l => norm(l.exchange) === normExchange);
-      const ls = lsMatch ? (parseFloat(lsMatch.quantity) || 1) : 1;
-
-      // Price Unit — from deriv_price_units (same as Dashboard)
-      let puMatch = normUnderlying
-        ? priceUnits.find(p => norm(p.exchange) === normExchange && norm(p.underlying || "") === normUnderlying)
-        : null;
-      if (!puMatch) puMatch = priceUnits.find(p => norm(p.exchange) === normExchange && !p.underlying);
-      if (!puMatch) puMatch = priceUnits.find(p => norm(p.exchange) === normExchange);
-      const pu = puMatch ? (parseFloat(puMatch.unit) || 1) : 1;
-
+      const ls = resolveLotSize(b.ops[0]?.exchange || "", b.instrument, products, lotSizes);
+      const pu = resolvePriceUnit(b.ops[0]?.exchange || "", b.instrument, products, priceUnits);
       const lotSize = ls * pu;
 
       // Run FIFO per year — only ops up to end of year, incremental
@@ -8416,8 +8427,9 @@ const DerivStatistics = () => {
       buckets[key].ops.push(op);
     }
     return Object.values(buckets).map(b => {
-      const product = products.find(p => norm(p.label) === norm(b.instrument));
-      const lotSize = product ? (parseFloat(product.volumeSizePerLot) || 1) : 1;
+      const ls = resolveLotSize(b.ops[0]?.exchange || "", b.instrument, products, lotSizes);
+      const pu = resolvePriceUnit(b.ops[0]?.exchange || "", b.instrument, products, priceUnits);
+      const lotSize = ls * pu;
       const fifo = runFIFO(b.ops, lotSize);
       return {
         account: b.account,
@@ -8741,43 +8753,8 @@ const DerivativesDashboard = () => {
   };
 
   // Get lot size for a given exchange+instrument combo
-  const getLotSize = (exchange, instrument) => {
-    const norm = v => (v || "").toLowerCase().trim().replace(/_/g, " ");
-    // Resolve underlying and exchange from deriv_products using instrument label
-    const product = products.find(p => norm(p.label) === norm(instrument));
-    const underlying = product?.underlying || instrument;
-    const resolvedExchange = product?.stoxxExchange || exchange;
-    const normUnderlying = norm(underlying);
-    const normExchange = norm(resolvedExchange);
-    // 1. Match on exchange + underlying
-    let match = lotSizes.find(l =>
-      norm(l.exchange) === normExchange &&
-      norm(l.instrument) === normUnderlying
-    );
-    // 2. Fallback: underlying only
-    if (!match) match = lotSizes.find(l => norm(l.instrument) === normUnderlying);
-    // 3. Fallback: exchange only
-    if (!match && normExchange) match = lotSizes.find(l => norm(l.exchange) === normExchange);
-    return match ? (parseFloat(match.quantity) || 1) : 1;
-  };
-
-  const getPriceUnit = (exchange, instrument) => {
-    const norm = v => (v || "").toLowerCase().trim().replace(/_/g, " ");
-    const product = products.find(p => norm(p.label) === norm(instrument));
-    const resolvedExchange = product?.stoxxExchange || exchange;
-    const resolvedUnderlying = product?.underlying || "";
-    const normExchange = norm(resolvedExchange);
-    const normUnderlying = norm(resolvedUnderlying);
-    // 1. Precise match: exchange + underlying
-    let match = normUnderlying
-      ? priceUnits.find(p => norm(p.exchange) === normExchange && norm(p.underlying || "") === normUnderlying)
-      : null;
-    // 2. Fallback: exchange only (underlying empty or no precise match)
-    if (!match) match = priceUnits.find(p => norm(p.exchange) === normExchange && !p.underlying);
-    // 3. Fallback: any entry for this exchange
-    if (!match) match = priceUnits.find(p => norm(p.exchange) === normExchange);
-    return match ? (parseFloat(match.unit) || 1) : 1;
-  };
+  const getLotSize = (exchange, instrument) => resolveLotSize(exchange, instrument, products, lotSizes);
+  const getPriceUnit = (exchange, instrument) => resolvePriceUnit(exchange, instrument, products, priceUnits);
 
   const saveMarketPrice = async (key, value) => {
     if (value === undefined || value === "") {

@@ -6851,17 +6851,24 @@ const setOps = async (val) => {
       const fmt = prod?.decimals || "decimal";
       const tick = prod?.tickSize || "";
       if (tick && !fmt.includes("/")) {
-        // Decimal tick validation — use rounded integer arithmetic to avoid float precision issues
         const tickVal = parseFloat(tick);
-        const priceVal = parseFloat(form.price);
+        const priceStr = String(form.price).replace(/,/g, ".");
+        const priceVal = parseFloat(priceStr);
         if (!isNaN(tickVal) && tickVal > 0 && !isNaN(priceVal)) {
-          const decimals = (tick.includes(".") ? tick.split(".")[1].length : 0);
-          const factor = Math.pow(10, decimals);
-          const priceInt = Math.round(priceVal * factor);
-          const tickInt  = Math.round(tickVal * factor);
-          if (priceInt % tickInt !== 0) {
-            const suggested = (Math.round(priceVal / tickVal) * tickVal).toFixed(decimals);
-            errors.price = `Prix invalide — le tick minimum est ${tick} (ex: ${suggested})`;
+          const tickDecimals = tick.includes(".") ? tick.split(".")[1].length : 0;
+          // Count decimals in price
+          const priceDecimals = priceStr.includes(".") ? priceStr.split(".")[1].length : 0;
+          // If price has more decimals than tick, it's invalid
+          const invalid = priceDecimals > tickDecimals ||
+            (tickDecimals > 0 && (() => {
+              // Also check that the value at tick precision is a multiple of tick
+              const factor = Math.pow(10, tickDecimals);
+              const priceInt = Math.round(priceVal * factor);
+              const tickInt  = Math.round(tickVal * factor);
+              return tickInt > 0 && priceInt % tickInt !== 0;
+            })());
+          if (invalid) {
+            errors.price = `Prix invalide — le tick minimum est ${tick} (ex: ${(Math.floor(priceVal / tickVal) * tickVal).toFixed(tickDecimals)})`;
           }
         }
       } else if (tick && fmt.includes("/") && form.price.includes(" ")) {

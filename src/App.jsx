@@ -6954,10 +6954,13 @@ const setOps = async (val) => {
     if (!price && price !== 0) return "—";
     const prod = products.find(p => p.label === instrument);
     const fmt = prod?.decimals || "decimal";
-    const tick = prod?.tickSize || "";
     // Fraction format: e.g. "1/8"
     if (fmt.includes("/")) {
       const den = parseInt(fmt.split("/")[1] || "8");
+      // If already stored as fraction string "201 4/8", display as-is
+      if (typeof price === "string" && price.includes(" ") && price.includes("/")) {
+        return price;
+      }
       const num = parseFloat(price);
       if (isNaN(num)) return String(price);
       const intPart = Math.floor(num);
@@ -6971,6 +6974,15 @@ const setOps = async (val) => {
     const dpMatch = fmt.match(/^decimal(\d)$/);
     if (dpMatch) {
       const dp = parseInt(dpMatch[1]);
+      // Handle fraction string stored as "201 4/8" in non-fraction mode (fallback)
+      if (typeof price === "string" && price.includes(" ")) {
+        const [intStr, fracStr] = price.split(" ");
+        if (fracStr && fracStr.includes("/")) {
+          const [fn, fd] = fracStr.split("/").map(Number);
+          const num = parseInt(intStr) + fn / fd;
+          return num.toFixed(dp);
+        }
+      }
       const num = parseFloat(price);
       if (isNaN(num)) return String(price);
       return num.toFixed(dp);
@@ -7991,7 +8003,18 @@ const Pipeline = ({ contacts, setContacts, companies, setCompanies }) => {
 
 // ─── FIFO ENGINE ─────────────────────────────────────────────
 const runFIFO = (bucketOps, lotSize = 1) => {
-  const parseP = (v) => { const n = parseFloat(String(v ?? "").replace(/,/g, ".")); return isNaN(n) ? 0 : n; };
+  const parseP = (v) => {
+    const s = String(v ?? "").replace(/,/g, ".");
+    // Handle fraction string "201 4/8"
+    if (s.includes(" ") && s.includes("/")) {
+      const [intStr, fracStr] = s.split(" ");
+      const [fn, fd] = fracStr.split("/").map(Number);
+      const result = parseInt(intStr) + fn / fd;
+      return isNaN(result) ? 0 : result;
+    }
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  };
   const sorted = [...bucketOps].sort((a, b) => {
     const da = a.tradeDate || "9999", db = b.tradeDate || "9999";
     if (da !== db) return da < db ? -1 : 1;
@@ -8326,7 +8349,17 @@ const DerivStatistics = () => {
 
   // FIFO per bucket (account × instrument) — returns realizedPnl
   const runFIFOPnl = (bucketOps, lotSize = 1) => {
-    const parseP = v => { const n = parseFloat(String(v ?? "").replace(/,/g, ".")); return isNaN(n) ? 0 : n; };
+    const parseP = v => {
+      const s = String(v ?? "").replace(/,/g, ".");
+      if (s.includes(" ") && s.includes("/")) {
+        const [intStr, fracStr] = s.split(" ");
+        const [fn, fd] = fracStr.split("/").map(Number);
+        const result = parseInt(intStr) + fn / fd;
+        return isNaN(result) ? 0 : result;
+      }
+      const n = parseFloat(s);
+      return isNaN(n) ? 0 : n;
+    };
     const sorted = [...bucketOps].sort((a, b) => {
       const da = a.tradeDate || "9999", db = b.tradeDate || "9999";
       if (da !== db) return da < db ? -1 : 1;
@@ -8789,6 +8822,8 @@ const DerivativesDashboard = () => {
     const fmt = prod?.decimals || "decimal";
     if (fmt.includes("/")) {
       const den = parseInt(fmt.split("/")[1] || "8");
+      // If already stored as fraction string "201 4/8", display as-is
+      if (typeof price === "string" && price.includes(" ") && price.includes("/")) return price;
       const num = parseFloat(price);
       if (isNaN(num)) return String(price);
       const intPart = Math.floor(num);

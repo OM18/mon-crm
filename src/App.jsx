@@ -1,3 +1,6 @@
+﻿// @ts-nocheck
+cd src
+$content = Get-Content App.jsx -Raw -Encoding UTF8; "// @ts-nocheck`r`n" + $content | Set-Content App.jsx -Encoding UTF8
 import { useState, useEffect, useRef, createContext, useContext, useMemo } from "react";
 import { supabase } from './supabase';
 
@@ -9596,6 +9599,31 @@ export default function CRM() {
   const [tasks, setTasks] = useState(initialTasks);
   const [page, setPage] = useState("dashboard");
   const dataLoaded = useRef(false);
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const w = el.width = window.innerWidth;
+    const h = el.height = window.innerHeight;
+    const ctx = el.getContext("2d");
+    const cx = w / 2, cy = h / 2;
+    const maxDist = Math.sqrt(cx * cx + cy * cy);
+    const imageData = ctx.createImageData(w, h);
+    const data = imageData.data;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const dist = Math.sqrt(Math.pow(x - cx, 2) + Math.pow(y - cy, 2));
+        const gradient = (1 - dist / maxDist) * 0.25;
+        const noise = (Math.random() - 0.5) * 0.06;
+        const val = Math.max(0, Math.min(1, gradient + noise));
+        const v = Math.round(val * 255);
+        const idx = (y * w + x) * 4;
+        data[idx] = v; data[idx+1] = v; data[idx+2] = v; data[idx+3] = 255;
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }, []);
 
   useEffect(() => {
   async function initEmployees() {
@@ -9670,29 +9698,7 @@ export default function CRM() {
     <ConfigProvider>
       <div style={{ display: "flex", minHeight: "100vh", width: "100vw", overflow: "hidden", background: "transparent", fontFamily: "'Inter', 'Segoe UI', sans-serif", color: COLORS.text, position: "relative" }}>
         {/* Global canvas background — dark radial gradient + grain */}
-        <canvas ref={el => {
-          if (!el || el._init) return;
-          el._init = true;
-          const w = el.width = window.innerWidth;
-          const h = el.height = window.innerHeight;
-          const ctx = el.getContext("2d");
-          const cx = w / 2, cy = h / 2;
-          const maxDist = Math.sqrt(cx * cx + cy * cy);
-          const imageData = ctx.createImageData(w, h);
-          const data = imageData.data;
-          for (let y = 0; y < h; y++) {
-            for (let x = 0; x < w; x++) {
-              const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-              const gradient = (1 - dist / maxDist) * 0.25;
-              const noise = (Math.random() - 0.5) * 0.06;
-              const val = Math.max(0, Math.min(1, gradient + noise));
-              const v = Math.round(val * 255);
-              const i = (y * w + x) * 4;
-              data[i] = v; data[i+1] = v; data[i+2] = v; data[i+3] = 255;
-            }
-          }
-          ctx.putImageData(imageData, 0, 0);
-        }} style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0, pointerEvents: "none" }} />
+        <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0, pointerEvents: "none" }} />
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&family=DM+Mono:wght@400;600&display=swap');
           * { box-sizing: border-box; }

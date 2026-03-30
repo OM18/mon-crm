@@ -3046,7 +3046,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ACCOUNT CURRENCY <span style={{ color: COLORS.red }}>*</span></label>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         {(config.contractsCurrency || []).map(c => {
-                          const selected = Array.isArray(accForm.currency) && accForm.currency.includes(c.value);
+                          const selected = Array.isArray(accForm.currency) && accForm.currency.some(v => (v || "").toUpperCase() === (c.value || "").toUpperCase());
                           const col = c.color || COLORS.accent;
                           return (
                             <div key={c.value} onClick={() => {
@@ -3183,7 +3183,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                             <div style={{ position: "absolute", top: 3, left: a.isActive ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                           </div>
                           <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, fontWeight: 600, minWidth: 58, textAlign: "center", background: a.isActive ? `${COLORS.green}22` : `${COLORS.red}22`, color: a.isActive ? COLORS.green : COLORS.red }}>{a.isActive ? "Active" : "Inactive"}</span>
-                          <button onClick={() => { const acc = { ...a, currency: Array.isArray(a.currency) ? a.currency : (a.currency ? [a.currency] : []) }; setAccForm(acc); setEditAccId(a.id); setShowAccForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                          <button onClick={() => { const acc = { ...a, currency: Array.isArray(a.currency) ? a.currency.map(v => (v||"").toUpperCase()) : (a.currency ? [a.currency.toUpperCase()] : []) }; setAccForm(acc); setEditAccId(a.id); setShowAccForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
                           <button onClick={() => deleteAccount(a.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
                         </div>
                       );
@@ -7340,8 +7340,11 @@ const setOps = async (val) => {
                   <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.internalDeal ? `${COLORS.blue}20` : "transparent", color: o.internalDeal ? COLORS.blue : COLORS.textMuted }}>{o.internalDeal ? "YES" : "—"}</span></div>
                   {/* FEES — calculé auto, éditable manuellement */}
                   {(() => {
+                    const product = products.find(p => (p.label || "").toLowerCase().trim() === (o.instrument || "").toLowerCase().trim());
+                    const productCurrency = (product?.currency || "").toUpperCase();
                     const account = derivAccounts.find(a => a.accountNumber === o.account);
-                    const currency = (Array.isArray(account?.currency) ? (account.currency[0] || "") : (account?.currency || "")).toUpperCase();
+                    const accountCurrency = (Array.isArray(account?.currency) ? (account.currency[0] || "") : (account?.currency || "")).toUpperCase();
+                    const currency = productCurrency || accountCurrency;
                     const sym = CURRENCY_SYMBOLS[currency] || currency;
                     const autoFees = computeFees(o, exchangeTarifs);
                     const hasManual = o.fees !== undefined && o.fees !== "";
@@ -7425,8 +7428,11 @@ const setOps = async (val) => {
 
           {/* FEES */}
           {(() => {
+            const product = products.find(p => (p.label || "").toLowerCase().trim() === (sel.instrument || "").toLowerCase().trim());
+            const productCurrency = (product?.currency || "").toUpperCase();
             const account = derivAccounts.find(a => a.accountNumber === sel.account);
-            const currency = (Array.isArray(account?.currency) ? (account.currency[0] || "") : (account?.currency || "")).toUpperCase();
+            const accountCurrency = (Array.isArray(account?.currency) ? (account.currency[0] || "") : (account?.currency || "")).toUpperCase();
+            const currency = productCurrency || accountCurrency;
             const sym = CURRENCY_SYMBOLS[currency] || currency;
             const autoFees = computeFees(sel, exchangeTarifs);
             const hasManual = sel.fees !== undefined && sel.fees !== "";

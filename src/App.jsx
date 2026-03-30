@@ -6890,7 +6890,7 @@ const setOps = async (val) => {
     setFormErrors({});
     const norm = v => (v || "").toString().toLowerCase().trim();
     const resolvedExchange = products.find(p => norm(p.label) === norm(form.instrument))?.stoxxExchange || form.exchange || "";
-    const data = { ...form, exchange: resolvedExchange, id: editOp ? editOp.id : Date.now() };
+    const data = { ...form, price: String(form.price).replace(/,/g, "."), exchange: resolvedExchange, id: editOp ? editOp.id : Date.now() };
     if (editOp) { setOpsRaw(ops.map(o => o.id === editOp.id ? data : o)); await saveOneDerivative(data); }
     else        { setOpsRaw([...ops, data]); await saveOneDerivative(data); }
     setShowForm(false);
@@ -7580,7 +7580,7 @@ const setOps = async (val) => {
                     {decConfig && <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.blue, fontWeight: 400, fontFamily: "'DM Mono', monospace" }}>format: {decConfig.example}</span>}
                   </label>
                   {!isFraction ? (
-                    <input value={form.price} onChange={e => { setForm(f => ({ ...f, price: e.target.value })); setFormErrors(er => ({ ...er, price: undefined })); }} placeholder="0.00"
+                    <input value={form.price} onChange={e => { const v = e.target.value.replace(/,/g, "."); setForm(f => ({ ...f, price: v })); setFormErrors(er => ({ ...er, price: undefined })); }} placeholder="0.00"
                       style={{ background: COLORS.bg, border: `1px solid ${formErrors.price ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
                   ) : (
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

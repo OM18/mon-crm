@@ -8460,7 +8460,7 @@ const DerivStatistics = () => {
     }
     return Object.values(result).map(r => ({ ...r, pnlByYear: getPnlByYear(r.ops) }))
       .sort((a, b) => a.bu.localeCompare(b.bu) || a.underlyingCat.localeCompare(b.underlyingCat));
-  }, [ops, accounts, products]);
+  }, [ops, accounts, products, lotSizes, priceUnits]);
 
   // ── TABLE 2: by BU × Account ──
   const table2 = useMemo(() => {
@@ -8475,7 +8475,7 @@ const DerivStatistics = () => {
     }
     return Object.values(result).map(r => ({ ...r, pnlByYear: getPnlByYear(r.ops) }))
       .sort((a, b) => a.bu.localeCompare(b.bu) || a.account.localeCompare(b.account));
-  }, [ops, accounts, products]);
+  }, [ops, accounts, products, lotSizes, priceUnits]);
 
   const fmtPnl = (n) => {
     if (n === 0 || n === undefined) return "—";

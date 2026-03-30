@@ -8549,15 +8549,52 @@ const DerivStatistics = () => {
   const totalRow1 = years.reduce((acc, y) => ({ ...acc, [y]: table1.reduce((s, r) => s + (r.pnlByYear[y] || 0), 0) }), {});
   const totalRow2 = years.reduce((acc, y) => ({ ...acc, [y]: table2.reduce((s, r) => s + (r.pnlByYear[y] || 0), 0) }), {});
 
+  const exportYearToExcel = async (label, rowOps, year) => {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    // Filter ops for this year only
+    const yearOps = rowOps.filter(o => o.tradeDate && parseInt(o.tradeDate.slice(0, 4)) === year);
+    const buckets = getStatFifoDetail(yearOps);
+    const fmtNum = n => typeof n === "number" ? Math.round(n * 100) / 100 : n;
+
+    const sheetData = [
+      ["ACCOUNT", "INSTRUMENT", "POSITION", "BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "DELTA", "P&L"],
+    ];
+    for (const b of [...buckets].sort((a, z) => Math.abs(z.realizedPnl) - Math.abs(a.realizedPnl))) {
+      for (const m of b.matches) {
+        sheetData.push([
+          b.account, b.instrument,
+          m.position || "LONG",
+          m.buyRef || "—", m.buyDate,
+          m.sellRef || "—", m.sellDate,
+          m.lots, fmtNum(m.entryPrice), fmtNum(m.exitPrice),
+          fmtNum(m.exitPrice - m.entryPrice), fmtNum(m.pnl),
+        ]);
+      }
+    }
+    const totalPnl = buckets.reduce((s, b) => s + b.realizedPnl, 0);
+    const totalLots = buckets.reduce((s, b) => s + b.matches.reduce((ss, m) => ss + m.lots, 0), 0);
+    sheetData.push([]);
+    sheetData.push(["TOTAL", "", "", "", "", "", "", totalLots, "", "", "", fmtNum(totalPnl)]);
+
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    XLSX.utils.book_append_sheet(wb, ws, `P&L ${year}`);
+    XLSX.writeFile(wb, `stats_pnl_${label.replace(/[^a-zA-Z0-9]/g, "_")}_${year}.xlsx`);
+  };
+
   const TableHeader = ({ cols }) => (
     <div style={{ display: "grid", gridTemplateColumns: cols, background: COLORS.tableHeader, padding: "10px 20px", borderRadius: "10px 10px 0 0" }}>
-      {["BU", "Category / Account", ...years.map(String)].map(h => (
-        <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: h === "BU" || h === "Category / Account" ? "left" : "right" }}>{h}</div>
+      {["BU", "Category / Account", ...years.map(String), ...years.map(y => String(y))].map((h, i) => (
+        <div key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: i < 2 ? "left" : "center" }}>
+          {i >= 2 + years.length
+            ? <img src="/logoxl.png" style={{ width: 18, height: 18, objectFit: "contain", opacity: 0.7 }} title={`Export ${years[i - 2 - years.length]}`} />
+            : h}
+        </div>
       ))}
     </div>
   );
 
-  const COLS = "80px 1fr repeat(3, 140px)";
+  const COLS = `80px 1fr repeat(3, 120px) repeat(3, 44px)`;
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, color: COLORS.textMuted, fontSize: 14 }}>
@@ -8577,32 +8614,34 @@ const DerivStatistics = () => {
           return (
             <div key={bu}>
               {/* BU subtotal row */}
-              <div style={{ display: "grid", gridTemplateColumns: COLS, padding: "9px 20px", background: `${COLORS.accent}10`, borderBottom: `1px solid ${COLORS.border}` }}>
+              <div style={{ display: "grid", gridTemplateColumns: COLS, padding: "9px 20px", background: `${COLORS.accent}10`, borderBottom: `1px solid ${COLORS.border}`, alignItems: "center" }}>
                 <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.accent, fontFamily: "'DM Mono', monospace" }}>{(bu || "—").toUpperCase()}</div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSub }}>{buRows.length} ligne{buRows.length > 1 ? "s" : ""}</div>
                 {years.map(y => (
                   <div key={y} style={{ textAlign: "right", fontSize: 13, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: pnlColor(buTotal[y]) }}>{fmtPnl(buTotal[y])}</div>
                 ))}
+                {years.map(y => <div key={`xl-${y}`} />)}
               </div>
               {/* Detail rows */}
               {buRows.map((row, i) => (
                 <div key={i} style={{ display: "grid", gridTemplateColumns: COLS, padding: "9px 20px", borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}>
                   <div />
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 13, color: COLORS.text, fontWeight: 500 }}>{row[labelKey] || "—"}</span>
-                    {/* Excel icon — détail P&L */}
-                    <div
-                      onClick={() => setStatDetailRow({ label: row[labelKey] || "—", ops: row.ops })}
-                      title="Voir le détail du calcul P&L"
-                      style={{ display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" }}
-                      onMouseOver={e => e.currentTarget.style.opacity = "0.7"}
-                      onMouseOut={e => e.currentTarget.style.opacity = "1"}
-                    >
-                      <img src="/logoxl.png" style={{ width: 22, height: 22, objectFit: "contain" }} />
-                    </div>
-                  </div>
+                  <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 500 }}>{row[labelKey] || "—"}</div>
                   {years.map(y => (
                     <div key={y} style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: pnlColor(row.pnlByYear[y]), fontWeight: 600 }}>{fmtPnl(row.pnlByYear[y])}</div>
+                  ))}
+                  {years.map(y => (
+                    <div key={`xl-${y}`} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div
+                        onClick={() => exportYearToExcel(row[labelKey] || "—", row.ops, y)}
+                        title={`Exporter P&L ${y}`}
+                        style={{ cursor: "pointer", transition: "opacity 0.15s" }}
+                        onMouseOver={e => e.currentTarget.style.opacity = "0.7"}
+                        onMouseOut={e => e.currentTarget.style.opacity = "1"}
+                      >
+                        <img src="/logoxl.png" style={{ width: 20, height: 20, objectFit: "contain" }} />
+                      </div>
+                    </div>
                   ))}
                 </div>
               ))}
@@ -8610,12 +8649,13 @@ const DerivStatistics = () => {
           );
         })}
         {/* Grand total */}
-        <div style={{ display: "grid", gridTemplateColumns: COLS, padding: "12px 20px", background: COLORS.tableHeader, borderTop: `2px solid ${COLORS.border}` }}>
+        <div style={{ display: "grid", gridTemplateColumns: COLS, padding: "12px 20px", background: COLORS.tableHeader, borderTop: `2px solid ${COLORS.border}`, alignItems: "center" }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.text }}>TOTAL</div>
           <div />
           {years.map(y => (
             <div key={y} style={{ textAlign: "right", fontSize: 14, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: pnlColor(totalRow[y]) }}>{fmtPnl(totalRow[y])}</div>
           ))}
+          {years.map(y => <div key={`xl-${y}`} />)}
         </div>
       </div>
     );

@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 import { useState, useEffect, useRef, createContext, useContext, useMemo } from "react";
 import { supabase } from './supabase';
 
@@ -832,20 +831,12 @@ const DerivDecimalsEditor = ({ config, updateField }) => {
     // Check duplicate
     const exists = localItems.some(i => normV(i.exchange) === normV(newEntry.exchange) && normV(i.underlying) === normV(newEntry.underlying));
     if (exists) return;
-    const next = [...localItems, { ...newEntry, id: Date.now() }];
-    mark(next);
-    updateField("derivDecimals", next);
-    setDirty(false);
+    mark([...localItems, { ...newEntry, id: Date.now() }]);
     setNewEntry(EMPTY_ENTRY);
   };
 
   const updateEntry = (idx, field, val) => mark(localItems.map((x, i) => i === idx ? { ...x, [field]: val } : x));
-  const removeEntry = (idx) => {
-    const next = localItems.filter((_, i) => i !== idx);
-    mark(next);
-    updateField("derivDecimals", next);
-    setDirty(false);
-  };
+  const removeEntry = (idx) => mark(localItems.filter((_, i) => i !== idx));
 
   const newItems = localItems.filter(isNewStyle);
   const legacyItems = localItems.filter(i => !isNewStyle(i));
@@ -1710,21 +1701,18 @@ useEffect(() => {
   // Migrate existing products when quotationUnits or decimals config are loaded
   useEffect(() => {
     if (!products.length) return;
-    const normM = v => (v || '').toLowerCase().trim().replace(/_/g, " ");
+    const normM = v => (v || '').toLowerCase().trim();
     const decRules = (config.derivDecimals || []).filter(d => d.exchange !== undefined || d.underlying !== undefined);
     const needsMigration = products.some(p => {
       const quMatch = quotationUnits.find(q => normM(q.underlying) === normM(p.underlying) && normM(q.exchange) === normM(p.stoxxExchange));
-      // Only auto-apply decimals if product has no decimals set or is still at default
-      const hasManualDecimals = p.decimals && p.decimals !== "decimal";
-      const decMatch = !hasManualDecimals ? decRules.find(d => normM(d.underlying) === normM(p.underlying) && normM(d.exchange) === normM(p.stoxxExchange)) : null;
+      const decMatch = decRules.find(d => normM(d.underlying) === normM(p.underlying) && normM(d.exchange) === normM(p.stoxxExchange));
       return (quMatch && p.quotationUnit !== quMatch.quotationUnit) ||
              (decMatch && (p.decimals !== decMatch.displayFormat || p.tickSize !== (decMatch.tickSize || "")));
     });
     if (!needsMigration) return;
     const updated = products.map(p => {
       const quMatch = quotationUnits.find(q => normM(q.underlying) === normM(p.underlying) && normM(q.exchange) === normM(p.stoxxExchange));
-      const hasManualDecimals = p.decimals && p.decimals !== "decimal";
-      const decMatch = !hasManualDecimals ? decRules.find(d => normM(d.underlying) === normM(p.underlying) && normM(d.exchange) === normM(p.stoxxExchange)) : null;
+      const decMatch = decRules.find(d => normM(d.underlying) === normM(p.underlying) && normM(d.exchange) === normM(p.stoxxExchange));
       return {
         ...p,
         ...(quMatch ? { quotationUnit: quMatch.quotationUnit } : {}),
@@ -1732,7 +1720,8 @@ useEffect(() => {
       };
     });
     setProducts(updated);
-    saveProducts(updated, setProducts, products);
+    // Note: migration only updates local state, not persisted to DB automatically
+    // Products are saved explicitly when user makes a change in the admin panel
   }, [quotationUnits, products.length, config.derivDecimals]);
 
   const remove = async (id) => { const u = products.filter(p => p.id !== id); setProducts(u); await saveProducts(u, setProducts, products); };
@@ -3047,7 +3036,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ACCOUNT CURRENCY <span style={{ color: COLORS.red }}>*</span></label>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         {(config.contractsCurrency || []).map(c => {
-                          const selected = Array.isArray(accForm.currency) && accForm.currency.some(v => (v || "").toUpperCase() === (c.value || "").toUpperCase());
+                          const selected = Array.isArray(accForm.currency) && accForm.currency.includes(c.value);
                           const col = c.color || COLORS.accent;
                           return (
                             <div key={c.value} onClick={() => {
@@ -3184,7 +3173,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                             <div style={{ position: "absolute", top: 3, left: a.isActive ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
                           </div>
                           <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, fontWeight: 600, minWidth: 58, textAlign: "center", background: a.isActive ? `${COLORS.green}22` : `${COLORS.red}22`, color: a.isActive ? COLORS.green : COLORS.red }}>{a.isActive ? "Active" : "Inactive"}</span>
-                          <button onClick={() => { const acc = { ...a, currency: Array.isArray(a.currency) ? a.currency.map(v => (v||"").toUpperCase()) : (a.currency ? [a.currency.toUpperCase()] : []) }; setAccForm(acc); setEditAccId(a.id); setShowAccForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                          <button onClick={() => { const acc = { ...a, currency: Array.isArray(a.currency) ? a.currency : (a.currency ? [a.currency] : []) }; setAccForm(acc); setEditAccId(a.id); setShowAccForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
                           <button onClick={() => deleteAccount(a.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
                         </div>
                       );
@@ -3333,11 +3322,10 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                     {lotSizes.map(l => {
                       const exchCfg = (config.derivExchanges || []).find(e => e.value === l.exchange);
                       const unitCfg = (config.derivVolumeUnits || []).find(u => u.value === l.volumeUnit);
-                      const commodityCfg = (config.derivCommodities || []).find(c => c.value === l.instrument);
                       return (
                         <div key={l.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px 80px 60px", gap: 8, alignItems: "center", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 12px" }}>
                           <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.blue }}>{exchCfg?.label || l.exchange}</span>
-                          <span style={{ fontSize: 13, color: COLORS.text }}>{commodityCfg?.label || l.instrument}</span>
+                          <span style={{ fontSize: 13, color: COLORS.text }}>{l.instrument}</span>
                           <span style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", color: COLORS.green }}>{l.quantity}</span>
                           <span style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600 }}>{unitCfg?.label || l.volumeUnit}</span>
                           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -3988,8 +3976,7 @@ const Dashboard = ({ contacts, companies, tasks }) => {
   const getStatusCfg = (v) => config.activityStatus.find(s => s.value === v) || { label: v || "—", color: COLORS.textSub };
 
   return (
-    <div style={{ position: "relative" }}>
-      <div style={{ position: "relative", zIndex: 1 }}>
+    <div>
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif" }}>Vue d'ensemble</h1>
         <p style={{ margin: "6px 0 0", color: COLORS.textSub, fontSize: 14 }}>Bienvenue dans votre espace CRM</p>
@@ -5295,9 +5282,11 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
 
       </div>
     </div>
-    </div>
   );
 };
+
+// ─── COMPANIES ────────────────────────────────────────────────
+const LoginPage = ({ onLogin }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -6851,24 +6840,15 @@ const setOps = async (val) => {
       const fmt = prod?.decimals || "decimal";
       const tick = prod?.tickSize || "";
       if (tick && !fmt.includes("/")) {
+        // Decimal tick validation
         const tickVal = parseFloat(tick);
-        const priceStr = String(form.price).replace(/,/g, ".");
-        const priceVal = parseFloat(priceStr);
+        const priceVal = parseFloat(form.price);
         if (!isNaN(tickVal) && tickVal > 0 && !isNaN(priceVal)) {
-          const tickDecimals = tick.includes(".") ? tick.split(".")[1].length : 0;
-          // Count decimals in price
-          const priceDecimals = priceStr.includes(".") ? priceStr.split(".")[1].length : 0;
-          // If price has more decimals than tick, it's invalid
-          const invalid = priceDecimals > tickDecimals ||
-            (tickDecimals > 0 && (() => {
-              // Also check that the value at tick precision is a multiple of tick
-              const factor = Math.pow(10, tickDecimals);
-              const priceInt = Math.round(priceVal * factor);
-              const tickInt  = Math.round(tickVal * factor);
-              return tickInt > 0 && priceInt % tickInt !== 0;
-            })());
-          if (invalid) {
-            errors.price = `Prix invalide — le tick minimum est ${tick} (ex: ${(Math.floor(priceVal / tickVal) * tickVal).toFixed(tickDecimals)})`;
+          // Check if price is a multiple of tick (within floating point tolerance)
+          const remainder = Math.abs(priceVal % tickVal);
+          const tolerance = tickVal * 0.0001;
+          if (remainder > tolerance && Math.abs(remainder - tickVal) > tolerance) {
+            errors.price = `Prix invalide — le tick minimum est ${tick} (ex: ${(Math.round(priceVal / tickVal) * tickVal).toFixed(tick.includes(".") ? tick.split(".")[1].length : 0)})`;
           }
         }
       } else if (tick && fmt.includes("/") && form.price.includes(" ")) {
@@ -6890,7 +6870,7 @@ const setOps = async (val) => {
     setFormErrors({});
     const norm = v => (v || "").toString().toLowerCase().trim();
     const resolvedExchange = products.find(p => norm(p.label) === norm(form.instrument))?.stoxxExchange || form.exchange || "";
-    const data = { ...form, price: String(form.price).replace(/,/g, "."), exchange: resolvedExchange, id: editOp ? editOp.id : Date.now() };
+    const data = { ...form, exchange: resolvedExchange, id: editOp ? editOp.id : Date.now() };
     if (editOp) { setOpsRaw(ops.map(o => o.id === editOp.id ? data : o)); await saveOneDerivative(data); }
     else        { setOpsRaw([...ops, data]); await saveOneDerivative(data); }
     setShowForm(false);
@@ -6953,12 +6933,7 @@ const setOps = async (val) => {
       : tagChecks.every(Boolean);
     const customPass = customChecks.every(Boolean);
     return tagPass && customPass;
-  }).sort((a, b) => {
-    const dateDiff = (b.tradeDate || "").localeCompare(a.tradeDate || "");
-    if (dateDiff !== 0) return dateDiff;
-    // Same date: most recently entered first (highest id)
-    return (b.id || 0) - (a.id || 0);
-  });
+  }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
   }, [ops, search, accountSearch, dateFrom, dateTo, JSON.stringify(activeFilters), JSON.stringify(customFilters), filterMode, derivAccounts, products, config]);
 
   const sel = ops.find(o => o.id === selected);
@@ -6968,13 +6943,10 @@ const setOps = async (val) => {
     if (!price && price !== 0) return "—";
     const prod = products.find(p => p.label === instrument);
     const fmt = prod?.decimals || "decimal";
+    const tick = prod?.tickSize || "";
     // Fraction format: e.g. "1/8"
     if (fmt.includes("/")) {
       const den = parseInt(fmt.split("/")[1] || "8");
-      // If already stored as fraction string "201 4/8", display as-is
-      if (typeof price === "string" && price.includes(" ") && price.includes("/")) {
-        return price;
-      }
       const num = parseFloat(price);
       if (isNaN(num)) return String(price);
       const intPart = Math.floor(num);
@@ -6988,18 +6960,9 @@ const setOps = async (val) => {
     const dpMatch = fmt.match(/^decimal(\d)$/);
     if (dpMatch) {
       const dp = parseInt(dpMatch[1]);
-      // Handle fraction string stored as "201 4/8" in non-fraction mode (fallback)
-      if (typeof price === "string" && price.includes(" ")) {
-        const [intStr, fracStr] = price.split(" ");
-        if (fracStr && fracStr.includes("/")) {
-          const [fn, fd] = fracStr.split("/").map(Number);
-          const num = parseInt(intStr) + fn / fd;
-          return parseFloat(num.toFixed(dp)).toString();
-        }
-      }
       const num = parseFloat(price);
       if (isNaN(num)) return String(price);
-      return parseFloat(num.toFixed(dp)).toString();
+      return num.toFixed(dp);
     }
     // decimal or unknown: show as-is
     return String(price);
@@ -7366,8 +7329,8 @@ const setOps = async (val) => {
                   <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.internalDeal ? `${COLORS.blue}20` : "transparent", color: o.internalDeal ? COLORS.blue : COLORS.textMuted }}>{o.internalDeal ? "YES" : "—"}</span></div>
                   {/* FEES — calculé auto, éditable manuellement */}
                   {(() => {
-                    const product = products.find(p => (p.label || "").toLowerCase().trim() === (o.instrument || "").toLowerCase().trim());
-                    const currency = (product?.currency || "").toUpperCase();
+                    const account = derivAccounts.find(a => a.accountNumber === o.account);
+                    const currency = (Array.isArray(account?.currency) ? (account.currency[0] || "") : (account?.currency || "")).toUpperCase();
                     const sym = CURRENCY_SYMBOLS[currency] || currency;
                     const autoFees = computeFees(o, exchangeTarifs);
                     const hasManual = o.fees !== undefined && o.fees !== "";
@@ -7451,8 +7414,8 @@ const setOps = async (val) => {
 
           {/* FEES */}
           {(() => {
-            const product = products.find(p => (p.label || "").toLowerCase().trim() === (sel.instrument || "").toLowerCase().trim());
-            const currency = (product?.currency || "").toUpperCase();
+            const account = derivAccounts.find(a => a.accountNumber === sel.account);
+            const currency = (Array.isArray(account?.currency) ? (account.currency[0] || "") : (account?.currency || "")).toUpperCase();
             const sym = CURRENCY_SYMBOLS[currency] || currency;
             const autoFees = computeFees(sel, exchangeTarifs);
             const hasManual = sel.fees !== undefined && sel.fees !== "";
@@ -7580,7 +7543,7 @@ const setOps = async (val) => {
                     {decConfig && <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.blue, fontWeight: 400, fontFamily: "'DM Mono', monospace" }}>format: {decConfig.example}</span>}
                   </label>
                   {!isFraction ? (
-                    <input value={form.price} onChange={e => { const v = e.target.value.replace(/,/g, "."); setForm(f => ({ ...f, price: v })); setFormErrors(er => ({ ...er, price: undefined })); }} placeholder="0.00"
+                    <input value={form.price} onChange={e => { setForm(f => ({ ...f, price: e.target.value })); setFormErrors(er => ({ ...er, price: undefined })); }} placeholder="0.00"
                       style={{ background: COLORS.bg, border: `1px solid ${formErrors.price ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
                   ) : (
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -7662,25 +7625,6 @@ const setOps = async (val) => {
   .map(a => <option key={a.id} value={a.accountNumber}>{a.accountNumber.toUpperCase()}</option>)}
               </select>
               {formErrors.account && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.account}</span>}
-              {/* Warning devise compte vs instrument */}
-              {(() => {
-                if (!form.account || !form.instrument) return null;
-                const product = products.find(p => (p.label || "").toLowerCase().trim() === (form.instrument || "").toLowerCase().trim());
-                const instrCurrency = (product?.currency || "").toUpperCase();
-                const account = derivAccounts.find(a => a.accountNumber === form.account);
-                const accCurrencies = (Array.isArray(account?.currency) ? account.currency : (account?.currency ? [account.currency] : [])).map(v => (v || "").toUpperCase());
-                if (!instrCurrency || accCurrencies.length === 0) return null;
-                const mismatch = !accCurrencies.includes(instrCurrency);
-                if (!mismatch) return null;
-                return (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, background: `${COLORS.orange}15`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "8px 12px" }}>
-                    <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
-                    <span style={{ fontSize: 12, color: COLORS.orange, fontWeight: 600, lineHeight: 1.4 }}>
-                      Devise du compte (<strong>{accCurrencies.join(", ")}</strong>) différente de la devise de l'instrument (<strong>{instrCurrency}</strong>). Vérifiez la configuration.
-                    </span>
-                  </div>
-                );
-              })()}
             </div>
 
             {/* Contract + Trade */}
@@ -8017,18 +7961,7 @@ const Pipeline = ({ contacts, setContacts, companies, setCompanies }) => {
 
 // ─── FIFO ENGINE ─────────────────────────────────────────────
 const runFIFO = (bucketOps, lotSize = 1) => {
-  const parseP = (v) => {
-    const s = String(v ?? "").replace(/,/g, ".");
-    // Handle fraction string "201 4/8"
-    if (s.includes(" ") && s.includes("/")) {
-      const [intStr, fracStr] = s.split(" ");
-      const [fn, fd] = fracStr.split("/").map(Number);
-      const result = parseInt(intStr) + fn / fd;
-      return isNaN(result) ? 0 : result;
-    }
-    const n = parseFloat(s);
-    return isNaN(n) ? 0 : n;
-  };
+  const parseP = (v) => { const n = parseFloat(String(v ?? "").replace(/,/g, ".")); return isNaN(n) ? 0 : n; };
   const sorted = [...bucketOps].sort((a, b) => {
     const da = a.tradeDate || "9999", db = b.tradeDate || "9999";
     if (da !== db) return da < db ? -1 : 1;
@@ -8060,7 +7993,6 @@ const runFIFO = (bucketOps, lotSize = 1) => {
           buyRef: op.ref,    buyDate: op.tradeDate || "—",
           sellRef: head.ref, sellDate: head.date,
           lots: matched, entryPrice: head.price, exitPrice: price, pnl,
-          position: "SHORT",
         });
         head.remaining -= matched;
         remaining      -= matched;
@@ -8082,7 +8014,6 @@ const runFIFO = (bucketOps, lotSize = 1) => {
           buyRef: head.ref,  buyDate: head.date,
           sellRef: op.ref,   sellDate: op.tradeDate || "—",
           lots: matched, entryPrice: head.price, exitPrice: price, pnl,
-          position: "LONG",
         });
         head.remaining -= matched;
         remaining      -= matched;
@@ -8286,42 +8217,11 @@ function ExpiryRow({ instrument, exchange, index, products }) {
 }
 
 // ─── DERIV STATISTICS ────────────────────────────────────────
-// ─── SHARED HELPERS (used by both Statistics and Dashboard) ──
-const _norm = v => (v || "").toLowerCase().trim().replace(/_/g, " ");
-
-const resolveLotSize = (exchange, instrument, products, lotSizes) => {
-  const product = products.find(p => _norm(p.label) === _norm(instrument));
-  const underlying = product?.underlying || instrument;
-  const resolvedExchange = product?.stoxxExchange || exchange;
-  const normUnderlying = _norm(underlying);
-  const normExchange = _norm(resolvedExchange);
-  let match = lotSizes.find(l => _norm(l.exchange) === normExchange && _norm(l.instrument) === normUnderlying);
-  if (!match) match = lotSizes.find(l => _norm(l.instrument) === normUnderlying);
-  if (!match && normExchange) match = lotSizes.find(l => _norm(l.exchange) === normExchange);
-  return match ? (parseFloat(match.quantity) || 1) : 1;
-};
-
-const resolvePriceUnit = (exchange, instrument, products, priceUnits) => {
-  const product = products.find(p => _norm(p.label) === _norm(instrument));
-  const resolvedExchange = product?.stoxxExchange || exchange;
-  const resolvedUnderlying = product?.underlying || "";
-  const normExchange = _norm(resolvedExchange);
-  const normUnderlying = _norm(resolvedUnderlying);
-  let match = normUnderlying
-    ? priceUnits.find(p => _norm(p.exchange) === normExchange && _norm(p.underlying || "") === normUnderlying)
-    : null;
-  if (!match) match = priceUnits.find(p => _norm(p.exchange) === normExchange && !p.underlying);
-  if (!match) match = priceUnits.find(p => _norm(p.exchange) === normExchange);
-  return match ? (parseFloat(match.unit) || 1) : 1;
-};
-
 const DerivStatistics = () => {
   const { config } = useConfig();
   const [ops, setOps] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [products, setProducts] = useState([]);
-  const [lotSizes, setLotSizes] = useState([]);
-  const [priceUnits, setPriceUnits] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -8343,10 +8243,6 @@ const DerivStatistics = () => {
       if (accData?.length) setAccounts(accData.map(r => r.data ?? r));
       const { data: prodData } = await supabase.from('deriv_products').select('data');
       if (prodData?.length) setProducts(prodData.map(r => r.data ?? r));
-      const { data: lsData } = await supabase.from('deriv_lot_sizes').select('data');
-      if (lsData?.length) setLotSizes(lsData.map(r => r.data ?? r));
-      const { data: puData } = await supabase.from('deriv_price_units').select('data');
-      if (puData?.length) setPriceUnits(puData.map(r => r.data ?? r));
       setLoading(false);
     }
     loadAll();
@@ -8365,17 +8261,7 @@ const DerivStatistics = () => {
 
   // FIFO per bucket (account × instrument) — returns realizedPnl
   const runFIFOPnl = (bucketOps, lotSize = 1) => {
-    const parseP = v => {
-      const s = String(v ?? "").replace(/,/g, ".");
-      if (s.includes(" ") && s.includes("/")) {
-        const [intStr, fracStr] = s.split(" ");
-        const [fn, fd] = fracStr.split("/").map(Number);
-        const result = parseInt(intStr) + fn / fd;
-        return isNaN(result) ? 0 : result;
-      }
-      const n = parseFloat(s);
-      return isNaN(n) ? 0 : n;
-    };
+    const parseP = v => { const n = parseFloat(String(v ?? "").replace(/,/g, ".")); return isNaN(n) ? 0 : n; };
     const sorted = [...bucketOps].sort((a, b) => {
       const da = a.tradeDate || "9999", db = b.tradeDate || "9999";
       if (da !== db) return da < db ? -1 : 1;
@@ -8414,9 +8300,9 @@ const DerivStatistics = () => {
     return realizedPnl;
   };
 
-  // Compute P&L per year — using EXIT date (sellDate) to assign each match to a year
+  // Compute P&L per op filtered by year
   const getPnlByYear = (opsSubset) => {
-    const norm = v => (v || "").toLowerCase().trim().replace(/_/g, " ");
+    const norm = v => (v || "").toLowerCase().trim();
     // Group by account × instrument
     const buckets = {};
     for (const op of opsSubset) {
@@ -8428,18 +8314,15 @@ const DerivStatistics = () => {
     for (const year of years) pnlByYear[year] = 0;
 
     for (const b of Object.values(buckets)) {
-      const ls = resolveLotSize(b.ops[0]?.exchange || "", b.instrument, products, lotSizes);
-      const pu = resolvePriceUnit(b.ops[0]?.exchange || "", b.instrument, products, priceUnits);
-      const lotSize = ls * pu;
-
-      // Run FIFO on ALL ops, then split matches by exit year (sellDate)
-      const { matches } = runFIFO(b.ops, lotSize);
-      for (const m of matches) {
-        // Use sellDate as the reference year for this realized P&L
-        const exitYear = m.sellDate && m.sellDate !== "—" ? parseInt(m.sellDate.slice(0, 4)) : null;
-        if (exitYear && pnlByYear[exitYear] !== undefined) {
-          pnlByYear[exitYear] += m.pnl;
-        }
+      const product = products.find(p => norm(p.label) === norm(b.instrument));
+      const lotSize = product ? (parseFloat(product.volumeSizePerLot) || 1) : 1;
+      // Run FIFO per year — only ops up to end of year, incremental
+      for (const year of years) {
+        const opsUpToYear = b.ops.filter(o => o.tradeDate && parseInt(o.tradeDate.slice(0, 4)) <= year);
+        const opsUpToPrevYear = b.ops.filter(o => o.tradeDate && parseInt(o.tradeDate.slice(0, 4)) <= year - 1);
+        const pnlTotal = runFIFOPnl(opsUpToYear, lotSize);
+        const pnlPrev  = runFIFOPnl(opsUpToPrevYear, lotSize);
+        pnlByYear[year] += pnlTotal - pnlPrev;
       }
     }
     return pnlByYear;
@@ -8460,7 +8343,7 @@ const DerivStatistics = () => {
     }
     return Object.values(result).map(r => ({ ...r, pnlByYear: getPnlByYear(r.ops) }))
       .sort((a, b) => a.bu.localeCompare(b.bu) || a.underlyingCat.localeCompare(b.underlyingCat));
-  }, [ops, accounts, products, lotSizes, priceUnits]);
+  }, [ops, accounts, products]);
 
   // ── TABLE 2: by BU × Account ──
   const table2 = useMemo(() => {
@@ -8475,7 +8358,7 @@ const DerivStatistics = () => {
     }
     return Object.values(result).map(r => ({ ...r, pnlByYear: getPnlByYear(r.ops) }))
       .sort((a, b) => a.bu.localeCompare(b.bu) || a.account.localeCompare(b.account));
-  }, [ops, accounts, products, lotSizes, priceUnits]);
+  }, [ops, accounts, products]);
 
   const fmtPnl = (n) => {
     if (n === 0 || n === undefined) return "—";
@@ -8484,117 +8367,18 @@ const DerivStatistics = () => {
   };
   const pnlColor = (n) => !n || n === 0 ? COLORS.textMuted : n > 0 ? COLORS.green : COLORS.red;
 
-  // ── P&L DETAIL MODAL (Statistics) ──
-  const [statDetailRow, setStatDetailRow] = useState(null); // { label, ops }
-
-  const getStatFifoDetail = (rowOps) => {
-    const norm = v => (v || "").toLowerCase().trim();
-    const buckets = {};
-    for (const op of rowOps) {
-      const key = `${op.account}||${norm(op.instrument)}`;
-      if (!buckets[key]) buckets[key] = { account: op.account, instrument: op.instrument, ops: [] };
-      buckets[key].ops.push(op);
-    }
-    return Object.values(buckets).map(b => {
-      const ls = resolveLotSize(b.ops[0]?.exchange || "", b.instrument, products, lotSizes);
-      const pu = resolvePriceUnit(b.ops[0]?.exchange || "", b.instrument, products, priceUnits);
-      const lotSize = ls * pu;
-      const fifo = runFIFO(b.ops, lotSize);
-      return {
-        account: b.account,
-        instrument: b.instrument,
-        buyCount: b.ops.filter(o => (o.side||"").toUpperCase() === "BUY").length,
-        sellCount: b.ops.filter(o => (o.side||"").toUpperCase() === "SELL").length,
-        matches: fifo.matches,
-        realizedPnl: fifo.realizedPnl,
-        openLots: fifo.openLots,
-      };
-    }).filter(b => b.matches.length > 0 || b.buyCount > 0);
-  };
-
-  const exportStatDetailToExcel = async (label, rowOps) => {
-    const XLSX = await import("xlsx");
-    const wb = XLSX.utils.book_new();
-    const buckets = getStatFifoDetail(rowOps);
-    const fmtNum = n => typeof n === "number" ? Math.round(n * 100) / 100 : n;
-
-    const sheetData = [
-      ["ACCOUNT", "INSTRUMENT", "POSITION", "BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "DELTA", "P&L"],
-    ];
-
-    for (const b of [...buckets].sort((a, z) => Math.abs(z.realizedPnl) - Math.abs(a.realizedPnl))) {
-      for (const m of b.matches) {
-        sheetData.push([
-          b.account, b.instrument,
-          m.position || "LONG",
-          m.buyRef || "—", m.buyDate,
-          m.sellRef || "—", m.sellDate,
-          m.lots, fmtNum(m.entryPrice), fmtNum(m.exitPrice),
-          fmtNum(m.exitPrice - m.entryPrice), fmtNum(m.pnl),
-        ]);
-      }
-    }
-
-    const totalPnl = buckets.reduce((s, b) => s + b.realizedPnl, 0);
-    const totalLots = buckets.reduce((s, b) => s + b.matches.reduce((ss, m) => ss + m.lots, 0), 0);
-    sheetData.push([]);
-    sheetData.push(["TOTAL", "", "", "", "", "", "", totalLots, "", "", "", fmtNum(totalPnl)]);
-
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    XLSX.utils.book_append_sheet(wb, ws, "P&L Détail");
-
-    const date = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `stats_pnl_${label.replace(/[^a-zA-Z0-9]/g, "_")}_${date}.xlsx`);
-  };
-
   const totalRow1 = years.reduce((acc, y) => ({ ...acc, [y]: table1.reduce((s, r) => s + (r.pnlByYear[y] || 0), 0) }), {});
   const totalRow2 = years.reduce((acc, y) => ({ ...acc, [y]: table2.reduce((s, r) => s + (r.pnlByYear[y] || 0), 0) }), {});
 
-  const exportYearToExcel = async (label, rowOps, year) => {
-    const XLSX = await import("xlsx");
-    const wb = XLSX.utils.book_new();
-    // Run full FIFO then filter matches by exit year (sellDate)
-    const buckets = getStatFifoDetail(rowOps);
-    const fmtNum = n => typeof n === "number" ? Math.round(n * 100) / 100 : n;
-
-    const sheetData = [
-      ["ACCOUNT", "INSTRUMENT", "POSITION", "BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "DELTA", "P&L"],
-    ];
-    let totalPnl = 0, totalLots = 0;
-    for (const b of [...buckets].sort((a, z) => Math.abs(z.realizedPnl) - Math.abs(a.realizedPnl))) {
-      const yearMatches = b.matches.filter(m => m.sellDate && m.sellDate !== "—" && parseInt(m.sellDate.slice(0, 4)) === year);
-      for (const m of yearMatches) {
-        sheetData.push([
-          b.account, b.instrument,
-          m.position || "LONG",
-          m.buyRef || "—", m.buyDate,
-          m.sellRef || "—", m.sellDate,
-          m.lots, fmtNum(m.entryPrice), fmtNum(m.exitPrice),
-          fmtNum(m.exitPrice - m.entryPrice), fmtNum(m.pnl),
-        ]);
-        totalPnl += m.pnl;
-        totalLots += m.lots;
-      }
-    }
-    sheetData.push([]);
-    sheetData.push(["TOTAL", "", "", "", "", "", "", totalLots, "", "", "", fmtNum(totalPnl)]);
-
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    XLSX.utils.book_append_sheet(wb, ws, `P&L ${year}`);
-    XLSX.writeFile(wb, `stats_pnl_${label.replace(/[^a-zA-Z0-9]/g, "_")}_${year}.xlsx`);
-  };
-
   const TableHeader = ({ cols }) => (
     <div style={{ display: "grid", gridTemplateColumns: cols, background: COLORS.tableHeader, padding: "10px 20px", borderRadius: "10px 10px 0 0" }}>
-      {["BU", "Category / Account", ...years.map(String), ...years.map(y => String(y))].map((h, i) => (
-        <div key={i} style={{ fontSize: 10, fontWeight: 700, color: i >= 2 + years.length ? COLORS.green : COLORS.textMuted, letterSpacing: 0.8, textAlign: i < 2 ? "left" : "center" }}>
-          {h}
-        </div>
+      {["BU", "Category / Account", ...years.map(String)].map(h => (
+        <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: h === "BU" || h === "Category / Account" ? "left" : "right" }}>{h}</div>
       ))}
     </div>
   );
 
-  const COLS = `80px 1fr repeat(3, 120px) repeat(3, 44px)`;
+  const COLS = "80px 1fr repeat(3, 140px)";
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, color: COLORS.textMuted, fontSize: 14 }}>
@@ -8614,34 +8398,20 @@ const DerivStatistics = () => {
           return (
             <div key={bu}>
               {/* BU subtotal row */}
-              <div style={{ display: "grid", gridTemplateColumns: COLS, padding: "9px 20px", background: `${COLORS.accent}10`, borderBottom: `1px solid ${COLORS.border}`, alignItems: "center" }}>
+              <div style={{ display: "grid", gridTemplateColumns: COLS, padding: "9px 20px", background: `${COLORS.accent}10`, borderBottom: `1px solid ${COLORS.border}` }}>
                 <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.accent, fontFamily: "'DM Mono', monospace" }}>{(bu || "—").toUpperCase()}</div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSub }}>{buRows.length} ligne{buRows.length > 1 ? "s" : ""}</div>
                 {years.map(y => (
                   <div key={y} style={{ textAlign: "right", fontSize: 13, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: pnlColor(buTotal[y]) }}>{fmtPnl(buTotal[y])}</div>
                 ))}
-                {years.map(y => <div key={`xl-${y}`} />)}
               </div>
               {/* Detail rows */}
               {buRows.map((row, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: COLS, padding: "9px 20px", borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}>
+                <div key={i} style={{ display: "grid", gridTemplateColumns: COLS, padding: "9px 20px", borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 0 ? COLORS.card : `${COLORS.card}BB` }}>
                   <div />
                   <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 500 }}>{row[labelKey] || "—"}</div>
                   {years.map(y => (
                     <div key={y} style={{ textAlign: "right", fontSize: 13, fontFamily: "'DM Mono', monospace", color: pnlColor(row.pnlByYear[y]), fontWeight: 600 }}>{fmtPnl(row.pnlByYear[y])}</div>
-                  ))}
-                  {years.map(y => (
-                    <div key={`xl-${y}`} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <div
-                        onClick={() => exportYearToExcel(row[labelKey] || "—", row.ops, y)}
-                        title={`Exporter P&L ${y}`}
-                        style={{ cursor: "pointer", transition: "opacity 0.15s" }}
-                        onMouseOver={e => e.currentTarget.style.opacity = "0.7"}
-                        onMouseOut={e => e.currentTarget.style.opacity = "1"}
-                      >
-                        <img src="/logoxl.png" style={{ width: 20, height: 20, objectFit: "contain" }} />
-                      </div>
-                    </div>
                   ))}
                 </div>
               ))}
@@ -8649,13 +8419,12 @@ const DerivStatistics = () => {
           );
         })}
         {/* Grand total */}
-        <div style={{ display: "grid", gridTemplateColumns: COLS, padding: "12px 20px", background: COLORS.tableHeader, borderTop: `2px solid ${COLORS.border}`, alignItems: "center" }}>
+        <div style={{ display: "grid", gridTemplateColumns: COLS, padding: "12px 20px", background: COLORS.tableHeader, borderTop: `2px solid ${COLORS.border}` }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.text }}>TOTAL</div>
           <div />
           {years.map(y => (
             <div key={y} style={{ textAlign: "right", fontSize: 14, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: pnlColor(totalRow[y]) }}>{fmtPnl(totalRow[y])}</div>
           ))}
-          {years.map(y => <div key={`xl-${y}`} />)}
         </div>
       </div>
     );
@@ -8705,110 +8474,6 @@ const DerivStatistics = () => {
           </>
         )}
       </div>
-
-      {/* ── STAT P&L DETAIL MODAL ── */}
-      {statDetailRow && (() => {
-        const buckets = getStatFifoDetail(statDetailRow.ops);
-        const totalPnl = buckets.reduce((s, b) => s + b.realizedPnl, 0);
-        const MATCH_GRID = "1fr 1fr 1fr 1fr 80px 90px 90px 110px";
-        return (
-          <div style={{ position: "fixed", inset: 0, background: "#00000099", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 24 }}
-               onClick={e => { if (e.target === e.currentTarget) setStatDetailRow(null); }}>
-            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, width: "100%", maxWidth: 940, maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-
-              {/* Header */}
-              <div style={{ background: COLORS.tableHeader, padding: "18px 24px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{statDetailRow.label}</div>
-                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>Détail du calcul P&L — méthode FIFO</div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <button
-                    onClick={() => exportStatDetailToExcel(statDetailRow.label, statDetailRow.ops)}
-                    style={{ display: "flex", alignItems: "center", gap: 7, background: "#1D6F42", border: "1px solid #1a5c37", borderRadius: 8, padding: "8px 14px", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-                    onMouseOver={e => e.currentTarget.style.opacity = "0.85"}
-                    onMouseOut={e => e.currentTarget.style.opacity = "1"}
-                  >
-                    <img src="/logoxl.png" style={{ width: 18, height: 18, objectFit: "contain" }} />
-                    Exporter Excel
-                  </button>
-                  <button onClick={() => setStatDetailRow(null)} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 24, lineHeight: 1, padding: 0 }}>×</button>
-                </div>
-              </div>
-
-              {/* Body */}
-              <div style={{ overflowY: "auto", flex: 1 }}>
-                <div style={{ margin: "16px 24px 0", background: `${COLORS.blue}10`, border: `1px solid ${COLORS.blue}30`, borderRadius: 10, padding: "12px 16px", fontSize: 12, color: COLORS.textSub, lineHeight: 1.7 }}>
-                  <strong style={{ color: COLORS.text }}>Formule appliquée :</strong>{" "}
-                  P&L réalisé = Σ <span style={{ color: COLORS.accent, fontFamily: "'DM Mono', monospace" }}>(Prix SELL − Prix BUY) × Lots matchés × Lot Size</span>. BUY consommés dans l'ordre chronologique (FIFO).
-                </div>
-
-                {buckets.sort((a, z) => Math.abs(z.realizedPnl) - Math.abs(a.realizedPnl)).map((b, j) => (
-                  <div key={j} style={{ margin: "16px 24px 0" }}>
-                    <div style={{ background: COLORS.tableHeader, borderRadius: "10px 10px 0 0", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${COLORS.border}`, borderBottom: "none" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.accent }} />
-                        <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{b.account}</span>
-                        <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.textSub }}>{b.instrument}</span>
-                        <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 4 }}>{b.buyCount} BUY · {b.sellCount} SELL · {b.matches.length} match{b.matches.length !== 1 ? "es" : ""}</span>
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: b.sellCount > 0 ? (b.realizedPnl >= 0 ? COLORS.green : COLORS.red) : COLORS.textMuted }}>
-                        {b.sellCount > 0 ? fmtPnl(b.realizedPnl) : "Pas de SELL"}
-                      </div>
-                    </div>
-                    {b.matches.length > 0 ? (
-                      <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: "0 0 10px 10px", overflow: "hidden" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: MATCH_GRID, padding: "8px 16px", background: `${COLORS.tableHeader}CC`, borderBottom: `1px solid ${COLORS.border}` }}>
-                          {["BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "P&L"].map((h, i) => (
-                            <div key={i} style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.5, textAlign: i >= 4 ? "right" : "left" }}>{h}</div>
-                          ))}
-                        </div>
-                        {b.matches.map((m, k) => (
-                          <div key={k} style={{ display: "grid", gridTemplateColumns: MATCH_GRID, padding: "9px 16px", borderBottom: k < b.matches.length - 1 ? `1px solid ${COLORS.border}20` : "none", background: k % 2 === 0 ? "transparent" : `${COLORS.card}40`, alignItems: "center" }}>
-                            <div style={{ fontSize: 11, color: COLORS.green, fontFamily: "'DM Mono', monospace", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.buyRef || "—"}</div>
-                            <div style={{ fontSize: 11, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{m.buyDate}</div>
-                            <div style={{ fontSize: 11, color: COLORS.red, fontFamily: "'DM Mono', monospace", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.sellRef || "—"}</div>
-                            <div style={{ fontSize: 11, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{m.sellDate}</div>
-                            <div style={{ textAlign: "right", fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.text, fontWeight: 600 }}>{m.lots}</div>
-                            <div style={{ textAlign: "right", fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{m.entryPrice.toFixed(2)}</div>
-                            <div style={{ textAlign: "right" }}>
-                              <div style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>{m.exitPrice.toFixed(2)}</div>
-                              <div style={{ fontSize: 9, color: m.exitPrice > m.entryPrice ? COLORS.green : COLORS.red, fontFamily: "'DM Mono', monospace" }}>
-                                {m.exitPrice > m.entryPrice ? "▲" : "▼"} {Math.abs(m.exitPrice - m.entryPrice).toFixed(2)}
-                              </div>
-                            </div>
-                            <div style={{ textAlign: "right" }}>
-                              <div style={{ fontSize: 13, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: m.pnl >= 0 ? COLORS.green : COLORS.red }}>{fmtPnl(m.pnl)}</div>
-                              <div style={{ fontSize: 9, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>({m.exitPrice > m.entryPrice ? "+" : ""}{(m.exitPrice - m.entryPrice).toFixed(2)}) × {m.lots}</div>
-                            </div>
-                          </div>
-                        ))}
-                        <div style={{ display: "grid", gridTemplateColumns: MATCH_GRID, padding: "9px 16px", background: `${COLORS.accent}08`, borderTop: `1px solid ${COLORS.accent}25` }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.accent, gridColumn: "1 / 5" }}>SOUS-TOTAL {b.instrument}</div>
-                          <div style={{ textAlign: "right", fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.text, fontWeight: 700 }}>{b.matches.reduce((s,m)=>s+m.lots,0)}</div>
-                          <div /><div />
-                          <div style={{ textAlign: "right", fontSize: 14, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: b.realizedPnl >= 0 ? COLORS.green : COLORS.red }}>{fmtPnl(b.realizedPnl)}</div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: "0 0 10px 10px", padding: "16px", textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>
-                        Aucun match FIFO — position entièrement ouverte ({b.openLots} lots).
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {/* Grand total */}
-                <div style={{ margin: "16px 24px 24px", background: `${COLORS.accent}10`, border: `2px solid ${COLORS.accent}40`, borderRadius: 10, padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.accent }}>TOTAL — {statDetailRow.label}</div>
-                  <div style={{ fontSize: 20, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: totalPnl >= 0 ? COLORS.green : COLORS.red }}>{fmtPnl(totalPnl)}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 };
@@ -8873,8 +8538,43 @@ const DerivativesDashboard = () => {
   };
 
   // Get lot size for a given exchange+instrument combo
-  const getLotSize = (exchange, instrument) => resolveLotSize(exchange, instrument, products, lotSizes);
-  const getPriceUnit = (exchange, instrument) => resolvePriceUnit(exchange, instrument, products, priceUnits);
+  const getLotSize = (exchange, instrument) => {
+    const norm = v => (v || "").toLowerCase().trim();
+    // Resolve underlying and exchange from deriv_products using instrument label
+    const product = products.find(p => norm(p.label) === norm(instrument));
+    const underlying = product?.underlying || instrument;
+    const resolvedExchange = product?.stoxxExchange || exchange;
+    const normUnderlying = norm(underlying);
+    const normExchange = norm(resolvedExchange);
+    // 1. Match on exchange + underlying
+    let match = lotSizes.find(l =>
+      norm(l.exchange) === normExchange &&
+      norm(l.instrument) === normUnderlying
+    );
+    // 2. Fallback: underlying only
+    if (!match) match = lotSizes.find(l => norm(l.instrument) === normUnderlying);
+    // 3. Fallback: exchange only
+    if (!match && normExchange) match = lotSizes.find(l => norm(l.exchange) === normExchange);
+    return match ? (parseFloat(match.quantity) || 1) : 1;
+  };
+
+  const getPriceUnit = (exchange, instrument) => {
+    const norm = v => (v || "").toLowerCase().trim();
+    const product = products.find(p => norm(p.label) === norm(instrument));
+    const resolvedExchange = product?.stoxxExchange || exchange;
+    const resolvedUnderlying = product?.underlying || "";
+    const normExchange = norm(resolvedExchange);
+    const normUnderlying = norm(resolvedUnderlying);
+    // 1. Precise match: exchange + underlying
+    let match = normUnderlying
+      ? priceUnits.find(p => norm(p.exchange) === normExchange && norm(p.underlying || "") === normUnderlying)
+      : null;
+    // 2. Fallback: exchange only (underlying empty or no precise match)
+    if (!match) match = priceUnits.find(p => norm(p.exchange) === normExchange && !p.underlying);
+    // 3. Fallback: any entry for this exchange
+    if (!match) match = priceUnits.find(p => norm(p.exchange) === normExchange);
+    return match ? (parseFloat(match.unit) || 1) : 1;
+  };
 
   const saveMarketPrice = async (key, value) => {
     if (value === undefined || value === "") {
@@ -8890,8 +8590,6 @@ const DerivativesDashboard = () => {
     const fmt = prod?.decimals || "decimal";
     if (fmt.includes("/")) {
       const den = parseInt(fmt.split("/")[1] || "8");
-      // If already stored as fraction string "201 4/8", display as-is
-      if (typeof price === "string" && price.includes(" ") && price.includes("/")) return price;
       const num = parseFloat(price);
       if (isNaN(num)) return String(price);
       const intPart = Math.floor(num);
@@ -9004,7 +8702,6 @@ const DerivativesDashboard = () => {
   const [expandedInstruments, setExpandedInstruments] = useState({});
   const toggle = (key) => setExpandedAccounts(p => ({ ...p, [key]: !p[key] }));
   const toggleInst = (key) => setExpandedInstruments(p => ({ ...p, [key]: !p[key] }));
-  const [pnlAccountSearch, setPnlAccountSearch] = useState("");
 
   // ── P&L DETAIL MODAL ──
   const [pnlDetailAccount, setPnlDetailAccount] = useState(null); // row object
@@ -9012,37 +8709,37 @@ const DerivativesDashboard = () => {
   const exportPnlDetailToExcel = async (row) => {
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
-    const fmtNum = n => typeof n === "number" ? Math.round(n * 100) / 100 : n;
 
-    const sheetData = [
-      ["INSTRUMENT", "POSITION", "BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "DELTA", "P&L"],
+    // Sheet 1: Summary par instrument
+    const summaryData = [
+      ["INSTRUMENT", "BUY", "SELL", "LOTS OUVERTS", "MATCHES", "REALISED P&L"],
+      ...row.instruments.map(inst => [
+        inst.instrument,
+        inst.buyCount,
+        inst.sellCount,
+        inst.openLots,
+        inst.matches.length,
+        inst.realizedPnl,
+      ]),
+      ["TOTAL", row.instruments.reduce((s,i)=>s+i.buyCount,0), row.instruments.reduce((s,i)=>s+i.sellCount,0), row.openLots, row.instruments.reduce((s,i)=>s+i.matches.length,0), row.realizedPnl],
     ];
+    const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, ws1, "Résumé");
 
-    const sorted = [...row.instruments].sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl));
-    for (const inst of sorted) {
+    // Sheet 2: Matches FIFO détaillés
+    const matchData = [
+      ["INSTRUMENT", "BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS MATCHÉS", "PRIX ENTRÉE", "PRIX SORTIE", "P&L"],
+    ];
+    for (const inst of row.instruments) {
       for (const m of inst.matches) {
-        sheetData.push([
-          inst.instrument,
-          m.position || "LONG",
-          m.buyRef || "—", m.buyDate,
-          m.sellRef || "—", m.sellDate,
-          m.lots, fmtNum(m.entryPrice), fmtNum(m.exitPrice),
-          fmtNum(m.exitPrice - m.entryPrice), fmtNum(m.pnl),
-        ]);
+        matchData.push([inst.instrument, m.buyRef||"—", m.buyDate, m.sellRef||"—", m.sellDate, m.lots, m.entryPrice, m.exitPrice, m.pnl]);
       }
     }
+    const ws2 = XLSX.utils.aoa_to_sheet(matchData);
+    XLSX.utils.book_append_sheet(wb, ws2, "Matches FIFO");
 
-    // Total row
-    const totalPnl = row.instruments.reduce((s, i) => s + i.realizedPnl, 0);
-    const totalLots = row.instruments.reduce((s, i) => s + i.matches.reduce((ss, m) => ss + m.lots, 0), 0);
-    sheetData.push([]);
-    sheetData.push(["TOTAL", "", "", "", "", "", totalLots, "", "", "", fmtNum(totalPnl)]);
-
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    XLSX.utils.book_append_sheet(wb, ws, "P&L Détail");
-
-    const date = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `pnl_${(row.account || "compte").replace(/[^a-zA-Z0-9]/g, "_")}_${date}.xlsx`);
+    const date = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `pnl_${(row.account||"compte").replace(/[^a-zA-Z0-9]/g,"_")}_${date}.xlsx`);
   };
 
   const KpiCard = ({ label, value, sub, color }) => (
@@ -9234,19 +8931,9 @@ const DerivativesDashboard = () => {
       })()}
 
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ background: COLORS.tableHeader, padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>P&amp;L PAR COMPTE</div>
-            <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>Cliquez sur un compte pour voir le détail par instrument</div>
-          </div>
-          <input
-            placeholder="🔍 Rechercher un compte…"
-            value={pnlAccountSearch}
-            onChange={e => setPnlAccountSearch(e.target.value)}
-            style={{ width: 220, background: COLORS.bg, border: `1px solid ${pnlAccountSearch ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 8, padding: "8px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }}
-            onFocus={e => e.target.style.borderColor = COLORS.accent}
-            onBlur={e => e.target.style.borderColor = pnlAccountSearch ? COLORS.accent + "80" : COLORS.border}
-          />
+        <div style={{ background: COLORS.tableHeader, padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>P&amp;L PAR COMPTE</div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>Cliquez sur un compte pour voir le détail par instrument</div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "10px 20px", background: `${COLORS.tableHeader}99`, borderBottom: `1px solid ${COLORS.border}` }}>
@@ -9255,19 +8942,13 @@ const DerivativesDashboard = () => {
           ))}
         </div>
 
-        {(() => {
-          const q = pnlAccountSearch.toLowerCase().trim();
-          return q ? rows.filter(r => (r.account || "").toLowerCase().includes(q)) : rows;
-        })().length === 0 && (
+        {rows.length === 0 && (
           <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "48px 0", fontSize: 14 }}>
             Aucune opération. Ajoutez des BUY et des SELL dans Derivatives.
           </div>
         )}
 
-        {(() => {
-          const q = pnlAccountSearch.toLowerCase().trim();
-          const filteredRows = q ? rows.filter(r => (r.account || "").toLowerCase().includes(q)) : rows;
-          return filteredRows.map((row, idx) => {
+        {rows.map((row, idx) => {
           const expanded = expandedAccounts[row.account];
           const isLast = idx === rows.length - 1;
           const totalBuyCount = row.instruments.reduce((s, i) => s + i.buyCount, 0);
@@ -9295,11 +8976,20 @@ const DerivativesDashboard = () => {
                   <div
                     onClick={e => { e.stopPropagation(); setPnlDetailAccount(row); }}
                     title="Voir le détail du calcul P&L"
-                    style={{ marginLeft: 4, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" }}
-                    onMouseOver={e => e.currentTarget.style.opacity = "0.7"}
+                    style={{ marginLeft: 4, width: 28, height: 28, borderRadius: 6, background: "#1D6F42", border: "1px solid #1a5c37", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" }}
+                    onMouseOver={e => e.currentTarget.style.opacity = "0.8"}
                     onMouseOut={e => e.currentTarget.style.opacity = "1"}
                   >
-                    <img src="/logoxl.png" style={{ width: 28, height: 28, objectFit: "contain" }} />
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                      <rect width="24" height="24" rx="3" fill="#1D6F42"/>
+                      <path d="M4 4h16v16H4z" fill="none"/>
+                      <path d="M13 4v6h6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <rect x="3" y="11" width="18" height="10" rx="1" fill="white" fillOpacity="0.15" stroke="white" strokeWidth="1.2"/>
+                      <line x1="9" y1="11" x2="9" y2="21" stroke="white" strokeWidth="1"/>
+                      <line x1="15" y1="11" x2="15" y2="21" stroke="white" strokeWidth="1"/>
+                      <line x1="3" y1="15" x2="21" y2="15" stroke="white" strokeWidth="1"/>
+                      <text x="5.5" y="10" fontSize="7" fill="white" fontWeight="bold">XLS</text>
+                    </svg>
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
@@ -9407,7 +9097,7 @@ const DerivativesDashboard = () => {
               )}
             </div>
           );
-        }); })()}
+        })}
 
         {rows.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "14px 20px", background: `${COLORS.accent}08`, borderTop: `2px solid ${COLORS.accent}30` }}>
@@ -9461,7 +9151,11 @@ const DerivativesDashboard = () => {
                     onMouseOver={e => e.currentTarget.style.opacity = "0.85"}
                     onMouseOut={e => e.currentTarget.style.opacity = "1"}
                   >
-                    <img src="/logoxl.png" style={{ width: 18, height: 18, objectFit: "contain" }} />
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" fill="white" fillOpacity="0.2" stroke="white" strokeWidth="1.5"/>
+                      <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                      <path d="M8 13h8M8 17h5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
                     Exporter Excel
                   </button>
                   <button onClick={() => setPnlDetailAccount(null)} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 24, lineHeight: 1, padding: 0 }}>×</button>
@@ -9597,31 +9291,6 @@ export default function CRM() {
   const [tasks, setTasks] = useState(initialTasks);
   const [page, setPage] = useState("dashboard");
   const dataLoaded = useRef(false);
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const el = canvasRef.current;
-    if (!el) return;
-    const w = el.width = window.innerWidth;
-    const h = el.height = window.innerHeight;
-    const ctx = el.getContext("2d");
-    const cx = w / 2, cy = h / 2;
-    const maxDist = Math.sqrt(cx * cx + cy * cy);
-    const imageData = ctx.createImageData(w, h);
-    const data = imageData.data;
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const dist = Math.sqrt(Math.pow(x - cx, 2) + Math.pow(y - cy, 2));
-        const gradient = (1 - dist / maxDist) * 0.25;
-        const noise = (Math.random() - 0.5) * 0.06;
-        const val = Math.max(0, Math.min(1, gradient + noise));
-        const v = Math.round(val * 255);
-        const idx = (y * w + x) * 4;
-        data[idx] = v; data[idx+1] = v; data[idx+2] = v; data[idx+3] = 255;
-      }
-    }
-    ctx.putImageData(imageData, 0, 0);
-  }, []);
 
   useEffect(() => {
   async function initEmployees() {
@@ -9694,9 +9363,7 @@ export default function CRM() {
 
   return (
     <ConfigProvider>
-      <div style={{ display: "flex", minHeight: "100vh", width: "100vw", overflow: "hidden", background: "transparent", fontFamily: "'Inter', 'Segoe UI', sans-serif", color: COLORS.text, position: "relative" }}>
-        {/* Global canvas background — dark radial gradient + grain */}
-        <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0, pointerEvents: "none" }} />
+      <div style={{ display: "flex", minHeight: "100vh", width: "100vw", overflow: "hidden", background: COLORS.bg, fontFamily: "'Inter', 'Segoe UI', sans-serif", color: COLORS.text }}>
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&family=DM+Mono:wght@400;600&display=swap');
           * { box-sizing: border-box; }
@@ -9707,7 +9374,7 @@ export default function CRM() {
         `}</style>
 
         {/* Sidebar */}
-        <div style={{ width: 220, background: `${COLORS.surface}CC`, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", padding: "28px 0", flexShrink: 0, position: "relative", zIndex: 1 }}>
+        <div style={{ width: 220, background: COLORS.surface, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", padding: "28px 0", flexShrink: 0 }}>
           <div style={{ padding: "0 24px 28px" }}>
             <div style={{ fontSize: 22, fontFamily: "'Inter', sans-serif", color: COLORS.text, lineHeight: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -9770,7 +9437,7 @@ export default function CRM() {
         </div>
 
         {/* Main */}
-        <div style={{ flex: 1, padding: "32px 40px", overflowY: "auto", background: "transparent", position: "relative", zIndex: 1 }}>
+        <div style={{ flex: 1, padding: "32px 40px", overflowY: "auto", background: COLORS.bg }}>
           {page === "dashboard" && <Dashboard contacts={contacts} companies={companies} tasks={tasks} />}
           {page === "companies" && <Companies companies={companies} setCompanies={setCompanies} contacts={contacts} />}
           {page === "contacts" && <Contacts contacts={contacts} setContacts={setContacts} companies={companies} />}

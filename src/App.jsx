@@ -6851,15 +6851,17 @@ const setOps = async (val) => {
       const fmt = prod?.decimals || "decimal";
       const tick = prod?.tickSize || "";
       if (tick && !fmt.includes("/")) {
-        // Decimal tick validation
+        // Decimal tick validation — use rounded integer arithmetic to avoid float precision issues
         const tickVal = parseFloat(tick);
         const priceVal = parseFloat(form.price);
         if (!isNaN(tickVal) && tickVal > 0 && !isNaN(priceVal)) {
-          // Check if price is a multiple of tick (within floating point tolerance)
-          const remainder = Math.abs(priceVal % tickVal);
-          const tolerance = tickVal * 0.0001;
-          if (remainder > tolerance && Math.abs(remainder - tickVal) > tolerance) {
-            errors.price = `Prix invalide — le tick minimum est ${tick} (ex: ${(Math.round(priceVal / tickVal) * tickVal).toFixed(tick.includes(".") ? tick.split(".")[1].length : 0)})`;
+          const decimals = (tick.includes(".") ? tick.split(".")[1].length : 0);
+          const factor = Math.pow(10, decimals);
+          const priceInt = Math.round(priceVal * factor);
+          const tickInt  = Math.round(tickVal * factor);
+          if (priceInt % tickInt !== 0) {
+            const suggested = (Math.round(priceVal / tickVal) * tickVal).toFixed(decimals);
+            errors.price = `Prix invalide — le tick minimum est ${tick} (ex: ${suggested})`;
           }
         }
       } else if (tick && fmt.includes("/") && form.price.includes(" ")) {

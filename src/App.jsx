@@ -6994,12 +6994,12 @@ const setOps = async (val) => {
         if (fracStr && fracStr.includes("/")) {
           const [fn, fd] = fracStr.split("/").map(Number);
           const num = parseInt(intStr) + fn / fd;
-          return num.toFixed(dp);
+          return parseFloat(num.toFixed(dp)).toString();
         }
       }
       const num = parseFloat(price);
       if (isNaN(num)) return String(price);
-      return num.toFixed(dp);
+      return parseFloat(num.toFixed(dp)).toString();
     }
     // decimal or unknown: show as-is
     return String(price);

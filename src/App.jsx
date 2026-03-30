@@ -7341,10 +7341,7 @@ const setOps = async (val) => {
                   {/* FEES — calculé auto, éditable manuellement */}
                   {(() => {
                     const product = products.find(p => (p.label || "").toLowerCase().trim() === (o.instrument || "").toLowerCase().trim());
-                    const productCurrency = (product?.currency || "").toUpperCase();
-                    const account = derivAccounts.find(a => a.accountNumber === o.account);
-                    const accountCurrency = (Array.isArray(account?.currency) ? (account.currency[0] || "") : (account?.currency || "")).toUpperCase();
-                    const currency = productCurrency || accountCurrency;
+                    const currency = (product?.currency || "").toUpperCase();
                     const sym = CURRENCY_SYMBOLS[currency] || currency;
                     const autoFees = computeFees(o, exchangeTarifs);
                     const hasManual = o.fees !== undefined && o.fees !== "";
@@ -7429,10 +7426,7 @@ const setOps = async (val) => {
           {/* FEES */}
           {(() => {
             const product = products.find(p => (p.label || "").toLowerCase().trim() === (sel.instrument || "").toLowerCase().trim());
-            const productCurrency = (product?.currency || "").toUpperCase();
-            const account = derivAccounts.find(a => a.accountNumber === sel.account);
-            const accountCurrency = (Array.isArray(account?.currency) ? (account.currency[0] || "") : (account?.currency || "")).toUpperCase();
-            const currency = productCurrency || accountCurrency;
+            const currency = (product?.currency || "").toUpperCase();
             const sym = CURRENCY_SYMBOLS[currency] || currency;
             const autoFees = computeFees(sel, exchangeTarifs);
             const hasManual = sel.fees !== undefined && sel.fees !== "";
@@ -7642,6 +7636,25 @@ const setOps = async (val) => {
   .map(a => <option key={a.id} value={a.accountNumber}>{a.accountNumber.toUpperCase()}</option>)}
               </select>
               {formErrors.account && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.account}</span>}
+              {/* Warning devise compte vs instrument */}
+              {(() => {
+                if (!form.account || !form.instrument) return null;
+                const product = products.find(p => (p.label || "").toLowerCase().trim() === (form.instrument || "").toLowerCase().trim());
+                const instrCurrency = (product?.currency || "").toUpperCase();
+                const account = derivAccounts.find(a => a.accountNumber === form.account);
+                const accCurrencies = (Array.isArray(account?.currency) ? account.currency : (account?.currency ? [account.currency] : [])).map(v => (v || "").toUpperCase());
+                if (!instrCurrency || accCurrencies.length === 0) return null;
+                const mismatch = !accCurrencies.includes(instrCurrency);
+                if (!mismatch) return null;
+                return (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, background: `${COLORS.orange}15`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "8px 12px" }}>
+                    <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
+                    <span style={{ fontSize: 12, color: COLORS.orange, fontWeight: 600, lineHeight: 1.4 }}>
+                      Devise du compte (<strong>{accCurrencies.join(", ")}</strong>) différente de la devise de l'instrument (<strong>{instrCurrency}</strong>). Vérifiez la configuration.
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Contract + Trade */}

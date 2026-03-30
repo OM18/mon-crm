@@ -8051,6 +8051,7 @@ const runFIFO = (bucketOps, lotSize = 1) => {
           buyRef: op.ref,    buyDate: op.tradeDate || "—",
           sellRef: head.ref, sellDate: head.date,
           lots: matched, entryPrice: head.price, exitPrice: price, pnl,
+          position: "SHORT",
         });
         head.remaining -= matched;
         remaining      -= matched;
@@ -8072,6 +8073,7 @@ const runFIFO = (bucketOps, lotSize = 1) => {
           buyRef: head.ref,  buyDate: head.date,
           sellRef: op.ref,   sellDate: op.tradeDate || "—",
           lots: matched, entryPrice: head.price, exitPrice: price, pnl,
+          position: "LONG",
         });
         head.remaining -= matched;
         remaining      -= matched;
@@ -8505,22 +8507,34 @@ const DerivStatistics = () => {
     const wb = XLSX.utils.book_new();
     const buckets = getStatFifoDetail(rowOps);
     const fmtNum = n => typeof n === "number" ? Math.round(n * 100) / 100 : n;
-    for (const b of buckets.sort((a, z) => Math.abs(z.realizedPnl) - Math.abs(a.realizedPnl))) {
-      const sheetData = [];
-      sheetData.push([`${b.account} — ${b.instrument}`]);
-      sheetData.push([`${b.buyCount} BUY · ${b.sellCount} SELL · ${b.matches.length} matches`]);
-      sheetData.push([]);
-      sheetData.push(["BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "DELTA", "P&L"]);
+
+    const sheetData = [
+      ["ACCOUNT", "INSTRUMENT", "POSITION", "BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "DELTA", "P&L"],
+    ];
+
+    for (const b of [...buckets].sort((a, z) => Math.abs(z.realizedPnl) - Math.abs(a.realizedPnl))) {
       for (const m of b.matches) {
-        sheetData.push([m.buyRef||"—", m.buyDate, m.sellRef||"—", m.sellDate, m.lots, fmtNum(m.entryPrice), fmtNum(m.exitPrice), fmtNum(m.exitPrice - m.entryPrice), fmtNum(m.pnl)]);
+        sheetData.push([
+          b.account, b.instrument,
+          m.position || "LONG",
+          m.buyRef || "—", m.buyDate,
+          m.sellRef || "—", m.sellDate,
+          m.lots, fmtNum(m.entryPrice), fmtNum(m.exitPrice),
+          fmtNum(m.exitPrice - m.entryPrice), fmtNum(m.pnl),
+        ]);
       }
-      sheetData.push([]);
-      sheetData.push([`SOUS-TOTAL`, "", "", "", b.matches.reduce((s,m)=>s+m.lots,0), "", "", "", fmtNum(b.realizedPnl)]);
-      const sheetName = `${b.account} ${b.instrument}`.slice(0, 31);
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), sheetName);
     }
-    const date = new Date().toISOString().slice(0,10);
-    XLSX.writeFile(wb, `stats_pnl_${label.replace(/[^a-zA-Z0-9]/g,"_")}_${date}.xlsx`);
+
+    const totalPnl = buckets.reduce((s, b) => s + b.realizedPnl, 0);
+    const totalLots = buckets.reduce((s, b) => s + b.matches.reduce((ss, m) => ss + m.lots, 0), 0);
+    sheetData.push([]);
+    sheetData.push(["TOTAL", "", "", "", "", "", "", totalLots, "", "", "", fmtNum(totalPnl)]);
+
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    XLSX.utils.book_append_sheet(wb, ws, "P&L Détail");
+
+    const date = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `stats_pnl_${label.replace(/[^a-zA-Z0-9]/g, "_")}_${date}.xlsx`);
   };
 
   const totalRow1 = years.reduce((acc, y) => ({ ...acc, [y]: table1.reduce((s, r) => s + (r.pnlByYear[y] || 0), 0) }), {});
@@ -8949,28 +8963,34 @@ const DerivativesDashboard = () => {
   const exportPnlDetailToExcel = async (row) => {
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
+    const fmtNum = n => typeof n === "number" ? Math.round(n * 100) / 100 : n;
 
-    // Un onglet par instrument avec le tableau de détail exact
-    for (const inst of [...row.instruments].sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl))) {
-      const sheetData = [];
-      sheetData.push([inst.instrument]);
-      sheetData.push([`${inst.buyCount} BUY · ${inst.sellCount} SELL · ${inst.matches.length} matches`]);
-      sheetData.push([]);
-      sheetData.push(["BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "DELTA", "P&L"]);
+    const sheetData = [
+      ["INSTRUMENT", "POSITION", "BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "DELTA", "P&L"],
+    ];
+
+    const sorted = [...row.instruments].sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl));
+    for (const inst of sorted) {
       for (const m of inst.matches) {
         sheetData.push([
+          inst.instrument,
+          m.position || "LONG",
           m.buyRef || "—", m.buyDate,
           m.sellRef || "—", m.sellDate,
-          m.lots, m.entryPrice, m.exitPrice,
-          m.exitPrice - m.entryPrice, m.pnl,
+          m.lots, fmtNum(m.entryPrice), fmtNum(m.exitPrice),
+          fmtNum(m.exitPrice - m.entryPrice), fmtNum(m.pnl),
         ]);
       }
-      sheetData.push([]);
-      sheetData.push([`SOUS-TOTAL ${inst.instrument}`, "", "", "", inst.matches.reduce((s, m) => s + m.lots, 0), "", "", "", inst.realizedPnl]);
-      const sheetName = inst.instrument.slice(0, 31);
-      const ws = XLSX.utils.aoa_to_sheet(sheetData);
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
+
+    // Total row
+    const totalPnl = row.instruments.reduce((s, i) => s + i.realizedPnl, 0);
+    const totalLots = row.instruments.reduce((s, i) => s + i.matches.reduce((ss, m) => ss + m.lots, 0), 0);
+    sheetData.push([]);
+    sheetData.push(["TOTAL", "", "", "", "", "", totalLots, "", "", "", fmtNum(totalPnl)]);
+
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    XLSX.utils.book_append_sheet(wb, ws, "P&L Détail");
 
     const date = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `pnl_${(row.account || "compte").replace(/[^a-zA-Z0-9]/g, "_")}_${date}.xlsx`);

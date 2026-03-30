@@ -8414,7 +8414,7 @@ const DerivStatistics = () => {
     return realizedPnl;
   };
 
-  // Compute P&L per op filtered by year
+  // Compute P&L per year — using EXIT date (sellDate) to assign each match to a year
   const getPnlByYear = (opsSubset) => {
     const norm = v => (v || "").toLowerCase().trim().replace(/_/g, " ");
     // Group by account × instrument
@@ -8432,13 +8432,14 @@ const DerivStatistics = () => {
       const pu = resolvePriceUnit(b.ops[0]?.exchange || "", b.instrument, products, priceUnits);
       const lotSize = ls * pu;
 
-      // Run FIFO per year — only ops up to end of year, incremental
-      for (const year of years) {
-        const opsUpToYear = b.ops.filter(o => o.tradeDate && parseInt(o.tradeDate.slice(0, 4)) <= year);
-        const opsUpToPrevYear = b.ops.filter(o => o.tradeDate && parseInt(o.tradeDate.slice(0, 4)) <= year - 1);
-        const pnlTotal = runFIFOPnl(opsUpToYear, lotSize);
-        const pnlPrev  = runFIFOPnl(opsUpToPrevYear, lotSize);
-        pnlByYear[year] += pnlTotal - pnlPrev;
+      // Run FIFO on ALL ops, then split matches by exit year (sellDate)
+      const { matches } = runFIFO(b.ops, lotSize);
+      for (const m of matches) {
+        // Use sellDate as the reference year for this realized P&L
+        const exitYear = m.sellDate && m.sellDate !== "—" ? parseInt(m.sellDate.slice(0, 4)) : null;
+        if (exitYear && pnlByYear[exitYear] !== undefined) {
+          pnlByYear[exitYear] += m.pnl;
+        }
       }
     }
     return pnlByYear;
@@ -8552,16 +8553,17 @@ const DerivStatistics = () => {
   const exportYearToExcel = async (label, rowOps, year) => {
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
-    // Filter ops for this year only
-    const yearOps = rowOps.filter(o => o.tradeDate && parseInt(o.tradeDate.slice(0, 4)) === year);
-    const buckets = getStatFifoDetail(yearOps);
+    // Run full FIFO then filter matches by exit year (sellDate)
+    const buckets = getStatFifoDetail(rowOps);
     const fmtNum = n => typeof n === "number" ? Math.round(n * 100) / 100 : n;
 
     const sheetData = [
       ["ACCOUNT", "INSTRUMENT", "POSITION", "BUY REF", "DATE BUY", "SELL REF", "DATE SELL", "LOTS", "PRIX ENTRÉE", "PRIX SORTIE", "DELTA", "P&L"],
     ];
+    let totalPnl = 0, totalLots = 0;
     for (const b of [...buckets].sort((a, z) => Math.abs(z.realizedPnl) - Math.abs(a.realizedPnl))) {
-      for (const m of b.matches) {
+      const yearMatches = b.matches.filter(m => m.sellDate && m.sellDate !== "—" && parseInt(m.sellDate.slice(0, 4)) === year);
+      for (const m of yearMatches) {
         sheetData.push([
           b.account, b.instrument,
           m.position || "LONG",
@@ -8570,10 +8572,10 @@ const DerivStatistics = () => {
           m.lots, fmtNum(m.entryPrice), fmtNum(m.exitPrice),
           fmtNum(m.exitPrice - m.entryPrice), fmtNum(m.pnl),
         ]);
+        totalPnl += m.pnl;
+        totalLots += m.lots;
       }
     }
-    const totalPnl = buckets.reduce((s, b) => s + b.realizedPnl, 0);
-    const totalLots = buckets.reduce((s, b) => s + b.matches.reduce((ss, m) => ss + m.lots, 0), 0);
     sheetData.push([]);
     sheetData.push(["TOTAL", "", "", "", "", "", "", totalLots, "", "", "", fmtNum(totalPnl)]);
 

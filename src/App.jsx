@@ -8585,10 +8585,8 @@ const DerivStatistics = () => {
   const TableHeader = ({ cols }) => (
     <div style={{ display: "grid", gridTemplateColumns: cols, background: COLORS.tableHeader, padding: "10px 20px", borderRadius: "10px 10px 0 0" }}>
       {["BU", "Category / Account", ...years.map(String), ...years.map(y => String(y))].map((h, i) => (
-        <div key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: i < 2 ? "left" : "center" }}>
-          {i >= 2 + years.length
-            ? <img src="/logoxl.png" style={{ width: 18, height: 18, objectFit: "contain", opacity: 0.7 }} title={`Export ${years[i - 2 - years.length]}`} />
-            : h}
+        <div key={i} style={{ fontSize: 10, fontWeight: 700, color: i >= 2 + years.length ? COLORS.green : COLORS.textMuted, letterSpacing: 0.8, textAlign: i < 2 ? "left" : "center" }}>
+          {h}
         </div>
       ))}
     </div>

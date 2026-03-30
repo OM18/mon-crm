@@ -6944,7 +6944,12 @@ const setOps = async (val) => {
       : tagChecks.every(Boolean);
     const customPass = customChecks.every(Boolean);
     return tagPass && customPass;
-  }).sort((a, b) => (b.tradeDate || "").localeCompare(a.tradeDate || ""));
+  }).sort((a, b) => {
+    const dateDiff = (b.tradeDate || "").localeCompare(a.tradeDate || "");
+    if (dateDiff !== 0) return dateDiff;
+    // Same date: most recently entered first (highest id)
+    return (b.id || 0) - (a.id || 0);
+  });
   }, [ops, search, accountSearch, dateFrom, dateTo, JSON.stringify(activeFilters), JSON.stringify(customFilters), filterMode, derivAccounts, products, config]);
 
   const sel = ops.find(o => o.id === selected);

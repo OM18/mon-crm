@@ -8414,28 +8414,43 @@ const DerivStatistics = () => {
     return realizedPnl;
   };
 
-  // Compute P&L per year — using EXIT date (sellDate) to assign each match to a year
-  const getPnlByYear = (opsSubset) => {
-    const norm = v => (v || "").toLowerCase().trim().replace(/_/g, " ");
-    // Group by account × instrument
+  // ── P&L DETAIL MODAL (Statistics) ──
+  const [statDetailRow, setStatDetailRow] = useState(null); // { label, ops }
+
+  // getStatFifoDetail must be defined before getPnlByYear (which calls it)
+  const getStatFifoDetail = (rowOps) => {
+    const norm = v => (v || "").toLowerCase().trim();
     const buckets = {};
-    for (const op of opsSubset) {
-      const key = `${op.account}||${(op.instrument || "").toLowerCase()}`;
+    for (const op of rowOps) {
+      const key = `${op.account}||${norm(op.instrument)}`;
       if (!buckets[key]) buckets[key] = { account: op.account, instrument: op.instrument, ops: [] };
       buckets[key].ops.push(op);
     }
-    const pnlByYear = {};
-    for (const year of years) pnlByYear[year] = 0;
-
-    for (const b of Object.values(buckets)) {
+    return Object.values(buckets).map(b => {
       const ls = resolveLotSize(b.ops[0]?.exchange || "", b.instrument, products, lotSizes);
       const pu = resolvePriceUnit(b.ops[0]?.exchange || "", b.instrument, products, priceUnits);
       const lotSize = ls * pu;
+      const fifo = runFIFO(b.ops, lotSize);
+      return {
+        account: b.account,
+        instrument: b.instrument,
+        buyCount: b.ops.filter(o => (o.side||"").toUpperCase() === "BUY").length,
+        sellCount: b.ops.filter(o => (o.side||"").toUpperCase() === "SELL").length,
+        matches: fifo.matches,
+        realizedPnl: fifo.realizedPnl,
+        openLots: fifo.openLots,
+      };
+    }).filter(b => b.matches.length > 0 || b.buyCount > 0);
+  };
 
-      // Run FIFO on ALL ops, then split matches by exit year (sellDate)
-      const { matches } = runFIFO(b.ops, lotSize);
-      for (const m of matches) {
-        // Use sellDate as the reference year for this realized P&L
+  // Compute P&L per year — using EXIT date (sellDate) to assign each match to a year
+  // Uses exactly the same FIFO logic as getStatFifoDetail / exportYearToExcel to stay in sync
+  const getPnlByYear = (opsSubset) => {
+    const pnlByYear = {};
+    for (const year of years) pnlByYear[year] = 0;
+    const buckets = getStatFifoDetail(opsSubset);
+    for (const b of buckets) {
+      for (const m of b.matches) {
         const exitYear = m.sellDate && m.sellDate !== "—" ? parseInt(m.sellDate.slice(0, 4)) : null;
         if (exitYear && pnlByYear[exitYear] !== undefined) {
           pnlByYear[exitYear] += m.pnl;
@@ -8483,34 +8498,6 @@ const DerivStatistics = () => {
     return (n >= 0 ? "+ " : "− ") + abs;
   };
   const pnlColor = (n) => !n || n === 0 ? COLORS.textMuted : n > 0 ? COLORS.green : COLORS.red;
-
-  // ── P&L DETAIL MODAL (Statistics) ──
-  const [statDetailRow, setStatDetailRow] = useState(null); // { label, ops }
-
-  const getStatFifoDetail = (rowOps) => {
-    const norm = v => (v || "").toLowerCase().trim();
-    const buckets = {};
-    for (const op of rowOps) {
-      const key = `${op.account}||${norm(op.instrument)}`;
-      if (!buckets[key]) buckets[key] = { account: op.account, instrument: op.instrument, ops: [] };
-      buckets[key].ops.push(op);
-    }
-    return Object.values(buckets).map(b => {
-      const ls = resolveLotSize(b.ops[0]?.exchange || "", b.instrument, products, lotSizes);
-      const pu = resolvePriceUnit(b.ops[0]?.exchange || "", b.instrument, products, priceUnits);
-      const lotSize = ls * pu;
-      const fifo = runFIFO(b.ops, lotSize);
-      return {
-        account: b.account,
-        instrument: b.instrument,
-        buyCount: b.ops.filter(o => (o.side||"").toUpperCase() === "BUY").length,
-        sellCount: b.ops.filter(o => (o.side||"").toUpperCase() === "SELL").length,
-        matches: fifo.matches,
-        realizedPnl: fifo.realizedPnl,
-        openLots: fifo.openLots,
-      };
-    }).filter(b => b.matches.length > 0 || b.buyCount > 0);
-  };
 
   const exportStatDetailToExcel = async (label, rowOps) => {
     const XLSX = await import("xlsx");

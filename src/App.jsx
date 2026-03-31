@@ -4471,7 +4471,25 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
     return matched ? matched.value : v;
   });
 } else { obj.contractsCurrency = []; }
-      } else if (type === "contacts") {
+
+        // Parse compliance dates (handles Excel serial, DD/MM/YYYY, ISO)
+        const parseCompanyDate = (val) => {
+          if (!val && val !== 0) return "";
+          const s = val.toString().trim();
+          if (/^\d{4,5}$/.test(s)) {
+            const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+            return d.toISOString().split("T")[0];
+          }
+          const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+          if (m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+          if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+          return s;
+        };
+        if (obj.complianceCreationDate)       obj.complianceCreationDate       = parseCompanyDate(obj.complianceCreationDate);
+        if (obj.complianceLastUpdateDate)     obj.complianceLastUpdateDate     = parseCompanyDate(obj.complianceLastUpdateDate);
+        if (obj.complianceRequestDate)        obj.complianceRequestDate        = parseCompanyDate(obj.complianceRequestDate);
+        if (obj.complianceLastReceptionDate)  obj.complianceLastReceptionDate  = parseCompanyDate(obj.complianceLastReceptionDate);
+        if (obj.complianceFinalConfirmationDate) obj.complianceFinalConfirmationDate = parseCompanyDate(obj.complianceFinalConfirmationDate);
         obj.avatar = (obj.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
         obj.tags = []; obj.revenue = Number(obj.revenue) || 0;
         const val = obj.status;
@@ -5226,11 +5244,11 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
               </div>
               {[
                 { label: "Legal Name", value: sel.legalName },
-{ label: "Creation Date", value: sel.complianceCreationDate },
-                { label: "Last Update Date", value: sel.complianceLastUpdateDate },
-                { label: "Request Date", value: sel.complianceRequestDate },
-                { label: "Last Reception Date", value: sel.complianceLastReceptionDate },
-                { label: "Final Confirmation Date", value: sel.complianceFinalConfirmationDate },
+{ label: "Creation Date", value: sel.complianceCreationDate ? sel.complianceCreationDate.split("-").reverse().join("/") : null },
+                { label: "Last Update Date", value: sel.complianceLastUpdateDate ? sel.complianceLastUpdateDate.split("-").reverse().join("/") : null },
+                { label: "Request Date", value: sel.complianceRequestDate ? sel.complianceRequestDate.split("-").reverse().join("/") : null },
+                { label: "Last Reception Date", value: sel.complianceLastReceptionDate ? sel.complianceLastReceptionDate.split("-").reverse().join("/") : null },
+                { label: "Final Confirmation Date", value: sel.complianceFinalConfirmationDate ? sel.complianceFinalConfirmationDate.split("-").reverse().join("/") : null },
               ].map(row => (
                 <div key={row.label} style={{ display: "flex", justifyContent: "space-between", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 7, paddingTop: 7 }}>
                   <span style={{ fontSize: 11, color: COLORS.textSub }}>{row.label}</span>

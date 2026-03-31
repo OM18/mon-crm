@@ -5825,7 +5825,7 @@ return (
                     <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>
                       {(getComplianceCfg(c.complianceStatus).displayLabel
                         ? getComplianceCfg(c.complianceStatus).displayLabel.replace(/\\n/g, "\n").split("\n")
-                        : getComplianceCfg(c.complianceStatus).label.split(/\s*–\s*/)
+                        : getComplianceCfg(c.complianceStatus).label.split(/\s*[–-]\s*/)
                       ).map((part, i) => <span key={i} style={{ display: "block", color: getComplianceCfg(c.complianceStatus).color }}>{part.trim()}</span>)}
                     </span>
                   </div>
@@ -5838,7 +5838,7 @@ return (
                     <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>
                       {(getFinalAuthCfg(c.finalAuthStatus).displayLabel
                         ? getFinalAuthCfg(c.finalAuthStatus).displayLabel.replace(/\\n/g, "\n").split("\n")
-                        : getFinalAuthCfg(c.finalAuthStatus).label.split(/\s*–\s*/)
+                        : getFinalAuthCfg(c.finalAuthStatus).label.split(/\s*[–-]\s*/)
                       ).map((part, i) => <span key={i} style={{ display: "block", color: getFinalAuthCfg(c.finalAuthStatus).color }}>{part.trim()}</span>)}
                     </span>
                   </div>

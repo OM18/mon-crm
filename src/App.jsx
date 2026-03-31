@@ -4365,14 +4365,16 @@ const g = guessField(h, fieldMap);  if (g && !Object.values(autoMap).includes(g)
     return match ? match.value : null;
   };
 
+  // Match against config values/labels only — no hardcoded guessing
+  // Normalizes spaces, dashes (- and –) and case for flexible matching
   const mapAuth = (val, cfgList) => {
-    if (!val) return cfgList[0]?.value || "";
-    const v = val.toString().toUpperCase().trim();
-    if (v.includes("AWAITING")) return "not_auth_awaiting";
-    if (v.includes("REQUESTED")) return "not_auth_requested";
-    if (v === "AUTHORISED" || v === "AUTHORIZED") return "authorized";
-    if (v.includes("BLACK")) return "blacklisted";
-    return cfgList[0]?.value || "";
+    if (!val) return null;
+    const norm = s => s.toString().toLowerCase().replace(/[–—]/g, "-").replace(/\s+/g, " ").trim();
+    const normalizedVal = norm(val);
+    const match = cfgList.find(s =>
+      norm(s.value) === normalizedVal || norm(s.label) === normalizedVal
+    );
+    return match ? match.value : null; // null = unknown, will be flagged
   };
 
   const doImport = () => {
@@ -4402,19 +4404,23 @@ const g = guessField(h, fieldMap);  if (g && !Object.values(autoMap).includes(g)
         obj.size = obj.size || "1-10";
         if (obj.complianceStatus) {
   const mapped = mapAuth(obj.complianceStatus, config.complianceStatus);
-  if (!config.complianceStatus.find(s => s.value === mapped)) {
+  if (mapped === null) {
     const key = `complianceStatus:${obj.complianceStatus}`;
     if (!unknowns[key]) unknowns[key] = { fieldKey: "complianceStatus", configKey: "complianceStatus", fieldLabel: "Compliance Status", value: obj.complianceStatus };
+    obj.complianceStatus = "";
+  } else {
+    obj.complianceStatus = mapped;
   }
-  obj.complianceStatus = mapped;
 }
 if (obj.finalAuthStatus) {
   const mapped = mapAuth(obj.finalAuthStatus, config.finalAuthStatus);
-  if (!config.finalAuthStatus.find(s => s.value === mapped)) {
+  if (mapped === null) {
     const key = `finalAuthStatus:${obj.finalAuthStatus}`;
     if (!unknowns[key]) unknowns[key] = { fieldKey: "finalAuthStatus", configKey: "finalAuthStatus", fieldLabel: "Final Authorization Status", value: obj.finalAuthStatus };
+    obj.finalAuthStatus = "";
+  } else {
+    obj.finalAuthStatus = mapped;
   }
-  obj.finalAuthStatus = mapped;
 }
         if (obj.businessUnit && typeof obj.businessUnit === "string") {
           const buValues = obj.businessUnit.split(/[,;]/).map(v => v.trim()).filter(Boolean);
@@ -5665,8 +5671,8 @@ return (
           <button onClick={openNew} style={{ background: COLORS.accent, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 14px", lineHeight: "1", height: "46px", marginTop: 3 }}>+ NEW COMPANY</button>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, padding: "8px 18px", marginBottom: 2 }}>
-          {["Company", "Broker", "Role", "Compliance Status", "Final Auth. Status", "Website", "Business Unit"].map(h => (
+        <div style={{ display: "grid", gridTemplateColumns: "100px 2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, padding: "8px 18px", marginBottom: 2 }}>
+          {["Ref", "Company", "Broker", "Role", "Compliance Status", "Final Auth. Status", "Website", "Business Unit"].map(h => (
             <div key={h} style={{ fontSize: 14, color: "#D4AF37", fontWeight: 600, letterSpacing: 0.5 }}>{h.toUpperCase()}</div>
           ))}
         </div>
@@ -5717,14 +5723,14 @@ return (
               background: selected === c.id ? `${COLORS.purple}12` : COLORS.card,
               border: `1px solid ${selected === c.id ? COLORS.purple : COLORS.border}`,
               borderRadius: 12, padding: "12px 18px", cursor: "pointer",
-              display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, alignItems: "center", transition: "all 0.15s",
+              display: "grid", gridTemplateColumns: "100px 2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, alignItems: "center", transition: "all 0.15s",
             }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.accent, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.ref || "—"}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <CountryFlag country={c.country} size={36} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 700, color: COLORS.text, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
                   <div style={{ color: COLORS.textSub, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {c.ref && <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.accent, marginRight: 6 }}>{c.ref}</span>}
                     {[c.city, c.country ? getCountryLabel(c.country, config.country).toUpperCase() : null].filter(Boolean).join(", ") || "—"}
                   </div>
                 </div>

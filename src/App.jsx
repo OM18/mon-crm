@@ -508,8 +508,8 @@ const FIELD_DEFINITIONS = [
   { key: "city", label: "City", icon: "🏙", description: "Villes disponibles dans les formulaires", hasColor: false, hasValue: false },
   { key: "businessUnit", label: "Business Unit", icon: "◈", description: "Unités métier disponibles", hasColor: true, hasValue: true },
   { key: "country", label: "Country", icon: "🌍", description: "Pays disponibles dans les formulaires", hasColor: false, hasValue: false, sorted: true },
-  { key: "complianceStatus", label: "Compliance Status", icon: "🛡", description: "Statuts de conformité", hasColor: true, hasValue: true },
-  { key: "finalAuthStatus", label: "Final Authorization Status", icon: "✅", description: "Statuts d'autorisation finale", hasColor: true, hasValue: true },
+  { key: "complianceStatus", label: "Compliance Status", icon: "🛡", description: "Statuts de conformité", hasColor: true, hasValue: true, hasDisplayLabel: true },
+  { key: "finalAuthStatus", label: "Final Authorization Status", icon: "✅", description: "Statuts d'autorisation finale", hasColor: true, hasValue: true, hasDisplayLabel: true },
   { key: "roles", label: "Roles", icon: "◎", description: "Rôles assignables aux sociétés", hasColor: true, hasValue: true },
   { key: "companySize", label: "Company Size", icon: "📐", description: "Taille de la société (Small, Medium, Big)", hasColor: true, hasValue: true },
   { key: "contractsCurrency", label: "Contracts Currency", icon: "💱", description: "Devises utilisées dans les contrats", hasColor: true, hasValue: true },
@@ -624,6 +624,17 @@ const item = { value: isCountry ? newLabel.toUpperCase() : val, label: isCountry
                   )}
                   <input value={item.label} onChange={e => updateItem(realIdx, "label", e.target.value)}
                     style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                  {fieldDef.hasDisplayLabel && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+                      <input
+                        value={item.displayLabel || ""}
+                        onChange={e => updateItem(realIdx, "displayLabel", e.target.value)}
+                        placeholder={`Affichage court (\\n = saut de ligne)`}
+                        title="Label d'affichage dans la table — utilisez \\n pour un saut de ligne"
+                        style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.accentLight, fontSize: 11, fontFamily: "'DM Mono', monospace", outline: "none", width: "100%" }}
+                      />
+                    </div>
+                  )}
                   {fieldDef.hasValue && (
                     <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap", background: COLORS.bg, padding: "2px 6px", borderRadius: 4 }}>
                       {item.value}
@@ -5752,9 +5763,10 @@ return (
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: getComplianceCfg(c.complianceStatus).color, flexShrink: 0, marginTop: 3 }} />
                     <span style={{ fontSize: 11, color: getComplianceCfg(c.complianceStatus).color, fontWeight: 600, lineHeight: 1.3 }}>
-                      {getComplianceCfg(c.complianceStatus).label.includes("–")
-                        ? getComplianceCfg(c.complianceStatus).label.split("–").map((part, i) => <span key={i} style={{ display: "block" }}>{i === 0 ? part.trim() + " –" : part.trim()}</span>)
-                        : getComplianceCfg(c.complianceStatus).label}
+                      {(getComplianceCfg(c.complianceStatus).displayLabel
+                        ? getComplianceCfg(c.complianceStatus).displayLabel.split("\\n")
+                        : getComplianceCfg(c.complianceStatus).label.split(" ")
+                      ).map((part, i) => <span key={i} style={{ display: "block" }}>{part}</span>)}
                     </span>
                   </div>
                 ) : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
@@ -5764,9 +5776,10 @@ return (
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: getFinalAuthCfg(c.finalAuthStatus).color, flexShrink: 0, marginTop: 3 }} />
                     <span style={{ fontSize: 11, color: getFinalAuthCfg(c.finalAuthStatus).color, fontWeight: 600, lineHeight: 1.3 }}>
-                      {getFinalAuthCfg(c.finalAuthStatus).label.includes("–")
-                        ? getFinalAuthCfg(c.finalAuthStatus).label.split("–").map((part, i) => <span key={i} style={{ display: "block" }}>{i === 0 ? part.trim() + " –" : part.trim()}</span>)
-                        : getFinalAuthCfg(c.finalAuthStatus).label}
+                      {(getFinalAuthCfg(c.finalAuthStatus).displayLabel
+                        ? getFinalAuthCfg(c.finalAuthStatus).displayLabel.split("\\n")
+                        : getFinalAuthCfg(c.finalAuthStatus).label.split(" ")
+                      ).map((part, i) => <span key={i} style={{ display: "block" }}>{part}</span>)}
                     </span>
                   </div>
                 ) : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}

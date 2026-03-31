@@ -5540,8 +5540,36 @@ const sel = selected ? filtered.find(c => c.id === selected) : null;
   const selContacts = sel ? contacts.filter(c => c.companyId === sel.id) : [];
 
   const getStatusCfg = (v) => config.activityStatus.find(s => s.value === v) || { label: v || "—", color: COLORS.textSub };
-  const getComplianceCfg = (v) => config.complianceStatus.find(s => s.value === v || s.value?.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
-  const getFinalAuthCfg = (v) => config.finalAuthStatus.find(s => s.value === v || s.value?.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
+  const COMPLIANCE_LEGACY_MAP = {
+    "not_authorised_-_requested": "not_auth_requested",
+    "not_authorised_-_inactive": "not_auth_awaiting",
+    "not_authorised": "not_auth_awaiting",
+    "not_authorized_-_requested": "not_auth_requested",
+    "not_authorized_-_inactive": "not_auth_awaiting",
+    "not_authorized": "not_auth_awaiting",
+    "authorised": "authorized",
+    "blacklisted": "blacklisted",
+  };
+  const getComplianceCfg = (v) => {
+    if (!v) return { label: "—", color: COLORS.textSub };
+    const norm = s => s?.toLowerCase().replace(/[\s_\-]+/g, "");
+    const mapped = COMPLIANCE_LEGACY_MAP[v] || COMPLIANCE_LEGACY_MAP[v?.toLowerCase()];
+    return config.complianceStatus.find(s => s.value === v)
+      || config.complianceStatus.find(s => norm(s.value) === norm(v))
+      || config.complianceStatus.find(s => norm(s.label) === norm(v))
+      || (mapped && config.complianceStatus.find(s => s.value === mapped))
+      || { label: v, color: COLORS.textSub };
+  };
+  const getFinalAuthCfg = (v) => {
+    if (!v) return { label: "—", color: COLORS.textSub };
+    const norm = s => s?.toLowerCase().replace(/[\s_\-]+/g, "");
+    const mapped = COMPLIANCE_LEGACY_MAP[v] || COMPLIANCE_LEGACY_MAP[v?.toLowerCase()];
+    return config.finalAuthStatus.find(s => s.value === v)
+      || config.finalAuthStatus.find(s => norm(s.value) === norm(v))
+      || config.finalAuthStatus.find(s => norm(s.label) === norm(v))
+      || (mapped && config.finalAuthStatus.find(s => s.value === mapped))
+      || { label: v, color: COLORS.textSub };
+  };
   const getBUCfg = (v) => config.businessUnit.find(s => s.value === v) || { label: v || "—", color: COLORS.accent };
   const getRoleCfg = (v) => config.roles.find(r => r.value === v) || { color: COLORS.accent };
   const getTypeCfg = (v) => config.companyType.find(s => s.value === v) || { label: v || "—", color: COLORS.blue };

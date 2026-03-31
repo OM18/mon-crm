@@ -5543,11 +5543,15 @@ const sel = selected ? filtered.find(c => c.id === selected) : null;
   const COMPLIANCE_LEGACY_MAP = {
     "not_authorised_-_requested": "not_auth_requested",
     "not_authorised_-_inactive": "not_auth_awaiting",
+    "not_authorised_-_under_review": "not_auth_awaiting",
     "not_authorised": "not_auth_awaiting",
     "not_authorized_-_requested": "not_auth_requested",
     "not_authorized_-_inactive": "not_auth_awaiting",
+    "not_authorized_-_under_review": "not_auth_awaiting",
     "not_authorized": "not_auth_awaiting",
     "authorised": "authorized",
+    "authorised_upon_request": "authorized_upon_request",
+    "authorized_upon_request": "authorized_upon_request",
     "blacklisted": "blacklisted",
   };
   const getComplianceCfg = (v) => {

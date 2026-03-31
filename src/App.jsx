@@ -8449,6 +8449,11 @@ const DerivStatistics = () => {
     const pnlByYear = {};
     for (const year of years) pnlByYear[year] = 0;
     const buckets = getStatFifoDetail(opsSubset);
+    const isDebug = opsSubset.some(o => o.account === "21747");
+    if (isDebug) console.log("[DEBUG 21747] buckets:", buckets.map(b => ({
+      account: b.account, instrument: b.instrument,
+      matches: b.matches.map(m => ({ sellDate: m.sellDate, pnl: m.pnl, lots: m.lots }))
+    })));
     for (const b of buckets) {
       for (const m of b.matches) {
         const exitYear = m.sellDate && m.sellDate !== "—" ? parseInt(m.sellDate.slice(0, 4)) : null;
@@ -8457,6 +8462,7 @@ const DerivStatistics = () => {
         }
       }
     }
+    if (isDebug) console.log("[DEBUG 21747] pnlByYear:", pnlByYear);
     return pnlByYear;
   };
 

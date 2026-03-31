@@ -8450,19 +8450,18 @@ const DerivStatistics = () => {
     for (const year of years) pnlByYear[year] = 0;
     const buckets = getStatFifoDetail(opsSubset);
     const isDebug = opsSubset.some(o => o.account === "21747");
-    if (isDebug) console.log("[DEBUG 21747] buckets:", buckets.map(b => ({
-      account: b.account, instrument: b.instrument,
-      matches: b.matches.map(m => ({ sellDate: m.sellDate, pnl: m.pnl, lots: m.lots }))
-    })));
     for (const b of buckets) {
       for (const m of b.matches) {
         const exitYear = m.sellDate && m.sellDate !== "—" ? parseInt(m.sellDate.slice(0, 4)) : null;
+        if (isDebug && exitYear === 2026) {
+          console.log("[DEBUG 21747 match 2026]", { instrument: b.instrument, buyDate: m.buyDate, sellDate: m.sellDate, lots: m.lots, entryPrice: m.entryPrice, exitPrice: m.exitPrice, pnl: m.pnl });
+        }
         if (exitYear && pnlByYear[exitYear] !== undefined) {
           pnlByYear[exitYear] += m.pnl;
         }
       }
     }
-    if (isDebug) console.log("[DEBUG 21747] pnlByYear:", pnlByYear);
+    if (isDebug) console.log("[DEBUG 21747] total 2026:", pnlByYear[2026]);
     return pnlByYear;
   };
 
@@ -8485,17 +8484,20 @@ const DerivStatistics = () => {
 
   // ── TABLE 2: by BU × Account ──
   const table2 = useMemo(() => {
-    const result = {};
+    // Collect all ops per account (BU must not split FIFO — run on full account history)
+    const byAccount = {};
     for (const op of specOps) {
-      const acc = accounts.find(a => a.accountNumber === op.account);
-      const bu = acc?.businessUnit || op.businessUnit || "—";
       const account = op.account || "—";
-      const key = `${bu}||${account}`;
-      if (!result[key]) result[key] = { bu, account, ops: [] };
-      result[key].ops.push(op);
+      if (!byAccount[account]) byAccount[account] = { ops: [], bu: null };
+      byAccount[account].ops.push(op);
     }
-    return Object.values(result).map(r => ({ ...r, pnlByYear: getPnlByYear(r.ops) }))
-      .sort((a, b) => a.bu.localeCompare(b.bu) || a.account.localeCompare(b.account));
+    for (const account of Object.keys(byAccount)) {
+      const acc = accounts.find(a => a.accountNumber === account);
+      byAccount[account].bu = acc?.businessUnit || byAccount[account].ops[0]?.businessUnit || "—";
+    }
+    return Object.entries(byAccount).map(([account, { bu, ops: accOps }]) => ({
+      bu, account, ops: accOps, pnlByYear: getPnlByYear(accOps),
+    })).sort((a, b) => a.bu.localeCompare(b.bu) || a.account.localeCompare(b.account));
   }, [ops, accounts, products]);
 
   const fmtPnl = (n) => {

@@ -1,5 +1,4 @@
-﻿// @ts-nocheck
-import { useState, useEffect, useRef, createContext, useContext, useMemo } from "react";
+﻿import { useState, useEffect, useRef, createContext, useContext, useMemo } from "react";
 import { supabase } from './supabase';
 
 // ─── SAFE SUPABASE SAVE ───────────────────────────────────────
@@ -3988,8 +3987,7 @@ const Dashboard = ({ contacts, companies, tasks }) => {
   const getStatusCfg = (v) => config.activityStatus.find(s => s.value === v) || { label: v || "—", color: COLORS.textSub };
 
   return (
-    <div style={{ position: "relative" }}>
-      <div style={{ position: "relative", zIndex: 1 }}>
+    <div>
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif" }}>Vue d'ensemble</h1>
         <p style={{ margin: "6px 0 0", color: COLORS.textSub, fontSize: 14 }}>Bienvenue dans votre espace CRM</p>
@@ -5295,9 +5293,11 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
 
       </div>
     </div>
-    </div>
   );
 };
+
+// ─── COMPANIES ────────────────────────────────────────────────
+const LoginPage = ({ onLogin }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -8460,7 +8460,7 @@ const DerivStatistics = () => {
     }
     return Object.values(result).map(r => ({ ...r, pnlByYear: getPnlByYear(r.ops) }))
       .sort((a, b) => a.bu.localeCompare(b.bu) || a.underlyingCat.localeCompare(b.underlyingCat));
-  }, [ops, accounts, products, lotSizes, priceUnits]);
+  }, [ops, accounts, products]);
 
   // ── TABLE 2: by BU × Account ──
   const table2 = useMemo(() => {
@@ -8475,7 +8475,7 @@ const DerivStatistics = () => {
     }
     return Object.values(result).map(r => ({ ...r, pnlByYear: getPnlByYear(r.ops) }))
       .sort((a, b) => a.bu.localeCompare(b.bu) || a.account.localeCompare(b.account));
-  }, [ops, accounts, products, lotSizes, priceUnits]);
+  }, [ops, accounts, products]);
 
   const fmtPnl = (n) => {
     if (n === 0 || n === undefined) return "—";
@@ -9597,31 +9597,6 @@ export default function CRM() {
   const [tasks, setTasks] = useState(initialTasks);
   const [page, setPage] = useState("dashboard");
   const dataLoaded = useRef(false);
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const el = canvasRef.current;
-    if (!el) return;
-    const w = el.width = window.innerWidth;
-    const h = el.height = window.innerHeight;
-    const ctx = el.getContext("2d");
-    const cx = w / 2, cy = h / 2;
-    const maxDist = Math.sqrt(cx * cx + cy * cy);
-    const imageData = ctx.createImageData(w, h);
-    const data = imageData.data;
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const dist = Math.sqrt(Math.pow(x - cx, 2) + Math.pow(y - cy, 2));
-        const gradient = (1 - dist / maxDist) * 0.25;
-        const noise = (Math.random() - 0.5) * 0.06;
-        const val = Math.max(0, Math.min(1, gradient + noise));
-        const v = Math.round(val * 255);
-        const idx = (y * w + x) * 4;
-        data[idx] = v; data[idx+1] = v; data[idx+2] = v; data[idx+3] = 255;
-      }
-    }
-    ctx.putImageData(imageData, 0, 0);
-  }, []);
 
   useEffect(() => {
   async function initEmployees() {
@@ -9694,9 +9669,7 @@ export default function CRM() {
 
   return (
     <ConfigProvider>
-      <div style={{ display: "flex", minHeight: "100vh", width: "100vw", overflow: "hidden", background: "transparent", fontFamily: "'Inter', 'Segoe UI', sans-serif", color: COLORS.text, position: "relative" }}>
-        {/* Global canvas background — dark radial gradient + grain */}
-        <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0, pointerEvents: "none" }} />
+      <div style={{ display: "flex", minHeight: "100vh", width: "100vw", overflow: "hidden", background: COLORS.bg, fontFamily: "'Inter', 'Segoe UI', sans-serif", color: COLORS.text }}>
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&family=DM+Mono:wght@400;600&display=swap');
           * { box-sizing: border-box; }
@@ -9707,7 +9680,7 @@ export default function CRM() {
         `}</style>
 
         {/* Sidebar */}
-        <div style={{ width: 220, background: `${COLORS.surface}CC`, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", padding: "28px 0", flexShrink: 0, position: "relative", zIndex: 1 }}>
+        <div style={{ width: 220, background: COLORS.surface, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", padding: "28px 0", flexShrink: 0 }}>
           <div style={{ padding: "0 24px 28px" }}>
             <div style={{ fontSize: 22, fontFamily: "'Inter', sans-serif", color: COLORS.text, lineHeight: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -9770,7 +9743,7 @@ export default function CRM() {
         </div>
 
         {/* Main */}
-        <div style={{ flex: 1, padding: "32px 40px", overflowY: "auto", background: "transparent", position: "relative", zIndex: 1 }}>
+        <div style={{ flex: 1, padding: "32px 40px", overflowY: "auto", background: COLORS.bg }}>
           {page === "dashboard" && <Dashboard contacts={contacts} companies={companies} tasks={tasks} />}
           {page === "companies" && <Companies companies={companies} setCompanies={setCompanies} contacts={contacts} />}
           {page === "contacts" && <Contacts contacts={contacts} setContacts={setContacts} companies={companies} />}

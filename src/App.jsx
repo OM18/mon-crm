@@ -8449,19 +8449,14 @@ const DerivStatistics = () => {
     const pnlByYear = {};
     for (const year of years) pnlByYear[year] = 0;
     const buckets = getStatFifoDetail(opsSubset);
-    const isDebug = opsSubset.some(o => o.account === "21747");
     for (const b of buckets) {
       for (const m of b.matches) {
         const exitYear = m.sellDate && m.sellDate !== "—" ? parseInt(m.sellDate.slice(0, 4)) : null;
-        if (isDebug && exitYear === 2026) {
-          console.log("[DEBUG 21747 match 2026]", { instrument: b.instrument, buyDate: m.buyDate, sellDate: m.sellDate, lots: m.lots, entryPrice: m.entryPrice, exitPrice: m.exitPrice, pnl: m.pnl });
-        }
         if (exitYear && pnlByYear[exitYear] !== undefined) {
           pnlByYear[exitYear] += m.pnl;
         }
       }
     }
-    if (isDebug) console.log("[DEBUG 21747] total 2026:", pnlByYear[2026]);
     return pnlByYear;
   };
 

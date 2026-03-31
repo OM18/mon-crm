@@ -5774,9 +5774,9 @@ return (
               borderRadius: 12, padding: "12px 18px", cursor: "pointer",
               display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, alignItems: "center", transition: "all 0.15s",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, overflow: "hidden" }}>
                 <CountryFlag country={c.country} size={36} />
-                <div style={{ minWidth: 0 }}>
+                <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
                   <div style={{ fontWeight: 700, color: COLORS.text, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
                   <div style={{ color: COLORS.textSub, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {[c.city, c.country ? getCountryLabel(c.country, config.country).toUpperCase() : null].filter(Boolean).join(", ") || "—"}

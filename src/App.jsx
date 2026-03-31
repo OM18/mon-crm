@@ -8298,6 +8298,9 @@ const resolveLotSize = (exchange, instrument, products, lotSizes) => {
   let match = lotSizes.find(l => _norm(l.exchange) === normExchange && _norm(l.instrument) === normUnderlying);
   if (!match) match = lotSizes.find(l => _norm(l.instrument) === normUnderlying);
   if (!match && normExchange) match = lotSizes.find(l => _norm(l.exchange) === normExchange);
+  if (_norm(instrument).includes("soybean")) {
+    console.log("[DEBUG lotSize]", { instrument, exchange, product: product ? { label: product.label, underlying: product.underlying, stoxxExchange: product.stoxxExchange } : null, normUnderlying, normExchange, match, result: match ? (parseFloat(match.quantity) || 1) : 1, allLotSizes: lotSizes.map(l => ({ exchange: l.exchange, instrument: l.instrument, quantity: l.quantity })) });
+  }
   return match ? (parseFloat(match.quantity) || 1) : 1;
 };
 

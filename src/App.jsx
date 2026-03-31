@@ -5671,8 +5671,14 @@ return (
           <button onClick={openNew} style={{ background: COLORS.accent, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 14px", lineHeight: "1", height: "46px", marginTop: 3 }}>+ NEW COMPANY</button>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "100px 2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, padding: "8px 18px", marginBottom: 2 }}>
-          {["Ref", "Company", "Broker", "Role", "Compliance Status", "Final Auth. Status", "Website", "Business Unit"].map(h => (
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, padding: "8px 18px", marginBottom: 2 }}>
+          {["Company", "Broker", "Role"].map(h => (
+            <div key={h} style={{ fontSize: 14, color: "#D4AF37", fontWeight: 600, letterSpacing: 0.5 }}>{h.toUpperCase()}</div>
+          ))}
+          {["Compliance\nStatus", "Final Auth.\nStatus"].map(h => (
+            <div key={h} style={{ fontSize: 14, color: "#D4AF37", fontWeight: 600, letterSpacing: 0.5, whiteSpace: "pre-line", lineHeight: 1.3 }}>{h.toUpperCase()}</div>
+          ))}
+          {["Website", "Business Unit"].map(h => (
             <div key={h} style={{ fontSize: 14, color: "#D4AF37", fontWeight: 600, letterSpacing: 0.5 }}>{h.toUpperCase()}</div>
           ))}
         </div>
@@ -5723,9 +5729,8 @@ return (
               background: selected === c.id ? `${COLORS.purple}12` : COLORS.card,
               border: `1px solid ${selected === c.id ? COLORS.purple : COLORS.border}`,
               borderRadius: 12, padding: "12px 18px", cursor: "pointer",
-              display: "grid", gridTemplateColumns: "100px 2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, alignItems: "center", transition: "all 0.15s",
+              display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, alignItems: "center", transition: "all 0.15s",
             }}>
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.accent, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.ref || "—"}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <CountryFlag country={c.country} size={36} />
                 <div style={{ minWidth: 0 }}>
@@ -5733,6 +5738,7 @@ return (
                   <div style={{ color: COLORS.textSub, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {[c.city, c.country ? getCountryLabel(c.country, config.country).toUpperCase() : null].filter(Boolean).join(", ") || "—"}
                   </div>
+                  {c.ref && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: COLORS.textMuted, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.ref}</div>}
                 </div>
               </div>
               <div style={{ fontSize: 12, color: c.broker ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.broker || "—"}</div>
@@ -5743,20 +5749,24 @@ return (
               </div>
               <div>
                 {c.complianceStatus ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: getComplianceCfg(c.complianceStatus).color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, color: getComplianceCfg(c.complianceStatus).color, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {getComplianceCfg(c.complianceStatus).label.split("–").pop()?.trim() || getComplianceCfg(c.complianceStatus).label}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
+                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: getComplianceCfg(c.complianceStatus).color, flexShrink: 0, marginTop: 3 }} />
+                    <span style={{ fontSize: 11, color: getComplianceCfg(c.complianceStatus).color, fontWeight: 600, lineHeight: 1.3 }}>
+                      {getComplianceCfg(c.complianceStatus).label.includes("–")
+                        ? getComplianceCfg(c.complianceStatus).label.split("–").map((part, i) => <span key={i} style={{ display: "block" }}>{i === 0 ? part.trim() + " –" : part.trim()}</span>)
+                        : getComplianceCfg(c.complianceStatus).label}
                     </span>
                   </div>
                 ) : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
               </div>
               <div>
                 {c.finalAuthStatus ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: getFinalAuthCfg(c.finalAuthStatus).color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, color: getFinalAuthCfg(c.finalAuthStatus).color, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {getFinalAuthCfg(c.finalAuthStatus).label.split("–").pop()?.trim() || getFinalAuthCfg(c.finalAuthStatus).label}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
+                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: getFinalAuthCfg(c.finalAuthStatus).color, flexShrink: 0, marginTop: 3 }} />
+                    <span style={{ fontSize: 11, color: getFinalAuthCfg(c.finalAuthStatus).color, fontWeight: 600, lineHeight: 1.3 }}>
+                      {getFinalAuthCfg(c.finalAuthStatus).label.includes("–")
+                        ? getFinalAuthCfg(c.finalAuthStatus).label.split("–").map((part, i) => <span key={i} style={{ display: "block" }}>{i === 0 ? part.trim() + " –" : part.trim()}</span>)
+                        : getFinalAuthCfg(c.finalAuthStatus).label}
                     </span>
                   </div>
                 ) : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}

@@ -5535,6 +5535,9 @@ const passFilters = filterMode === "AND"
   return true;
   });
   return ms && passFilters && passCustom;
+}).sort((a, b) => {
+  const toNum = v => { if (!v) return 0; const n = parseFloat(v.toString()); return isNaN(n) ? 0 : n; };
+  return toNum(b.complianceCreationDate) - toNum(a.complianceCreationDate);
 });
 
 const sel = selected ? filtered.find(c => c.id === selected) : null;

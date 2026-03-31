@@ -4037,6 +4037,7 @@ const Dashboard = ({ contacts, companies, tasks }) => {
 
 // ─── EXCEL IMPORT ─────────────────────────────────────────────
 const COMPANY_FIELD_MAP = {
+  "ref": ["ref", "reference", "référence", "company ref", "orb ref"],
   "name": ["name", "company name", "société", "societe", "company"],
   "website": ["website", "site", "url", "site web"],
   "city": ["city", "ville"],
@@ -4246,6 +4247,7 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
 
   const IMPORT_GUIDE = {
   companies: [
+    { field: "ref", format: "Texte", note: "Laisser vide pour générer automatiquement" },
     { field: "name", format: "Texte", note: "" },
     { field: "legalName", format: "Texte", note: "" },
     { field: "companyType", format: "Texte", note: "" },
@@ -4382,6 +4384,14 @@ const g = guessField(h, fieldMap);  if (g && !Object.values(autoMap).includes(g)
       if (type === "companies") {
         obj.avatar = (obj.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
         obj.tags = []; obj.revenue = Number(obj.revenue) || 0;
+        // Keep imported ref if provided, otherwise generate one
+        if (!obj.ref || obj.ref.trim() === "") {
+          const existingRefs = [...companies.map(c => c.ref), ...rawRows.slice(0, i).map((_, j) => { const o = {}; Object.entries(mapping).forEach(([ci, f]) => { if (f) o[f] = rawRows[j][ci]?.toString() || ""; }); return o.ref; }).filter(Boolean)];
+          let num = companies.length + i + 1;
+          let generatedRef;
+          do { generatedRef = "ORB-" + String(num).padStart(6, "0"); num++; } while (existingRefs.includes(generatedRef));
+          obj.ref = generatedRef;
+        }
         Object.entries(FIELD_CONFIG_MAP).forEach(([fieldKey, { configKey, label }]) => {
           const val = obj[fieldKey];
           if (val && !mapToConfigValue(configKey, val)) {

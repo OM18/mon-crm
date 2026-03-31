@@ -5540,8 +5540,8 @@ const sel = selected ? filtered.find(c => c.id === selected) : null;
   const selContacts = sel ? contacts.filter(c => c.companyId === sel.id) : [];
 
   const getStatusCfg = (v) => config.activityStatus.find(s => s.value === v) || { label: v || "—", color: COLORS.textSub };
-  const getComplianceCfg = (v) => config.complianceStatus.find(s => s.value === v) || { label: v || "—", color: COLORS.textSub };
-  const getFinalAuthCfg = (v) => config.finalAuthStatus.find(s => s.value === v) || { label: v || "—", color: COLORS.textSub };
+  const getComplianceCfg = (v) => config.complianceStatus.find(s => s.value === v || s.value?.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
+  const getFinalAuthCfg = (v) => config.finalAuthStatus.find(s => s.value === v || s.value?.toLowerCase() === v?.toLowerCase()) || { label: v || "—", color: COLORS.textSub };
   const getBUCfg = (v) => config.businessUnit.find(s => s.value === v) || { label: v || "—", color: COLORS.accent };
   const getRoleCfg = (v) => config.roles.find(r => r.value === v) || { color: COLORS.accent };
   const getTypeCfg = (v) => config.companyType.find(s => s.value === v) || { label: v || "—", color: COLORS.blue };
@@ -5764,7 +5764,7 @@ return (
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: getComplianceCfg(c.complianceStatus).color, flexShrink: 0, marginTop: 3 }} />
                     <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>
                       {(getComplianceCfg(c.complianceStatus).displayLabel
-                        ? getComplianceCfg(c.complianceStatus).displayLabel.split(/\\n|\n/)
+                        ? getComplianceCfg(c.complianceStatus).displayLabel.replace(/\\n/g, "\n").split("\n")
                         : getComplianceCfg(c.complianceStatus).label.split(/\s*–\s*/)
                       ).map((part, i) => <span key={i} style={{ display: "block", color: getComplianceCfg(c.complianceStatus).color }}>{part.trim()}</span>)}
                     </span>
@@ -5777,7 +5777,7 @@ return (
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: getFinalAuthCfg(c.finalAuthStatus).color, flexShrink: 0, marginTop: 3 }} />
                     <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>
                       {(getFinalAuthCfg(c.finalAuthStatus).displayLabel
-                        ? getFinalAuthCfg(c.finalAuthStatus).displayLabel.split(/\\n|\n/)
+                        ? getFinalAuthCfg(c.finalAuthStatus).displayLabel.replace(/\\n/g, "\n").split("\n")
                         : getFinalAuthCfg(c.finalAuthStatus).label.split(/\s*–\s*/)
                       ).map((part, i) => <span key={i} style={{ display: "block", color: getFinalAuthCfg(c.finalAuthStatus).color }}>{part.trim()}</span>)}
                     </span>

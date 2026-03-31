@@ -5477,25 +5477,35 @@ useEffect(() => {
   const filtered = companies.filter(c => {
     const ms = c.name?.toLowerCase().includes(search.toLowerCase()) || c.website?.toLowerCase().includes(search.toLowerCase());
 const filterKeys = activeFilters ? Object.keys(activeFilters) : [];
-const passFilters = filterKeys.every(key => {
-  const val = c[key];
-  const valArr = Array.isArray(val) ? val : (val !== undefined && val !== null && val !== "" ? [val] : []);
-  if (activeFilters[key].length > 0) {
-    const inc = filterMode === "AND" ? activeFilters[key].every(f => valArr.includes(f)) : activeFilters[key].some(f => valArr.includes(f));
-    if (!inc) return false;
-    // "only" check: if any active filter value for this key has "only" mode, the field must contain exactly that value and nothing else
-    const onlyVals = (onlyFilters[key] || []).filter(v => activeFilters[key].includes(v));
-    if (onlyVals.length > 0) {
-      const exactMatch = onlyVals.some(v => valArr.length === 1 && valArr[0] === v);
-      if (!exactMatch) return false;
-    }
-  }
-  if (excludeFilters[key]?.length > 0) {
-    const exc = excludeFilters[key].some(f => valArr.includes(f));
-    if (exc) return false;
-  }
-  return true;
-});
+const passFilters = filterMode === "AND"
+  ? filterKeys.every(key => {
+      const val = c[key];
+      const valArr = Array.isArray(val) ? val : (val !== undefined && val !== null && val !== "" ? [val] : []);
+      if (activeFilters[key].length > 0) {
+        // Always OR within the same filter key
+        const inc = activeFilters[key].some(f => valArr.includes(f));
+        if (!inc) return false;
+        const onlyVals = (onlyFilters[key] || []).filter(v => activeFilters[key].includes(v));
+        if (onlyVals.length > 0) {
+          const exactMatch = onlyVals.some(v => valArr.length === 1 && valArr[0] === v);
+          if (!exactMatch) return false;
+        }
+      }
+      if (excludeFilters[key]?.length > 0) {
+        const exc = excludeFilters[key].some(f => valArr.includes(f));
+        if (exc) return false;
+      }
+      return true;
+    })
+  : filterKeys.some(key => {
+      const val = c[key];
+      const valArr = Array.isArray(val) ? val : (val !== undefined && val !== null && val !== "" ? [val] : []);
+      if (activeFilters[key].length > 0) {
+        const inc = activeFilters[key].some(f => valArr.includes(f));
+        if (inc) return true;
+      }
+      return false;
+    }) || filterKeys.length === 0;
  const passCustom = customFilters.every(cf => {
   const val = c[cf.key];
   const isEmpty = val === null || val === undefined || val === "" || (Array.isArray(val) && val.length === 0);

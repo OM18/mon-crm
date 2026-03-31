@@ -5821,7 +5821,6 @@ return (
               <div>
                 {c.complianceStatus ? (
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: getComplianceCfg(c.complianceStatus).color, flexShrink: 0, marginTop: 3 }} />
                     <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>
                       {(getComplianceCfg(c.complianceStatus).displayLabel
                         ? getComplianceCfg(c.complianceStatus).displayLabel.replace(/\\n/g, "\n").split("\n")
@@ -5834,7 +5833,6 @@ return (
               <div>
                 {c.finalAuthStatus ? (
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: getFinalAuthCfg(c.finalAuthStatus).color, flexShrink: 0, marginTop: 3 }} />
                     <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>
                       {(getFinalAuthCfg(c.finalAuthStatus).displayLabel
                         ? getFinalAuthCfg(c.finalAuthStatus).displayLabel.replace(/\\n/g, "\n").split("\n")

@@ -5762,11 +5762,11 @@ return (
                 {c.complianceStatus ? (
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: getComplianceCfg(c.complianceStatus).color, flexShrink: 0, marginTop: 3 }} />
-                    <span style={{ fontSize: 11, color: getComplianceCfg(c.complianceStatus).color, fontWeight: 600, lineHeight: 1.3 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>
                       {(getComplianceCfg(c.complianceStatus).displayLabel
                         ? getComplianceCfg(c.complianceStatus).displayLabel.split("\\n")
                         : getComplianceCfg(c.complianceStatus).label.split(" ")
-                      ).map((part, i) => <span key={i} style={{ display: "block" }}>{part}</span>)}
+                      ).map((part, i) => <span key={i} style={{ display: "block", color: getComplianceCfg(c.complianceStatus).color }}>{part}</span>)}
                     </span>
                   </div>
                 ) : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
@@ -5775,11 +5775,11 @@ return (
                 {c.finalAuthStatus ? (
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: getFinalAuthCfg(c.finalAuthStatus).color, flexShrink: 0, marginTop: 3 }} />
-                    <span style={{ fontSize: 11, color: getFinalAuthCfg(c.finalAuthStatus).color, fontWeight: 600, lineHeight: 1.3 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>
                       {(getFinalAuthCfg(c.finalAuthStatus).displayLabel
                         ? getFinalAuthCfg(c.finalAuthStatus).displayLabel.split("\\n")
                         : getFinalAuthCfg(c.finalAuthStatus).label.split(" ")
-                      ).map((part, i) => <span key={i} style={{ display: "block" }}>{part}</span>)}
+                      ).map((part, i) => <span key={i} style={{ display: "block", color: getFinalAuthCfg(c.finalAuthStatus).color }}>{part}</span>)}
                     </span>
                   </div>
                 ) : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}

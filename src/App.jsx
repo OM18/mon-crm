@@ -8298,9 +8298,6 @@ const resolveLotSize = (exchange, instrument, products, lotSizes) => {
   let match = lotSizes.find(l => _norm(l.exchange) === normExchange && _norm(l.instrument) === normUnderlying);
   if (!match) match = lotSizes.find(l => _norm(l.instrument) === normUnderlying);
   if (!match && normExchange) match = lotSizes.find(l => _norm(l.exchange) === normExchange);
-  if (_norm(instrument).includes("soybean")) {
-    console.log("[DEBUG lotSize]", { instrument, exchange, product: product ? { label: product.label, underlying: product.underlying, stoxxExchange: product.stoxxExchange } : null, normUnderlying, normExchange, match, result: match ? (parseFloat(match.quantity) || 1) : 1, allLotSizes: lotSizes.map(l => ({ exchange: l.exchange, instrument: l.instrument, quantity: l.quantity })) });
-  }
   return match ? (parseFloat(match.quantity) || 1) : 1;
 };
 
@@ -8478,7 +8475,7 @@ const DerivStatistics = () => {
     }
     return Object.values(result).map(r => ({ ...r, pnlByYear: getPnlByYear(r.ops) }))
       .sort((a, b) => a.bu.localeCompare(b.bu) || a.underlyingCat.localeCompare(b.underlyingCat));
-  }, [ops, accounts, products]);
+  }, [ops, accounts, products, lotSizes, priceUnits]);
 
   // ── TABLE 2: by BU × Account ──
   const table2 = useMemo(() => {
@@ -8496,7 +8493,7 @@ const DerivStatistics = () => {
     return Object.entries(byAccount).map(([account, { bu, ops: accOps }]) => ({
       bu, account, ops: accOps, pnlByYear: getPnlByYear(accOps),
     })).sort((a, b) => a.bu.localeCompare(b.bu) || a.account.localeCompare(b.account));
-  }, [ops, accounts, products]);
+  }, [ops, accounts, products, lotSizes, priceUnits]);
 
   const fmtPnl = (n) => {
     if (n === 0 || n === undefined) return "—";

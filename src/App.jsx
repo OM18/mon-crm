@@ -5389,6 +5389,33 @@ const LoginPage = ({ onLogin }) => {
   );
 };
 
+const VirtualList = ({ items, itemHeight, containerHeight, renderItem, emptyMessage }) => {
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef(null);
+  const gap = 6;
+  const rowHeight = itemHeight + gap;
+  const totalHeight = items.length * rowHeight;
+  const visibleCount = Math.ceil(containerHeight / rowHeight) + 4;
+  const startIdx = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
+  const endIdx = Math.min(items.length, startIdx + visibleCount);
+  const visibleItems = items.slice(startIdx, endIdx);
+  const offsetY = startIdx * rowHeight;
+
+  return (
+    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
+      style={{ overflowY: "auto", flex: 1, position: "relative" }}>
+      {items.length === 0
+        ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>{emptyMessage}</div>
+        : <div style={{ height: totalHeight, position: "relative" }}>
+            <div style={{ position: "absolute", top: offsetY, left: 0, right: 0, display: "flex", flexDirection: "column", gap }}>
+              {visibleItems.map(item => renderItem(item))}
+            </div>
+          </div>
+      }
+    </div>
+  );
+};
+
 const CompanyRow = ({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, config }) => (
   <div onClick={onSelect} style={{
     background: isSelected ? `${COLORS.purple}12` : COLORS.card,
@@ -5874,13 +5901,10 @@ return (
       })}
   </div>
 )}
-        <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-          {filtered.map(c => (
-            <CompanyRow key={c.id} c={c} isSelected={selected === c.id} onSelect={() => setSelected(c.id === selected ? null : c.id)}
-              getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} config={config} />
-          ))}
-          {filtered.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>}
-        </div>
+        <VirtualList items={filtered} itemHeight={70} containerHeight={600} renderItem={(c) => (
+          <CompanyRow key={c.id} c={c} isSelected={selected === c.id} onSelect={() => setSelected(c.id === selected ? null : c.id)}
+            getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} config={config} />
+        )} emptyMessage="Aucune société trouvée" />
       </div>
 
       {sel && <div style={{ marginLeft: 20 }}><CompanyDetailPanel sel={sel} selContacts={selContacts} onEdit={() => openEdit(sel)} onDelete={() => del(sel.id)}

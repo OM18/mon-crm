@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, createContext, useContext, useMemo } from "react";
+﻿import { useState, useEffect, useRef, createContext, useContext, useMemo, memo } from "react";
 import { supabase } from './supabase';
 
 // ─── SAFE SUPABASE SAVE ───────────────────────────────────────
@@ -5389,7 +5389,7 @@ const LoginPage = ({ onLogin }) => {
   );
 };
 
-const CompanyRow = React.memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, config }) => (
+const CompanyRow = memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, config }) => (
   <div onClick={onSelect} style={{
     background: isSelected ? `${COLORS.purple}12` : COLORS.card,
     border: `1px solid ${isSelected ? COLORS.purple : COLORS.border}`,

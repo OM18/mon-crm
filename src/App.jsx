@@ -5389,6 +5389,62 @@ const LoginPage = ({ onLogin }) => {
   );
 };
 
+const CompanyRow = React.memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, config }) => (
+  <div onClick={onSelect} style={{
+    background: isSelected ? `${COLORS.purple}12` : COLORS.card,
+    border: `1px solid ${isSelected ? COLORS.purple : COLORS.border}`,
+    borderRadius: 12, padding: "12px 18px", cursor: "pointer",
+    display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, alignItems: "center", transition: "all 0.15s",
+  }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, overflow: "hidden" }}>
+      <CountryFlag country={c.country} size={36} />
+      <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+        <div style={{ fontWeight: 700, color: COLORS.text, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
+        <div style={{ color: COLORS.textSub, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {[c.city, c.country ? getCountryLabel(c.country, config.country).toUpperCase() : null].filter(Boolean).join(", ") || "—"}
+        </div>
+        {c.ref && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: COLORS.textMuted, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.ref}</div>}
+      </div>
+    </div>
+    <div style={{ fontSize: 12, color: c.broker ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.broker || "—"}</div>
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      {(c.roles || []).slice(0, 2).map(r => <Badge key={r} label={r.toUpperCase()} color={getRoleCfg(r).color} />)}
+      {(c.roles || []).length > 2 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>+{c.roles.length - 2}</span>}
+      {(c.roles || []).length === 0 && <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
+    </div>
+    <div>
+      {c.complianceStatus ? (
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>
+            {(getComplianceCfg(c.complianceStatus).displayLabel
+              ? getComplianceCfg(c.complianceStatus).displayLabel.replace(/\\n/g, "\n").split("\n")
+              : getComplianceCfg(c.complianceStatus).label.split(/\s*[–-]\s*/)
+            ).map((part, i) => <span key={i} style={{ display: "block", color: getComplianceCfg(c.complianceStatus).color }}>{part.trim()}</span>)}
+          </span>
+        </div>
+      ) : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
+    </div>
+    <div>
+      {c.finalAuthStatus ? (
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>
+            {(getFinalAuthCfg(c.finalAuthStatus).displayLabel
+              ? getFinalAuthCfg(c.finalAuthStatus).displayLabel.replace(/\\n/g, "\n").split("\n")
+              : getFinalAuthCfg(c.finalAuthStatus).label.split(/\s*[–-]\s*/)
+            ).map((part, i) => <span key={i} style={{ display: "block", color: getFinalAuthCfg(c.finalAuthStatus).color }}>{part.trim()}</span>)}
+          </span>
+        </div>
+      ) : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
+    </div>
+    <div style={{ fontSize: 12, color: COLORS.blue, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.website || "—"}</div>
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      {(Array.isArray(c.businessUnit) ? c.businessUnit : (c.businessUnit ? [c.businessUnit] : [])).length > 0
+        ? (Array.isArray(c.businessUnit) ? c.businessUnit : [c.businessUnit]).map(v => <Badge key={v} label={getBUCfg(v).label.toUpperCase()} color={getBUCfg(v).color} />)
+        : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
+    </div>
+  </div>
+));
+
 const Companies = ({ companies, setCompanies, contacts }) => {
   const { config } = useConfig();
   const [search, setSearch] = useState("");
@@ -5491,7 +5547,7 @@ useEffect(() => {
   });
   const [form, setForm] = useState(makeEmptyForm());
 
-  const filtered = companies.filter(c => {
+  const filtered = useMemo(() => companies.filter(c => {
     const ms = c.name?.toLowerCase().includes(search.toLowerCase()) || c.website?.toLowerCase().includes(search.toLowerCase());
 const filterKeys = activeFilters ? Object.keys(activeFilters) : [];
 const passFilters = filterMode === "AND"
@@ -5555,9 +5611,9 @@ const passFilters = filterMode === "AND"
 }).sort((a, b) => {
   const toNum = v => { if (!v) return 0; const n = parseFloat(v.toString()); return isNaN(n) ? 0 : n; };
   return toNum(b.complianceCreationDate) - toNum(a.complianceCreationDate);
-});
+}), [companies, search, activeFilters, excludeFilters, onlyFilters, customFilters, filterMode]);
 
-const sel = selected ? filtered.find(c => c.id === selected) : null;
+const sel = useMemo(() => selected ? filtered.find(c => c.id === selected) : null, [selected, filtered]);
   const openEdit = (c) => { setForm({ ...c, tags: (c.tags || []).join(", "), roles: c.roles || [] }); setEditCompany(c); setShowForm(true); };
   const openNew = () => { setForm(makeEmptyForm()); setEditCompany(null); setShowForm(true); };
   const toggleRole = (role) => { const cur = form.roles || []; setForm({ ...form, roles: cur.includes(role) ? cur.filter(r => r !== role) : [...cur, role] }); };
@@ -5820,59 +5876,8 @@ return (
 )}
         <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
           {filtered.map(c => (
-            <div key={c.id} onClick={() => setSelected(c.id === selected ? null : c.id)} style={{
-              background: selected === c.id ? `${COLORS.purple}12` : COLORS.card,
-              border: `1px solid ${selected === c.id ? COLORS.purple : COLORS.border}`,
-              borderRadius: 12, padding: "12px 18px", cursor: "pointer",
-              display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, alignItems: "center", transition: "all 0.15s",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, overflow: "hidden" }}>
-                <CountryFlag country={c.country} size={36} />
-                <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
-                  <div style={{ fontWeight: 700, color: COLORS.text, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
-                  <div style={{ color: COLORS.textSub, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {[c.city, c.country ? getCountryLabel(c.country, config.country).toUpperCase() : null].filter(Boolean).join(", ") || "—"}
-                  </div>
-                  {c.ref && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: COLORS.textMuted, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.ref}</div>}
-                </div>
-              </div>
-              <div style={{ fontSize: 12, color: c.broker ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.broker || "—"}</div>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {(c.roles || []).slice(0, 2).map(r => <Badge key={r} label={r.toUpperCase()} color={getRoleCfg(r).color} />)}
-                {(c.roles || []).length > 2 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>+{c.roles.length - 2}</span>}
-                {(c.roles || []).length === 0 && <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
-              </div>
-              <div>
-                {c.complianceStatus ? (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>
-                      {(getComplianceCfg(c.complianceStatus).displayLabel
-                        ? getComplianceCfg(c.complianceStatus).displayLabel.replace(/\\n/g, "\n").split("\n")
-                        : getComplianceCfg(c.complianceStatus).label.split(/\s*[–-]\s*/)
-                      ).map((part, i) => <span key={i} style={{ display: "block", color: getComplianceCfg(c.complianceStatus).color }}>{part.trim()}</span>)}
-                    </span>
-                  </div>
-                ) : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
-              </div>
-              <div>
-                {c.finalAuthStatus ? (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>
-                      {(getFinalAuthCfg(c.finalAuthStatus).displayLabel
-                        ? getFinalAuthCfg(c.finalAuthStatus).displayLabel.replace(/\\n/g, "\n").split("\n")
-                        : getFinalAuthCfg(c.finalAuthStatus).label.split(/\s*[–-]\s*/)
-                      ).map((part, i) => <span key={i} style={{ display: "block", color: getFinalAuthCfg(c.finalAuthStatus).color }}>{part.trim()}</span>)}
-                    </span>
-                  </div>
-                ) : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
-              </div>
-              <div style={{ fontSize: 12, color: COLORS.blue, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.website || "—"}</div>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {(Array.isArray(c.businessUnit) ? c.businessUnit : (c.businessUnit ? [c.businessUnit] : [])).length > 0
-                  ? (Array.isArray(c.businessUnit) ? c.businessUnit : [c.businessUnit]).map(v => <Badge key={v} label={getBUCfg(v).label.toUpperCase()} color={getBUCfg(v).color} />)
-                  : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
-              </div>
-            </div>
+            <CompanyRow key={c.id} c={c} isSelected={selected === c.id} onSelect={() => setSelected(c.id === selected ? null : c.id)}
+              getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} config={config} />
           ))}
           {filtered.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>}
         </div>

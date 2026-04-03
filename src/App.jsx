@@ -5448,6 +5448,23 @@ useEffect(() => {
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [editCompany, setEditCompany] = useState(null);
+  const [isReloading, setIsReloading] = useState(false);
+
+  const reloadCompanies = async () => {
+    setIsReloading(true);
+    const PAGE = 1000;
+    let all = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase.from('companies').select('data').order('id', { ascending: true }).range(from, from + PAGE - 1);
+      if (error || !data || data.length === 0) break;
+      all = [...all, ...data.map(r => r.data ?? r)];
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    if (all.length) setCompanies(all);
+    setIsReloading(false);
+  };
 
   useEffect(() => {
     const handleKey = (e) => { if (e.key === "Escape" && selected && !showForm && !showImport) setSelected(null); };
@@ -5742,6 +5759,10 @@ return (
               🗑 Effacer tout ({companies.length})
             </button>
           )}
+          <button onClick={reloadCompanies} disabled={isReloading} title="Recharger depuis Supabase"
+            style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: isReloading ? "wait" : "pointer", fontSize: 18, padding: "10px 14px", color: isReloading ? COLORS.textMuted : COLORS.textSub, transition: "color 0.2s", height: "46px" }}>
+            {isReloading ? "⟳" : "↺"}
+          </button>
           <button onClick={openNew} style={{ background: COLORS.accent, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 14px", lineHeight: "1", height: "46px", marginTop: 3 }}>+ NEW COMPANY</button>
         </div>
 

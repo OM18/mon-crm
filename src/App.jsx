@@ -5389,7 +5389,7 @@ const LoginPage = ({ onLogin }) => {
   );
 };
 
-const CompanyRow = memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, config }) => (
+const CompanyRow = ({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, config }) => (
   <div onClick={onSelect} style={{
     background: isSelected ? `${COLORS.purple}12` : COLORS.card,
     border: `1px solid ${isSelected ? COLORS.purple : COLORS.border}`,
@@ -5443,7 +5443,7 @@ const CompanyRow = memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAu
         : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
     </div>
   </div>
-));
+);
 
 const Companies = ({ companies, setCompanies, contacts }) => {
   const { config } = useConfig();

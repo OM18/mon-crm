@@ -8013,13 +8013,14 @@ const setOps = async (val) => {
       !activeFilters.status.length        || activeFilters.status.includes(o.status) || activeFilters.status.some(s => o.status?.toLowerCase() === s?.toLowerCase()),
       !activeFilters.businessUnit.length  || activeFilters.businessUnit.includes(o.businessUnit),
       !activeFilters.internalDeal.length  || activeFilters.internalDeal.includes(String(o.internalDeal)),
-      !activeFilters.exchange.length      || activeFilters.exchange.some(ex => norm(o.exchange) === norm(ex)),
       !activeFilters.underlying.length    || activeFilters.underlying.some(u => norm(opUnderlying) === norm(u)),
       !activeFilters.financingBank.length || activeFilters.financingBank.some(fb => norm(opFinancingBank) === norm(fb)),
     ].filter((_, i) => {
-      const keys = ["type","opType","side","status","businessUnit","internalDeal","exchange","underlying","financingBank"];
+      const keys = ["type","opType","side","status","businessUnit","internalDeal","underlying","financingBank"];
       return activeFilters[keys[i]].length > 0;
     });
+    // Exchange is always AND (never affected by OR mode)
+    const exchangePass = !activeFilters.exchange.length || activeFilters.exchange.some(ex => norm(o.exchange) === norm(ex));
     const customChecks = customFilters.map(cf => {
       const val = o[cf.key];
       if (cf.op === "empty")    return !val || String(val).trim() === "";
@@ -8035,7 +8036,7 @@ const setOps = async (val) => {
       ? (tagChecks.length === 0 || tagChecks.some(Boolean))
       : tagChecks.every(Boolean);
     const customPass = customChecks.every(Boolean);
-    return tagPass && customPass;
+    return tagPass && exchangePass && customPass;
   }).sort((a, b) => {
     const dateDiff = (b.tradeDate || "").localeCompare(a.tradeDate || "");
     if (dateDiff !== 0) return dateDiff;

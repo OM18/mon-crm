@@ -5814,10 +5814,80 @@ const CompanyRow = ({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg
   </div>
 );
 
+// ─── COMPANY EXPORT MODAL ────────────────────────────────────
+const COMPANY_EXPORT_HEADERS = [
+  "ref", "name", "legalName", "companyType", "group", "taxInfo",
+  "website", "phone", "address", "city", "country", "status", "companySize",
+  "broker", "roles", "gtRole", "businessUnit",
+  "complianceStatus", "finalAuthStatus",
+  "complianceCreationDate", "complianceLastUpdateDate",
+  "complianceRequestDate", "complianceLastReceptionDate", "complianceFinalConfirmationDate",
+  "complianceAdditionalInfos",
+  "incorporationDate", "equity", "turnover", "netIncome", "totalFixedAssets", "totalAssets",
+  "contractsCurrency", "numberOfContracts", "foodFeed", "tags", "watchList",
+];
+
+const CompanyExportModal = ({ all, filtered, onClose }) => {
+  const [scope, setScope] = useState("filtered");
+  const [exporting, setExporting] = useState(false);
+
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      const XLSX = await import("xlsx");
+      const data = scope === "all" ? all : filtered;
+      const rows = data.map(c => COMPANY_EXPORT_HEADERS.map(h => {
+        const v = c[h];
+        if (Array.isArray(v)) return v.join(", ");
+        if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+        return v ?? "";
+      }));
+      const ws = XLSX.utils.aoa_to_sheet([COMPANY_EXPORT_HEADERS, ...rows]);
+      ws["!cols"] = COMPANY_EXPORT_HEADERS.map(h => ({ wch: Math.max(h.length + 2, 14) }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Companies");
+      XLSX.writeFile(wb, `companies_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) { console.error("[export] error:", e); }
+    setExporting(false);
+    onClose();
+  };
+
+  return (
+    <Modal title="Exporter les sociétés" onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ fontSize: 13, color: COLORS.textSub }}>Choisissez les sociétés à exporter :</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {[
+            { value: "filtered", label: "Sociétés filtrées", sub: `${filtered.length} société${filtered.length !== 1 ? "s" : ""} visibles à l'écran` },
+            { value: "all",      label: "Toutes les sociétés", sub: `${all.length} société${all.length !== 1 ? "s" : ""} au total` },
+          ].map(opt => (
+            <div key={opt.value} onClick={() => setScope(opt.value)}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 10, border: `1px solid ${scope === opt.value ? COLORS.accent : COLORS.border}`, background: scope === opt.value ? `${COLORS.accent}10` : COLORS.card, cursor: "pointer", transition: "all 0.15s" }}>
+              <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${scope === opt.value ? COLORS.accent : COLORS.border}`, background: scope === opt.value ? COLORS.accent : "transparent", flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{opt.label}</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted }}>{opt.sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.card, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
+          📋 {COMPANY_EXPORT_HEADERS.length} colonnes : {COMPANY_EXPORT_HEADERS.join(", ")}
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+          <Btn variant="secondary" onClick={onClose}>Annuler</Btn>
+          <Btn onClick={doExport} disabled={exporting}>{exporting ? "Export en cours…" : "⬇ Exporter Excel"}</Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 const Companies = ({ companies, setCompanies, contacts }) => {
   const { config, updateField } = useConfig();
   const [search, setSearch] = useState("");
   const [activeViewId, setActiveViewId] = useState(null);
+  const [showExport, setShowExport] = useState(false);
 const [showFilters, setShowFilters] = useState(false);
 const [filterMode, setFilterMode] = useState("AND");
 const [activeFilters, setActiveFilters] = useState({
@@ -6257,31 +6327,7 @@ return (
                       <span style={{ fontSize: 16 }}>⬆</span> IMPORT
                     </div>
                     <div style={{ height: 1, background: COLORS.border }} />
-                    <div onClick={async () => {
-                      setXlOpen(false);
-                      const XLSX = await import("xlsx");
-                      const headers = [
-                        "ref", "name", "legalName", "companyType", "group", "taxInfo",
-                        "website", "phone", "address", "city", "country", "status", "companySize",
-                        "broker", "roles", "gtRole", "businessUnit",
-                        "complianceStatus", "finalAuthStatus",
-                        "complianceCreationDate", "complianceLastUpdateDate",
-                        "complianceRequestDate", "complianceLastReceptionDate", "complianceFinalConfirmationDate",
-                        "complianceAdditionalInfos",
-                        "incorporationDate", "equity", "turnover", "netIncome", "totalFixedAssets", "totalAssets",
-                        "contractsCurrency", "numberOfContracts", "foodFeed", "tags", "watchList",
-                      ];
-                      const rows = filtered.map(c => headers.map(h => {
-                        const v = c[h];
-                        if (Array.isArray(v)) return v.join(", ");
-                        if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
-                        return v ?? "";
-                      }));
-                      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-                      const wb = XLSX.utils.book_new();
-                      XLSX.utils.book_append_sheet(wb, ws, "Companies");
-                      XLSX.writeFile(wb, `companies_export_${new Date().toISOString().split("T")[0]}.xlsx`);
-                    }}
+                    <div onClick={() => { setXlOpen(false); setShowExport(true); }}
                       style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", cursor: "pointer", color: COLORS.text, fontSize: 13, fontWeight: 600 }}
                       onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
                       onMouseOut={e => e.currentTarget.style.background = "transparent"}>
@@ -6587,6 +6633,7 @@ return (
     return next;
   });
 }} />}
+      {showExport && <CompanyExportModal all={companies} filtered={filtered} onClose={() => setShowExport(false)} />}
     </div>
   );
 };

@@ -283,6 +283,7 @@ const DEFAULT_CONFIG = {
     { value: "barley", label: "Barley" },
   ],
   derivUnderlyingOrigins: ["FRANCE", "UKRAINE", "MOROCCO", "BRAZIL", "ARGENTINA", "UNITED STATES", "AUSTRALIA"],
+  companyTimezone: "Europe/Paris",
 };
 
 // ─── CONFIG CONTEXT ───────────────────────────────────────────
@@ -2744,6 +2745,146 @@ const FinancingBanksEditor = ({ companies = [], config, updateField }) => {
   );
 };
 
+// ─── TIMEZONE BLOCK (Admin → Company tab) ─────────────────────
+const ALL_TIMEZONES = (() => {
+  try { return Intl.supportedValuesOf('timeZone'); } catch {
+    return [
+      "Africa/Abidjan","Africa/Casablanca","Africa/Johannesburg","Africa/Lagos","Africa/Nairobi",
+      "America/Bogota","America/Buenos_Aires","America/Chicago","America/Lima","America/Los_Angeles",
+      "America/Mexico_City","America/New_York","America/Santiago","America/Sao_Paulo","America/Toronto",
+      "Asia/Bangkok","Asia/Colombo","Asia/Dhaka","Asia/Dubai","Asia/Ho_Chi_Minh","Asia/Hong_Kong",
+      "Asia/Jakarta","Asia/Karachi","Asia/Kolkata","Asia/Kuala_Lumpur","Asia/Manila","Asia/Riyadh",
+      "Asia/Seoul","Asia/Shanghai","Asia/Singapore","Asia/Taipei","Asia/Tehran","Asia/Tokyo",
+      "Atlantic/Reykjavik","Australia/Melbourne","Australia/Perth","Australia/Sydney",
+      "Europe/Amsterdam","Europe/Athens","Europe/Berlin","Europe/Brussels","Europe/Bucharest",
+      "Europe/Budapest","Europe/Copenhagen","Europe/Dublin","Europe/Helsinki","Europe/Istanbul",
+      "Europe/Kiev","Europe/Lisbon","Europe/London","Europe/Luxembourg","Europe/Madrid",
+      "Europe/Moscow","Europe/Oslo","Europe/Paris","Europe/Prague","Europe/Rome","Europe/Stockholm",
+      "Europe/Vienna","Europe/Warsaw","Europe/Zurich","Pacific/Auckland","Pacific/Honolulu","UTC",
+    ];
+  }
+})();
+
+const getTzMeta = (tz) => {
+  try {
+    const now = new Date();
+    const offset = new Intl.DateTimeFormat('en', { timeZone: tz, timeZoneName: 'shortOffset' })
+      .formatToParts(now).find(p => p.type === 'timeZoneName')?.value || '';
+    const time = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
+    return { offset, time };
+  } catch { return { offset: '', time: '--:--' }; }
+};
+
+const TimezoneBlock = ({ config, updateField }) => {
+  const [search, setSearch] = useState('');
+  const [open, setOpen] = useState(false);
+  const dropRef = useRef(null);
+  const currentTz = config.companyTimezone || 'Europe/Paris';
+  const meta = getTzMeta(currentTz);
+
+  const filtered = search.trim()
+    ? ALL_TIMEZONES.filter(tz => tz.toLowerCase().includes(search.toLowerCase()))
+    : ALL_TIMEZONES;
+
+  useEffect(() => {
+    const handler = (e) => { if (dropRef.current && !dropRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14 }}>🕐 TIMEZONE</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+
+        {/* Dropdown */}
+        <div ref={dropRef} style={{ position: 'relative', flex: '1 1 260px', maxWidth: 360 }}>
+          <div
+            onClick={() => setOpen(o => !o)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: COLORS.bg, border: `1px solid ${open ? COLORS.accent : COLORS.border}`,
+              borderRadius: 8, padding: '10px 14px', cursor: 'pointer', transition: 'border-color 0.2s',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 16 }}>🌍</span>
+              <span style={{ fontSize: 14, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{currentTz}</span>
+            </div>
+            <span style={{ color: COLORS.textMuted, fontSize: 12 }}>{open ? '▲' : '▼'}</span>
+          </div>
+
+          {open && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 200,
+              background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.5)', overflow: 'hidden',
+            }}>
+              {/* Search */}
+              <div style={{ padding: '10px 12px', borderBottom: `1px solid ${COLORS.border}` }}>
+                <input
+                  autoFocus
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Rechercher un timezone…"
+                  style={{
+                    width: '100%', background: COLORS.bg, border: `1px solid ${COLORS.border}`,
+                    borderRadius: 6, padding: '7px 10px', color: COLORS.text, fontSize: 13,
+                    outline: 'none', fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+              {/* List */}
+              <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                {filtered.length === 0 && (
+                  <div style={{ padding: '16px', textAlign: 'center', color: COLORS.textMuted, fontSize: 13 }}>Aucun résultat</div>
+                )}
+                {filtered.map(tz => {
+                  const m = getTzMeta(tz);
+                  const selected = tz === currentTz;
+                  return (
+                    <div
+                      key={tz}
+                      onClick={() => { updateField('companyTimezone', tz); setOpen(false); setSearch(''); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 14px', cursor: 'pointer', transition: 'background 0.1s',
+                        background: selected ? `${COLORS.accent}18` : 'transparent',
+                        borderLeft: selected ? `3px solid ${COLORS.accent}` : '3px solid transparent',
+                      }}
+                      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = COLORS.hover; }}
+                      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <span style={{ fontSize: 13, color: selected ? COLORS.accent : COLORS.text }}>{tz}</span>
+                      <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{m.offset}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Live clock badge */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: `${COLORS.accent}10`, border: `1px solid ${COLORS.accent}30`,
+          borderRadius: 10, padding: '10px 18px', flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 22, fontFamily: "'DM Mono', monospace", fontWeight: 700, color: COLORS.accent, letterSpacing: 1 }}>
+            {meta.time}
+          </span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600 }}>{meta.offset}</span>
+            <span style={{ fontSize: 10, color: COLORS.textMuted }}>heure locale</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -3890,6 +4031,12 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>Paramètres spécifiques aux sociétés</div>
           </div>
           <div style={{ padding: "20px 24px" }}>
+
+            {/* ── TIMEZONE BLOCK ── */}
+            <TimezoneBlock config={config} updateField={updateField} />
+
+            <div style={{ height: 1, background: COLORS.border, margin: "20px 0" }} />
+
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, textTransform: "uppercase", letterSpacing: 0.5 }}>👥 EMPLOYEES</div>
               <Btn onClick={() => { setEmpForm({ firstName: "", name: "", phone: "", email: "", status: "active" }); setEditEmpId(null); setShowEmpForm(true); }}>+ Ajouter</Btn>

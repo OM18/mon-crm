@@ -4654,15 +4654,16 @@ if (obj.finalAuthStatus) {
         } else { obj.businessUnit = []; }
         if (obj.roles && typeof obj.roles === "string") {
   const roleValues = obj.roles.split(/[,;\/]/).map(r => r.trim()).filter(Boolean);
+  const normRole = s => s.toLowerCase().replace(/_/g, " ");
   roleValues.forEach(r => {
-    const matched = config.roles?.find(cr => cr.value.toLowerCase() === r.toLowerCase() || cr.label.toLowerCase() === r.toLowerCase());
+    const matched = config.roles?.find(cr => normRole(cr.value) === normRole(r) || normRole(cr.label) === normRole(r));
     if (!matched) {
       const key = `roles:${r}`;
       if (!unknowns[key]) unknowns[key] = { fieldKey: "roles", configKey: "roles", fieldLabel: "Roles", value: r };
     }
   });
   obj.roles = roleValues.map(r => {
-    const matched = config.roles?.find(cr => cr.value.toLowerCase() === r.toLowerCase() || cr.label.toLowerCase() === r.toLowerCase());
+    const matched = config.roles?.find(cr => normRole(cr.value) === normRole(r) || normRole(cr.label) === normRole(r));
     return matched ? matched.value : r;
   });
 } else { obj.roles = []; }
@@ -4864,8 +4865,9 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
           }).filter(Boolean);
         }
         if (Array.isArray(resolved.roles)) {
+  const normRole = s => s.toLowerCase().replace(/_/g, " ");
   resolved.roles = resolved.roles.map(r => {
-    const matched = config.roles?.find(cr => cr.value.toLowerCase() === r.toLowerCase() || cr.label.toLowerCase() === r.toLowerCase());
+    const matched = config.roles?.find(cr => normRole(cr.value) === normRole(r) || normRole(cr.label) === normRole(r));
     if (matched) return matched.value;
     const key = `roles:${r}`;
     return finalDecisions[key] === "add" ? r : null;
@@ -5317,7 +5319,7 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
               <span style={{ fontSize: 12, color: COLORS.textSub, flexShrink: 0 }}>Roles</span>
               {(sel.roles && sel.roles.length > 0)
                 ? <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    {sel.roles.map(r => <Badge key={r} label={r} color={getRoleCfg(r).color} />)}
+                    {sel.roles.map(r => <Badge key={r} label={getRoleCfg(r).label || r} color={getRoleCfg(r).color} />)}
                   </div>
                 : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
             </div>
@@ -5380,7 +5382,7 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
               <span style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600 }}>ROLES</span>
               {(sel.roles && sel.roles.length > 0)
                 ? <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    {sel.roles.map(r => <Badge key={r} label={r} color={getRoleCfg(r).color} />)}
+                    {sel.roles.map(r => <Badge key={r} label={getRoleCfg(r).label || r} color={getRoleCfg(r).color} />)}
                   </div>
                 : <span style={{ fontSize: 13, color: COLORS.textMuted }}>—</span>}
             </div>
@@ -5644,7 +5646,7 @@ const CompanyRow = ({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg
     </div>
     <div style={{ fontSize: 12, color: c.broker ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.broker || "—"}</div>
     <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-      {(c.roles || []).slice(0, 2).map(r => <Badge key={r} label={r.toUpperCase()} color={getRoleCfg(r).color} />)}
+      {(c.roles || []).slice(0, 2).map(r => <Badge key={r} label={getRoleCfg(r).label || r} color={getRoleCfg(r).color} />)}
       {(c.roles || []).length > 2 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>+{c.roles.length - 2}</span>}
       {(c.roles || []).length === 0 && <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
     </div>
@@ -8246,7 +8248,7 @@ const CompaniesDashboard = ({ companies, setCompanies }) => {
                       <div style={{ fontSize: 11, color: COLORS.textSub }}>{[c.city, c.country].filter(Boolean).join(", ") || "—"}</div>
                     </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                      {(c.roles || []).slice(0, 2).map(r => <Badge key={r} label={r} color={getRoleCfg(r).color} />)}
+                      {(c.roles || []).slice(0, 2).map(r => <Badge key={r} label={getRoleCfg(r).label || r} color={getRoleCfg(r).color} />)}
                       {(c.roles || []).length > 2 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>+{c.roles.length - 2}</span>}
                     </div>
                   </div>

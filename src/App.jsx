@@ -5460,7 +5460,6 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
                     value={sel.complianceStatus || ""}
                     onChange={e => onPatchCompany({ complianceStatus: e.target.value })}
                     style={{ width: "100%", background: `${getComplianceCfg(sel.complianceStatus).color}18`, border: `1px solid ${getComplianceCfg(sel.complianceStatus).color}60`, borderRadius: 8, padding: "7px 10px", color: getComplianceCfg(sel.complianceStatus).color, fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer", fontFamily: "inherit" }}>
-                    <option value="">— None —</option>
                     {config.complianceStatus.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
@@ -5470,7 +5469,6 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
                     value={sel.finalAuthStatus || ""}
                     onChange={e => onPatchCompany({ finalAuthStatus: e.target.value })}
                     style={{ width: "100%", background: `${getFinalAuthCfg(sel.finalAuthStatus).color}18`, border: `1px solid ${getFinalAuthCfg(sel.finalAuthStatus).color}60`, borderRadius: 8, padding: "7px 10px", color: getFinalAuthCfg(sel.finalAuthStatus).color, fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer", fontFamily: "inherit" }}>
-                    <option value="">— None —</option>
                     {config.finalAuthStatus.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>

@@ -2722,86 +2722,107 @@ const DerivAccountImportModal = ({ onClose, onImport, config }) => {
 
 // ─── FINANCING BANKS EDITOR ──────────────────────────────────
 const FinancingBanksEditor = ({ companies = [], config, updateField }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
 
   const bankCompanies = companies.filter(c =>
     Array.isArray(c.roles) ? c.roles.includes("Bank") : c.roles === "Bank"
-  );
+  ).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   const selected = Array.isArray(config.derivFinancingBanks) ? config.derivFinancingBanks : [];
-
-  // Auto-clean: remove any stored name that no longer matches a Bank company
   const validNames = bankCompanies.map(c => c.name);
   const cleanSelected = selected.filter(name => validNames.includes(name));
+
   useEffect(() => {
     if (cleanSelected.length !== selected.length) {
       updateField("derivFinancingBanks", cleanSelected);
     }
   }, [bankCompanies.map(c => c.name).join(",")]);
 
-  const toggle = (companyName) => {
-    const next = cleanSelected.includes(companyName)
-      ? cleanSelected.filter(v => v !== companyName)
-      : [...cleanSelected, companyName];
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const toggle = (name) => {
+    const next = cleanSelected.includes(name)
+      ? cleanSelected.filter(v => v !== name)
+      : [...cleanSelected, name];
     updateField("derivFinancingBanks", next);
   };
 
+  const remove = (name) => updateField("derivFinancingBanks", cleanSelected.filter(v => v !== name));
+
+  const filtered = search.trim()
+    ? bankCompanies.filter(c => c.name?.toLowerCase().includes(search.toLowerCase()))
+    : bankCompanies;
+
   return (
     <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 14, marginBottom: 0, overflow: "hidden" }}>
-      <div onClick={() => setExpanded(!expanded)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
-        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
-        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>🏦</span>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Financing Banks</div>
-            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Banques de financement — sélectionner parmi les companies avec le rôle Bank</div>
-          </div>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderBottom: cleanSelected.length > 0 ? `1px solid ${COLORS.border}` : "none" }}>
+        <span style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>🏦</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Financing Banks</div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted }}>Banques de financement — sélectionner parmi les companies avec le rôle Bank</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 420 }}>
-          {cleanSelected.length === 0
-            ? <span style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>Aucune sélectionnée</span>
-            : cleanSelected.map(name => (
-              <span key={name} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: `${COLORS.accent}20`, color: COLORS.accent, border: `1px solid ${COLORS.accent}40` }}>
-                {name}
-              </span>
-            ))
-          }
-          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)", marginLeft: 4 }}>▾</span>
+        {/* Dropdown trigger */}
+        <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
+          <div onClick={() => setOpen(o => !o)}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8, cursor: "pointer", border: `1px solid ${open ? COLORS.accent + "80" : COLORS.border}`, background: open ? `${COLORS.accent}10` : COLORS.card, transition: "all 0.15s" }}>
+            <span style={{ fontSize: 13, color: COLORS.textSub }}>+ Ajouter une banque</span>
+            <span style={{ fontSize: 9, color: COLORS.textMuted }}>▼</span>
+          </div>
+          {open && (
+            <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", minWidth: 280 }}>
+              <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}` }}>
+                <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Rechercher une banque…"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 10px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+              <div style={{ maxHeight: 260, overflowY: "auto" }}>
+                {bankCompanies.length === 0 && (
+                  <div style={{ padding: 16, textAlign: "center", color: COLORS.textMuted, fontSize: 13 }}>
+                    Aucune company avec le rôle <strong>Bank</strong>
+                  </div>
+                )}
+                {filtered.length === 0 && bankCompanies.length > 0 && (
+                  <div style={{ padding: 16, textAlign: "center", color: COLORS.textMuted, fontSize: 13 }}>Aucun résultat</div>
+                )}
+                {filtered.map(c => {
+                  const isSelected = cleanSelected.includes(c.name);
+                  return (
+                    <div key={c.id} onClick={() => toggle(c.name)}
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", cursor: "pointer", background: isSelected ? `${COLORS.accent}12` : "transparent", borderLeft: `3px solid ${isSelected ? COLORS.accent : "transparent"}`, transition: "background 0.1s" }}
+                      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
+                      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", border: `2px solid ${isSelected ? COLORS.accent : COLORS.textMuted}`, background: isSelected ? COLORS.accent : "transparent", flexShrink: 0, transition: "all 0.15s" }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? COLORS.accent : COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                        {c.country && <div style={{ fontSize: 11, color: COLORS.textMuted }}>{c.country}</div>}
+                      </div>
+                      {isSelected && <span style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700 }}>✓</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {expanded && (
-        <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
-          {bankCompanies.length === 0 ? (
-            <div style={{ textAlign: "center", color: COLORS.textMuted, fontSize: 13, padding: "16px 0" }}>
-              Aucune company avec le rôle <strong style={{ color: COLORS.text }}>Bank</strong> trouvée.
-              <div style={{ fontSize: 11, marginTop: 4 }}>Assignez ce rôle dans le module Companies.</div>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {bankCompanies.map(c => {
-                const isSelected = cleanSelected.includes(c.name);
-                return (
-                  <div key={c.id} onClick={() => toggle(c.name)}
-                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 10, cursor: "pointer", border: `1px solid ${isSelected ? COLORS.accent + "60" : COLORS.border}`, background: isSelected ? `${COLORS.accent}10` : COLORS.card, transition: "all 0.15s" }}
-                    onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
-                    onMouseOut={e => { e.currentTarget.style.background = isSelected ? `${COLORS.accent}10` : COLORS.card; }}>
-                    <div style={{ width: 30, height: 30, borderRadius: 8, background: isSelected ? `${COLORS.accent}25` : COLORS.bg, border: `1px solid ${isSelected ? COLORS.accent + "50" : COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: isSelected ? COLORS.accent : COLORS.textMuted, flexShrink: 0 }}>
-                      {(c.name || "?")[0].toUpperCase()}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{c.name}</div>
-                      {c.country && <div style={{ fontSize: 11, color: COLORS.textMuted }}>{c.country}</div>}
-                    </div>
-                    <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${isSelected ? COLORS.accent : COLORS.textMuted}`, background: isSelected ? COLORS.accent : COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
-                      {isSelected && <span style={{ color: COLORS.textOnAccent, fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+      {/* Selected banks as removable tags */}
+      {cleanSelected.length > 0 && (
+        <div style={{ padding: "10px 18px", display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {cleanSelected.map(name => (
+            <span key={name} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 7, background: `${COLORS.accent}18`, color: COLORS.accent, border: `1px solid ${COLORS.accent}40` }}>
+              🏦 {name}
+              <span onClick={() => remove(name)} style={{ cursor: "pointer", fontSize: 13, lineHeight: 1, color: COLORS.accent, opacity: 0.7, marginLeft: 2 }}>✕</span>
+            </span>
+          ))}
         </div>
       )}
     </div>

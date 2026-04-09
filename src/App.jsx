@@ -2777,7 +2777,7 @@ const FinancingBanksEditor = ({ companies = [], config, updateField }) => {
             <span style={{ fontSize: 9, color: COLORS.textMuted }}>▼</span>
           </div>
           {open && (
-            <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", minWidth: 280 }}>
+            <div style={{ position: "absolute", bottom: "calc(100% + 6px)", right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", minWidth: 280 }}>
               <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}` }}>
                 <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
                   placeholder="Rechercher une banque…"

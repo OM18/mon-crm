@@ -6486,21 +6486,10 @@ return (
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, padding: "8px 18px", marginBottom: 2 }}>
-          {["Company", "Broker", "Role"].map(h => (
-            <div key={h} style={{ fontSize: 14, color: "#D4AF37", fontWeight: 600, letterSpacing: 0.5 }}>{h.toUpperCase()}</div>
-          ))}
-          {["Compliance\nStatus", "Final Auth.\nStatus"].map(h => (
-            <div key={h} style={{ fontSize: 14, color: "#D4AF37", fontWeight: 600, letterSpacing: 0.5, whiteSpace: "pre-line", lineHeight: 1.3 }}>{h.toUpperCase()}</div>
-          ))}
-          {["Website", "Business Unit"].map(h => (
-            <div key={h} style={{ fontSize: 14, color: "#D4AF37", fontWeight: 600, letterSpacing: 0.5 }}>{h.toUpperCase()}</div>
-          ))}
-        </div>
-
        {Object.values(activeFilters).flat().length > 0 && (
   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
     <span style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, alignSelf: "center" }}>Filtres actifs :</span>
+    <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: `${COLORS.accent}15`, color: COLORS.accent, fontWeight: 700, alignSelf: "center", fontFamily: "'DM Mono', monospace" }}>{filtered.length} société{filtered.length !== 1 ? "s" : ""}</span>
     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: filterMode === "AND" ? `${COLORS.accent}22` : `${COLORS.purple}22`, color: filterMode === "AND" ? COLORS.accent : COLORS.purple, fontWeight: 700, alignSelf: "center" }}>{filterMode}</span>
     {customFilters.filter(cf => cf.value).map((cf, i) => (
       <span key={`custom:${cf.key}`} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, padding: "2px 8px", borderRadius: 6, background: `${COLORS.accent}22`, color: COLORS.accent, border: `1px solid ${COLORS.accent}55`, fontWeight: 600 }}>
@@ -6538,6 +6527,19 @@ return (
       })}
   </div>
 )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, padding: "8px 18px", marginBottom: 2 }}>
+          {["Company", "Broker", "Role"].map(h => (
+            <div key={h} style={{ fontSize: 14, color: "#D4AF37", fontWeight: 600, letterSpacing: 0.5 }}>{h.toUpperCase()}</div>
+          ))}
+          {["Compliance\nStatus", "Final Auth.\nStatus"].map(h => (
+            <div key={h} style={{ fontSize: 14, color: "#D4AF37", fontWeight: 600, letterSpacing: 0.5, whiteSpace: "pre-line", lineHeight: 1.3 }}>{h.toUpperCase()}</div>
+          ))}
+          {["Website", "Business Unit"].map(h => (
+            <div key={h} style={{ fontSize: 14, color: "#D4AF37", fontWeight: 600, letterSpacing: 0.5 }}>{h.toUpperCase()}</div>
+          ))}
+        </div>
+
         <VirtualList items={filtered} itemHeight={70} containerHeight={600} renderItem={(c) => (
           <CompanyRow key={c.id} c={c} isSelected={selected === c.id} onSelect={() => setSelected(c.id === selected ? null : c.id)}
             getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} config={config} />

@@ -5908,6 +5908,15 @@ const sel = useMemo(() => selected ? filtered.find(c => c.id === selected) : nul
   const normDateTimeLocal = (val) => {
     if (!val) return "";
     const s = val.toString().trim();
+    // Excel serial number (with or without decimal for time)
+    if (/^\d{4,5}(\.\d+)?$/.test(s)) {
+      const n = parseFloat(s);
+      if (n > 40000 && n < 60000) {
+        const d = new Date(Math.round((n - 25569) * 86400 * 1000));
+        const pad = x => String(x).padStart(2, '0');
+        return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+      }
+    }
     // Already datetime-local "yyyy-MM-ddTHH:mm..."
     if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return s.slice(0, 16);
     // ISO date only "yyyy-MM-dd"
@@ -5918,7 +5927,7 @@ const sel = useMemo(() => selected ? filtered.find(c => c.id === selected) : nul
     // "dd/mm/yyyy" or "dd.mm.yyyy"
     const mD = s.match(/^(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{4})$/);
     if (mD) return `${mD[3]}-${mD[2].padStart(2,'0')}-${mD[1].padStart(2,'0')}T00:00`;
-    // Fallback: try native Date parse (handles ISO with seconds, Z, etc.)
+    // Fallback: try native Date parse
     try {
       const d = new Date(s);
       if (!isNaN(d.getTime())) {

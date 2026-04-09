@@ -3015,6 +3015,275 @@ const SavedViewsBlock = ({ config, updateField }) => {
   );
 };
 
+// ─── EXCHANGE MANAGER BLOCK ───────────────────────────────────
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_LABELS = { Mon: "Lun", Tue: "Mar", Wed: "Mer", Thu: "Jeu", Fri: "Ven", Sat: "Sam", Sun: "Dim" };
+
+const pad2 = n => String(n).padStart(2, "0");
+
+const ExchangeManagerBlock = () => {
+  const [exchanges, setExchanges] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [holidays, setHolidays] = useState([]);
+  const [expanded, setExpanded] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Session form state per exchange
+  const [sessForm, setSessForm] = useState({});
+  const [editSessId, setEditSessId] = useState(null);
+  const [showSessForm, setShowSessForm] = useState({});
+
+  // Holiday form state per exchange
+  const [holForm, setHolForm] = useState({});
+  const [showHolForm, setShowHolForm] = useState({});
+
+  const EMPTY_SESS = () => ({ name: "", open_hour: 9, open_minute: 0, close_hour: 17, close_minute: 30, overnight: false, trading_days: ["Mon","Tue","Wed","Thu","Fri"] });
+  const EMPTY_HOL = () => ({ date: "", label: "" });
+
+  useEffect(() => {
+    async function load() {
+      const [{ data: ex }, { data: se }, { data: ho }] = await Promise.all([
+        supabase.from('exchanges').select('*').order('id'),
+        supabase.from('exchange_sessions').select('*').order('sort_order'),
+        supabase.from('exchange_holidays').select('*').order('date'),
+      ]);
+      if (ex) setExchanges(ex);
+      if (se) setSessions(se);
+      if (ho) setHolidays(ho);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const toggleExpand = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }));
+
+  // ── Sessions ──
+  const saveSession = async (exId) => {
+    setSaving(true);
+    const f = sessForm[exId] || EMPTY_SESS();
+    const exSessions = sessions.filter(s => s.exchange_id === exId);
+    if (editSessId) {
+      const { error } = await supabase.from('exchange_sessions').update({ name: f.name, open_hour: Number(f.open_hour), open_minute: Number(f.open_minute), close_hour: Number(f.close_hour), close_minute: Number(f.close_minute), overnight: f.overnight, trading_days: f.trading_days || ["Mon","Tue","Wed","Thu","Fri"] }).eq('id', editSessId);
+      if (!error) setSessions(prev => prev.map(s => s.id === editSessId ? { ...s, ...f, open_hour: Number(f.open_hour), open_minute: Number(f.open_minute), close_hour: Number(f.close_hour), close_minute: Number(f.close_minute) } : s));
+    } else {
+      const newSess = { exchange_id: exId, name: f.name, open_hour: Number(f.open_hour), open_minute: Number(f.open_minute), close_hour: Number(f.close_hour), close_minute: Number(f.close_minute), overnight: f.overnight, trading_days: f.trading_days || ["Mon","Tue","Wed","Thu","Fri"], sort_order: exSessions.length };
+      const { data, error } = await supabase.from('exchange_sessions').insert(newSess).select().single();
+      if (!error && data) setSessions(prev => [...prev, data]);
+    }
+    setShowSessForm(p => ({ ...p, [exId]: false }));
+    setEditSessId(null);
+    setSessForm(p => ({ ...p, [exId]: EMPTY_SESS() }));
+    setSaving(false);
+  };
+
+  const deleteSession = async (id) => {
+    await supabase.from('exchange_sessions').delete().eq('id', id);
+    setSessions(prev => prev.filter(s => s.id !== id));
+  };
+
+  const openEditSess = (exId, sess) => {
+    setSessForm(p => ({ ...p, [exId]: { ...sess, trading_days: sess.trading_days || ["Mon","Tue","Wed","Thu","Fri"] } }));
+    setEditSessId(sess.id);
+    setShowSessForm(p => ({ ...p, [exId]: true }));
+  };
+
+  // ── Holidays ──
+  const saveHoliday = async (exId) => {
+    setSaving(true);
+    const f = holForm[exId] || EMPTY_HOL();
+    if (!f.date) { setSaving(false); return; }
+    const newHol = { exchange_id: exId, date: f.date, label: f.label };
+    const { data, error } = await supabase.from('exchange_holidays').insert(newHol).select().single();
+    if (!error && data) setHolidays(prev => [...prev, data].sort((a,b) => a.date.localeCompare(b.date)));
+    setShowHolForm(p => ({ ...p, [exId]: false }));
+    setHolForm(p => ({ ...p, [exId]: EMPTY_HOL() }));
+    setSaving(false);
+  };
+
+  const deleteHoliday = async (id) => {
+    await supabase.from('exchange_holidays').delete().eq('id', id);
+    setHolidays(prev => prev.filter(h => h.id !== id));
+  };
+
+  const toggleActive = async (ex) => {
+    const newVal = !ex.active;
+    await supabase.from('exchanges').update({ active: newVal }).eq('id', ex.id);
+    setExchanges(prev => prev.map(e => e.id === ex.id ? { ...e, active: newVal } : e));
+  };
+
+  const SessFormUI = ({ exId }) => {
+    const f = sessForm[exId] || EMPTY_SESS();
+    const setF = (patch) => setSessForm(p => ({ ...p, [exId]: { ...(p[exId] || EMPTY_SESS()), ...patch } }));
+    const toggleDay = (day) => {
+      const days = f.trading_days || ["Mon","Tue","Wed","Thu","Fri"];
+      setF({ trading_days: days.includes(day) ? days.filter(d => d !== day) : [...days, day] });
+    };
+    return (
+      <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.accent}40`, borderRadius: 10, padding: 14, marginBottom: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <div style={{ gridColumn: "1/-1" }}>
+            <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>NOM DE LA SESSION</label>
+            <input value={f.name} onChange={e => setF({ name: e.target.value })} placeholder="Ex: Regular, Pre-Opening…"
+              style={{ width: "100%", marginTop: 4, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+          {[["OUVERTURE", "open_hour", "open_minute"], ["FERMETURE", "close_hour", "close_minute"]].map(([lbl, hk, mk]) => (
+            <div key={hk}>
+              <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>{lbl}</label>
+              <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center" }}>
+                <input type="number" min={0} max={23} value={f[hk]} onChange={e => setF({ [hk]: Number(e.target.value) })}
+                  style={{ width: 60, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "8px 10px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", textAlign: "center" }} />
+                <span style={{ color: COLORS.textMuted, fontWeight: 700 }}>:</span>
+                <input type="number" min={0} max={59} value={f[mk]} onChange={e => setF({ [mk]: Number(e.target.value) })}
+                  style={{ width: 60, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "8px 10px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", textAlign: "center" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginBottom: 10 }}>
+          <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>JOURS DE TRADING</label>
+          <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+            {DAYS.map(day => {
+              const active = (f.trading_days || ["Mon","Tue","Wed","Thu","Fri"]).includes(day);
+              return (
+                <button key={day} onClick={() => toggleDay(day)}
+                  style={{ padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: active ? `${COLORS.accent}25` : COLORS.hover, color: active ? COLORS.accent : COLORS.textMuted, border: `1px solid ${active ? COLORS.accent : COLORS.border}`, transition: "all 0.15s" }}>
+                  {DAY_LABELS[day]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <label style={{ fontSize: 12, color: COLORS.textSub, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+            <input type="checkbox" checked={f.overnight} onChange={e => setF({ overnight: e.target.checked })} />
+            Session overnight (chevauche minuit)
+          </label>
+        </div>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <Btn variant="secondary" onClick={() => { setShowSessForm(p => ({ ...p, [exId]: false })); setEditSessId(null); setF(EMPTY_SESS()); }}>Annuler</Btn>
+          <Btn onClick={() => saveSession(exId)} disabled={saving || !f.name}>{saving ? "…" : editSessId ? "Mettre à jour" : "Ajouter"}</Btn>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading) return <div style={{ padding: 24, color: COLORS.textMuted, fontSize: 13 }}>Chargement des exchanges…</div>;
+
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ padding: "18px 24px", borderBottom: `1px solid ${COLORS.border}`, background: `${COLORS.blue}08` }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>🏛 Exchanges — Sessions & Jours fériés</div>
+        <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>Configurez les horaires de trading et les jours fériés par exchange</div>
+      </div>
+      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+        {exchanges.map(ex => {
+          const exSessions = sessions.filter(s => s.exchange_id === ex.id).sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
+          const exHolidays = holidays.filter(h => h.exchange_id === ex.id).sort((a,b) => a.date.localeCompare(b.date));
+          const isOpen = expanded[ex.id];
+
+          return (
+            <div key={ex.id} style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden" }}>
+              {/* Exchange header */}
+              <div onClick={() => toggleExpand(ex.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", userSelect: "none" }}
+                onMouseEnter={e => e.currentTarget.style.background = COLORS.hover}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <div style={{ width: 34, height: 34, borderRadius: 8, background: `${COLORS.blue}20`, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🏛</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>{ex.name}</div>
+                  <div style={{ fontSize: 11, color: COLORS.textMuted }}>{ex.city} · {ex.timezone}</div>
+                </div>
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: `${COLORS.blue}15`, color: COLORS.blue, fontWeight: 600 }}>{exSessions.length} session{exSessions.length !== 1 ? "s" : ""}</span>
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: `${COLORS.orange}15`, color: COLORS.orange, fontWeight: 600 }}>{exHolidays.length} férié{exHolidays.length !== 1 ? "s" : ""}</span>
+                <div onClick={e => { e.stopPropagation(); toggleActive(ex); }} style={{ padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700, background: ex.active ? `${COLORS.green}20` : `${COLORS.red}15`, color: ex.active ? COLORS.green : COLORS.red, border: `1px solid ${ex.active ? COLORS.green : COLORS.red}40` }}>
+                  {ex.active ? "ACTIF" : "INACTIF"}
+                </div>
+                <span style={{ color: COLORS.textMuted, fontSize: 14, transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>▾</span>
+              </div>
+
+              {isOpen && (
+                <div style={{ padding: "16px", borderTop: `1px solid ${COLORS.border}` }}>
+
+                  {/* Sessions */}
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, textTransform: "uppercase", letterSpacing: 0.5 }}>⏰ Sessions de trading</div>
+                      <Btn onClick={() => { setSessForm(p => ({ ...p, [ex.id]: EMPTY_SESS() })); setEditSessId(null); setShowSessForm(p => ({ ...p, [ex.id]: true })); }} style={{ padding: "5px 12px", fontSize: 12 }}>+ Ajouter</Btn>
+                    </div>
+                    {showSessForm[ex.id] && <SessFormUI exId={ex.id} />}
+                    {exSessions.length === 0 && !showSessForm[ex.id] && (
+                      <div style={{ color: COLORS.textMuted, fontSize: 12, padding: "8px 0" }}>Aucune session — cliquez sur "+ Ajouter"</div>
+                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {exSessions.map(s => (
+                        <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 14px" }}>
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, marginRight: 10 }}>{s.name}</span>
+                            <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.accent }}>{pad2(s.open_hour)}:{pad2(s.open_minute)} – {pad2(s.close_hour)}:{pad2(s.close_minute)}</span>
+                            {s.overnight && <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.purple, fontWeight: 700 }}>OVERNIGHT</span>}
+                          </div>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            {(s.trading_days || ["Mon","Tue","Wed","Thu","Fri"]).map(d => (
+                              <span key={d} style={{ fontSize: 10, padding: "2px 5px", borderRadius: 4, background: `${COLORS.blue}15`, color: COLORS.blue, fontWeight: 600 }}>{DAY_LABELS[d]}</span>
+                            ))}
+                          </div>
+                          <button onClick={() => openEditSess(ex.id, s)} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                          <button onClick={() => deleteSession(s.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Holidays */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, textTransform: "uppercase", letterSpacing: 0.5 }}>🎌 Jours fériés</div>
+                      <Btn onClick={() => { setHolForm(p => ({ ...p, [ex.id]: EMPTY_HOL() })); setShowHolForm(p => ({ ...p, [ex.id]: true })); }} style={{ padding: "5px 12px", fontSize: 12 }}>+ Ajouter</Btn>
+                    </div>
+                    {showHolForm[ex.id] && (
+                      <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.accent}40`, borderRadius: 10, padding: 14, marginBottom: 10 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                          <div>
+                            <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DATE</label>
+                            <input type="date" value={holForm[ex.id]?.date || ""} onChange={e => setHolForm(p => ({ ...p, [ex.id]: { ...(p[ex.id] || EMPTY_HOL()), date: e.target.value } }))}
+                              style={{ width: "100%", marginTop: 4, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>LIBELLÉ</label>
+                            <input value={holForm[ex.id]?.label || ""} onChange={e => setHolForm(p => ({ ...p, [ex.id]: { ...(p[ex.id] || EMPTY_HOL()), label: e.target.value } }))} placeholder="Ex: Christmas, Thanksgiving…"
+                              style={{ width: "100%", marginTop: 4, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                          <Btn variant="secondary" onClick={() => setShowHolForm(p => ({ ...p, [ex.id]: false }))}>Annuler</Btn>
+                          <Btn onClick={() => saveHoliday(ex.id)} disabled={saving || !holForm[ex.id]?.date}>{saving ? "…" : "Ajouter"}</Btn>
+                        </div>
+                      </div>
+                    )}
+                    {exHolidays.length === 0 && !showHolForm[ex.id] && (
+                      <div style={{ color: COLORS.textMuted, fontSize: 12, padding: "8px 0" }}>Aucun jour férié configuré</div>
+                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {exHolidays.map(h => (
+                        <div key={h.id} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 14px" }}>
+                          <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.textSub, flexShrink: 0 }}>{h.date}</span>
+                          <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: COLORS.text }}>{h.label}</span>
+                          <button onClick={() => deleteHoliday(h.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -4150,6 +4419,9 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
               </div>
             );
           })()}
+
+          {/* ── EXCHANGE MANAGER ── */}
+          <ExchangeManagerBlock />
 
         </div>
       )}
@@ -8946,21 +9218,34 @@ function _thGetStatus(exchange, sessions, holidays) {
   const exSessions = sessions.filter(s => s.exchange_id === exchange.id).sort((a, b) => a.sort_order - b.sort_order);
   const today = _thLocalDate(exchange.timezone);
   const isHoliday = holidays.some(h => h.exchange_id === exchange.id && h.date === today);
-  const nextOpen = (cur) => {
+  const day = _thLocalDay(exchange.timezone);
+  const cur = _thLocalMins(exchange.timezone);
+
+  // Sessions active today (based on trading_days if available, fallback Mon-Fri)
+  const todaySessions = exSessions.filter(s => {
+    const td = s.trading_days;
+    if (!td || !Array.isArray(td) || td.length === 0) return day !== 'Sat' && day !== 'Sun';
+    return td.includes(day);
+  });
+
+  const nextOpen = (c) => {
     let best = Infinity;
-    exSessions.forEach(s => { let d = _thToM(s.open_hour, s.open_minute) - cur; if (d <= 0) d += 1440; if (d < best) best = d; });
+    todaySessions.forEach(s => { let d = _thToM(s.open_hour, s.open_minute) - c; if (d <= 0) d += 1440; if (d < best) best = d; });
+    // Also check next trading days if no sessions today
+    if (best === Infinity) {
+      exSessions.forEach(s => { let d = _thToM(s.open_hour, s.open_minute) - c; if (d <= 0) d += 1440; if (d < best) best = d; });
+    }
     return best;
   };
-  if (isHoliday) return { kind: 'holiday', diffMins: nextOpen(_thLocalMins(exchange.timezone)) + 1440 };
-  const day = _thLocalDay(exchange.timezone);
-  if (day === 'Sat' || day === 'Sun') {
-    const cur = _thLocalMins(exchange.timezone);
-    const daysToMon = day === 'Sat' ? 2 : 1;
+
+  if (isHoliday) return { kind: 'holiday', diffMins: nextOpen(cur) + 1440 };
+  if (todaySessions.length === 0) {
+    const daysToNext = day === 'Sat' ? 2 : day === 'Sun' ? 1 : 1;
     const firstOpen = _thToM(exSessions[0]?.open_hour || 8, exSessions[0]?.open_minute || 0);
-    return { kind: 'weekend', diffMins: daysToMon * 1440 - cur + firstOpen };
+    return { kind: 'weekend', diffMins: daysToNext * 1440 - cur + firstOpen };
   }
-  const cur = _thLocalMins(exchange.timezone);
-  for (const s of exSessions) {
+
+  for (const s of todaySessions) {
     const o = _thToM(s.open_hour, s.open_minute), c = _thToM(s.close_hour, s.close_minute);
     if (s.overnight) { if (cur >= o || cur < c) return { kind: 'open', session: s.name, diffMins: cur >= o ? 1440 - cur + c : c - cur }; }
     else { if (cur >= o && cur < c) return { kind: 'open', session: s.name, diffMins: c - cur }; }

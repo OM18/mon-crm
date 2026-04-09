@@ -6114,38 +6114,6 @@ const sel = useMemo(() => selected ? filtered.find(c => c.id === selected) : nul
 <div style={{ display: "flex", gap: 0, height: "calc(100vh - 60px)", overflow: "hidden" }}>
 <div style={{ flex: sel ? 1 : "1 1 100%", display: "flex", flexDirection: "column", minWidth: 0 }}>
 
-        {/* ── SAVED VIEWS BUTTONS ── */}
-        {(config.companyViews || []).length > 0 && (
-          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-            {(config.companyViews || []).map(view => {
-              const isActive = activeViewId === view.id;
-              const EMPTY = { city:[], companyType:[], status:[], country:[], businessUnit:[], roles:[], foodFeed:[], companySize:[], complianceStatus:[], finalAuthStatus:[], contractsCurrency:[], watchList:[] };
-              return (
-                <button key={view.id} onClick={() => {
-                  if (isActive) {
-                    setActiveViewId(null);
-                    setActiveFilters({...EMPTY}); setExcludeFilters({...EMPTY}); setOnlyFilters({...EMPTY});
-                    setCustomFilters([]); setFilterMode("AND"); setSearch("");
-                  } else {
-                    setActiveViewId(view.id);
-                    setActiveFilters(view.filters?.activeFilters || {...EMPTY});
-                    setExcludeFilters(view.filters?.excludeFilters || {...EMPTY});
-                    setOnlyFilters(view.filters?.onlyFilters || {...EMPTY});
-                    setCustomFilters(view.filters?.customFilters || []);
-                    setFilterMode(view.filters?.filterMode || "AND");
-                    setSearch(view.filters?.search || "");
-                  }
-                }}
-                  style={{ padding: "7px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", letterSpacing: 0.3, transition: "all 0.15s", background: isActive ? COLORS.accent : COLORS.card, color: isActive ? COLORS.textOnAccent : COLORS.textSub, border: `1.5px solid ${isActive ? COLORS.accent : COLORS.border}` }}
-                  onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = COLORS.accent + "80"; e.currentTarget.style.color = COLORS.text; }}}
-                  onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = COLORS.border; e.currentTarget.style.color = COLORS.textSub; }}}>
-                  {view.name}{isActive && <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.7 }}>✕</span>}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
         <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
           <input placeholder="Search a company..." value={search} onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: 160, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
@@ -6351,6 +6319,37 @@ return (
           )}
           <button onClick={openNew} style={{ background: COLORS.accent, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 14px", lineHeight: "1", height: "46px", marginTop: 3 }}>+ NEW COMPANY</button>
         </div>
+
+        {(config.companyViews || []).length > 0 && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+            {(config.companyViews || []).map(view => {
+              const isActive = activeViewId === view.id;
+              const EMPTY = { city:[], companyType:[], status:[], country:[], businessUnit:[], roles:[], foodFeed:[], companySize:[], complianceStatus:[], finalAuthStatus:[], contractsCurrency:[], watchList:[] };
+              return (
+                <button key={view.id} onClick={() => {
+                  if (isActive) {
+                    setActiveViewId(null);
+                    setActiveFilters({...EMPTY}); setExcludeFilters({...EMPTY}); setOnlyFilters({...EMPTY});
+                    setCustomFilters([]); setFilterMode("AND"); setSearch("");
+                  } else {
+                    setActiveViewId(view.id);
+                    setActiveFilters(view.filters?.activeFilters || {...EMPTY});
+                    setExcludeFilters(view.filters?.excludeFilters || {...EMPTY});
+                    setOnlyFilters(view.filters?.onlyFilters || {...EMPTY});
+                    setCustomFilters(view.filters?.customFilters || []);
+                    setFilterMode(view.filters?.filterMode || "AND");
+                    setSearch(view.filters?.search || "");
+                  }
+                }}
+                  style={{ padding: "7px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", letterSpacing: 0.3, transition: "all 0.15s", background: isActive ? COLORS.accent : COLORS.card, color: isActive ? COLORS.textOnAccent : COLORS.textSub, border: `1.5px solid ${isActive ? COLORS.accent : COLORS.border}` }}
+                  onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = COLORS.accent + "80"; e.currentTarget.style.color = COLORS.text; }}}
+                  onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = COLORS.border; e.currentTarget.style.color = COLORS.textSub; }}}>
+                  {view.name}{isActive && <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.7 }}>✕</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.2fr 1fr", gap: 10, padding: "8px 18px", marginBottom: 2 }}>
           {["Company", "Broker", "Role"].map(h => (

@@ -5217,7 +5217,7 @@ if (Array.isArray(resolved.contractsCurrency)) {
 };
 
 // ─── COMPANY DETAIL PANEL ────────────────────────────────────
-const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, getComplianceCfg, getFinalAuthCfg, getBUCfg, getRoleCfg, getTypeCfg }) => {
+const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, getComplianceCfg, getFinalAuthCfg, getBUCfg, getRoleCfg, getTypeCfg, onPatchCompany }) => {
   const { config } = useConfig();
   const [activeTab, setActiveTab] = useState("info");
   const TABS = [
@@ -5456,11 +5456,23 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
                 <div>
                   <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, marginBottom: 6 }}>COMPLIANCE STATUS</div>
-                  {sel.complianceStatus ? <Badge label={getComplianceCfg(sel.complianceStatus).label} color={getComplianceCfg(sel.complianceStatus).color} /> : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
+                  <select
+                    value={sel.complianceStatus || ""}
+                    onChange={e => onPatchCompany({ complianceStatus: e.target.value })}
+                    style={{ width: "100%", background: `${getComplianceCfg(sel.complianceStatus).color}18`, border: `1px solid ${getComplianceCfg(sel.complianceStatus).color}60`, borderRadius: 8, padding: "7px 10px", color: getComplianceCfg(sel.complianceStatus).color, fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                    <option value="">— None —</option>
+                    {config.complianceStatus.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
                 </div>
                 <div>
                   <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, marginBottom: 6 }}>FINAL AUTHORIZATION STATUS</div>
-                  {sel.finalAuthStatus ? <Badge label={getFinalAuthCfg(sel.finalAuthStatus).label} color={getFinalAuthCfg(sel.finalAuthStatus).color} /> : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
+                  <select
+                    value={sel.finalAuthStatus || ""}
+                    onChange={e => onPatchCompany({ finalAuthStatus: e.target.value })}
+                    style={{ width: "100%", background: `${getFinalAuthCfg(sel.finalAuthStatus).color}18`, border: `1px solid ${getFinalAuthCfg(sel.finalAuthStatus).color}60`, borderRadius: 8, padding: "7px 10px", color: getFinalAuthCfg(sel.finalAuthStatus).color, fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                    <option value="">— None —</option>
+                    {config.finalAuthStatus.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
                 </div>
               </div>
               {[
@@ -6201,7 +6213,13 @@ return (
 
       {sel && <div style={{ marginLeft: 20 }}><CompanyDetailPanel sel={sel} selContacts={selContacts} onEdit={() => openEdit(sel)} onDelete={() => del(sel.id)}
         getStatusCfg={getStatusCfg} getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg}
-        getBUCfg={getBUCfg} getRoleCfg={getRoleCfg} getTypeCfg={getTypeCfg} /></div>}
+        getBUCfg={getBUCfg} getRoleCfg={getRoleCfg} getTypeCfg={getTypeCfg}
+        onPatchCompany={(patch) => {
+          const tz = config.companyTimezone || 'Europe/Paris';
+          const updated = companies.map(c => c.id === sel.id ? { ...c, ...patch, complianceLastUpdateDate: nowInTz(tz) } : c);
+          setCompanies(updated);
+          saveLargeTable('companies', updated);
+        }} /></div>}
 
 
       {showForm && (

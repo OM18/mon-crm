@@ -6065,33 +6065,65 @@ return (
               </div>
             )}
           </div>
-          <div onClick={() => setShowImport(true)} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent" }}><img src="/logoxl.png" style={{ width: 32, height: 32, objectFit: "contain" }} /></div>
-          <button onClick={async () => {
-            const XLSX = await import("xlsx");
-            const headers = [
-              "ref", "name", "legalName", "companyType", "group", "taxInfo",
-              "website", "phone", "address", "city", "country", "status", "companySize",
-              "broker", "roles", "gtRole", "businessUnit",
-              "complianceStatus", "finalAuthStatus",
-              "complianceCreationDate", "complianceLastUpdateDate",
-              "complianceRequestDate", "complianceLastReceptionDate", "complianceFinalConfirmationDate",
-              "complianceAdditionalInfos",
-              "incorporationDate", "equity", "turnover", "netIncome", "totalFixedAssets", "totalAssets",
-              "contractsCurrency", "numberOfContracts", "foodFeed", "tags", "watchList",
-            ];
-            const rows = filtered.map(c => headers.map(h => {
-              const v = c[h];
-              if (Array.isArray(v)) return v.join(", ");
-              if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
-              return v ?? "";
-            }));
-            const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Companies");
-            XLSX.writeFile(wb, `companies_export_${new Date().toISOString().split("T")[0]}.xlsx`);
-          }} style={{ background: `${COLORS.accent}15`, color: COLORS.accent, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: "10px 14px", letterSpacing: 0.3, height: "46px", whiteSpace: "nowrap" }}>
-            ⬇ EXPORT
-          </button>
+          {(() => {
+            const [xlOpen, setXlOpen] = useState(false);
+            const ref = useRef(null);
+            useEffect(() => {
+              if (!xlOpen) return;
+              const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setXlOpen(false); };
+              document.addEventListener("mousedown", handler);
+              return () => document.removeEventListener("mousedown", handler);
+            }, [xlOpen]);
+            return (
+              <div ref={ref} style={{ position: "relative" }}>
+                <div onClick={() => setXlOpen(o => !o)}
+                  style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${xlOpen ? COLORS.accent + "80" : COLORS.border}`, background: xlOpen ? `${COLORS.accent}10` : "transparent", transition: "all 0.15s" }}>
+                  <img src="/logoxl.png" style={{ width: 28, height: 28, objectFit: "contain" }} />
+                </div>
+                {xlOpen && (
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", minWidth: 150 }}>
+                    <div onClick={() => { setXlOpen(false); setShowImport(true); }}
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", cursor: "pointer", color: COLORS.text, fontSize: 13, fontWeight: 600 }}
+                      onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
+                      onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                      <span style={{ fontSize: 16 }}>⬆</span> IMPORT
+                    </div>
+                    <div style={{ height: 1, background: COLORS.border }} />
+                    <div onClick={async () => {
+                      setXlOpen(false);
+                      const XLSX = await import("xlsx");
+                      const headers = [
+                        "ref", "name", "legalName", "companyType", "group", "taxInfo",
+                        "website", "phone", "address", "city", "country", "status", "companySize",
+                        "broker", "roles", "gtRole", "businessUnit",
+                        "complianceStatus", "finalAuthStatus",
+                        "complianceCreationDate", "complianceLastUpdateDate",
+                        "complianceRequestDate", "complianceLastReceptionDate", "complianceFinalConfirmationDate",
+                        "complianceAdditionalInfos",
+                        "incorporationDate", "equity", "turnover", "netIncome", "totalFixedAssets", "totalAssets",
+                        "contractsCurrency", "numberOfContracts", "foodFeed", "tags", "watchList",
+                      ];
+                      const rows = filtered.map(c => headers.map(h => {
+                        const v = c[h];
+                        if (Array.isArray(v)) return v.join(", ");
+                        if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+                        return v ?? "";
+                      }));
+                      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "Companies");
+                      XLSX.writeFile(wb, `companies_export_${new Date().toISOString().split("T")[0]}.xlsx`);
+                    }}
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", cursor: "pointer", color: COLORS.text, fontSize: 13, fontWeight: 600 }}
+                      onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
+                      onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                      <span style={{ fontSize: 16 }}>⬇</span> EXPORT
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {companies.length > 0 && (
             <button onClick={async () => {
               if (window.confirm(`⚠️ Supprimer les ${companies.length} companies ? Cette action est irréversible.`)) {

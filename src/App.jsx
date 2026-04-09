@@ -8421,6 +8421,12 @@ const setOps = async (val) => {
         {/* Tableau */}
         <div style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
           <div style={{ minWidth: 1100 }}>
+            {/* DEBUG */}
+            {activeFilters.exchange.length > 0 && (
+              <div style={{ padding: "6px 16px", background: COLORS.red, color: "#fff", fontSize: 12, fontWeight: 700 }}>
+                DEBUG — filtered: {filtered.length} ops | exchange filter: [{activeFilters.exchange.join(",")}] | euronext in filtered: {filtered.filter(o => (o.exchange||"").toLowerCase() === "euronext").length}
+              </div>
+            )}
             {/* Header */}
             <div style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, background: COLORS.tableHeader, borderRadius: "10px 10px 0 0", padding: "10px 16px" }}>
               {HEADERS.map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: "center" }}>{h}</div>)}

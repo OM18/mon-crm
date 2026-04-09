@@ -402,6 +402,68 @@ const getCountryLabel = (v, configCountry) => {
   return v.replace(/_/g, " ");
 };
 
+// ─── DATE FORMATTING UTILITY ──────────────────────────────────
+// Converts any stored date value (ISO, dd/mm/yyyy, dd.mm.yyyy, Excel serial)
+// to "dd/mm/yyyy hh:mm" in the given IANA timezone.
+// If the stored value has no time component, hh:mm defaults to "00:00".
+const formatComplianceDate = (val, tz) => {
+  if (!val && val !== 0) return null;
+  const s = val.toString().trim();
+  let date = null;
+
+  // Excel serial number (e.g. 44927)
+  const n = parseFloat(s);
+  if (!isNaN(n) && n > 40000 && n < 60000 && /^\d+(\.\d+)?$/.test(s)) {
+    date = new Date(Math.round((n - 25569) * 86400 * 1000));
+  }
+  // ISO datetime "2024-03-15T14:30:00..." or "2024-03-15T14:30"
+  else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) {
+    date = new Date(s);
+  }
+  // ISO date only "2024-03-15"
+  else if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    date = new Date(s + 'T00:00:00');
+  }
+  // dd/mm/yyyy hh:mm  or  dd.mm.yyyy hh:mm
+  else if (/^\d{1,2}[\/\.]\d{1,2}[\/\.]\d{4}\s+\d{2}:\d{2}/.test(s)) {
+    const [datePart, timePart] = s.split(/\s+/);
+    const [d, mo, y] = datePart.split(/[\/\.]/);
+    date = new Date(`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}T${timePart}:00`);
+  }
+  // dd/mm/yyyy  or  dd.mm.yyyy
+  else if (/^\d{1,2}[\/\.]\d{1,2}[\/\.]\d{4}$/.test(s)) {
+    const [d, mo, y] = s.split(/[\/\.]/);
+    date = new Date(`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}T00:00:00`);
+  }
+  else {
+    return s; // unknown format — return as-is
+  }
+
+  if (!date || isNaN(date.getTime())) return s;
+
+  const safeZone = (() => { try { Intl.DateTimeFormat(undefined, { timeZone: tz }); return tz; } catch { return 'UTC'; } })();
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: safeZone,
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  // en-GB gives "15/03/2024, 14:30" — normalise to "15/03/2024 14:30"
+  return fmt.format(date).replace(',', '');
+};
+
+// Returns current datetime string "yyyy-MM-ddTHH:mm" in the given IANA timezone
+// (used as value for <input type="datetime-local"> and for auto-stamping)
+const nowInTz = (tz) => {
+  const safeZone = (() => { try { Intl.DateTimeFormat(undefined, { timeZone: tz }); return tz; } catch { return 'UTC'; } })();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: safeZone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const get = t => parts.find(p => p.type === t)?.value || '00';
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
+};
+
 // ─── SHARED COMPONENTS ────────────────────────────────────────
 const Avatar = ({ initials, size = 40, color = COLORS.accent, square = false }) => (
   <div style={{
@@ -5391,11 +5453,11 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
               </div>
               {[
                 { label: "Legal Name", value: sel.legalName },
-{ label: "Creation Date", value: (() => { const v = sel.complianceCreationDate; if (!v) return null; const s = v.toString().trim(); const n = parseFloat(s); if (!isNaN(n) && n > 40000 && n < 60000) { const d = new Date(Math.round((n - 25569) * 86400 * 1000)); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; } if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.split("-").reverse().join("/"); return s; })() },
-                { label: "Last Update Date", value: (() => { const v = sel.complianceLastUpdateDate; if (!v) return null; const s = v.toString().trim(); const n = parseFloat(s); if (!isNaN(n) && n > 40000 && n < 60000) { const d = new Date(Math.round((n - 25569) * 86400 * 1000)); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; } if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.split("-").reverse().join("/"); return s; })() },
-                { label: "Request Date", value: (() => { const v = sel.complianceRequestDate; if (!v) return null; const s = v.toString().trim(); const n = parseFloat(s); if (!isNaN(n) && n > 40000 && n < 60000) { const d = new Date(Math.round((n - 25569) * 86400 * 1000)); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; } if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.split("-").reverse().join("/"); return s; })() },
-                { label: "Last Reception Date", value: (() => { const v = sel.complianceLastReceptionDate; if (!v) return null; const s = v.toString().trim(); const n = parseFloat(s); if (!isNaN(n) && n > 40000 && n < 60000) { const d = new Date(Math.round((n - 25569) * 86400 * 1000)); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; } if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.split("-").reverse().join("/"); return s; })() },
-                { label: "Final Confirmation Date", value: (() => { const v = sel.complianceFinalConfirmationDate; if (!v) return null; const s = v.toString().trim(); const n = parseFloat(s); if (!isNaN(n) && n > 40000 && n < 60000) { const d = new Date(Math.round((n - 25569) * 86400 * 1000)); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; } if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.split("-").reverse().join("/"); return s; })() },
+{ label: "Creation Date", value: formatComplianceDate(sel.complianceCreationDate, config.companyTimezone || 'Europe/Paris') },
+                { label: "Last Update Date", value: formatComplianceDate(sel.complianceLastUpdateDate, config.companyTimezone || 'Europe/Paris') },
+                { label: "Request Date", value: formatComplianceDate(sel.complianceRequestDate, config.companyTimezone || 'Europe/Paris') },
+                { label: "Last Reception Date", value: formatComplianceDate(sel.complianceLastReceptionDate, config.companyTimezone || 'Europe/Paris') },
+                { label: "Final Confirmation Date", value: formatComplianceDate(sel.complianceFinalConfirmationDate, config.companyTimezone || 'Europe/Paris') },
               ].map(row => (
                 <div key={row.label} style={{ display: "flex", justifyContent: "space-between", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 7, paddingTop: 7 }}>
                   <span style={{ fontSize: 11, color: COLORS.textSub }}>{row.label}</span>
@@ -5801,8 +5863,20 @@ const sel = useMemo(() => selected ? filtered.find(c => c.id === selected) : nul
   };
 
   const save = () => {
-    const data = { ...form, tags: form.tags.split(",").map(t => t.trim()).filter(Boolean), avatar: form.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase(), revenue: Number(form.revenue) || 0, roles: form.roles || [] };
-    const updated = editCompany ? companies.map(c => c.id === editCompany.id ? { ...c, ...data } : c) : [...companies, { ...data, id: Date.now(), ref: generateCompanyRef() }];
+    const tz = config.companyTimezone || 'Europe/Paris';
+    const now = nowInTz(tz); // "yyyy-MM-ddTHH:mm" in company timezone
+    const isNew = !editCompany;
+    const data = {
+      ...form,
+      tags: form.tags.split(",").map(t => t.trim()).filter(Boolean),
+      avatar: form.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase(),
+      revenue: Number(form.revenue) || 0,
+      roles: form.roles || [],
+      // Auto-stamp: creation date only for new companies, last update always
+      complianceCreationDate: isNew ? now : (form.complianceCreationDate || now),
+      complianceLastUpdateDate: now,
+    };
+    const updated = isNew ? [...companies, { ...data, id: Date.now(), ref: generateCompanyRef() }] : companies.map(c => c.id === editCompany.id ? { ...c, ...data } : c);
     setCompanies(updated);
     saveLargeTable('companies', updated);
     setShowForm(false); setSelected(null);
@@ -6112,10 +6186,10 @@ return (
             </div>
             <SelectField label="Compliance Status" value={form.complianceStatus} onChange={v => setForm({ ...form, complianceStatus: v })} options={config.complianceStatus.map(s => ({ value: s.value, label: s.label }))} />
             <SelectField label="Final Authorization Status" value={form.finalAuthStatus} onChange={v => setForm({ ...form, finalAuthStatus: v })} options={config.finalAuthStatus.map(s => ({ value: s.value, label: s.label }))} />
-            <Input label="Creation Date" type="date" value={form.complianceCreationDate || ""} onChange={v => setForm({ ...form, complianceCreationDate: v })} />
-            <Input label="Last Update Date" type="date" value={form.complianceLastUpdateDate || ""} onChange={v => setForm({ ...form, complianceLastUpdateDate: v })} />
-            <Input label="Request Date" type="date" value={form.complianceRequestDate || ""} onChange={v => setForm({ ...form, complianceRequestDate: v })} />
-            <Input label="Last Reception Date" type="date" value={form.complianceLastReceptionDate || ""} onChange={v => setForm({ ...form, complianceLastReceptionDate: v })} />
+            <Input label="Creation Date" type="datetime-local" value={form.complianceCreationDate || ""} onChange={v => setForm({ ...form, complianceCreationDate: v })} />
+            <Input label="Last Update Date" type="datetime-local" value={form.complianceLastUpdateDate || ""} onChange={v => setForm({ ...form, complianceLastUpdateDate: v })} />
+            <Input label="Request Date" type="datetime-local" value={form.complianceRequestDate || ""} onChange={v => setForm({ ...form, complianceRequestDate: v })} />
+            <Input label="Last Reception Date" type="datetime-local" value={form.complianceLastReceptionDate || ""} onChange={v => setForm({ ...form, complianceLastReceptionDate: v })} />
             <Input label="Final Confirmation Date" type="date" value={form.complianceFinalConfirmationDate || ""} onChange={v => setForm({ ...form, complianceFinalConfirmationDate: v })} />
             <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>ADDITIONAL INFOS (COMPLIANCE)</label>

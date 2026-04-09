@@ -4291,6 +4291,7 @@ const COMPANY_FIELD_MAP = {
   "numberOfContracts": ["number of contracts", "nombre contrats", "nb contrats", "contracts", "numberofcontracts"],
 "foodFeed": ["food feed", "foodfeed", "food/feed", "food", "feed"],
     "tags": ["tags", "tag"],
+  "gtRole": ["gt role", "gt_role", "gtrole", "gt role(s)", "gt roles"],
 };
 
 const CONTACT_FIELD_MAP = {
@@ -4481,6 +4482,7 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
     { field: "companySize", format: "Texte", note: "" },
     { field: "broker", format: "Texte", note: "" },
     { field: "roles", format: "Texte", note: "Choix multiple — Séparateurs : , / ; |" },
+    { field: "gtRole", format: "Texte", note: "" },
     { field: "businessUnit", format: "Texte", note: "Choix multiple — Séparateurs : , / ; |" },
     { field: "complianceStatus", format: "Texte", note: "" },
     { field: "finalAuthStatus", format: "Texte", note: "" },
@@ -5323,6 +5325,10 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
                   </div>
                 : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
             </div>
+            <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: "9px 0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: COLORS.textSub, flexShrink: 0 }}>GT Role</span>
+              <span style={{ fontSize: 12, color: sel.gtRole ? COLORS.text : COLORS.textMuted, fontWeight: sel.gtRole ? 600 : 400 }}>{sel.gtRole || "—"}</span>
+            </div>
             <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: "9px 0", display: "flex", justifyContent: "space-between", gap: 8 }}>
   <span style={{ fontSize: 12, color: COLORS.textSub, flexShrink: 0 }}>Tags</span>
   {(sel.tags && sel.tags.length > 0)
@@ -5385,6 +5391,10 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
                     {sel.roles.map(r => <Badge key={r} label={getRoleCfg(r).label || r} color={getRoleCfg(r).color} />)}
                   </div>
                 : <span style={{ fontSize: 13, color: COLORS.textMuted }}>—</span>}
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${COLORS.border}`, padding: "10px 0" }}>
+              <span style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600 }}>GT ROLE</span>
+              <span style={{ fontSize: 13, color: sel.gtRole ? COLORS.text : COLORS.textMuted, fontWeight: sel.gtRole ? 600 : 400 }}>{sel.gtRole || "—"}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${COLORS.border}`, padding: "10px 0" }}>
               <span style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600 }}>BROKER</span>
@@ -5782,6 +5792,7 @@ useEffect(() => {
     companySize: "", watchList: false,
     incorporationDate: "", equity: "", turnover: "", netIncome: "", totalFixedAssets: "", totalAssets: "",
     contractsCurrency: [], numberOfContracts: "", foodFeed: "",
+    gtRole: "",
   });
   const [form, setForm] = useState(makeEmptyForm());
 
@@ -6055,6 +6066,32 @@ return (
             )}
           </div>
           <div onClick={() => setShowImport(true)} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent" }}><img src="/logoxl.png" style={{ width: 32, height: 32, objectFit: "contain" }} /></div>
+          <button onClick={async () => {
+            const XLSX = await import("xlsx");
+            const headers = [
+              "ref", "name", "legalName", "companyType", "group", "taxInfo",
+              "website", "phone", "address", "city", "country", "status", "companySize",
+              "broker", "roles", "gtRole", "businessUnit",
+              "complianceStatus", "finalAuthStatus",
+              "complianceCreationDate", "complianceLastUpdateDate",
+              "complianceRequestDate", "complianceLastReceptionDate", "complianceFinalConfirmationDate",
+              "complianceAdditionalInfos",
+              "incorporationDate", "equity", "turnover", "netIncome", "totalFixedAssets", "totalAssets",
+              "contractsCurrency", "numberOfContracts", "foodFeed", "tags", "watchList",
+            ];
+            const rows = filtered.map(c => headers.map(h => {
+              const v = c[h];
+              if (Array.isArray(v)) return v.join(", ");
+              if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+              return v ?? "";
+            }));
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Companies");
+            XLSX.writeFile(wb, `companies_export_${new Date().toISOString().split("T")[0]}.xlsx`);
+          }} style={{ background: `${COLORS.accent}15`, color: COLORS.accent, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: "10px 14px", letterSpacing: 0.3, height: "46px", whiteSpace: "nowrap" }}>
+            ⬇ EXPORT
+          </button>
           {companies.length > 0 && (
             <button onClick={async () => {
               if (window.confirm(`⚠️ Supprimer les ${companies.length} companies ? Cette action est irréversible.`)) {
@@ -6257,6 +6294,7 @@ return (
                 })}
               </div>
             </div>
+            <div style={{ gridColumn: "1 / -1" }}><Input label="GT Role" value={form.gtRole || ""} onChange={v => setForm({ ...form, gtRole: v })} placeholder="Ex: VESSEL MANAGER" /></div>
             <div style={{ gridColumn: "1 / -1" }}><Input label="Tags (séparés par virgule)" value={form.tags} onChange={v => setForm({ ...form, tags: v })} placeholder="B2B, Export" /></div>
             <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10, margin: "4px 0" }}>
               <div style={{ fontSize: 11, color: COLORS.green, fontWeight: 700, letterSpacing: 0.5, whiteSpace: "nowrap" }}>💰 FINANCE</div>

@@ -2777,7 +2777,7 @@ const FinancingBanksEditor = ({ companies = [], config, updateField }) => {
             <span style={{ fontSize: 9, color: COLORS.textMuted }}>▼</span>
           </div>
           {open && (
-            <div style={{ position: "absolute", bottom: "calc(100% + 6px)", right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", minWidth: 280 }}>
+            <div style={{ position: "absolute", bottom: "calc(100% + 6px)", right: 0, zIndex: 1000, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", minWidth: 280 }}>
               <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}` }}>
                 <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
                   placeholder="Rechercher une banque…"
@@ -3782,7 +3782,9 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           </div>
 
           {/* ── Account Financing Bank ── */}
-          <FinancingBanksEditor companies={companies} config={config} updateField={updateField} />
+          <div style={{ position: "relative", zIndex: 50 }}>
+            <FinancingBanksEditor companies={companies} config={config} updateField={updateField} />
+          </div>
 
           {/* ── Account Type ── */}
           <AccountTypePillsEditor config={config} updateField={updateField} defaultKey="derivDefaultAccountType" onSetDefault={v => updateField("derivDefaultAccountType", v)} />

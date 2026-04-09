@@ -4161,6 +4161,18 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           })()}
 
         </div>
+
+        {/* ── SAVED VIEWS ── */}
+        <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "18px 24px", borderBottom: `1px solid ${COLORS.border}`, background: `${COLORS.accent}06` }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>📋 Vues sauvegardées</div>
+            <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>Sous-tableaux filtrés dans le menu Companies</div>
+          </div>
+          <div style={{ padding: "20px 24px" }}>
+            <SavedViewsBlock config={config} updateField={updateField} />
+          </div>
+        </div>
+
       )}
 
       {adminTab === "company" && (
@@ -4173,11 +4185,6 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
             {/* ── TIMEZONE BLOCK ── */}
             <TimezoneBlock config={config} updateField={updateField} />
-
-            <div style={{ height: 1, background: COLORS.border, margin: "20px 0" }} />
-
-            {/* ── SAVED VIEWS BLOCK ── */}
-            <SavedViewsBlock config={config} updateField={updateField} />
 
             <div style={{ height: 1, background: COLORS.border, margin: "20px 0" }} />
 

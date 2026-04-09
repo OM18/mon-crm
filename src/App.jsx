@@ -5454,24 +5454,44 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
                 <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, letterSpacing: 0.5 }}>COMPLIANCE</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-                <div>
-                  <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, marginBottom: 6 }}>COMPLIANCE STATUS</div>
-                  <select
-                    value={sel.complianceStatus || ""}
-                    onChange={e => onPatchCompany({ complianceStatus: e.target.value })}
-                    style={{ width: "100%", background: `${getComplianceCfg(sel.complianceStatus).color}18`, border: `1px solid ${getComplianceCfg(sel.complianceStatus).color}60`, borderRadius: 8, padding: "7px 10px", color: getComplianceCfg(sel.complianceStatus).color, fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer", fontFamily: "inherit" }}>
-                    {config.complianceStatus.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, marginBottom: 6 }}>FINAL AUTHORIZATION STATUS</div>
-                  <select
-                    value={sel.finalAuthStatus || ""}
-                    onChange={e => onPatchCompany({ finalAuthStatus: e.target.value })}
-                    style={{ width: "100%", background: `${getFinalAuthCfg(sel.finalAuthStatus).color}18`, border: `1px solid ${getFinalAuthCfg(sel.finalAuthStatus).color}60`, borderRadius: 8, padding: "7px 10px", color: getFinalAuthCfg(sel.finalAuthStatus).color, fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer", fontFamily: "inherit" }}>
-                    {config.finalAuthStatus.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                </div>
+                {[
+                  { label: "COMPLIANCE STATUS", field: "complianceStatus", options: config.complianceStatus, getCfg: getComplianceCfg },
+                  { label: "FINAL AUTHORIZATION STATUS", field: "finalAuthStatus", options: config.finalAuthStatus, getCfg: getFinalAuthCfg },
+                ].map(({ label, field, options, getCfg }) => {
+                  const current = getCfg(sel[field]);
+                  const [open, setOpen] = useState(false);
+                  const ref = useRef(null);
+                  useEffect(() => {
+                    if (!open) return;
+                    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+                    document.addEventListener("mousedown", handler);
+                    return () => document.removeEventListener("mousedown", handler);
+                  }, [open]);
+                  return (
+                    <div key={field}>
+                      <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, marginBottom: 6 }}>{label}</div>
+                      <div ref={ref} style={{ position: "relative" }}>
+                        <div onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: `${current.color}18`, border: `1px solid ${current.color}60`, borderRadius: 8, padding: "7px 10px", cursor: "pointer", transition: "all 0.15s" }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: current.color, lineHeight: 1.3 }}>{current.label}</span>
+                          <span style={{ fontSize: 9, color: current.color, marginLeft: 6, flexShrink: 0 }}>▼</span>
+                        </div>
+                        {open && (
+                          <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060" }}>
+                            {options.map(s => (
+                              <div key={s.value} onClick={() => { onPatchCompany({ [field]: s.value }); setOpen(false); }}
+                                style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", cursor: "pointer", background: sel[field] === s.value ? `${s.color}18` : "transparent", borderLeft: `3px solid ${sel[field] === s.value ? s.color : "transparent"}`, transition: "background 0.1s" }}
+                                onMouseEnter={e => { if (sel[field] !== s.value) e.currentTarget.style.background = COLORS.hover; }}
+                                onMouseLeave={e => { if (sel[field] !== s.value) e.currentTarget.style.background = "transparent"; }}>
+                                <div style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, fontWeight: 600, color: s.color, lineHeight: 1.3 }}>{s.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               {[
                 { label: "Legal Name", value: sel.legalName },

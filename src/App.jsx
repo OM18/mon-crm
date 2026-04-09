@@ -3059,13 +3059,13 @@ const ExchangeManagerBlock = () => {
   const toggleExpand = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }));
 
   // ── Sessions ──
-  const saveSession = async (exId) => {
+  const saveSession = async (exId, sessId) => {
     setSaving(true);
     const f = sessForm[exId] || EMPTY_SESS();
     const exSessions = sessions.filter(s => s.exchange_id === exId);
-    if (editSessId) {
-      const { error } = await supabase.from('exchange_sessions').update({ name: f.name, open_hour: Number(f.open_hour), open_minute: Number(f.open_minute), close_hour: Number(f.close_hour), close_minute: Number(f.close_minute), overnight: f.overnight, trading_days: f.trading_days || ["Mon","Tue","Wed","Thu","Fri"] }).eq('id', editSessId);
-      if (!error) setSessions(prev => prev.map(s => s.id === editSessId ? { ...s, ...f, open_hour: Number(f.open_hour), open_minute: Number(f.open_minute), close_hour: Number(f.close_hour), close_minute: Number(f.close_minute) } : s));
+    if (sessId) {
+      const { error } = await supabase.from('exchange_sessions').update({ name: f.name, open_hour: Number(f.open_hour), open_minute: Number(f.open_minute), close_hour: Number(f.close_hour), close_minute: Number(f.close_minute), overnight: f.overnight, trading_days: f.trading_days || ["Mon","Tue","Wed","Thu","Fri"] }).eq('id', sessId);
+      if (!error) setSessions(prev => prev.map(s => s.id === sessId ? { ...s, ...f, open_hour: Number(f.open_hour), open_minute: Number(f.open_minute), close_hour: Number(f.close_hour), close_minute: Number(f.close_minute) } : s));
     } else {
       const newSess = { exchange_id: exId, name: f.name, open_hour: Number(f.open_hour), open_minute: Number(f.open_minute), close_hour: Number(f.close_hour), close_minute: Number(f.close_minute), overnight: f.overnight, trading_days: f.trading_days || ["Mon","Tue","Wed","Thu","Fri"], sort_order: exSessions.length };
       const { data, error } = await supabase.from('exchange_sessions').insert(newSess).select().single();
@@ -3112,62 +3112,6 @@ const ExchangeManagerBlock = () => {
     setExchanges(prev => prev.map(e => e.id === ex.id ? { ...e, active: newVal } : e));
   };
 
-  const SessFormUI = ({ exId }) => {
-    const f = sessForm[exId] || EMPTY_SESS();
-    const setF = (patch) => setSessForm(p => ({ ...p, [exId]: { ...(p[exId] || EMPTY_SESS()), ...patch } }));
-    const toggleDay = (day) => {
-      const days = f.trading_days || ["Mon","Tue","Wed","Thu","Fri"];
-      setF({ trading_days: days.includes(day) ? days.filter(d => d !== day) : [...days, day] });
-    };
-    return (
-      <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.accent}40`, borderRadius: 10, padding: 14, marginBottom: 10 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <div style={{ gridColumn: "1/-1" }}>
-            <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>NOM DE LA SESSION</label>
-            <input value={f.name} onChange={e => setF({ name: e.target.value })} placeholder="Ex: Regular, Pre-Opening…"
-              style={{ width: "100%", marginTop: 4, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-          </div>
-          {[["OUVERTURE", "open_hour", "open_minute"], ["FERMETURE", "close_hour", "close_minute"]].map(([lbl, hk, mk]) => (
-            <div key={hk}>
-              <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>{lbl}</label>
-              <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center" }}>
-                <input type="number" min={0} max={23} value={f[hk]} onChange={e => setF({ [hk]: Number(e.target.value) })}
-                  style={{ width: 60, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "8px 10px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", textAlign: "center" }} />
-                <span style={{ color: COLORS.textMuted, fontWeight: 700 }}>:</span>
-                <input type="number" min={0} max={59} value={f[mk]} onChange={e => setF({ [mk]: Number(e.target.value) })}
-                  style={{ width: 60, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "8px 10px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", textAlign: "center" }} />
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>JOURS DE TRADING</label>
-          <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-            {DAYS.map(day => {
-              const active = (f.trading_days || ["Mon","Tue","Wed","Thu","Fri"]).includes(day);
-              return (
-                <button key={day} onClick={() => toggleDay(day)}
-                  style={{ padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: active ? `${COLORS.accent}25` : COLORS.hover, color: active ? COLORS.accent : COLORS.textMuted, border: `1px solid ${active ? COLORS.accent : COLORS.border}`, transition: "all 0.15s" }}>
-                  {DAY_LABELS[day]}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <label style={{ fontSize: 12, color: COLORS.textSub, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-            <input type="checkbox" checked={f.overnight} onChange={e => setF({ overnight: e.target.checked })} />
-            Session overnight (chevauche minuit)
-          </label>
-        </div>
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <Btn variant="secondary" onClick={() => { setShowSessForm(p => ({ ...p, [exId]: false })); setEditSessId(null); setF(EMPTY_SESS()); }}>Annuler</Btn>
-          <Btn onClick={() => saveSession(exId)} disabled={saving || !f.name}>{saving ? "…" : editSessId ? "Mettre à jour" : "Ajouter"}</Btn>
-        </div>
-      </div>
-    );
-  };
-
   if (loading) return <div style={{ padding: 24, color: COLORS.textMuted, fontSize: 13 }}>Chargement des exchanges…</div>;
 
   return (
@@ -3210,7 +3154,54 @@ const ExchangeManagerBlock = () => {
                       <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, textTransform: "uppercase", letterSpacing: 0.5 }}>⏰ Sessions de trading</div>
                       <Btn onClick={() => { setSessForm(p => ({ ...p, [ex.id]: EMPTY_SESS() })); setEditSessId(null); setShowSessForm(p => ({ ...p, [ex.id]: true })); }} style={{ padding: "5px 12px", fontSize: 12 }}>+ Ajouter</Btn>
                     </div>
-                    {showSessForm[ex.id] && <SessFormUI exId={ex.id} />}
+                    {showSessForm[ex.id] && (() => {
+                      const exId = ex.id;
+                      const f = sessForm[exId] || EMPTY_SESS();
+                      const setF = (patch) => setSessForm(p => ({ ...p, [exId]: { ...(p[exId] || EMPTY_SESS()), ...patch } }));
+                      const toggleDay = (day) => { const days = f.trading_days || ["Mon","Tue","Wed","Thu","Fri"]; setF({ trading_days: days.includes(day) ? days.filter(d => d !== day) : [...days, day] }); };
+                      const currentSessId = editSessId;
+                      return (
+                        <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.accent}40`, borderRadius: 10, padding: 14, marginBottom: 10 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                            <div style={{ gridColumn: "1/-1" }}>
+                              <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>NOM DE LA SESSION</label>
+                              <input value={f.name} onChange={e => setF({ name: e.target.value })} placeholder="Ex: Regular, Pre-Opening…"
+                                style={{ width: "100%", marginTop: 4, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                            </div>
+                            {[["OUVERTURE", "open_hour", "open_minute"], ["FERMETURE", "close_hour", "close_minute"]].map(([lbl, hk, mk]) => (
+                              <div key={hk}>
+                                <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>{lbl}</label>
+                                <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center" }}>
+                                  <input type="number" min={0} max={23} value={f[hk]} onChange={e => setF({ [hk]: Number(e.target.value) })}
+                                    style={{ width: 60, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "8px 10px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", textAlign: "center" }} />
+                                  <span style={{ color: COLORS.textMuted, fontWeight: 700 }}>:</span>
+                                  <input type="number" min={0} max={59} value={f[mk]} onChange={e => setF({ [mk]: Number(e.target.value) })}
+                                    style={{ width: 60, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "8px 10px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", textAlign: "center" }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ marginBottom: 10 }}>
+                            <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>JOURS DE TRADING</label>
+                            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                              {DAYS.map(day => { const isActive = (f.trading_days || ["Mon","Tue","Wed","Thu","Fri"]).includes(day); return (
+                                <button key={day} onClick={() => toggleDay(day)} style={{ padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: isActive ? `${COLORS.accent}25` : COLORS.hover, color: isActive ? COLORS.accent : COLORS.textMuted, border: `1px solid ${isActive ? COLORS.accent : COLORS.border}`, transition: "all 0.15s" }}>{DAY_LABELS[day]}</button>
+                              ); })}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                            <label style={{ fontSize: 12, color: COLORS.textSub, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                              <input type="checkbox" checked={f.overnight} onChange={e => setF({ overnight: e.target.checked })} />
+                              Session overnight (chevauche minuit)
+                            </label>
+                          </div>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <Btn variant="secondary" onClick={() => { setShowSessForm(p => ({ ...p, [exId]: false })); setEditSessId(null); setSessForm(p => ({ ...p, [exId]: EMPTY_SESS() })); }}>Annuler</Btn>
+                            <Btn onClick={() => saveSession(exId, currentSessId)} disabled={saving || !f.name}>{saving ? "…" : currentSessId ? "Mettre à jour" : "Ajouter"}</Btn>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {exSessions.length === 0 && !showSessForm[ex.id] && (
                       <div style={{ color: COLORS.textMuted, fontSize: 12, padding: "8px 0" }}>Aucune session — cliquez sur "+ Ajouter"</div>
                     )}

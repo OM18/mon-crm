@@ -8425,6 +8425,7 @@ const setOps = async (val) => {
               {HEADERS.map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: "center" }}>{h}</div>)}
             </div>
             {/* Lignes */}
+            {(() => { if (activeFilters.exchange.length > 0) { const wrong = filtered.filter(o => !activeFilters.exchange.some(ex => (o.exchange||"").toLowerCase() === ex.toLowerCase())); if (wrong.length > 0) console.warn('WRONG IN FILTERED:', wrong.map(o => ({ref: o.ref, exchange: o.exchange}))); } return null; })()}
             {filtered.map((o, i) => {
               const sc = getStatusCfg(o.status);
               const isSelected = selected === o.id;

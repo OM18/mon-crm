@@ -5908,16 +5908,24 @@ const sel = useMemo(() => selected ? filtered.find(c => c.id === selected) : nul
   const normDateTimeLocal = (val) => {
     if (!val) return "";
     const s = val.toString().trim();
-    // Already datetime-local format
+    // Already datetime-local "yyyy-MM-ddTHH:mm..."
     if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return s.slice(0, 16);
-    // ISO date only → add T00:00
+    // ISO date only "yyyy-MM-dd"
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s + "T00:00";
-    // dd/mm/yyyy HH:mm or dd.mm.yyyy HH:mm
-    const mDT = s.match(/^(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{4})\s+(\d{2}:\d{2})/);
-    if (mDT) return `${mDT[3]}-${mDT[2].padStart(2,'0')}-${mDT[1].padStart(2,'0')}T${mDT[4]}`;
-    // dd/mm/yyyy
+    // "dd/mm/yyyy HH:mm" or "dd.mm.yyyy HH:mm"
+    const mDT = s.match(/^(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{4})[\s,]+(\d{2}):(\d{2})/);
+    if (mDT) return `${mDT[3]}-${mDT[2].padStart(2,'0')}-${mDT[1].padStart(2,'0')}T${mDT[4]}:${mDT[5]}`;
+    // "dd/mm/yyyy" or "dd.mm.yyyy"
     const mD = s.match(/^(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{4})$/);
     if (mD) return `${mD[3]}-${mD[2].padStart(2,'0')}-${mD[1].padStart(2,'0')}T00:00`;
+    // Fallback: try native Date parse (handles ISO with seconds, Z, etc.)
+    try {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) {
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+    } catch {}
     return "";
   };
   const openEdit = (c) => {

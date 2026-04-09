@@ -284,6 +284,7 @@ const DEFAULT_CONFIG = {
   ],
   derivUnderlyingOrigins: ["FRANCE", "UKRAINE", "MOROCCO", "BRAZIL", "ARGENTINA", "UNITED STATES", "AUSTRALIA"],
   companyTimezone: "Europe/Paris",
+  companyViews: [],
 };
 
 // ─── CONFIG CONTEXT ───────────────────────────────────────────
@@ -2947,6 +2948,82 @@ const TimezoneBlock = ({ config, updateField }) => {
   );
 };
 
+// ─── SAVED VIEWS BLOCK (Admin → Company tab) ──────────────────
+const SavedViewsBlock = ({ config, updateField }) => {
+  const views = config.companyViews || [];
+  const [newName, setNewName] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [editName, setEditName] = useState("");
+
+  const save = (updated) => updateField("companyViews", updated);
+
+  const addView = () => {
+    const name = newName.trim();
+    if (!name) return;
+    save([...views, { id: Date.now(), name, filters: null }]);
+    setNewName("");
+  };
+
+  const deleteView = (id) => save(views.filter(v => v.id !== id));
+
+  const startEdit = (v) => { setEditId(v.id); setEditName(v.name); };
+  const confirmEdit = () => {
+    save(views.map(v => v.id === editId ? { ...v, name: editName.trim() || v.name } : v));
+    setEditId(null);
+  };
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 14 }}>📋 VUES SAUVEGARDÉES</div>
+      <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 14 }}>
+        Les filtres sont capturés depuis le menu Companies. Créez d'abord la vue ici, puis appliquez les filtres souhaités dans Companies et cliquez sur "Capturer".
+      </div>
+
+      {/* Existing views */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+        {views.length === 0 && (
+          <div style={{ fontSize: 12, color: COLORS.textMuted, padding: "10px 0" }}>Aucune vue — ajoutez-en une ci-dessous.</div>
+        )}
+        {views.map(v => (
+          <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+            {editId === v.id ? (
+              <>
+                <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditId(null); }}
+                  style={{ flex: 1, background: COLORS.card, border: `1px solid ${COLORS.accent}`, borderRadius: 6, padding: "5px 10px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+                <button onClick={confirmEdit} style={{ background: COLORS.accent, color: COLORS.textOnAccent, border: "none", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit" }}>✓</button>
+                <button onClick={() => setEditId(null)} style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 12, color: COLORS.textMuted, fontFamily: "inherit" }}>✕</button>
+              </>
+            ) : (
+              <>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: COLORS.text }}>{v.name}</span>
+                {v.filters
+                  ? <span style={{ fontSize: 10, color: COLORS.green, fontWeight: 600, padding: "2px 7px", background: `${COLORS.green}15`, borderRadius: 5 }}>FILTRES DÉFINIS</span>
+                  : <span style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 600, padding: "2px 7px", background: COLORS.hover, borderRadius: 5 }}>AUCUN FILTRE</span>
+                }
+                <button onClick={() => startEdit(v)} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
+                <button onClick={() => deleteView(v.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Add new view */}
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={newName} onChange={e => setNewName(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && addView()}
+          placeholder="Nom de la nouvelle vue…"
+          style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }}
+          onFocus={e => e.target.style.borderColor = COLORS.accent}
+          onBlur={e => e.target.style.borderColor = COLORS.border}
+        />
+        <button onClick={addView} style={{ background: COLORS.accent, color: COLORS.textOnAccent, border: "none", borderRadius: 8, padding: "9px 18px", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit" }}>+ Ajouter</button>
+      </div>
+    </div>
+  );
+};
+
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -4096,6 +4173,11 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
             {/* ── TIMEZONE BLOCK ── */}
             <TimezoneBlock config={config} updateField={updateField} />
+
+            <div style={{ height: 1, background: COLORS.border, margin: "20px 0" }} />
+
+            {/* ── SAVED VIEWS BLOCK ── */}
+            <SavedViewsBlock config={config} updateField={updateField} />
 
             <div style={{ height: 1, background: COLORS.border, margin: "20px 0" }} />
 
@@ -5736,8 +5818,9 @@ const CompanyRow = ({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg
 );
 
 const Companies = ({ companies, setCompanies, contacts }) => {
-  const { config } = useConfig();
+  const { config, updateField } = useConfig();
   const [search, setSearch] = useState("");
+  const [activeViewId, setActiveViewId] = useState(null);
 const [showFilters, setShowFilters] = useState(false);
 const [filterMode, setFilterMode] = useState("AND");
 const [activeFilters, setActiveFilters] = useState({
@@ -6033,6 +6116,54 @@ const sel = useMemo(() => selected ? filtered.find(c => c.id === selected) : nul
   return (
 <div style={{ display: "flex", gap: 0, height: "calc(100vh - 60px)", overflow: "hidden" }}>
 <div style={{ flex: sel ? 1 : "1 1 100%", display: "flex", flexDirection: "column", minWidth: 0 }}>
+
+        {/* ── SAVED VIEWS ── */}
+        {(config.companyViews || []).length > 0 && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            {(config.companyViews || []).map(view => {
+              const isActive = activeViewId === view.id;
+              return (
+                <button key={view.id} onClick={() => {
+                  if (isActive) {
+                    // Deselect — reset filters
+                    setActiveViewId(null);
+                    setActiveFilters({ city:[], companyType:[], status:[], country:[], businessUnit:[], roles:[], foodFeed:[], companySize:[], complianceStatus:[], finalAuthStatus:[], contractsCurrency:[], watchList:[] });
+                    setExcludeFilters({ city:[], companyType:[], status:[], country:[], businessUnit:[], roles:[], foodFeed:[], companySize:[], complianceStatus:[], finalAuthStatus:[], contractsCurrency:[], watchList:[] });
+                    setOnlyFilters({ city:[], companyType:[], status:[], country:[], businessUnit:[], roles:[], foodFeed:[], companySize:[], complianceStatus:[], finalAuthStatus:[], contractsCurrency:[], watchList:[] });
+                    setCustomFilters([]);
+                    setFilterMode("AND");
+                    setSearch("");
+                  } else {
+                    // Apply view filters
+                    setActiveViewId(view.id);
+                    setActiveFilters(view.filters?.activeFilters || { city:[], companyType:[], status:[], country:[], businessUnit:[], roles:[], foodFeed:[], companySize:[], complianceStatus:[], finalAuthStatus:[], contractsCurrency:[], watchList:[] });
+                    setExcludeFilters(view.filters?.excludeFilters || { city:[], companyType:[], status:[], country:[], businessUnit:[], roles:[], foodFeed:[], companySize:[], complianceStatus:[], finalAuthStatus:[], contractsCurrency:[], watchList:[] });
+                    setOnlyFilters(view.filters?.onlyFilters || { city:[], companyType:[], status:[], country:[], businessUnit:[], roles:[], foodFeed:[], companySize:[], complianceStatus:[], finalAuthStatus:[], contractsCurrency:[], watchList:[] });
+                    setCustomFilters(view.filters?.customFilters || []);
+                    setFilterMode(view.filters?.filterMode || "AND");
+                    setSearch(view.filters?.search || "");
+                  }
+                }}
+                  style={{
+                    padding: "7px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700,
+                    fontFamily: "inherit", letterSpacing: 0.3, transition: "all 0.15s",
+                    background: isActive ? COLORS.accent : COLORS.card,
+                    color: isActive ? COLORS.textOnAccent : COLORS.textSub,
+                    border: `1.5px solid ${isActive ? COLORS.accent : COLORS.border}`,
+                  }}
+                  onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = COLORS.accent + "80"; e.currentTarget.style.color = COLORS.text; }}}
+                  onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = COLORS.border; e.currentTarget.style.color = COLORS.textSub; }}}
+                >
+                  {view.name}
+                  {isActive && (
+                    <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.7 }}>✕</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
           <input placeholder="Search a company..." value={search} onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: 160, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
@@ -6225,6 +6356,18 @@ return (
             style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: isReloading ? "wait" : "pointer", fontSize: 18, padding: "10px 14px", color: isReloading ? COLORS.textMuted : COLORS.textSub, transition: "color 0.2s", height: "46px" }}>
             {isReloading ? "⟳" : "↺"}
           </button>
+          {activeViewId && (
+            <button onClick={() => {
+              const updated = (config.companyViews || []).map(v => v.id === activeViewId ? {
+                ...v,
+                filters: { activeFilters, excludeFilters, onlyFilters, customFilters, filterMode, search }
+              } : v);
+              updateField("companyViews", updated);
+            }} title="Sauvegarder les filtres actuels dans cette vue"
+              style={{ background: `${COLORS.blue}15`, color: COLORS.blue, border: `1px solid ${COLORS.blue}40`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: "10px 14px", height: "46px", whiteSpace: "nowrap" }}>
+              📌 Capturer
+            </button>
+          )}
           <button onClick={openNew} style={{ background: COLORS.accent, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", padding: "6px 14px", lineHeight: "1", height: "46px", marginTop: 3 }}>+ NEW COMPANY</button>
         </div>
 

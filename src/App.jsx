@@ -7980,8 +7980,7 @@ const setOps = async (val) => {
     setSelected(data.id);
   };
 
-  const [filtered, setFiltered] = useState([]);
-  useEffect(() => {
+  const filtered = useMemo(() => {
     const norm = v => (v || "").toString().toLowerCase().trim().replace(/[_\s-]/g, "");
     const resolveProduct = (instrument) => {
       if (!instrument) return null;
@@ -7995,59 +7994,61 @@ const setOps = async (val) => {
       const match = commodities.find(c => norm(c.value) === norm(raw) || norm(c.label) === norm(raw));
       return match ? match.value : raw;
     };
-    const result = ops.filter(o => {
-    const q = search.toLowerCase();
-    const ms = !q || o.ref?.toLowerCase().includes(q) || o.instrument?.toLowerCase().includes(q) || o.broker?.toLowerCase().includes(q) || o.exchange?.toLowerCase().includes(q) || o.contract?.toLowerCase().includes(q) || o.notes?.toLowerCase().includes(q);
-    if (!ms) return false;
-    const aq = accountSearch.toLowerCase().trim();
-    if (aq && (!o.account || o.account.toLowerCase() !== aq)) return false;
-    if (dateFrom && (o.tradeDate || "") < dateFrom) return false;
-    if (dateTo   && (o.tradeDate || "") > dateTo)   return false;
-    const accRecord = derivAccounts.find(a => a.accountNumber === o.account);
-    const opFinancingBank = accRecord?.financingBank || "";
-    const product = resolveProduct(o.instrument);
-    const opUnderlying = resolveUnderlying(product?.underlying || "");
-    const tagChecks = [
-      !activeFilters.type.length          || activeFilters.type.includes(o.type),
-      !activeFilters.opType.length        || activeFilters.opType.includes(o.opType),
-      !activeFilters.side.length          || activeFilters.side.includes(o.side),
-      !activeFilters.status.length        || activeFilters.status.includes(o.status) || activeFilters.status.some(s => o.status?.toLowerCase() === s?.toLowerCase()),
-      !activeFilters.businessUnit.length  || activeFilters.businessUnit.includes(o.businessUnit),
-      !activeFilters.internalDeal.length  || activeFilters.internalDeal.includes(String(o.internalDeal)),
-      !activeFilters.underlying.length    || activeFilters.underlying.some(u => norm(opUnderlying) === norm(u)),
-      !activeFilters.financingBank.length || activeFilters.financingBank.some(fb => norm(opFinancingBank) === norm(fb)),
-    ].filter((_, i) => {
-      const keys = ["type","opType","side","status","businessUnit","internalDeal","underlying","financingBank"];
-      return activeFilters[keys[i]].length > 0;
-    });
-    // Exchange is always AND (never affected by OR mode)
-    const exchangePass = !activeFilters.exchange.length || activeFilters.exchange.some(ex => norm(o.exchange) === norm(ex));
-    const customChecks = customFilters.map(cf => {
-      const val = o[cf.key];
-      if (cf.op === "empty")    return !val || String(val).trim() === "";
-      if (cf.op === "notempty") return !!val && String(val).trim() !== "";
-      if (!cf.value && cf.value !== 0) return true;
-      if (cf.op === "eq")       return String(val || "").toLowerCase() === String(cf.value || "").toLowerCase();
-      if (cf.op === "gt")       return Number(val) > Number(cf.value);
-      if (cf.op === "lt")       return Number(val) < Number(cf.value);
-      if (cf.op === "contains") return String(val || "").toLowerCase().includes(String(cf.value).toLowerCase());
+    const exchFilter = activeFilters.exchange;
+    const typeFilter = activeFilters.type;
+    const opTypeFilter = activeFilters.opType;
+    const sideFilter = activeFilters.side;
+    const statusFilter = activeFilters.status;
+    const buFilter = activeFilters.businessUnit;
+    const dealFilter = activeFilters.internalDeal;
+    const underFilter = activeFilters.underlying;
+    const bankFilter = activeFilters.financingBank;
+    return ops.filter(o => {
+      const q = search.toLowerCase();
+      const ms = !q || o.ref?.toLowerCase().includes(q) || o.instrument?.toLowerCase().includes(q) || o.broker?.toLowerCase().includes(q) || o.exchange?.toLowerCase().includes(q) || o.contract?.toLowerCase().includes(q) || o.notes?.toLowerCase().includes(q);
+      if (!ms) return false;
+      const aq = accountSearch.toLowerCase().trim();
+      if (aq && (!o.account || o.account.toLowerCase() !== aq)) return false;
+      if (dateFrom && (o.tradeDate || "") < dateFrom) return false;
+      if (dateTo   && (o.tradeDate || "") > dateTo)   return false;
+      const accRecord = derivAccounts.find(a => a.accountNumber === o.account);
+      const opFinancingBank = accRecord?.financingBank || "";
+      const product = resolveProduct(o.instrument);
+      const opUnderlying = resolveUnderlying(product?.underlying || "");
+      // Exchange — always AND
+      if (exchFilter.length > 0 && !exchFilter.some(ex => norm(o.exchange) === norm(ex))) return false;
+      // Tag filters
+      if (typeFilter.length > 0   && !typeFilter.includes(o.type)) return false;
+      if (sideFilter.length > 0   && !sideFilter.includes(o.side)) return false;
+      if (dealFilter.length > 0   && !dealFilter.includes(String(o.internalDeal))) return false;
+      if (buFilter.length > 0     && !buFilter.includes(o.businessUnit)) return false;
+      if (opTypeFilter.length > 0 && !opTypeFilter.includes(o.opType)) return false;
+      if (statusFilter.length > 0 && !statusFilter.includes(o.status) && !statusFilter.some(s => o.status?.toLowerCase() === s?.toLowerCase())) return false;
+      if (underFilter.length > 0  && !underFilter.some(u => norm(opUnderlying) === norm(u))) return false;
+      if (bankFilter.length > 0   && !bankFilter.some(fb => norm(opFinancingBank) === norm(fb))) return false;
+      // Custom filters
+      for (const cf of customFilters) {
+        const val = o[cf.key];
+        if (cf.op === "empty"    && (val && String(val).trim() !== "")) return false;
+        if (cf.op === "notempty" && (!val || String(val).trim() === "")) return false;
+        if (cf.value !== undefined && cf.value !== null && cf.value !== "") {
+          if (cf.op === "eq"       && String(val || "").toLowerCase() !== String(cf.value || "").toLowerCase()) return false;
+          if (cf.op === "gt"       && !(Number(val) > Number(cf.value))) return false;
+          if (cf.op === "lt"       && !(Number(val) < Number(cf.value))) return false;
+          if (cf.op === "contains" && !String(val || "").toLowerCase().includes(String(cf.value).toLowerCase())) return false;
+        }
+      }
       return true;
+    }).sort((a, b) => {
+      const dateDiff = (b.tradeDate || "").localeCompare(a.tradeDate || "");
+      if (dateDiff !== 0) return dateDiff;
+      return (b.id || 0) - (a.id || 0);
     });
-    const tagPass = filterMode === "OR"
-      ? (tagChecks.length === 0 || tagChecks.some(Boolean))
-      : tagChecks.every(Boolean);
-    const customPass = customChecks.every(Boolean);
-    return tagPass && exchangePass && customPass;
-  }).sort((a, b) => {
-    const dateDiff = (b.tradeDate || "").localeCompare(a.tradeDate || "");
-    if (dateDiff !== 0) return dateDiff;
-    return (b.id || 0) - (a.id || 0);
-  });
-    setFiltered(result);
-    // Scroll to top when filter changes
-    const container = document.getElementById('deriv-scroll-container');
-    if (container) container.scrollTop = 0;
-  }, [ops, search, accountSearch, dateFrom, dateTo, activeFilters, customFilters, filterMode, derivAccounts, products, config]);
+  }, [ops, search, accountSearch, dateFrom, dateTo,
+      activeFilters.exchange, activeFilters.type, activeFilters.opType, activeFilters.side,
+      activeFilters.status, activeFilters.businessUnit, activeFilters.internalDeal,
+      activeFilters.underlying, activeFilters.financingBank,
+      customFilters, filterMode, derivAccounts, products, config]);
 
   const sel = ops.find(o => o.id === selected);
 
@@ -8423,7 +8424,7 @@ const setOps = async (val) => {
 
         {/* Tableau */}
         <div ref={el => { if (el) el._scrollRef = el; }} id="deriv-scroll-container" style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
-          <div style={{ minWidth: 1100 }}>
+          <div key={JSON.stringify(activeFilters) + filterMode} style={{ minWidth: 1100 }}>
             {/* Header */}
             <div style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, background: COLORS.tableHeader, borderRadius: "10px 10px 0 0", padding: "10px 16px" }}>
               {HEADERS.map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: "center" }}>{h}</div>)}

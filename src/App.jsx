@@ -8021,9 +8021,6 @@ const setOps = async (val) => {
     });
     // Exchange is always AND (never affected by OR mode)
     const exchangePass = !activeFilters.exchange.length || activeFilters.exchange.some(ex => norm(o.exchange) === norm(ex));
-if (activeFilters.exchange.length > 0 && norm(o.exchange) !== norm(activeFilters.exchange[0])) console.log('PASSE MAL:', o.ref, '| exchange:', o.exchange, '| filtre:', activeFilters.exchange);
-if (activeFilters.exchange.length > 0 && !exchangePass) console.log('BLOCKED:', o.ref, o.exchange, activeFilters.exchange);
-if (activeFilters.exchange.length > 0 && exchangePass && norm(o.exchange) !== norm(activeFilters.exchange[0])) console.log('WRONG PASS:', o.ref, o.exchange, activeFilters.exchange);
     const customChecks = customFilters.map(cf => {
       const val = o[cf.key];
       if (cf.op === "empty")    return !val || String(val).trim() === "";
@@ -8278,7 +8275,7 @@ if (activeFilters.exchange.length > 0 && exchangePass && norm(o.exchange) !== no
                       <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSub, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Exchange</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {exchanges.map(ex => {
-                          const isActive = activeFilters.exchange.includes(ex);
+                          const isActive = activeFilters.exchange.some(f => f.toLowerCase() === ex.toLowerCase());
                           const label = (config.derivExchanges || []).find(e => norm(e.value) === norm(ex))?.label || ex;
                           return (
                             <span key={ex} onClick={() => setActiveFilters(f => ({ ...f, exchange: isActive ? f.exchange.filter(v => v !== ex) : [...f.exchange, ex] }))}
@@ -8447,7 +8444,7 @@ if (activeFilters.exchange.length > 0 && exchangePass && norm(o.exchange) !== no
                   <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{o.tradeDate ? o.tradeDate.split("-").reverse().join("/") : "—"}</div>
                   <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{o.type?.toLowerCase() === "option" ? (o.expiryDate || "—") : <span style={{ color: COLORS.textMuted }}>—</span>}</div>
                   <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.broker || "—"}</div>
-                  {(() => { const exch = (config.derivExchanges || []).find(e => e.value === o.exchange); return <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{exch?.label || o.exchange || "—"}</div>; })()}
+                  {(() => { const norm = v => (v || "").toLowerCase().trim(); const exch = (config.derivExchanges || []).find(e => norm(e.value) === norm(o.exchange)); return <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{exch?.label || o.exchange || "—"}</div>; })()}
                   <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.account || "—"}</div>
                   <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sc.color}20`, color: sc.color }}>{sc.label}</span></div>
                   <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.internalDeal ? `${COLORS.blue}20` : "transparent", color: o.internalDeal ? COLORS.blue : COLORS.textMuted }}>{o.internalDeal ? "YES" : "—"}</span></div>

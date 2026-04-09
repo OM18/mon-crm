@@ -8021,6 +8021,9 @@ const setOps = async (val) => {
     });
     // Exchange is always AND (never affected by OR mode)
     const exchangePass = !activeFilters.exchange.length || activeFilters.exchange.some(ex => norm(o.exchange) === norm(ex));
+if (activeFilters.exchange.length > 0 && norm(o.exchange) !== norm(activeFilters.exchange[0])) console.log('PASSE MAL:', o.ref, '| exchange:', o.exchange, '| filtre:', activeFilters.exchange);
+if (activeFilters.exchange.length > 0 && !exchangePass) console.log('BLOCKED:', o.ref, o.exchange, activeFilters.exchange);
+if (activeFilters.exchange.length > 0 && exchangePass && norm(o.exchange) !== norm(activeFilters.exchange[0])) console.log('WRONG PASS:', o.ref, o.exchange, activeFilters.exchange);
     const customChecks = customFilters.map(cf => {
       const val = o[cf.key];
       if (cf.op === "empty")    return !val || String(val).trim() === "";

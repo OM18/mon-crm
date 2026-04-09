@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, createContext, useContext, useMemo, memo } from "react";
+﻿import { useState, useEffect, useRef, createContext, useContext, useMemo, memo, useCallback } from "react";
 import { supabase } from './supabase';
 
 // ─── SAFE SUPABASE SAVE ───────────────────────────────────────
@@ -5684,6 +5684,90 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
 };
 
 // ─── COMPANIES ────────────────────────────────────────────────
+// ─── AUTO LOGOUT ──────────────────────────────────────────────
+const INACTIVITY_MS  = 2 * 60 * 60 * 1000; // 2 heures
+const WARNING_MS     = 1 * 60 * 1000;       // avertissement 1 min avant
+
+const useAutoLogout = (currentUser, onLogout) => {
+  const [showWarning, setShowWarning] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(60);
+  const timerRef    = useRef(null);
+  const warningRef  = useRef(null);
+  const countRef    = useRef(null);
+
+  const clearAll = () => {
+    clearTimeout(timerRef.current);
+    clearTimeout(warningRef.current);
+    clearInterval(countRef.current);
+  };
+
+  const logout = useCallback(() => {
+    clearAll();
+    setShowWarning(false);
+    onLogout();
+  }, [onLogout]);
+
+  const resetTimer = useCallback(() => {
+    if (!currentUser) return;
+    clearAll();
+    setShowWarning(false);
+    setSecondsLeft(60);
+
+    // Show warning 1 min before logout
+    warningRef.current = setTimeout(() => {
+      setShowWarning(true);
+      setSecondsLeft(60);
+      countRef.current = setInterval(() => {
+        setSecondsLeft(s => {
+          if (s <= 1) { clearInterval(countRef.current); return 0; }
+          return s - 1;
+        });
+      }, 1000);
+    }, INACTIVITY_MS - WARNING_MS);
+
+    // Actual logout
+    timerRef.current = setTimeout(logout, INACTIVITY_MS);
+  }, [currentUser, logout]);
+
+  useEffect(() => {
+    if (!currentUser) { clearAll(); setShowWarning(false); return; }
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"];
+    const handler = () => resetTimer();
+    events.forEach(e => window.addEventListener(e, handler, { passive: true }));
+    resetTimer();
+    return () => {
+      events.forEach(e => window.removeEventListener(e, handler));
+      clearAll();
+    };
+  }, [currentUser, resetTimer]);
+
+  return { showWarning, secondsLeft, resetTimer };
+};
+
+const AutoLogoutWarning = ({ secondsLeft, onStay, onLogout }) => (
+  <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "32px 40px", maxWidth: 420, width: "90%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+      <div style={{ fontSize: 40, marginBottom: 16 }}>⏱</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text, marginBottom: 10 }}>Session inactive</div>
+      <div style={{ fontSize: 14, color: COLORS.textSub, marginBottom: 24, lineHeight: 1.6 }}>
+        Vous allez être déconnecté automatiquement dans
+        <div style={{ fontSize: 40, fontWeight: 800, color: COLORS.accent, fontFamily: "'DM Mono', monospace", margin: "12px 0" }}>
+          {String(secondsLeft).padStart(2, "0")}s
+        </div>
+        en raison d'inactivité.
+      </div>
+      <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+        <button onClick={onLogout} style={{ background: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit" }}>
+          Se déconnecter
+        </button>
+        <button onClick={onStay} style={{ background: COLORS.accent, color: COLORS.textOnAccent, border: "none", borderRadius: 8, padding: "10px 24px", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit" }}>
+          Rester connecté
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 const LoginPage = ({ onLogin }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -10331,6 +10415,8 @@ export default function CRM() {
   const handleLogin = (emp) => { setCurrentUser(emp); localStorage.setItem("crm_current_user", JSON.stringify(emp)); };
   const handleLogout = () => { setCurrentUser(null); localStorage.removeItem("crm_current_user"); };
 
+  const { showWarning, secondsLeft, resetTimer } = useAutoLogout(currentUser, handleLogout);
+
 
 
   useEffect(() => {
@@ -10475,6 +10561,13 @@ export default function CRM() {
           {page === "admin" && <AdminPanel companies={companies} />}
         </div>
       </div>
+      {showWarning && (
+        <AutoLogoutWarning
+          secondsLeft={secondsLeft}
+          onStay={resetTimer}
+          onLogout={handleLogout}
+        />
+      )}
     </ConfigProvider>
   );
 }

@@ -5216,6 +5216,43 @@ if (Array.isArray(resolved.contractsCurrency)) {
   );
 };
 
+// ─── COLORED STATUS DROPDOWN ─────────────────────────────────
+const ColoredStatusDropdown = ({ label, value, options, getCfg, onChange }) => {
+  const current = getCfg(value);
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, marginBottom: 6 }}>{label}</div>
+      <div ref={ref} style={{ position: "relative" }}>
+        <div onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: `${current.color}18`, border: `1px solid ${current.color}60`, borderRadius: 8, padding: "7px 10px", cursor: "pointer", transition: "all 0.15s" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: current.color, lineHeight: 1.3 }}>{current.label}</span>
+          <span style={{ fontSize: 9, color: current.color, marginLeft: 6, flexShrink: 0 }}>▼</span>
+        </div>
+        {open && (
+          <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060" }}>
+            {options.map(s => (
+              <div key={s.value} onClick={() => { onChange(s.value); setOpen(false); }}
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", cursor: "pointer", background: value === s.value ? `${s.color}18` : "transparent", borderLeft: `3px solid ${value === s.value ? s.color : "transparent"}`, transition: "background 0.1s" }}
+                onMouseEnter={e => { if (value !== s.value) e.currentTarget.style.background = COLORS.hover; }}
+                onMouseLeave={e => { if (value !== s.value) e.currentTarget.style.background = "transparent"; }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: s.color, lineHeight: 1.3 }}>{s.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ─── COMPANY DETAIL PANEL ────────────────────────────────────
 const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, getComplianceCfg, getFinalAuthCfg, getBUCfg, getRoleCfg, getTypeCfg, onPatchCompany }) => {
   const { config } = useConfig();
@@ -5457,41 +5494,16 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
                 {[
                   { label: "COMPLIANCE STATUS", field: "complianceStatus", options: config.complianceStatus, getCfg: getComplianceCfg },
                   { label: "FINAL AUTHORIZATION STATUS", field: "finalAuthStatus", options: config.finalAuthStatus, getCfg: getFinalAuthCfg },
-                ].map(({ label, field, options, getCfg }) => {
-                  const current = getCfg(sel[field]);
-                  const [open, setOpen] = useState(false);
-                  const ref = useRef(null);
-                  useEffect(() => {
-                    if (!open) return;
-                    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-                    document.addEventListener("mousedown", handler);
-                    return () => document.removeEventListener("mousedown", handler);
-                  }, [open]);
-                  return (
-                    <div key={field}>
-                      <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, marginBottom: 6 }}>{label}</div>
-                      <div ref={ref} style={{ position: "relative" }}>
-                        <div onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: `${current.color}18`, border: `1px solid ${current.color}60`, borderRadius: 8, padding: "7px 10px", cursor: "pointer", transition: "all 0.15s" }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: current.color, lineHeight: 1.3 }}>{current.label}</span>
-                          <span style={{ fontSize: 9, color: current.color, marginLeft: 6, flexShrink: 0 }}>▼</span>
-                        </div>
-                        {open && (
-                          <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060" }}>
-                            {options.map(s => (
-                              <div key={s.value} onClick={() => { onPatchCompany({ [field]: s.value }); setOpen(false); }}
-                                style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", cursor: "pointer", background: sel[field] === s.value ? `${s.color}18` : "transparent", borderLeft: `3px solid ${sel[field] === s.value ? s.color : "transparent"}`, transition: "background 0.1s" }}
-                                onMouseEnter={e => { if (sel[field] !== s.value) e.currentTarget.style.background = COLORS.hover; }}
-                                onMouseLeave={e => { if (sel[field] !== s.value) e.currentTarget.style.background = "transparent"; }}>
-                                <div style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
-                                <span style={{ fontSize: 11, fontWeight: 600, color: s.color, lineHeight: 1.3 }}>{s.label}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                ].map(({ label, field, options, getCfg }) => (
+                  <ColoredStatusDropdown
+                    key={field}
+                    label={label}
+                    value={sel[field]}
+                    options={options}
+                    getCfg={getCfg}
+                    onChange={v => onPatchCompany({ [field]: v })}
+                  />
+                ))}
               </div>
               {[
                 { label: "Legal Name", value: sel.legalName },

@@ -4917,7 +4917,7 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
       setUnknownQueue(queue); setCurrentQueueIdx(0); setDecisions(autoDecisions); setStep("validate");
     } else {
       const resolved = resolveItems(items, autoDecisions);
-      onImport(resolved); setImporting(false); onClose();
+      onImport(resolved, Object.values(mapping).filter(Boolean)); setImporting(false); onClose();
     }
     setImporting(false);
   };
@@ -5030,7 +5030,7 @@ if (Array.isArray(resolved.contractsCurrency)) {
       const skipped = unknownQueue.filter(u => newDecisions[`${u.configKey}:${u.value}`] === "skip").map(u => ({ field: u.fieldLabel, value: u.value }));
       setRejectedValues(skipped);
       const resolved = resolveItems(parsedItems, newDecisions);
-      onImport(resolved); setStep("summary");
+      onImport(resolved, Object.values(mapping).filter(Boolean)); setStep("summary");
     }
   };
 
@@ -6625,12 +6625,35 @@ return (
           </div>
         </Modal>
       )}
-      {showImport && <ExcelImportModal type="companies" onClose={() => setShowImport(false)} onImport={(items) => {
+      {showImport && <ExcelImportModal type="companies" onClose={() => setShowImport(false)} onImport={(items, mappedFields = []) => {
   setCompanies(prev => {
-    const ex = new Set(prev.map(c => c.name?.toLowerCase()));
-    const next = [...prev, ...items.filter(i => !ex.has(i.name?.toLowerCase()))];
-    saveLargeTable('companies', next);
-    return next;
+    const byRef = {};
+    prev.forEach(c => { if (c.ref) byRef[c.ref] = c; });
+    const updated = [...prev];
+    const updatedIds = new Set();
+
+    items.forEach(incoming => {
+      const existingIdx = incoming.ref ? prev.findIndex(c => c.ref === incoming.ref) : -1;
+      if (existingIdx !== -1) {
+        // Merge: only overwrite fields that were actually in the Excel and have a non-empty value
+        const merged = { ...prev[existingIdx] };
+        mappedFields.forEach(field => {
+          const val = incoming[field];
+          const isEmpty = val === undefined || val === null || val === "" || (Array.isArray(val) && val.length === 0);
+          if (!isEmpty) merged[field] = val;
+        });
+        // Always update lastUpdateDate on merge
+        merged.complianceLastUpdateDate = nowInTz(config.companyTimezone || 'Europe/Paris');
+        updated[existingIdx] = merged;
+        updatedIds.add(existingIdx);
+      } else {
+        // New company — add it
+        updated.push(incoming);
+      }
+    });
+
+    saveLargeTable('companies', updated);
+    return updated;
   });
 }} />}
       {showExport && <CompanyExportModal all={companies} filtered={filtered} onClose={() => setShowExport(false)} />}

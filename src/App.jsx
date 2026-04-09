@@ -7980,7 +7980,8 @@ const setOps = async (val) => {
     setSelected(data.id);
   };
 
-  const filtered = useMemo(() => {
+  const [filtered, setFiltered] = useState([]);
+  useEffect(() => {
     const norm = v => (v || "").toString().toLowerCase().trim().replace(/[_\s-]/g, "");
     const resolveProduct = (instrument) => {
       if (!instrument) return null;
@@ -7994,7 +7995,7 @@ const setOps = async (val) => {
       const match = commodities.find(c => norm(c.value) === norm(raw) || norm(c.label) === norm(raw));
       return match ? match.value : raw;
     };
-    return ops.filter(o => {
+    const result = ops.filter(o => {
     const q = search.toLowerCase();
     const ms = !q || o.ref?.toLowerCase().includes(q) || o.instrument?.toLowerCase().includes(q) || o.broker?.toLowerCase().includes(q) || o.exchange?.toLowerCase().includes(q) || o.contract?.toLowerCase().includes(q) || o.notes?.toLowerCase().includes(q);
     if (!ms) return false;
@@ -8040,10 +8041,10 @@ const setOps = async (val) => {
   }).sort((a, b) => {
     const dateDiff = (b.tradeDate || "").localeCompare(a.tradeDate || "");
     if (dateDiff !== 0) return dateDiff;
-    // Same date: most recently entered first (highest id)
     return (b.id || 0) - (a.id || 0);
   });
-  }, [ops, search, accountSearch, dateFrom, dateTo, JSON.stringify(activeFilters), JSON.stringify(customFilters), filterMode, derivAccounts, products, config]);
+    setFiltered(result);
+  }, [ops, search, accountSearch, dateFrom, dateTo, activeFilters, customFilters, filterMode, derivAccounts, products, config]);
 
   const sel = ops.find(o => o.id === selected);
 
@@ -8425,7 +8426,6 @@ const setOps = async (val) => {
               {HEADERS.map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: "center" }}>{h}</div>)}
             </div>
             {/* Lignes */}
-            {(() => { if (activeFilters.exchange.length > 0) { const wrong = filtered.filter(o => !activeFilters.exchange.some(ex => (o.exchange||"").toLowerCase() === ex.toLowerCase())); if (wrong.length > 0) console.warn('WRONG IN FILTERED:', wrong.map(o => ({ref: o.ref, exchange: o.exchange}))); } return null; })()}
             {filtered.map((o, i) => {
               const sc = getStatusCfg(o.status);
               const isSelected = selected === o.id;

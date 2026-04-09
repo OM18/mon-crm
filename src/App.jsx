@@ -5412,7 +5412,12 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
             ))}
             <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: "9px 0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 12, color: COLORS.textSub, flexShrink: 0 }}>Activity Status</span>
-              <Badge label={getStatusCfg(sel.status).label} color={getStatusCfg(sel.status).color} />
+              <ColoredStatusDropdown
+                value={sel.status}
+                options={config.activityStatus}
+                getCfg={getStatusCfg}
+                onChange={v => onPatchCompany({ status: v })}
+              />
             </div>
             <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: "9px 0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 12, color: COLORS.textSub, flexShrink: 0 }}>Company Size</span>

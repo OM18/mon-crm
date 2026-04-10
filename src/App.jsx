@@ -7960,15 +7960,19 @@ useEffect(() => {
       const resolvedExchange = products.find(p => norm(p.label) === norm(op.instrument))?.stoxxExchange || op.exchange || "";
       const opExchange = norm(resolvedExchange);
       const opTrans = norm(op.orderTransmissionType);
+      const opOpType = norm(op.opType);
 
       const matching = tarifs.filter(t => {
         if (!t.isActive) return false;
         const brokers = Array.isArray(t.financialBroker) ? t.financialBroker : [t.financialBroker];
         const transmissions = Array.isArray(t.orderTransmissionType) ? t.orderTransmissionType : [t.orderTransmissionType];
+        const opTypes = Array.isArray(t.opType) ? t.opType : (t.opType ? [t.opType] : []);
         const brokerMatch = brokers.some(b => norm(b) === opBroker || norm(b).includes(opBroker) || opBroker.includes(norm(b)));
         const exchangeMatch = norm(t.exchange) === opExchange || norm(t.exchange).includes(opExchange) || opExchange.includes(norm(t.exchange));
         const transMatch = opTrans === "" || transmissions.some(tr => norm(tr) === opTrans);
-        return brokerMatch && exchangeMatch && transMatch;
+        // If the tarif has no opType defined, it applies to all operation types
+        const opTypeMatch = opTypes.length === 0 || opOpType === "" || opTypes.some(ot => norm(ot) === opOpType);
+        return brokerMatch && exchangeMatch && transMatch && opTypeMatch;
       });
 
       if (matching.length === 0) return "";

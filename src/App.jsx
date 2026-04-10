@@ -8907,6 +8907,67 @@ const setOps = async (val) => {
               />
             )}
 
+            {/* Fees */}
+            {(() => {
+              const product = products.find(p => (p.label || "").toLowerCase().trim() === (form.instrument || "").toLowerCase().trim());
+              const currency = (product?.currency || "").toUpperCase();
+              const sym = CURRENCY_SYMBOLS[currency] || currency;
+              const autoFees = computeFees({ ...form }, exchangeTarifs);
+              const hasManual = form.fees !== undefined && form.fees !== "";
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
+                    FEES
+                    {autoFees !== "" && !hasManual && (
+                      <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.textMuted, fontWeight: 400 }}>(auto-calculées)</span>
+                    )}
+                    {hasManual && (
+                      <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.accent, fontWeight: 600 }}>● override manuel</span>
+                    )}
+                  </label>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      type="number"
+                      value={form.fees}
+                      onChange={e => setForm(f => ({ ...f, fees: e.target.value }))}
+                      placeholder={autoFees !== "" ? `${autoFees}${sym ? " " + sym : ""} (auto)` : "0"}
+                      style={{
+                        flex: 1,
+                        background: hasManual ? `${COLORS.accent}08` : COLORS.bg,
+                        border: `1px solid ${hasManual ? COLORS.accent + "60" : COLORS.border}`,
+                        borderRadius: 8, padding: "10px 14px",
+                        color: hasManual ? COLORS.accent : COLORS.text,
+                        fontSize: 14, outline: "none", fontFamily: "'DM Mono', monospace",
+                        fontWeight: hasManual ? 700 : 400,
+                      }}
+                      onFocus={e => e.target.style.borderColor = COLORS.accent}
+                      onBlur={e => e.target.style.borderColor = hasManual ? COLORS.accent + "60" : COLORS.border}
+                    />
+                    {sym && <span style={{ fontSize: 13, color: COLORS.textMuted, flexShrink: 0 }}>{sym}</span>}
+                    {hasManual && (
+                      <button
+                        onClick={() => setForm(f => ({ ...f, fees: "" }))}
+                        title="Supprimer l'override — revenir au calcul automatique"
+                        style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}40`, borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: COLORS.red, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
+                        ✕ Reset auto
+                      </button>
+                    )}
+                  </div>
+                  {autoFees !== "" && (
+                    <div style={{ fontSize: 11, color: hasManual ? COLORS.textMuted : COLORS.green, display: "flex", alignItems: "center", gap: 4 }}>
+                      {hasManual ? "⚠" : "✓"} Fees auto : <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{autoFees}{sym ? " " + sym : ""}</span>
+                      {hasManual && <span style={{ color: COLORS.textMuted }}> — remplacées par l'override</span>}
+                    </div>
+                  )}
+                  {autoFees === "" && !hasManual && (
+                    <div style={{ fontSize: 11, color: COLORS.textMuted }}>
+                      Aucun tarif correspondant — saisissez un montant manuel ou configurez les Exchange Tarifs dans l'Admin Panel.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Status */}
             <ToggleGroup label="OPERATION STATUS" options={(config.derivOpStatuses || []).map(s => s.label.toUpperCase())} value={form.status?.toUpperCase()} onChange={v => setForm(f => ({ ...f, status: v }))}
               colorFn={v => (config.derivOpStatuses || []).find(s => s.label.toUpperCase() === v)?.color || COLORS.accent} />

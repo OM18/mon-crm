@@ -3305,6 +3305,223 @@ const ExchangeManagerBlock = () => {
   );
 };
 
+const BatchEuronextFees = () => {
+  const [batchState, setBatchState] = useState("idle"); // idle | confirm | running | done | error
+  const [batchReport, setBatchReport] = useState(null);
+
+  const runBatch = async () => {
+    setBatchState("running");
+    setBatchReport(null);
+    try {
+      // 1. Load all operations fresh
+      const PAGE = 1000;
+      let allOps = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase.from("derivatives").select("data").range(from, from + PAGE - 1);
+        if (error || !data || data.length === 0) break;
+        allOps = [...allOps, ...data.map(r => r.data ?? r)];
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+
+      // 2. Load all tarifs (including inactive)
+      const { data: tarifData } = await supabase.from("deriv_exchange_tarifs").select("data");
+      const allTarifs = tarifData ? tarifData.map(r => r.data) : [];
+
+      // 3. Load all products
+      const { data: prodData } = await supabase.from("deriv_products").select("data");
+      const allProducts = prodData ? prodData.map(r => r.data) : [];
+
+      const norm = v => (v || "").toString().toLowerCase().trim();
+
+      const computeFeesForOp = (op, tarifs, prods) => {
+        const opBroker = norm(op.broker);
+        const resolvedExchange = prods.find(p => norm(p.label) === norm(op.instrument))?.stoxxExchange || op.exchange || "";
+        const opExchange = norm(resolvedExchange);
+        const opTrans = norm(op.orderTransmissionType);
+        const opOpType = norm(op.opType);
+        const tradeDate = op.tradeDate || "";
+
+        const matching = tarifs.filter(t => {
+          const brokers = Array.isArray(t.financialBroker) ? t.financialBroker : [t.financialBroker];
+          const transmissions = Array.isArray(t.orderTransmissionType) ? t.orderTransmissionType : [t.orderTransmissionType];
+          const opTypes = Array.isArray(t.opType) ? t.opType : (t.opType ? [t.opType] : []);
+          const brokerMatch = brokers.some(b => norm(b) === opBroker || norm(b).includes(opBroker) || opBroker.includes(norm(b)));
+          const exchangeMatch = norm(t.exchange) === opExchange || norm(t.exchange).includes(opExchange) || opExchange.includes(norm(t.exchange));
+          const transMatch = opTrans === "" || transmissions.some(tr => norm(tr) === opTrans);
+          const opTypeMatch = opTypes.length === 0 || opOpType === "" || opTypes.some(ot => norm(ot) === opOpType);
+          const dateFrom = t.validFrom || "";
+          const dateTo = t.validTo || "";
+          const dateMatch = (!dateFrom || tradeDate >= dateFrom) && (!dateTo || tradeDate <= dateTo);
+          return brokerMatch && exchangeMatch && transMatch && opTypeMatch && dateMatch;
+        });
+
+        if (matching.length === 0) return { fees: null, matched: [], ambiguous: false };
+
+        // Detect ambiguity: multiple tarifs of same tarifType matching same op
+        const byType = {};
+        matching.forEach(t => {
+          const k = t.tarifType || "__none__";
+          if (!byType[k]) byType[k] = [];
+          byType[k].push(t);
+        });
+        const ambiguous = Object.values(byType).some(arr => arr.length > 1);
+        if (ambiguous) return { fees: null, matched: matching, ambiguous: true };
+
+        const total = matching.reduce((sum, t) => sum + (parseFloat(t.tarif) || 0), 0);
+        const lots = parseFloat(op.quantity) || 1;
+        return { fees: Math.round(total * lots), matched: matching, ambiguous: false };
+      };
+
+      // 4. Filter Euronext ops
+      const euronextOps = allOps.filter(op => {
+        const resolvedEx = allProducts.find(p => norm(p.label) === norm(op.instrument))?.stoxxExchange || op.exchange || "";
+        return norm(resolvedEx).includes("euronext");
+      });
+
+      if (euronextOps.length === 0) {
+        setBatchReport({ updated: 0, errors: [], total: 0, message: "Aucune opération Euronext trouvée." });
+        setBatchState("done");
+        return;
+      }
+
+      const updatedList = [];
+      const errors = [];
+
+      for (const op of euronextOps) {
+        const { fees, matched, ambiguous } = computeFeesForOp(op, allTarifs, allProducts);
+
+        if (ambiguous) {
+          errors.push({
+            ref: op.ref || op.id,
+            tradeDate: op.tradeDate || "—",
+            reason: `Ambiguïté — plusieurs tarifs du même type matchent cette trade date. Tarifs en conflit : ${matched.map(t => `${t.tarifType || "—"} [${t.validFrom || "∞"} → ${t.validTo || "∞"}] (${t.isActive ? "actif" : "inactif"})`).join(" | ")}`,
+          });
+          continue;
+        }
+
+        if (fees === null) {
+          errors.push({
+            ref: op.ref || op.id,
+            tradeDate: op.tradeDate || "—",
+            reason: `Aucun tarif trouvé — broker: "${op.broker || "—"}", exchange: "${op.exchange || "—"}", opType: "${op.opType || "—"}", transmission: "${op.orderTransmissionType || "—"}", tradeDate: "${op.tradeDate || "—"}"`,
+          });
+          continue;
+        }
+
+        const wasManual = op.fees !== undefined && op.fees !== "";
+        const newOp = { ...op, fees: "" }; // clear override → auto
+        updatedList.push({ op: newOp, oldFees: op.fees, newFees: fees, wasManual });
+      }
+
+      // 5. Persist
+      for (const { op } of updatedList) {
+        await supabase.from("derivatives").delete().eq("data->>id", String(op.id));
+        await supabase.from("derivatives").insert({ data: op });
+      }
+
+      setBatchReport({ total: euronextOps.length, updated: updatedList.length, errors, updatedList });
+      setBatchState("done");
+    } catch (err) {
+      setBatchReport({ fatalError: String(err) });
+      setBatchState("error");
+    }
+  };
+
+  return (
+    <div style={{ background: COLORS.card, border: `2px dashed ${COLORS.red}60`, borderRadius: 16, overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ padding: "16px 24px", background: `${COLORS.red}08`, borderBottom: batchState !== "idle" && batchState !== "confirm" ? `1px solid ${COLORS.border}` : "none", display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: `${COLORS.red}20`, border: `1px solid ${COLORS.red}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🔁</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>Batch — Recalcul fees Euronext</div>
+            <span style={{ fontSize: 10, fontWeight: 700, background: `${COLORS.red}25`, color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 4, padding: "2px 8px", letterSpacing: 0.5 }}>⚠ USAGE UNIQUE</span>
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 3 }}>
+            Supprime les fees manuelles des ops Euronext et les recalcule (tarifs actifs + inactifs) en respectant les plages de validité (validFrom / validTo vs tradeDate).
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          {batchState === "idle" && <Btn variant="danger" onClick={() => setBatchState("confirm")}>Lancer le batch</Btn>}
+          {batchState === "confirm" && <>
+            <Btn variant="secondary" onClick={() => setBatchState("idle")}>Annuler</Btn>
+            <Btn variant="danger" onClick={runBatch}>✓ Confirmer</Btn>
+          </>}
+          {batchState === "running" && <span style={{ fontSize: 13, color: COLORS.textMuted, padding: "8px 14px" }}>⟳ Traitement…</span>}
+          {(batchState === "done" || batchState === "error") && <Btn variant="secondary" onClick={() => { setBatchState("idle"); setBatchReport(null); }}>Fermer</Btn>}
+        </div>
+      </div>
+
+      {/* Confirm warning */}
+      {batchState === "confirm" && (
+        <div style={{ padding: "12px 24px", background: `${COLORS.red}08`, borderTop: `1px solid ${COLORS.red}30` }}>
+          <div style={{ fontSize: 13, color: COLORS.red, fontWeight: 600 }}>
+            ⚠ Cette action va effacer toutes les fees manuelles des opérations Euronext et les remplacer par le calcul automatique (avec dates de validité). Confirmez-vous ?
+          </div>
+        </div>
+      )}
+
+      {/* Results */}
+      {batchState === "done" && batchReport && !batchReport.fatalError && (
+        <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {[
+              { label: "ops mises à jour", value: batchReport.updated, color: COLORS.green },
+              { label: "erreurs", value: batchReport.errors.length, color: batchReport.errors.length > 0 ? COLORS.red : COLORS.textMuted },
+              { label: "ops Euronext total", value: batchReport.total, color: COLORS.textSub },
+            ].map(({ label, value, color }) => (
+              <div key={label} style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 16px", flex: 1, minWidth: 90 }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color, fontFamily: "'DM Mono', monospace" }}>{value}</div>
+                <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 3 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+          {batchReport.message && <div style={{ fontSize: 13, color: COLORS.textMuted, fontStyle: "italic" }}>{batchReport.message}</div>}
+
+          {batchReport.updatedList?.length > 0 && (
+            <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden" }}>
+              <div style={{ padding: "8px 14px", background: `${COLORS.green}10`, fontSize: 11, fontWeight: 700, color: COLORS.green, letterSpacing: 0.5 }}>OPÉRATIONS MISES À JOUR</div>
+              <div style={{ maxHeight: 220, overflowY: "auto" }}>
+                {batchReport.updatedList.map(({ op, oldFees, newFees, wasManual }, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 14px", borderTop: i > 0 ? `1px solid ${COLORS.border}` : "none", fontSize: 12 }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: COLORS.accent, minWidth: 100 }}>{op.ref || op.id}</span>
+                    <span style={{ color: COLORS.textMuted, minWidth: 80 }}>{op.tradeDate || "—"}</span>
+                    {wasManual && <span style={{ fontSize: 10, background: `${COLORS.orange}20`, color: COLORS.orange, borderRadius: 4, padding: "1px 6px", fontWeight: 700 }}>manuel: {oldFees}</span>}
+                    <span style={{ marginLeft: "auto", fontFamily: "'DM Mono', monospace", color: COLORS.green, fontWeight: 700 }}>→ {newFees}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {batchReport.errors.length > 0 && (
+            <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.red}40`, borderRadius: 10, overflow: "hidden" }}>
+              <div style={{ padding: "8px 14px", background: `${COLORS.red}10`, fontSize: 11, fontWeight: 700, color: COLORS.red, letterSpacing: 0.5 }}>ERREURS — fees non recalculées</div>
+              <div style={{ maxHeight: 220, overflowY: "auto" }}>
+                {batchReport.errors.map((e, i) => (
+                  <div key={i} style={{ padding: "9px 14px", borderTop: i > 0 ? `1px solid ${COLORS.border}` : "none" }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 3 }}>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: COLORS.red, fontSize: 12 }}>{e.ref}</span>
+                      <span style={{ fontSize: 11, color: COLORS.textMuted }}>{e.tradeDate}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: COLORS.textSub, lineHeight: 1.6 }}>{e.reason}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {batchState === "error" && batchReport?.fatalError && (
+        <div style={{ padding: "14px 24px", color: COLORS.red, fontSize: 13 }}>❌ Erreur fatale : {batchReport.fatalError}</div>
+      )}
+    </div>
+  );
+};
+
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -4544,6 +4761,9 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
           {/* ── EXCHANGE MANAGER ── */}
           <ExchangeManagerBlock />
+
+          {/* ── BATCH EURONEXT FEES RECALC ── */}
+          <BatchEuronextFees />
 
         </div>
       )}

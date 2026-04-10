@@ -8043,6 +8043,12 @@ const setOps = async (val) => {
 
   const save = async () => {
     const errors = {};
+    // Validate ref
+    if (!form.ref?.trim()) {
+      errors.ref = "Référence est obligatoire";
+    } else if (ops.some(o => o.ref?.toLowerCase() === form.ref.trim().toLowerCase() && o.id !== (editOp?.id))) {
+      errors.ref = "Cette référence est déjà utilisée";
+    }
     REQUIRED_FIELDS.forEach(({ key, label }) => {
       const val = form[key];
       const isEmpty = val === null || val === undefined || val === "" || (Array.isArray(val) && val.length === 0);
@@ -8698,12 +8704,46 @@ const setOps = async (val) => {
         <Modal title={editOp ? "MODIFIER L'OPÉRATION" : "NEW OPERATION"} onClose={() => setShowForm(false)} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
-            {/* Référence (lecture seule à la création) */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>REFERENCE</label>
-              <input value={form.ref} readOnly
-                style={{ background: `${COLORS.accent}10`, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, padding: "10px 14px", color: COLORS.accent, fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none", fontWeight: 700 }} />
-            </div>
+            {/* Référence — éditable, avec validation doublon et bouton regénérer */}
+            {(() => {
+              const isDuplicate = form.ref?.trim() && ops.some(o => o.ref?.toLowerCase() === form.ref.trim().toLowerCase() && o.id !== (editOp?.id));
+              const refError = formErrors.ref || (isDuplicate ? "déjà utilisée" : (!form.ref?.trim() ? "obligatoire" : null));
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 11, color: refError ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
+                    REFERENCE <span style={{ color: COLORS.red }}>*</span>
+                    {isDuplicate && <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.red, fontWeight: 700 }}>⚠ déjà utilisée</span>}
+                  </label>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      value={form.ref}
+                      onChange={e => setForm(f => ({ ...f, ref: e.target.value.toUpperCase() }))}
+                      placeholder="DRV-XXXXXX"
+                      style={{
+                        flex: 1,
+                        background: refError ? `${COLORS.red}10` : `${COLORS.accent}10`,
+                        border: `1px solid ${refError ? COLORS.red + "80" : COLORS.accent + "40"}`,
+                        borderRadius: 8, padding: "10px 14px",
+                        color: refError ? COLORS.red : COLORS.accent,
+                        fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none", fontWeight: 700,
+                        transition: "all 0.2s",
+                      }}
+                      onFocus={e => { e.target.style.borderColor = refError ? COLORS.red : COLORS.accent; setFormErrors(e2 => ({ ...e2, ref: undefined })); }}
+                      onBlur={e => e.target.style.borderColor = refError ? COLORS.red + "80" : COLORS.accent + "40"}
+                    />
+                    <button
+                      onClick={() => setForm(f => ({ ...f, ref: genRef() }))}
+                      title="Regénérer une référence automatique"
+                      style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, padding: "0 12px", cursor: "pointer", color: COLORS.accent, fontSize: 16, flexShrink: 0, transition: "all 0.15s" }}
+                      onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}30`}
+                      onMouseOut={e => e.currentTarget.style.background = `${COLORS.accent}15`}
+                      title="Regénérer automatiquement">
+                      ↺
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Business Unit — filtrée sur les BUs actives dans l'admin panel Derivatives */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4, border: formErrors.businessUnit ? `1.5px solid ${COLORS.red}` : "1.5px solid transparent", borderRadius: 10, padding: formErrors.businessUnit ? "6px 8px" : 0 }}>

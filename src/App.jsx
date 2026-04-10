@@ -3308,10 +3308,12 @@ const ExchangeManagerBlock = () => {
 const BatchEuronextFees = () => {
   const [batchState, setBatchState] = useState("idle"); // idle | confirm | running | done | error
   const [batchReport, setBatchReport] = useState(null);
+  const [batchProgress, setBatchProgress] = useState({ phase: "", done: 0, total: 0 });
 
   const runBatch = async () => {
     setBatchState("running");
     setBatchReport(null);
+    setBatchProgress({ phase: "Chargement des opérations…", done: 0, total: 0 });
     try {
       // 1. Load all operations fresh
       const PAGE = 1000;
@@ -3325,6 +3327,7 @@ const BatchEuronextFees = () => {
         from += PAGE;
       }
 
+      setBatchProgress({ phase: "Chargement des tarifs…", done: 0, total: allOps.length });
       // 2. Load all tarifs (including inactive)
       const { data: tarifData } = await supabase.from("deriv_exchange_tarifs").select("data");
       const allTarifs = tarifData ? tarifData.map(r => r.data) : [];
@@ -3417,12 +3420,16 @@ const BatchEuronextFees = () => {
 
       // 5. Persist — parallel chunks of 20 to avoid overwhelming Supabase
       const CHUNK = 20;
+      let savedCount = 0;
+      setBatchProgress({ phase: "Sauvegarde…", done: 0, total: updatedList.length });
       for (let i = 0; i < updatedList.length; i += CHUNK) {
         const chunk = updatedList.slice(i, i + CHUNK);
         await Promise.all(chunk.map(async ({ op }) => {
           await supabase.from("derivatives").delete().eq("data->>id", String(op.id));
           await supabase.from("derivatives").insert({ data: op });
         }));
+        savedCount += chunk.length;
+        setBatchProgress({ phase: "Sauvegarde…", done: savedCount, total: updatedList.length });
       }
 
       setBatchReport({ total: euronextOps.length, updated: updatedList.length, errors, updatedList });
@@ -3453,7 +3460,23 @@ const BatchEuronextFees = () => {
             <Btn variant="secondary" onClick={() => setBatchState("idle")}>Annuler</Btn>
             <Btn variant="danger" onClick={runBatch}>✓ Confirmer</Btn>
           </>}
-          {batchState === "running" && <span style={{ fontSize: 13, color: COLORS.textMuted, padding: "8px 14px" }}>⟳ Traitement…</span>}
+          {batchState === "running" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "4px 0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 13, color: COLORS.textMuted }}>⟳ {batchProgress.phase}</span>
+                {batchProgress.total > 0 && (
+                  <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: COLORS.accent, fontWeight: 700 }}>
+                    {batchProgress.done} / {batchProgress.total}
+                  </span>
+                )}
+              </div>
+              {batchProgress.total > 0 && (
+                <div style={{ width: 180, height: 5, background: COLORS.border, borderRadius: 3, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${Math.round((batchProgress.done / batchProgress.total) * 100)}%`, background: COLORS.accent, borderRadius: 3, transition: "width 0.3s ease" }} />
+                </div>
+              )}
+            </div>
+          )}
           {(batchState === "done" || batchState === "error") && <Btn variant="secondary" onClick={() => { setBatchState("idle"); setBatchReport(null); }}>Fermer</Btn>}
         </div>
       </div>

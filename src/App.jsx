@@ -4464,7 +4464,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, textTransform: "uppercase", letterSpacing: 0.5 }}>👥 EMPLOYEES</div>
-              <Btn onClick={() => { setEmpForm({ firstName: "", name: "", phone: "", email: "", status: "active" }); setEditEmpId(null); setShowEmpForm(true); }}>+ Ajouter</Btn>
+              <Btn onClick={() => { setEmpForm({ firstName: "", name: "", phone: "", email: "", status: "active", role: "user", password: "" }); setEditEmpId(null); setShowEmpForm(true); }}>+ Ajouter</Btn>
             </div>
 
             {showEmpForm && (

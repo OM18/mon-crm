@@ -6601,7 +6601,7 @@ const sel = useMemo(() => selected ? filtered.find(c => c.id === selected) : nul
           
           <div style={{ position: "relative" }}>
             <Btn variant="secondary" onClick={() => setShowFilters(v => !v)}>
-              ▼ FILTER {Object.values(activeFilters).flat().length > 0 && <span style={{ background: COLORS.accent, color: "#fff", borderRadius: 10, fontSize: 11, padding: "1px 7px", marginLeft: 6 }}>{Object.values(activeFilters).flat().length}</span>}
+              ▼ FILTER {(Object.values(activeFilters).flat().length + customFilters.filter(cf => cf.value || cf.value2 || cf.op === "empty" || cf.op === "notempty").length) > 0 && <span style={{ background: COLORS.accent, color: "#fff", borderRadius: 10, fontSize: 11, padding: "1px 7px", marginLeft: 6 }}>{Object.values(activeFilters).flat().length + customFilters.filter(cf => cf.value || cf.value2 || cf.op === "empty" || cf.op === "notempty").length}</span>}
             </Btn>
             {showFilters && (
               <div style={{ position: "absolute", top: "110%", left: 0, zIndex: 100, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 16, minWidth: 320, maxWidth: 400, boxShadow: "0 8px 32px #0006", maxHeight: "70vh", overflowY: "auto" }}>
@@ -6869,7 +6869,7 @@ return (
           </div>
         )}
 
-       {Object.values(activeFilters).flat().length > 0 && (
+       {(Object.values(activeFilters).flat().length > 0 || customFilters.filter(cf => cf.value || cf.value2 || cf.op === "empty" || cf.op === "notempty").length > 0) && (
   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
     <span style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, alignSelf: "center" }}>Filtres actifs :</span>
     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: `${COLORS.accent}15`, color: COLORS.accent, fontWeight: 700, alignSelf: "center", fontFamily: "'DM Mono', monospace" }}>{filtered.length} société{filtered.length !== 1 ? "s" : ""}</span>

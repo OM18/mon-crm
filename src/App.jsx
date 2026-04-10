@@ -3395,6 +3395,7 @@ useEffect(() => {
   const [editEtId, setEditEtId] = useState(null);
   const [showEtForm, setShowEtForm] = useState(false);
   const [expandedExchangeTarifs, setExpandedExchangeTarifs] = useState(false);
+  const [etFilters, setEtFilters] = useState({ exchange: [], tarifType: [], opType: [], transmission: [], broker: [], isActive: "all" });
 
   // ── Price Units state ──
   const EMPTY_PU = { exchange: "", underlying: "", unit: "" };
@@ -4131,6 +4132,83 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                   </div>
                 )}
 
+                {/* Filtres */}
+                {exchangeTarifs.length > 0 && (() => {
+                  const allBrokers = [...new Set(exchangeTarifs.flatMap(et => Array.isArray(et.financialBroker) ? et.financialBroker : (et.financialBroker ? [et.financialBroker] : [])))].sort();
+                  const allExchanges = [...new Set(exchangeTarifs.map(et => et.exchange).filter(Boolean))].sort();
+                  const allTarifTypes = [...new Set(exchangeTarifs.map(et => et.tarifType).filter(Boolean))].sort();
+                  const allOpTypes = [...new Set(exchangeTarifs.flatMap(et => Array.isArray(et.opType) ? et.opType : (et.opType ? [et.opType] : [])))].sort();
+                  const allTransmissions = [...new Set(exchangeTarifs.flatMap(et => Array.isArray(et.orderTransmissionType) ? et.orderTransmissionType : (et.orderTransmissionType ? [et.orderTransmissionType] : [])))].sort();
+                  const hasFilters = etFilters.exchange.length > 0 || etFilters.tarifType.length > 0 || etFilters.opType.length > 0 || etFilters.transmission.length > 0 || etFilters.broker.length > 0 || etFilters.isActive !== "all";
+                  const toggle = (key, val) => setEtFilters(f => ({ ...f, [key]: f[key].includes(val) ? f[key].filter(v => v !== val) : [...f[key], val] }));
+                  const pillStyle = (active, color) => ({ cursor: "pointer", fontSize: 11, fontWeight: active ? 700 : 500, padding: "3px 10px", borderRadius: 8, border: `1px solid ${active ? color : COLORS.border}`, background: active ? `${color}22` : COLORS.bg, color: active ? color : COLORS.textMuted, transition: "all 0.12s", userSelect: "none" });
+                  return (
+                    <div style={{ background: COLORS.bg, border: `1px solid ${hasFilters ? COLORS.purple + "50" : COLORS.border}`, borderRadius: 10, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10, transition: "border-color 0.2s" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5 }}>FILTRES</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          {hasFilters && <span style={{ fontSize: 11, color: COLORS.purple, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>{(() => { const n = exchangeTarifs.filter(et => { if (etFilters.broker.length > 0) { const brokers = Array.isArray(et.financialBroker) ? et.financialBroker : (et.financialBroker ? [et.financialBroker] : []); if (!etFilters.broker.some(b => brokers.includes(b))) return false; } if (etFilters.exchange.length > 0 && !etFilters.exchange.includes(et.exchange)) return false; if (etFilters.tarifType.length > 0 && !etFilters.tarifType.includes(et.tarifType)) return false; if (etFilters.opType.length > 0) { const ops = Array.isArray(et.opType) ? et.opType : (et.opType ? [et.opType] : []); if (!etFilters.opType.some(o => ops.includes(o))) return false; } if (etFilters.transmission.length > 0) { const trans = Array.isArray(et.orderTransmissionType) ? et.orderTransmissionType : (et.orderTransmissionType ? [et.orderTransmissionType] : []); if (!etFilters.transmission.some(t => trans.includes(t))) return false; } if (etFilters.isActive !== "all") { const active = et.isActive !== false && String(et.isActive) !== "false"; if (etFilters.isActive === "active" && !active) return false; if (etFilters.isActive === "inactive" && active) return false; } return true; }).length; return `${n} résultat${n !== 1 ? "s" : ""}`; })()}</span>}
+                          {hasFilters && <span onClick={() => setEtFilters({ exchange: [], tarifType: [], opType: [], transmission: [], broker: [], isActive: "all" })} style={{ cursor: "pointer", fontSize: 11, color: COLORS.red, fontWeight: 600 }}>✕ Reset</span>}
+                        </div>
+                      </div>
+                      {/* Broker */}
+                      {allBrokers.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 700, letterSpacing: 0.5, marginBottom: 5 }}>BROKER</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                            {allBrokers.map(v => <span key={v} onClick={() => toggle("broker", v)} style={pillStyle(etFilters.broker.includes(v), COLORS.orange)}>{v}</span>)}
+                          </div>
+                        </div>
+                      )}
+                      {/* Exchange */}
+                      {allExchanges.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 700, letterSpacing: 0.5, marginBottom: 5 }}>EXCHANGE</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                            {allExchanges.map(v => { const label = (config.derivExchanges || []).find(e => e.value === v)?.label || v; return <span key={v} onClick={() => toggle("exchange", v)} style={pillStyle(etFilters.exchange.includes(v), COLORS.blue)}>{label}</span>; })}
+                          </div>
+                        </div>
+                      )}
+                      {/* Tarif Type */}
+                      {allTarifTypes.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 700, letterSpacing: 0.5, marginBottom: 5 }}>TARIF TYPE</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                            {allTarifTypes.map(v => <span key={v} onClick={() => toggle("tarifType", v)} style={pillStyle(etFilters.tarifType.includes(v), COLORS.accent)}>{v}</span>)}
+                          </div>
+                        </div>
+                      )}
+                      {/* Operation Type */}
+                      {allOpTypes.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 700, letterSpacing: 0.5, marginBottom: 5 }}>OPERATION TYPE</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                            {allOpTypes.map(v => <span key={v} onClick={() => toggle("opType", v)} style={pillStyle(etFilters.opType.includes(v), COLORS.green)}>{v}</span>)}
+                          </div>
+                        </div>
+                      )}
+                      {/* Transmission */}
+                      {allTransmissions.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 700, letterSpacing: 0.5, marginBottom: 5 }}>TRANSMISSION</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                            {allTransmissions.map(v => { const label = (config.derivOrderTransmissionTypes || []).find(t => t.value === v)?.label || v; return <span key={v} onClick={() => toggle("transmission", v)} style={pillStyle(etFilters.transmission.includes(v), COLORS.purple)}>{label}</span>; })}
+                          </div>
+                        </div>
+                      )}
+                      {/* Is Active */}
+                      <div>
+                        <div style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 700, letterSpacing: 0.5, marginBottom: 5 }}>STATUT</div>
+                        <div style={{ display: "flex", gap: 5 }}>
+                          {[["all", "Tous"], ["active", "Actif"], ["inactive", "Inactif"]].map(([val, label]) => (
+                            <span key={val} onClick={() => setEtFilters(f => ({ ...f, isActive: val }))} style={pillStyle(etFilters.isActive === val, val === "active" ? COLORS.green : val === "inactive" ? COLORS.red : COLORS.textSub)}>{label}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Liste */}
                 {exchangeTarifs.length === 0 && !showEtForm ? (
                   <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "24px 0", fontSize: 13 }}>Aucun tarif — cliquez sur "+ Ajouter" pour commencer</div>
@@ -4143,7 +4221,28 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                         ))}
                       </div>
                     )}
-                    {[...exchangeTarifs].sort((a, b) => {
+                    {[...exchangeTarifs].filter(et => {
+                      if (etFilters.broker.length > 0) {
+                        const brokers = Array.isArray(et.financialBroker) ? et.financialBroker : (et.financialBroker ? [et.financialBroker] : []);
+                        if (!etFilters.broker.some(b => brokers.includes(b))) return false;
+                      }
+                      if (etFilters.exchange.length > 0 && !etFilters.exchange.includes(et.exchange)) return false;
+                      if (etFilters.tarifType.length > 0 && !etFilters.tarifType.includes(et.tarifType)) return false;
+                      if (etFilters.opType.length > 0) {
+                        const ops = Array.isArray(et.opType) ? et.opType : (et.opType ? [et.opType] : []);
+                        if (!etFilters.opType.some(o => ops.includes(o))) return false;
+                      }
+                      if (etFilters.transmission.length > 0) {
+                        const trans = Array.isArray(et.orderTransmissionType) ? et.orderTransmissionType : (et.orderTransmissionType ? [et.orderTransmissionType] : []);
+                        if (!etFilters.transmission.some(t => trans.includes(t))) return false;
+                      }
+                      if (etFilters.isActive !== "all") {
+                        const active = et.isActive !== false && String(et.isActive) !== "false";
+                        if (etFilters.isActive === "active" && !active) return false;
+                        if (etFilters.isActive === "inactive" && active) return false;
+                      }
+                      return true;
+                    }).sort((a, b) => {
                         const ta = (a.tarifType || "").toLowerCase();
                         const tb = (b.tarifType || "").toLowerCase();
                         if (ta !== tb) return ta < tb ? -1 : 1;

@@ -3415,10 +3415,14 @@ const BatchEuronextFees = () => {
         updatedList.push({ op: newOp, oldFees: op.fees, newFees: fees, wasManual });
       }
 
-      // 5. Persist
-      for (const { op } of updatedList) {
-        await supabase.from("derivatives").delete().eq("data->>id", String(op.id));
-        await supabase.from("derivatives").insert({ data: op });
+      // 5. Persist — parallel chunks of 20 to avoid overwhelming Supabase
+      const CHUNK = 20;
+      for (let i = 0; i < updatedList.length; i += CHUNK) {
+        const chunk = updatedList.slice(i, i + CHUNK);
+        await Promise.all(chunk.map(async ({ op }) => {
+          await supabase.from("derivatives").delete().eq("data->>id", String(op.id));
+          await supabase.from("derivatives").insert({ data: op });
+        }));
       }
 
       setBatchReport({ total: euronextOps.length, updated: updatedList.length, errors, updatedList });

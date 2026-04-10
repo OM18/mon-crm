@@ -3530,7 +3530,7 @@ useEffect(() => {
     setEmployees(updated);
     await supabase.from('employees').delete().neq('id', 0);
 for (const e of updated) await supabase.from('employees').insert({ data: e });
-    setEmpForm({ firstName: "", name: "", phone: "", email: "", status: "active" });
+    setEmpForm({ firstName: "", name: "", phone: "", email: "", status: "active", role: "user", password: "" });
     setEditEmpId(null);
     setShowEmpForm(false);
   };
@@ -4500,6 +4500,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                     <div style={{ fontSize: 11, color: COLORS.textSub }}>{e.email}{e.phone ? ` · ${e.phone}` : ""}</div>
                   </div>
                   <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, fontWeight: 600, background: e.status === "active" ? `${COLORS.green}22` : `${COLORS.red}22`, color: e.status === "active" ? COLORS.green : COLORS.red }}>{e.status === "active" ? "Active" : "Inactive"}</span>
+                  <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, fontWeight: 700, background: e.role === "admin" ? `${COLORS.gold}22` : `${COLORS.border}`, color: e.role === "admin" ? COLORS.gold : COLORS.textMuted, border: `1px solid ${e.role === "admin" ? COLORS.gold + "50" : COLORS.border}` }}>{e.role === "admin" ? "⚙ Admin" : "User"}</span>
                   <button onClick={() => { setEmpForm({ ...e }); setEditEmpId(e.id); setShowEmpForm(true); }} style={{ background: "none", border: "none", color: COLORS.accent, cursor: "pointer", fontSize: 14 }}>✏️</button>
                   <button onClick={() => deleteEmployee(e.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 14 }}>🗑</button>
                 </div>
@@ -6080,7 +6081,10 @@ const LoginPage = ({ onLogin }) => {
     
     const emp = employees.find(e => e.email === email && e.password === password && e.status === "active");
     
-    if (emp) { onLogin(emp); }
+    if (emp) {
+      // Always use the freshest data from Supabase so role changes take effect immediately
+      onLogin(emp);
+    }
     else { setError("Email ou mot de passe incorrect."); }
   };
 
@@ -10735,6 +10739,23 @@ export default function CRM() {
 
   const handleLogin = (emp) => { setCurrentUser(emp); localStorage.setItem("crm_current_user", JSON.stringify(emp)); };
   const handleLogout = () => { setCurrentUser(null); localStorage.removeItem("crm_current_user"); };
+
+  // On mount, refresh currentUser from Supabase to pick up any role changes made since last login
+  useEffect(() => {
+    if (!currentUser?.email) return;
+    (async () => {
+      const { data } = await supabase.from('employees').select('data');
+      const employees = data ? data.map(r => r.data) : [];
+      const fresh = employees.find(e => e.email === currentUser.email && e.status === "active");
+      if (fresh) {
+        setCurrentUser(fresh);
+        localStorage.setItem("crm_current_user", JSON.stringify(fresh));
+      } else {
+        // Employee deactivated or deleted — force logout
+        handleLogout();
+      }
+    })();
+  }, []);
 
   const { showWarning, secondsLeft, resetTimer } = useAutoLogout(currentUser, handleLogout);
 

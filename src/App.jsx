@@ -6430,9 +6430,32 @@ const passFilters = filterMode === "AND"
     if (cf.op === "lt") return num < fnum;
   }
   if (cf.type === "date") {
-    if (cf.op === "eq") return val === cf.value;
-    if (cf.op === "gt") return val > cf.value;
-    if (cf.op === "lt") return val < cf.value;
+    // normalize val to ISO date prefix for comparison
+    const normDate = (v) => {
+      if (!v) return "";
+      const s = v.toString().trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+      const m = s.match(/^(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{4})/);
+      if (m) return m[3] + "-" + m[2].padStart(2,"0") + "-" + m[1].padStart(2,"0");
+      const n = parseFloat(s);
+      if (!isNaN(n) && n > 40000 && n < 60000) {
+        const d = new Date(Math.round((n - 25569) * 86400 * 1000));
+        return d.toISOString().slice(0, 10);
+      }
+      return s.slice(0, 10);
+    };
+    const nVal = normDate(val);
+    if (cf.op === "eq") return nVal === cf.value;
+    if (cf.op === "gt") return nVal > cf.value;
+    if (cf.op === "lt") return nVal < cf.value;
+    if (cf.op === "between") {
+      const from = cf.value || "";
+      const to = cf.value2 || "";
+      if (!from && !to) return true;
+      if (from && !to) return nVal >= from;
+      if (!from && to) return nVal <= to;
+      return nVal >= from && nVal <= to;
+    }
   }
   return true;
   });
@@ -6652,6 +6675,50 @@ return (
                   </div>
                 ))}
               <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSub, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>📅 Last Update Date</div>
+                {(() => {
+                  const dateRangeFilter = customFilters.find(cf => cf.key === "complianceLastUpdateDate");
+                  const dateRangeIdx = customFilters.findIndex(cf => cf.key === "complianceLastUpdateDate");
+                  const setFrom = (v) => {
+                    if (dateRangeIdx >= 0) {
+                      setCustomFilters(fs => fs.map((f, j) => j === dateRangeIdx ? { ...f, op: "between", value: v } : f));
+                    } else {
+                      setCustomFilters(fs => [...fs, { key: "complianceLastUpdateDate", label: "Last Update Date", type: "date", op: "between", value: v, value2: "" }]);
+                    }
+                  };
+                  const setTo = (v) => {
+                    if (dateRangeIdx >= 0) {
+                      setCustomFilters(fs => fs.map((f, j) => j === dateRangeIdx ? { ...f, op: "between", value2: v } : f));
+                    } else {
+                      setCustomFilters(fs => [...fs, { key: "complianceLastUpdateDate", label: "Last Update Date", type: "date", op: "between", value: "", value2: v }]);
+                    }
+                  };
+                  const clearRange = () => setCustomFilters(fs => fs.filter(f => f.key !== "complianceLastUpdateDate"));
+                  const fromVal = dateRangeFilter?.value || "";
+                  const toVal = dateRangeFilter?.value2 || "";
+                  const hasRange = fromVal || toVal;
+                  return (
+                    <div style={{ background: hasRange ? `${COLORS.accent}08` : COLORS.bg, border: `1px solid ${hasRange ? COLORS.accent + "40" : COLORS.border}`, borderRadius: 8, padding: "10px 12px", transition: "all 0.2s" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 600, minWidth: 28 }}>DE</span>
+                        <input type="date" value={fromVal} onChange={e => setFrom(e.target.value)}
+                          style={{ flex: 1, background: COLORS.card, border: `1px solid ${fromVal ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 6, padding: "5px 8px", color: fromVal ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", colorScheme: "dark", fontFamily: "inherit" }} />
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 600, minWidth: 28 }}>À</span>
+                        <input type="date" value={toVal} onChange={e => setTo(e.target.value)}
+                          style={{ flex: 1, background: COLORS.card, border: `1px solid ${toVal ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 6, padding: "5px 8px", color: toVal ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", colorScheme: "dark", fontFamily: "inherit" }} />
+                      </div>
+                      {hasRange && (
+                        <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+                          <span onClick={clearRange} style={{ cursor: "pointer", fontSize: 11, color: COLORS.red, fontWeight: 600 }}>✕ Effacer</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+              <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 12 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSub, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Filtres personnalisés</div>
                 <div style={{ position: "relative" }}>
                   <input value={filterSearch} onChange={e => { setFilterSearch(e.target.value); setFilterSuggestions(e.target.value.trim() ? CUSTOM_FILTER_FIELDS.filter(f => f.label.toLowerCase().includes(e.target.value.toLowerCase()) && !customFilters.find(cf => cf.key === f.key)) : []); }}
@@ -6659,7 +6726,7 @@ return (
                   {filterSuggestions.length > 0 && (
                     <div style={{ position: "absolute", top: "110%", left: 0, right: 0, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, zIndex: 200, overflow: "hidden" }}>
                       {filterSuggestions.map(f => (
-                        <div key={f.key} onClick={() => { setCustomFilters(cf => [...cf, { key: f.key, label: f.label, type: f.type, op: f.type === "text" || f.type === "contact" ? "notempty" : "eq", value: "" }]); setFilterSearch(""); setFilterSuggestions([]); }}
+                        <div key={f.key} onClick={() => { setCustomFilters(cf => [...cf, { key: f.key, label: f.label, type: f.type, op: f.type === "date" ? "between" : f.type === "text" || f.type === "contact" ? "notempty" : "eq", value: "", value2: "" }]); setFilterSearch(""); setFilterSuggestions([]); }}
                           style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12, color: COLORS.text, borderBottom: `1px solid ${COLORS.border}` }}
                           onMouseOver={e => e.currentTarget.style.background = COLORS.bg}
                           onMouseOut={e => e.currentTarget.style.background = "transparent"}>
@@ -6670,21 +6737,38 @@ return (
                   )}
                 </div>
                 {customFilters.map((cf, i) => (
-                  <div key={cf.key} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
-                    <span style={{ fontSize: 11, color: COLORS.textSub, minWidth: 100 }}>{cf.label}</span>
-                    <select value={cf.op} onChange={e => setCustomFilters(fs => fs.map((f, j) => j === i ? { ...f, op: e.target.value } : f))}
-  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 6px", color: COLORS.text, fontSize: 11, outline: "none" }}>
-  {cf.type !== "text" && cf.type !== "contact" && <option value="eq">=</option>}
-  {cf.type !== "text" && cf.type !== "contact" && <option value="gt">&gt;</option>}
-  {cf.type !== "text" && cf.type !== "contact" && <option value="lt">&lt;</option>}
-  {cf.type === "contact" && <option value="contains">Contient</option>}
-  <option value="empty">Est vide</option>
-  <option value="notempty">N'est pas vide</option>
-</select>
-                    {cf.op !== "empty" && cf.op !== "notempty" && <input value={cf.value} type={cf.type === "date" ? "date" : cf.type === "number" ? "number" : "text"} placeholder={cf.type === "contact" ? "Nom du contact..." : ""}
-                      onChange={e => setCustomFilters(fs => fs.map((f, j) => j === i ? { ...f, value: e.target.value } : f))}
-                      style={{ flex: 1, minWidth: 0, maxWidth: 120, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontSize: 11, outline: "none" }} />}
-                    <span onClick={() => setCustomFilters(fs => fs.filter((_, j) => j !== i))} style={{ cursor: "pointer", color: COLORS.textMuted, fontSize: 14 }}>✕</span>
+                  <div key={cf.key} style={{ marginTop: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 11, color: COLORS.textSub, minWidth: 100 }}>{cf.label}</span>
+                      <select value={cf.op} onChange={e => setCustomFilters(fs => fs.map((f, j) => j === i ? { ...f, op: e.target.value, value: "", value2: "" } : f))}
+                        style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 6px", color: COLORS.text, fontSize: 11, outline: "none" }}>
+                        {cf.type !== "text" && cf.type !== "contact" && <option value="eq">=</option>}
+                        {cf.type !== "text" && cf.type !== "contact" && <option value="gt">&gt;</option>}
+                        {cf.type !== "text" && cf.type !== "contact" && <option value="lt">&lt;</option>}
+                        {cf.type === "date" && <option value="between">Entre</option>}
+                        {cf.type === "contact" && <option value="contains">Contient</option>}
+                        <option value="empty">Est vide</option>
+                        <option value="notempty">N'est pas vide</option>
+                      </select>
+                      {cf.op !== "empty" && cf.op !== "notempty" && cf.op !== "between" && (
+                        <input value={cf.value} type={cf.type === "date" ? "date" : cf.type === "number" ? "number" : "text"} placeholder={cf.type === "contact" ? "Nom du contact..." : ""}
+                          onChange={e => setCustomFilters(fs => fs.map((f, j) => j === i ? { ...f, value: e.target.value } : f))}
+                          style={{ flex: 1, minWidth: 0, maxWidth: 120, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontSize: 11, outline: "none" }} />
+                      )}
+                      <span onClick={() => setCustomFilters(fs => fs.filter((_, j) => j !== i))} style={{ cursor: "pointer", color: COLORS.textMuted, fontSize: 14 }}>✕</span>
+                    </div>
+                    {cf.op === "between" && cf.type === "date" && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, paddingLeft: 106 }}>
+                        <input type="date" value={cf.value || ""} onChange={e => setCustomFilters(fs => fs.map((f, j) => j === i ? { ...f, value: e.target.value } : f))}
+                          style={{ flex: 1, background: COLORS.bg, border: `1px solid ${cf.value ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontSize: 11, outline: "none", colorScheme: "dark" }} />
+                        <span style={{ fontSize: 10, color: COLORS.textMuted, flexShrink: 0 }}>→</span>
+                        <input type="date" value={cf.value2 || ""} onChange={e => setCustomFilters(fs => fs.map((f, j) => j === i ? { ...f, value2: e.target.value } : f))}
+                          style={{ flex: 1, background: COLORS.bg, border: `1px solid ${cf.value2 ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontSize: 11, outline: "none", colorScheme: "dark" }} />
+                        {(cf.value || cf.value2) && (
+                          <span onClick={() => setCustomFilters(fs => fs.map((f, j) => j === i ? { ...f, value: "", value2: "" } : f))} style={{ cursor: "pointer", color: COLORS.textMuted, fontSize: 11 }}>✕</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
 </div>
@@ -6790,9 +6874,9 @@ return (
     <span style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, alignSelf: "center" }}>Filtres actifs :</span>
     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: `${COLORS.accent}15`, color: COLORS.accent, fontWeight: 700, alignSelf: "center", fontFamily: "'DM Mono', monospace" }}>{filtered.length} société{filtered.length !== 1 ? "s" : ""}</span>
     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: filterMode === "AND" ? `${COLORS.accent}22` : `${COLORS.purple}22`, color: filterMode === "AND" ? COLORS.accent : COLORS.purple, fontWeight: 700, alignSelf: "center" }}>{filterMode}</span>
-    {customFilters.filter(cf => cf.value).map((cf, i) => (
+    {customFilters.filter(cf => cf.value || cf.value2).map((cf, i) => (
       <span key={`custom:${cf.key}`} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, padding: "2px 8px", borderRadius: 6, background: `${COLORS.accent}22`, color: COLORS.accent, border: `1px solid ${COLORS.accent}55`, fontWeight: 600 }}>
-        {cf.label} {cf.type !== "text" ? cf.op === "eq" ? "=" : cf.op === "gt" ? ">" : "<" : "="} {cf.value}
+        {cf.label} {cf.op === "between" ? `${cf.value || "…"} → ${cf.value2 || "…"}` : cf.type !== "text" ? cf.op === "eq" ? "=" : cf.op === "gt" ? ">" : "<" : "="} {cf.op !== "between" ? cf.value : ""}
         <span onClick={() => setCustomFilters(fs => fs.filter((_, j) => j !== i))} style={{ cursor: "pointer", marginLeft: 2, fontSize: 12, lineHeight: 1 }}>✕</span>
       </span>
     ))}

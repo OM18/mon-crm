@@ -3418,13 +3418,37 @@ const BatchEuronextFees = () => {
         updatedList.push({ op: newOp, oldFees: op.fees, newFees: fees, wasManual });
       }
 
-      // 5. Persist — parallel chunks of 20 to avoid overwhelming Supabase
+      // 5. Persist safely:
+      // Step A — deduplicate entire derivatives table first (in case of previous botched run)
+      setBatchProgress({ phase: "Déduplication en base…", done: 0, total: updatedList.length });
+      const { data: allRows } = await supabase.from("derivatives").select("id, data");
+      if (allRows) {
+        const seenIds = new Set();
+        const rowsToDelete = [];
+        for (const row of allRows) {
+          const opId = String(row.data?.id ?? row.id);
+          if (seenIds.has(opId)) {
+            rowsToDelete.push(row.id); // duplicate supabase row
+          } else {
+            seenIds.add(opId);
+          }
+        }
+        if (rowsToDelete.length > 0) {
+          const DDCHUNK = 100;
+          for (let i = 0; i < rowsToDelete.length; i += DDCHUNK) {
+            await supabase.from("derivatives").delete().in("id", rowsToDelete.slice(i, i + DDCHUNK));
+          }
+        }
+      }
+
+      // Step B — for each op to update: delete all rows with that op id, then insert once
       const CHUNK = 20;
       let savedCount = 0;
       setBatchProgress({ phase: "Sauvegarde…", done: 0, total: updatedList.length });
       for (let i = 0; i < updatedList.length; i += CHUNK) {
         const chunk = updatedList.slice(i, i + CHUNK);
         await Promise.all(chunk.map(async ({ op }) => {
+          // delete ALL rows with this op id (catches any remaining duplicates)
           await supabase.from("derivatives").delete().eq("data->>id", String(op.id));
           await supabase.from("derivatives").insert({ data: op });
         }));
@@ -3455,7 +3479,38 @@ const BatchEuronextFees = () => {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-          {batchState === "idle" && <Btn variant="danger" onClick={() => setBatchState("confirm")}>Lancer le batch</Btn>}
+          {batchState === "idle" && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn variant="secondary" onClick={async () => {
+                setBatchState("running");
+                setBatchProgress({ phase: "Déduplication en base…", done: 0, total: 0 });
+                try {
+                  const { data: allRows } = await supabase.from("derivatives").select("id, data");
+                  if (allRows) {
+                    const seenIds = new Set();
+                    const rowsToDelete = [];
+                    for (const row of allRows) {
+                      const opId = String(row.data?.id ?? row.id);
+                      if (seenIds.has(opId)) { rowsToDelete.push(row.id); } else { seenIds.add(opId); }
+                    }
+                    if (rowsToDelete.length > 0) {
+                      const DDCHUNK = 100;
+                      for (let i = 0; i < rowsToDelete.length; i += DDCHUNK) {
+                        await supabase.from("derivatives").delete().in("id", rowsToDelete.slice(i, i + DDCHUNK));
+                      }
+                      setBatchReport({ dedupeOnly: true, removed: rowsToDelete.length, total: allRows.length });
+                    } else {
+                      setBatchReport({ dedupeOnly: true, removed: 0, total: allRows.length });
+                    }
+                  }
+                  setBatchState("done");
+                } catch (err) {
+                  setBatchReport({ fatalError: String(err) }); setBatchState("error");
+                }
+              }}>🧹 Dédupliquer</Btn>
+              <Btn variant="danger" onClick={() => setBatchState("confirm")}>Lancer le batch</Btn>
+            </div>
+          )}
           {batchState === "confirm" && <>
             <Btn variant="secondary" onClick={() => setBatchState("idle")}>Annuler</Btn>
             <Btn variant="danger" onClick={runBatch}>✓ Confirmer</Btn>
@@ -3491,7 +3546,17 @@ const BatchEuronextFees = () => {
       )}
 
       {/* Results */}
-      {batchState === "done" && batchReport && !batchReport.fatalError && (
+      {batchState === "done" && batchReport && !batchReport.fatalError && batchReport.dedupeOnly && (
+            <div style={{ padding: "16px 24px" }}>
+              <div style={{ background: batchReport.removed > 0 ? `${COLORS.green}10` : COLORS.bg, border: `1px solid ${batchReport.removed > 0 ? COLORS.green + "40" : COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                {batchReport.removed > 0
+                  ? <span style={{ fontSize: 13, color: COLORS.green, fontWeight: 700 }}>✓ {batchReport.removed} doublon{batchReport.removed > 1 ? "s" : ""} supprimé{batchReport.removed > 1 ? "s" : ""} sur {batchReport.total} lignes.</span>
+                  : <span style={{ fontSize: 13, color: COLORS.textMuted }}>✓ Aucun doublon trouvé ({batchReport.total} lignes).</span>
+                }
+              </div>
+            </div>
+      )}
+      {batchState === "done" && batchReport && !batchReport.fatalError && !batchReport.dedupeOnly && (
         <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             {[
@@ -3540,7 +3605,7 @@ const BatchEuronextFees = () => {
             </div>
           )}
         </div>
-      )}
+          )}
 
       {batchState === "error" && batchReport?.fatalError && (
         <div style={{ padding: "14px 24px", color: COLORS.red, fontSize: 13 }}>❌ Erreur fatale : {batchReport.fatalError}</div>

@@ -3418,59 +3418,41 @@ const BatchEuronextFees = () => {
         updatedList.push({ op: newOp, oldFees: op.fees, newFees: fees, wasManual });
       }
 
-      // 5. Persist safely:
-      // Step A — deduplicate entire derivatives table first (in case of previous botched run)
-      setBatchProgress({ phase: "Déduplication en base…", done: 0, total: updatedList.length });
-      const { data: allRows } = await supabase.from("derivatives").select("id, data");
-      if (allRows) {
-        // Group rows by op id
-        const byOpId = {};
-        for (const row of allRows) {
-          const opId = String(row.data?.id ?? row.id);
-          if (!byOpId[opId]) byOpId[opId] = [];
-          byOpId[opId].push(row);
-        }
-        const rowsToDelete = [];
-        for (const [opId, rows] of Object.entries(byOpId)) {
-          if (rows.length <= 1) continue;
-          // Sort: prefer row with fees="" (batch result) — keep it, delete others
-          // rows with fees="" or fees undefined = batch-processed (no override)
-          // rows with fees set = original imported value
-          rows.sort((a, b) => {
-            const aClean = a.data?.fees === "" || a.data?.fees === undefined || a.data?.fees === null;
-            const bClean = b.data?.fees === "" || b.data?.fees === undefined || b.data?.fees === null;
-            if (aClean && !bClean) return -1; // keep a (clean), delete b
-            if (!aClean && bClean) return 1;  // keep b (clean), delete a
-            // Both same type: keep the one with highest Supabase id (most recent insert)
-            return b.id - a.id;
-          });
-          // Keep first (best candidate), delete the rest
-          rowsToDelete.push(...rows.slice(1).map(r => r.id));
-        }
-        if (rowsToDelete.length > 0) {
-          const DDCHUNK = 100;
-          for (let i = 0; i < rowsToDelete.length; i += DDCHUNK) {
-            await supabase.from("derivatives").delete().in("id", rowsToDelete.slice(i, i + DDCHUNK));
-          }
+      // 5. Persist safely — safe in-place update: find the supabase row id for each op, then UPDATE data
+      // This never deletes any row — fully atomic, cannot lose ops
+      const CHUNK = 20;
+      let savedCount = 0;
+
+      // Build index: op.id (data field) → supabase row id
+      setBatchProgress({ phase: "Chargement index Supabase…", done: 0, total: updatedList.length });
+      const { data: indexRows } = await supabase.from("derivatives").select("id, data");
+      const supabaseRowByOpId = {};
+      if (indexRows) {
+        for (const r of indexRows) {
+          const opId = String(r.data?.id ?? "");
+          if (opId && !supabaseRowByOpId[opId]) supabaseRowByOpId[opId] = r.id;
         }
       }
 
-      // Step B — for each op to update: delete all rows with that op id, then insert once
-      const CHUNK = 20;
-      let savedCount = 0;
-      setBatchProgress({ phase: "Sauvegarde…", done: 0, total: updatedList.length });
+      const saveErrors = [];
+      setBatchProgress({ phase: "Mise à jour en base…", done: 0, total: updatedList.length });
       for (let i = 0; i < updatedList.length; i += CHUNK) {
         const chunk = updatedList.slice(i, i + CHUNK);
         await Promise.all(chunk.map(async ({ op }) => {
-          // delete ALL rows with this op id (catches any remaining duplicates)
-          await supabase.from("derivatives").delete().eq("data->>id", String(op.id));
-          await supabase.from("derivatives").insert({ data: op });
+          const supabaseId = supabaseRowByOpId[String(op.id)];
+          if (supabaseId) {
+            // Safe in-place update — row is never deleted
+            const { error } = await supabase.from("derivatives").update({ data: op }).eq("id", supabaseId);
+            if (error) saveErrors.push({ ref: op.ref || op.id, error: error.message });
+          } else {
+            saveErrors.push({ ref: op.ref || op.id, error: "Row Supabase introuvable — op non modifiée (aucune donnée perdue)" });
+          }
         }));
         savedCount += chunk.length;
-        setBatchProgress({ phase: "Sauvegarde…", done: savedCount, total: updatedList.length });
+        setBatchProgress({ phase: "Mise à jour en base…", done: savedCount, total: updatedList.length });
       }
 
-      setBatchReport({ total: euronextOps.length, updated: updatedList.length, errors, updatedList });
+      setBatchReport({ total: euronextOps.length, updated: updatedList.length, errors: [...errors, ...saveErrors], updatedList });
       setBatchState("done");
     } catch (err) {
       setBatchReport({ fatalError: String(err) });
@@ -3493,50 +3475,7 @@ const BatchEuronextFees = () => {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-          {batchState === "idle" && (
-            <div style={{ display: "flex", gap: 8 }}>
-              <Btn variant="secondary" onClick={async () => {
-                setBatchState("running");
-                setBatchProgress({ phase: "Déduplication en base…", done: 0, total: 0 });
-                try {
-                  const { data: allRows } = await supabase.from("derivatives").select("id, data");
-                  if (allRows) {
-                    const byOpId = {};
-                    for (const row of allRows) {
-                      const opId = String(row.data?.id ?? row.id);
-                      if (!byOpId[opId]) byOpId[opId] = [];
-                      byOpId[opId].push(row);
-                    }
-                    const rowsToDelete = [];
-                    for (const [opId, rows] of Object.entries(byOpId)) {
-                      if (rows.length <= 1) continue;
-                      rows.sort((a, b) => {
-                        const aClean = a.data?.fees === "" || a.data?.fees === undefined || a.data?.fees === null;
-                        const bClean = b.data?.fees === "" || b.data?.fees === undefined || b.data?.fees === null;
-                        if (aClean && !bClean) return -1;
-                        if (!aClean && bClean) return 1;
-                        return b.id - a.id;
-                      });
-                      rowsToDelete.push(...rows.slice(1).map(r => r.id));
-                    }
-                    if (rowsToDelete.length > 0) {
-                      const DDCHUNK = 100;
-                      for (let i = 0; i < rowsToDelete.length; i += DDCHUNK) {
-                        await supabase.from("derivatives").delete().in("id", rowsToDelete.slice(i, i + DDCHUNK));
-                      }
-                      setBatchReport({ dedupeOnly: true, removed: rowsToDelete.length, total: allRows.length });
-                    } else {
-                      setBatchReport({ dedupeOnly: true, removed: 0, total: allRows.length });
-                    }
-                  }
-                  setBatchState("done");
-                } catch (err) {
-                  setBatchReport({ fatalError: String(err) }); setBatchState("error");
-                }
-              }}>🧹 Dédupliquer</Btn>
-              <Btn variant="danger" onClick={() => setBatchState("confirm")}>Lancer le batch</Btn>
-            </div>
-          )}
+          {batchState === "idle" && <Btn variant="danger" onClick={() => setBatchState("confirm")}>Lancer le batch</Btn>}
           {batchState === "confirm" && <>
             <Btn variant="secondary" onClick={() => setBatchState("idle")}>Annuler</Btn>
             <Btn variant="danger" onClick={runBatch}>✓ Confirmer</Btn>
@@ -3572,17 +3511,7 @@ const BatchEuronextFees = () => {
       )}
 
       {/* Results */}
-      {batchState === "done" && batchReport && !batchReport.fatalError && batchReport.dedupeOnly && (
-            <div style={{ padding: "16px 24px" }}>
-              <div style={{ background: batchReport.removed > 0 ? `${COLORS.green}10` : COLORS.bg, border: `1px solid ${batchReport.removed > 0 ? COLORS.green + "40" : COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
-                {batchReport.removed > 0
-                  ? <span style={{ fontSize: 13, color: COLORS.green, fontWeight: 700 }}>✓ {batchReport.removed} doublon{batchReport.removed > 1 ? "s" : ""} supprimé{batchReport.removed > 1 ? "s" : ""} sur {batchReport.total} lignes — la row avec fees vides (résultat du batch) a été conservée pour chaque op.</span>
-                  : <span style={{ fontSize: 13, color: COLORS.textMuted }}>✓ Aucun doublon trouvé ({batchReport.total} lignes).</span>
-                }
-              </div>
-            </div>
-      )}
-      {batchState === "done" && batchReport && !batchReport.fatalError && !batchReport.dedupeOnly && (
+      {batchState === "done" && batchReport && !batchReport.fatalError && (
         <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             {[
@@ -5160,7 +5089,7 @@ if (aliases.some(a => { console.log("COMPARE:", JSON.stringify(norm), JSON.strin
 
 // ─── DERIV EXPORT MODAL ──────────────────────────────────────
 const DerivExportModal = ({ ops, filtered, onClose, products = [], config = {} }) => {
-  const [scope, setScope] = useState("filtered");
+  const [scope, setScope] = useState("all");
   const [exporting, setExporting] = useState(false);
   const COLUMNS = [
     { key: "ref",                   label: "Ref" },
@@ -5233,6 +5162,11 @@ const DerivExportModal = ({ ops, filtered, onClose, products = [], config = {} }
             </div>
           ))}
         </div>
+        {scope === "filtered" && filtered.length < ops.length && (
+          <div style={{ fontSize: 12, color: COLORS.orange, background: `${COLORS.orange}10`, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.orange}40`, fontWeight: 600 }}>
+            ⚠ Des filtres actifs réduisent l'export à {filtered.length} op{filtered.length !== 1 ? "s" : ""} sur {ops.length}. Sélectionnez "Toutes les opérations" pour exporter sans filtre.
+          </div>
+        )}
         <div style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.card, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
           📋 {COLUMNS.length} colonnes : {COLUMNS.map(c => c.label).join(", ")}
         </div>
@@ -8575,7 +8509,7 @@ const setOps = async (val) => {
       const ms = !q || o.ref?.toLowerCase().includes(q) || o.instrument?.toLowerCase().includes(q) || o.broker?.toLowerCase().includes(q) || o.exchange?.toLowerCase().includes(q) || o.contract?.toLowerCase().includes(q) || o.notes?.toLowerCase().includes(q);
       if (!ms) return false;
       const aq = accountSearch.toLowerCase().trim();
-      if (aq && (!o.account || o.account.toLowerCase() !== aq)) return false;
+      if (aq && (!o.account || !o.account.toLowerCase().trim().includes(aq))) return false;
       if (dateFrom && (o.tradeDate || "") < dateFrom) return false;
       if (dateTo   && (o.tradeDate || "") > dateTo)   return false;
       const accRecord = derivAccounts.find(a => a.accountNumber === o.account);

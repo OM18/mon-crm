@@ -3423,15 +3423,29 @@ const BatchEuronextFees = () => {
       setBatchProgress({ phase: "Déduplication en base…", done: 0, total: updatedList.length });
       const { data: allRows } = await supabase.from("derivatives").select("id, data");
       if (allRows) {
-        const seenIds = new Set();
-        const rowsToDelete = [];
+        // Group rows by op id
+        const byOpId = {};
         for (const row of allRows) {
           const opId = String(row.data?.id ?? row.id);
-          if (seenIds.has(opId)) {
-            rowsToDelete.push(row.id); // duplicate supabase row
-          } else {
-            seenIds.add(opId);
-          }
+          if (!byOpId[opId]) byOpId[opId] = [];
+          byOpId[opId].push(row);
+        }
+        const rowsToDelete = [];
+        for (const [opId, rows] of Object.entries(byOpId)) {
+          if (rows.length <= 1) continue;
+          // Sort: prefer row with fees="" (batch result) — keep it, delete others
+          // rows with fees="" or fees undefined = batch-processed (no override)
+          // rows with fees set = original imported value
+          rows.sort((a, b) => {
+            const aClean = a.data?.fees === "" || a.data?.fees === undefined || a.data?.fees === null;
+            const bClean = b.data?.fees === "" || b.data?.fees === undefined || b.data?.fees === null;
+            if (aClean && !bClean) return -1; // keep a (clean), delete b
+            if (!aClean && bClean) return 1;  // keep b (clean), delete a
+            // Both same type: keep the one with highest Supabase id (most recent insert)
+            return b.id - a.id;
+          });
+          // Keep first (best candidate), delete the rest
+          rowsToDelete.push(...rows.slice(1).map(r => r.id));
         }
         if (rowsToDelete.length > 0) {
           const DDCHUNK = 100;
@@ -3487,11 +3501,23 @@ const BatchEuronextFees = () => {
                 try {
                   const { data: allRows } = await supabase.from("derivatives").select("id, data");
                   if (allRows) {
-                    const seenIds = new Set();
-                    const rowsToDelete = [];
+                    const byOpId = {};
                     for (const row of allRows) {
                       const opId = String(row.data?.id ?? row.id);
-                      if (seenIds.has(opId)) { rowsToDelete.push(row.id); } else { seenIds.add(opId); }
+                      if (!byOpId[opId]) byOpId[opId] = [];
+                      byOpId[opId].push(row);
+                    }
+                    const rowsToDelete = [];
+                    for (const [opId, rows] of Object.entries(byOpId)) {
+                      if (rows.length <= 1) continue;
+                      rows.sort((a, b) => {
+                        const aClean = a.data?.fees === "" || a.data?.fees === undefined || a.data?.fees === null;
+                        const bClean = b.data?.fees === "" || b.data?.fees === undefined || b.data?.fees === null;
+                        if (aClean && !bClean) return -1;
+                        if (!aClean && bClean) return 1;
+                        return b.id - a.id;
+                      });
+                      rowsToDelete.push(...rows.slice(1).map(r => r.id));
                     }
                     if (rowsToDelete.length > 0) {
                       const DDCHUNK = 100;
@@ -3550,7 +3576,7 @@ const BatchEuronextFees = () => {
             <div style={{ padding: "16px 24px" }}>
               <div style={{ background: batchReport.removed > 0 ? `${COLORS.green}10` : COLORS.bg, border: `1px solid ${batchReport.removed > 0 ? COLORS.green + "40" : COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
                 {batchReport.removed > 0
-                  ? <span style={{ fontSize: 13, color: COLORS.green, fontWeight: 700 }}>✓ {batchReport.removed} doublon{batchReport.removed > 1 ? "s" : ""} supprimé{batchReport.removed > 1 ? "s" : ""} sur {batchReport.total} lignes.</span>
+                  ? <span style={{ fontSize: 13, color: COLORS.green, fontWeight: 700 }}>✓ {batchReport.removed} doublon{batchReport.removed > 1 ? "s" : ""} supprimé{batchReport.removed > 1 ? "s" : ""} sur {batchReport.total} lignes — la row avec fees vides (résultat du batch) a été conservée pour chaque op.</span>
                   : <span style={{ fontSize: 13, color: COLORS.textMuted }}>✓ Aucun doublon trouvé ({batchReport.total} lignes).</span>
                 }
               </div>

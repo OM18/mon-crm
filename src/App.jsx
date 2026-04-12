@@ -5089,7 +5089,7 @@ if (aliases.some(a => { console.log("COMPARE:", JSON.stringify(norm), JSON.strin
 
 // ─── DERIV EXPORT MODAL ──────────────────────────────────────
 const DerivExportModal = ({ ops, filtered, onClose, products = [], config = {} }) => {
-  const [scope, setScope] = useState("all");
+  const [scope, setScope] = useState("filtered");
   const [exporting, setExporting] = useState(false);
   const COLUMNS = [
     { key: "ref",                   label: "Ref" },
@@ -5162,11 +5162,6 @@ const DerivExportModal = ({ ops, filtered, onClose, products = [], config = {} }
             </div>
           ))}
         </div>
-        {scope === "filtered" && filtered.length < ops.length && (
-          <div style={{ fontSize: 12, color: COLORS.orange, background: `${COLORS.orange}10`, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.orange}40`, fontWeight: 600 }}>
-            ⚠ Des filtres actifs réduisent l'export à {filtered.length} op{filtered.length !== 1 ? "s" : ""} sur {ops.length}. Sélectionnez "Toutes les opérations" pour exporter sans filtre.
-          </div>
-        )}
         <div style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.card, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
           📋 {COLUMNS.length} colonnes : {COLUMNS.map(c => c.label).join(", ")}
         </div>

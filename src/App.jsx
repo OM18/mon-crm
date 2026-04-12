@@ -10618,18 +10618,23 @@ const DerivativesDashboard = () => {
 
     const bucketResults = Object.values(buckets).map(b => {
       const exchange = products.find(p => (p.label || "").toLowerCase().trim() === (b.instrument || "").toLowerCase().trim())?.stoxxExchange || b.ops[0]?.exchange || "";
+      const product = products.find(p => (p.label || "").toLowerCase().trim() === (b.instrument || "").toLowerCase().trim());
+      const currency = (product?.currency || "").toUpperCase() || "—";
       const ls = getLotSize(exchange, b.instrument);
       const pu = getPriceUnit(exchange, b.instrument);
-      return { ...b, exchange, lotSize: ls, priceUnit: pu, ...runFIFO(b.ops, ls * pu) };
+      return { ...b, exchange, currency, lotSize: ls, priceUnit: pu, ...runFIFO(b.ops, ls * pu) };
     });
 
     const accountMap = {};
     for (const b of bucketResults) {
-      if (!accountMap[b.account]) accountMap[b.account] = { account: b.account, realizedPnl: 0, openLots: 0, instruments: [] };
-      accountMap[b.account].realizedPnl += b.realizedPnl;
+      if (!accountMap[b.account]) accountMap[b.account] = { account: b.account, pnlByCurrency: {}, openLots: 0, instruments: [] };
+      // Accumulate P&L per currency
+      if (!accountMap[b.account].pnlByCurrency[b.currency]) accountMap[b.account].pnlByCurrency[b.currency] = 0;
+      accountMap[b.account].pnlByCurrency[b.currency] += b.realizedPnl;
       accountMap[b.account].openLots += b.openLots;
       accountMap[b.account].instruments.push({
         instrument: b.instrument,
+        currency: b.currency,
         realizedPnl: b.realizedPnl,
         openLots: b.openLots,
         openAvgPrice: b.openAvgPrice,
@@ -10639,8 +10644,20 @@ const DerivativesDashboard = () => {
       });
     }
 
-    const rows = Object.values(accountMap).sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl));
-    const grandPnl = rows.reduce((s, r) => s + r.realizedPnl, 0);
+    const rows = Object.values(accountMap).map(r => ({
+      ...r,
+      // Keep realizedPnl as sum for sorting (mixed currencies — imperfect but needed)
+      realizedPnl: Object.values(r.pnlByCurrency).reduce((s, v) => s + v, 0),
+    })).sort((a, b) => Math.abs(b.realizedPnl) - Math.abs(a.realizedPnl));
+    // grandPnl is per currency
+    const grandPnlByCurrency = {};
+    for (const r of rows) {
+      for (const [cur, pnl] of Object.entries(r.pnlByCurrency)) {
+        if (!grandPnlByCurrency[cur]) grandPnlByCurrency[cur] = 0;
+        grandPnlByCurrency[cur] += pnl;
+      }
+    }
+    const grandPnl = Object.values(grandPnlByCurrency).reduce((s, v) => s + v, 0);
     const grandOpenLots = rows.reduce((s, r) => s + r.openLots, 0);
     const totalBuys = ops.filter(o => (o.side || "").toUpperCase() === "BUY").length;
     const totalSells = ops.filter(o => (o.side || "").toUpperCase() === "SELL").length;
@@ -10754,7 +10771,19 @@ const DerivativesDashboard = () => {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-        <KpiCard label="REALISED P&L (FIFO)" value={totalSells > 0 ? fmt(grandPnl) : "—"} color={totalSells > 0 ? pnlColor(grandPnl) : COLORS.textMuted} sub={totalSells > 0 ? `${rows.length} compte${rows.length > 1 ? "s" : ""}` : "Aucun SELL enregistré"} />
+        <KpiCard label="REALISED P&L (FIFO)"
+          value={totalSells > 0
+            ? <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 2 }}>
+                {Object.entries(grandPnlByCurrency).filter(([,v]) => v !== 0).sort(([a],[b]) => a.localeCompare(b)).map(([cur, pnl]) => (
+                  <div key={cur} style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{cur}</span>
+                    <span style={{ fontSize: 22, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: pnlColor(pnl) }}>{fmt(pnl)}</span>
+                  </div>
+                ))}
+              </div>
+            : "—"}
+          color={totalSells > 0 ? pnlColor(grandPnl) : COLORS.textMuted}
+          sub={totalSells > 0 ? `${rows.length} compte${rows.length > 1 ? "s" : ""}` : "Aucun SELL enregistré"} />
         <KpiCard label="TOTAL OPÉRATIONS" value={ops.length} sub={`${totalBuys} BUY · ${totalSells} SELL`} />
         <KpiCard label="LOTS OUVERTS" value={fmtLots(grandOpenLots)} color={COLORS.orange} sub="position nette non clôturée" />
         <KpiCard label="MATCHES FIFO" value={totalMatches} sub={`sur ${bucketsCount} bucket${bucketsCount > 1 ? "s" : ""}`} />
@@ -10998,9 +11027,22 @@ const DerivativesDashboard = () => {
                   <span style={{ fontSize: 13, color: COLORS.textSub }}>{totalMatchCount}</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-                  {totalSellCount > 0
-                    ? <span style={{ fontSize: 16, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: pnlColor(row.realizedPnl) }}>{fmt(row.realizedPnl)}</span>
-                    : <span style={{ fontSize: 12, color: COLORS.textMuted }}>Pas de SELL</span>}
+                  {totalSellCount > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                      {Object.entries(row.pnlByCurrency)
+                        .filter(([, pnl]) => pnl !== 0)
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([cur, pnl]) => (
+                          <div key={cur} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{cur}</span>
+                            <span style={{ fontSize: 14, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: pnlColor(pnl) }}>{fmt(pnl)}</span>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: 12, color: COLORS.textMuted }}>Pas de SELL</span>
+                  )}
                 </div>
               </div>
 
@@ -11044,8 +11086,15 @@ const DerivativesDashboard = () => {
                             )}
                           </div>
                           <div style={{ textAlign: "right", fontSize: 12, color: COLORS.textSub }}>{inst.matches.length}</div>
-                          <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: inst.sellCount > 0 ? pnlColor(inst.realizedPnl) : COLORS.textMuted }}>
-                            {inst.sellCount > 0 ? fmt(inst.realizedPnl) : "—"}
+                          <div style={{ textAlign: "right" }}>
+                            {inst.sellCount > 0 ? (
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: pnlColor(inst.realizedPnl) }}>{fmt(inst.realizedPnl)}</span>
+                                {inst.currency && <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{inst.currency}</span>}
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>
+                            )}
                           </div>
                         </div>
 
@@ -11099,8 +11148,23 @@ const DerivativesDashboard = () => {
             <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: COLORS.red }}>{totalSells}</div>
             <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: grandOpenLots > 0 ? COLORS.orange : COLORS.textMuted }}>{fmtLots(grandOpenLots)}</div>
             <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: COLORS.textSub }}>{totalMatches}</div>
-            <div style={{ textAlign: "right", fontSize: 17, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: totalSells > 0 ? pnlColor(grandPnl) : COLORS.textMuted }}>
-              {totalSells > 0 ? fmt(grandPnl) : "—"}
+            <div style={{ textAlign: "right" }}>
+              {totalSells > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                  {Object.entries(grandPnlByCurrency)
+                    .filter(([, pnl]) => pnl !== 0)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([cur, pnl]) => (
+                      <div key={cur} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{cur}</span>
+                        <span style={{ fontSize: 15, fontWeight: 900, fontFamily: "'DM Mono', monospace", color: pnlColor(pnl) }}>{fmt(pnl)}</span>
+                      </div>
+                    ))
+                  }
+                </div>
+              ) : (
+                <span style={{ fontSize: 14, color: COLORS.textMuted }}>—</span>
+              )}
             </div>
           </div>
         )}

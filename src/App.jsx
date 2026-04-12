@@ -10608,7 +10608,7 @@ const DerivativesDashboard = () => {
   const pnlColor = (n) => n > 0 ? COLORS.green : n < 0 ? COLORS.red : COLORS.textMuted;
 
   // Build all FIFO computations — re-runs when ops or lotSizes are loaded
-  const { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions, bucketsCount } = useMemo(() => {
+  const { bucketResults, rows, grandPnl, grandPnlByCurrency, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions, bucketsCount } = useMemo(() => {
     const buckets = {};
     for (const op of ops) {
       const normKey = `${(op.account || "").toLowerCase().trim()}||${(op.instrument || "").toLowerCase().trim()}`;
@@ -10692,7 +10692,7 @@ const DerivativesDashboard = () => {
     }
     const openPositions = positions.sort((a, b) => a.side === b.side ? 0 : a.side === "BUY" ? -1 : 1);
 
-    return { bucketResults, rows, grandPnl, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions, bucketsCount: Object.keys(buckets).length };
+    return { bucketResults, rows, grandPnl, grandPnlByCurrency, grandOpenLots, totalBuys, totalSells, totalMatches, openPositions, bucketsCount: Object.keys(buckets).length };
   }, [ops, lotSizes, derivAccounts, products, priceUnits, quotationUnits]);
 
   const OPEN_GRID = "0.55fr 130px 150px 70px 80px 110px 130px 130px 130px";

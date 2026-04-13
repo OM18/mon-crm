@@ -3427,10 +3427,13 @@ const BatchEuronextFees = () => {
       setBatchProgress({ phase: "Chargement index Supabase…", done: 0, total: updatedList.length });
       const { data: indexRows } = await supabase.from("derivatives").select("id, data");
       const supabaseRowByOpId = {};
+      const supabaseRowByRef = {};
       if (indexRows) {
         for (const r of indexRows) {
           const opId = String(r.data?.id ?? "");
           if (opId && !supabaseRowByOpId[opId]) supabaseRowByOpId[opId] = r.id;
+          const ref = r.data?.ref || "";
+          if (ref && !supabaseRowByRef[ref]) supabaseRowByRef[ref] = r.id;
         }
       }
 
@@ -3471,20 +3474,11 @@ const BatchEuronextFees = () => {
       // share the same ref value — parallel updates trigger the unique constraint simultaneously
       for (let i = 0; i < updatedList.length; i++) {
         const { op } = updatedList[i];
-        const supabaseId = supabaseRowByOpId[String(op.id)];
+        // Look up by json id first, then fall back to ref (handles ops whose json id differs between memory and DB)
+        const supabaseId = supabaseRowByOpId[String(op.id)] || supabaseRowByRef[String(op.ref || "")];
         if (supabaseId) {
           const { error } = await supabase.from("derivatives").update({ data: op }).eq("id", supabaseId);
-          if (error) {
-            console.error("[BatchDiag] UPDATE FAILED", {
-              supabaseId,
-              opJsonId: op.id,
-              opRef: op.ref,
-              errorMsg: error.message,
-              errorDetails: error.details,
-              errorHint: error.hint,
-            });
-            saveErrors.push({ ref: op.ref || op.id, error: error.message, details: error.details || error.hint || "" });
-          }
+          if (error) saveErrors.push({ ref: op.ref || op.id, error: error.message });
         } else {
           saveErrors.push({ ref: op.ref || op.id, error: "Row Supabase introuvable — op non modifiée (aucune donnée perdue)" });
         }
@@ -3606,7 +3600,6 @@ const BatchEuronextFees = () => {
                       </div>
                       <div style={{ fontSize: 11, color: COLORS.textSub, lineHeight: 1.7, fontFamily: isSaveError ? "'DM Mono', monospace" : "inherit" }}>
                         {e.reason || e.error || "—"}
-                        {e.details && <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>{e.details}</div>}
                       </div>
                     </div>
                   );

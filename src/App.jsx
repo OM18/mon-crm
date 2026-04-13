@@ -3414,7 +3414,9 @@ const BatchEuronextFees = () => {
         }
 
         const wasManual = op.fees !== undefined && op.fees !== "";
-        const newOp = { ...op, fees: "" }; // clear override → auto
+        // Fix: ops imported from Excel may have empty ref — assign one to avoid duplicate key on the unique constraint
+        const safeRef = (op.ref && op.ref.trim() !== "") ? op.ref : `DRV-${Date.now().toString(36).toUpperCase().slice(-6)}-${op.id}`;
+        const newOp = { ...op, ref: safeRef, fees: "" }; // clear override → auto
         updatedList.push({ op: newOp, oldFees: op.fees, newFees: fees, wasManual });
       }
 

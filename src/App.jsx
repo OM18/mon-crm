@@ -3311,7 +3311,7 @@ const BatchEuronextFees = () => {
   const [batchProgress, setBatchProgress] = useState({ phase: "", done: 0, total: 0 });
 
   const runBatch = async () => {
-    alert("VERSION OK");
+    
     setBatchState("running");
     setBatchReport(null);
     setBatchProgress({ phase: "Chargement des opérations…", done: 0, total: 0 });
@@ -3429,6 +3429,20 @@ const BatchEuronextFees = () => {
       const { data: indexRows } = await supabase.from("derivatives").select("id, data");
       const supabaseRowByOpId = {};
       const supabaseRowByRef = {};
+      const supabaseRowByRef = {};
+if (indexRows) {
+  for (const r of indexRows) {
+    const opId = String(r.data?.id ?? "");
+    if (opId && !supabaseRowByOpId[opId]) supabaseRowByOpId[opId] = r.id;
+    const ref = r.data?.ref || "";
+    if (ref && !supabaseRowByRef[ref]) supabaseRowByRef[ref] = r.id;
+  }
+}
+console.log("REF INDEX CHECK", {
+  ref_1823: supabaseRowByRef["1823"],
+  ref_4500: supabaseRowByRef["4500"],
+  total_refs: Object.keys(supabaseRowByRef).length,
+});
       if (indexRows) {
         for (const r of indexRows) {
           const opId = String(r.data?.id ?? "");

@@ -3545,17 +3545,32 @@ const BatchEuronextFees = () => {
 
           {batchReport.errors.length > 0 && (
             <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.red}40`, borderRadius: 10, overflow: "hidden" }}>
-              <div style={{ padding: "8px 14px", background: `${COLORS.red}10`, fontSize: 11, fontWeight: 700, color: COLORS.red, letterSpacing: 0.5 }}>ERREURS — fees non recalculées</div>
-              <div style={{ maxHeight: 220, overflowY: "auto" }}>
-                {batchReport.errors.map((e, i) => (
-                  <div key={i} style={{ padding: "9px 14px", borderTop: i > 0 ? `1px solid ${COLORS.border}` : "none" }}>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 3 }}>
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: COLORS.red, fontSize: 12 }}>{e.ref}</span>
-                      <span style={{ fontSize: 11, color: COLORS.textMuted }}>{e.tradeDate}</span>
+              <div style={{ padding: "8px 14px", background: `${COLORS.red}10`, fontSize: 11, fontWeight: 700, color: COLORS.red, letterSpacing: 0.5 }}>
+                ERREURS — fees non recalculées ({batchReport.errors.length})
+              </div>
+              <div style={{ maxHeight: 400, overflowY: "auto" }}>
+                {batchReport.errors.map((e, i) => {
+                  const isAmbiguous = e.reason?.startsWith("Ambiguïté");
+                  const isSaveError = !!e.error;
+                  return (
+                    <div key={i} style={{ padding: "10px 14px", borderTop: i > 0 ? `1px solid ${COLORS.border}` : "none" }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: COLORS.red, fontSize: 12 }}>#{e.ref}</span>
+                        {e.tradeDate && <span style={{ fontSize: 11, color: COLORS.textMuted }}>{e.tradeDate}</span>}
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "1px 7px",
+                          background: isSaveError ? `${COLORS.purple}20` : isAmbiguous ? `${COLORS.orange}20` : `${COLORS.red}20`,
+                          color: isSaveError ? COLORS.purple : isAmbiguous ? COLORS.orange : COLORS.red,
+                        }}>
+                          {isSaveError ? "ERREUR SAUVEGARDE" : isAmbiguous ? "AMBIGUÏTÉ TARIFS" : "TARIF INTROUVABLE"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: COLORS.textSub, lineHeight: 1.7, fontFamily: isSaveError ? "'DM Mono', monospace" : "inherit" }}>
+                        {e.reason || e.error || "—"}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, color: COLORS.textSub, lineHeight: 1.6 }}>{e.reason}</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

@@ -8169,52 +8169,13 @@ const MultiToggle = ({ label, options, values, onChange }) => (
   </div>
 );
 
-const Derivatives = ({ companies }) => {
+const Derivatives = ({ companies, initialOps }) => {
   const { config } = useConfig();
   const [products, setProducts] = useState([]);
 
-useEffect(() => {
-  async function loadProducts() {
-    const { data } = await supabase.from('deriv_products').select('data');
-    if (data?.length) setProducts(data.map(r => r.data));
-  }
-  loadProducts();
-}, []);
-
 const [derivAccounts, setDerivAccounts] = useState([]);
-
-useEffect(() => {
-  async function loadDerivAccounts() {
-    const { data } = await supabase.from('deriv_accounts').select('*');
-    if (data?.length) setDerivAccounts(data.map(r => {
-      const acc = r.data ?? r;
-      if (typeof acc.isActive === "string") {
-        acc.isActive = acc.isActive.trim().toLowerCase() !== "false" && acc.isActive.trim() !== "0";
-      }
-      return acc;
-    }));
-  }
-  loadDerivAccounts();
-}, []);
-
 const [lotSizes, setLotSizes] = useState([]);
-
-useEffect(() => {
-  async function loadLotSizes() {
-    const { data } = await supabase.from('deriv_lot_sizes').select('data');
-    if (data?.length) setLotSizes(data.map(r => r.data));
-  }
-  loadLotSizes();
-}, []);
-  const [exchangeTarifs, setExchangeTarifs] = useState([]);
-
-useEffect(() => {
-  async function loadExchangeTarifs() {
-    const { data } = await supabase.from('deriv_exchange_tarifs').select('data');
-    if (data?.length) setExchangeTarifs(data.map(r => r.data));
-  }
-  loadExchangeTarifs();
-}, []);
+const [exchangeTarifs, setExchangeTarifs] = useState([]);
 
   const CURRENCY_SYMBOLS = { EUR: "€", USD: "$", GBP: "£", MAD: "MAD", UAH: "₴", CHF: "CHF" };
 
@@ -8287,23 +8248,50 @@ useEffect(() => {
     };
   };
 
-  const [ops, setOpsRaw] = useState([]);
+  const [ops, setOpsRaw] = useState(() => initialOps || []);
 
 useEffect(() => {
-  async function loadOps() {
+  async function loadAllDerivativesData() {
     const PAGE = 1000;
-    let all = [];
-    let from = 0;
-    while (true) {
-      const { data, error } = await supabase.from('derivatives').select('data').order('id', { ascending: true }).range(from, from + PAGE - 1);
-      if (error || !data || data.length === 0) break;
-      all = [...all, ...data.map(r => r.data ?? r)];
-      if (data.length < PAGE) break;
-      from += PAGE;
+
+    async function loadAllPages(baseQuery) {
+      let all = [], from = 0;
+      while (true) {
+        const { data, error } = await baseQuery.range(from, from + PAGE - 1);
+        if (error || !data || data.length === 0) break;
+        all = [...all, ...data.map(r => r.data ?? r)];
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      return all;
     }
-    if (all.length) setOpsRaw(all);
+
+    // ✅ Toutes les requêtes en parallèle — 1 aller-retour au lieu de 5 séquentiels
+    // Si les ops sont déjà chargées via le cache global, on les skippe
+    const fetchOps = !initialOps || initialOps.length === 0;
+    const [prods, accounts, lots, tarifs, opsData] = await Promise.all([
+      supabase.from('deriv_products').select('data').then(r => r.data || []),
+      supabase.from('deriv_accounts').select('*').then(r => r.data || []),
+      supabase.from('deriv_lot_sizes').select('data').then(r => r.data || []),
+      supabase.from('deriv_exchange_tarifs').select('data').then(r => r.data || []),
+      fetchOps
+        ? loadAllPages(supabase.from('derivatives').select('data').order('id', { ascending: true }))
+        : Promise.resolve([]),
+    ]);
+
+    if (prods.length) setProducts(prods.map(r => r.data ?? r));
+    if (accounts.length) setDerivAccounts(accounts.map(r => {
+      const acc = r.data ?? r;
+      if (typeof acc.isActive === "string") {
+        acc.isActive = acc.isActive.trim().toLowerCase() !== "false" && acc.isActive.trim() !== "0";
+      }
+      return acc;
+    }));
+    if (lots.length) setLotSizes(lots.map(r => r.data ?? r));
+    if (tarifs.length) setExchangeTarifs(tarifs.map(r => r.data ?? r));
+    if (opsData.length) setOpsRaw(opsData);
   }
-  loadOps();
+  loadAllDerivativesData();
 }, []);
 
 // ── Save ALL derivatives (import only) ─────────────────────
@@ -11342,6 +11330,7 @@ export default function CRM() {
   const [contacts, setContacts] = useState(initialContacts);
   const [companies, setCompanies] = useState([]);
   const [tasks, setTasks] = useState(initialTasks);
+  const [derivativesCache, setDerivativesCache] = useState(null);
   const [page, setPage] = useState("dashboard");
   const dataLoaded = useRef(false);
 
@@ -11396,14 +11385,16 @@ export default function CRM() {
     }
 
     async function loadData() {
-      const [contacts, companies, tasks] = await Promise.all([
+      const [contacts, companies, tasks, derivOps] = await Promise.all([
         loadAllPages('contacts'),
         loadAllPages('companies'),
         loadAllPages('tasks'),
+        loadAllPages('derivatives'),
       ]);
       if (contacts.length) setContacts(contacts);
       if (companies.length) setCompanies(companies);
       if (tasks.length) setTasks(tasks);
+      if (derivOps.length) setDerivativesCache(derivOps);
       dataLoaded.current = true;
     }
     loadData();
@@ -11516,7 +11507,7 @@ export default function CRM() {
           {page === "tasks" && <Tasks tasks={tasks} setTasks={setTasks} contacts={contacts} companies={companies} />}
           {page === "pipeline" && <Pipeline contacts={contacts} setContacts={setContacts} companies={companies} setCompanies={setCompanies} />}
           {page === "companies-dashboard" && <CompaniesDashboard companies={companies} setCompanies={setCompanies} />}
-          {page === "derivatives" && <Derivatives companies={companies} />}
+          {page === "derivatives" && <Derivatives companies={companies} initialOps={derivativesCache} />}
           {page === "derivatives-dashboard" && <DerivativesDashboard />}
           {page === "derivatives-statistics" && <DerivStatistics />}
           {page === "admin" && <AdminPanel companies={companies} />}

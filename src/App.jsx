@@ -3429,7 +3429,7 @@ const BatchEuronextFees = () => {
       const { data: indexRows } = await supabase.from("derivatives").select("id, data");
       const supabaseRowByOpId = {};
       const supabaseRowByRef = {};
-      const supabaseRowByRef = {};
+      
 if (indexRows) {
   for (const r of indexRows) {
     const opId = String(r.data?.id ?? "");

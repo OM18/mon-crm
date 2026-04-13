@@ -9035,7 +9035,7 @@ const setOps = async (val) => {
                           />
                         ) : (
                           <span style={{ fontSize: 13, fontWeight: 600, color: hasManual ? COLORS.accent : COLORS.text }}>
-                            {displayVal !== "" ? `${displayVal} ${sym}` : "—"}
+                            {displayVal !== "" ? `${parseFloat(displayVal).toFixed(2)} ${sym}` : "—"}
                           </span>
                         )}
                         <span onClick={() => setEditingFeesId(editingFees ? null : o.id)}
@@ -9105,7 +9105,7 @@ const setOps = async (val) => {
               <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: "8px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600, letterSpacing: 0.4 }}>OPERATION FEES</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: hasManual ? COLORS.accent : COLORS.text }}>
-                  {displayVal !== "" ? `${displayVal} ${sym}` : "—"}
+                  {displayVal !== "" ? `${parseFloat(displayVal).toFixed(2)} ${sym}` : "—"}
                 </span>
               </div>
             );

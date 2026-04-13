@@ -3467,20 +3467,18 @@ const BatchEuronextFees = () => {
 
       const saveErrors = [];
       setBatchProgress({ phase: "Mise à jour en base…", done: 0, total: updatedList.length });
-      for (let i = 0; i < updatedList.length; i += CHUNK) {
-        const chunk = updatedList.slice(i, i + CHUNK);
-        await Promise.all(chunk.map(async ({ op }) => {
-          const supabaseId = supabaseRowByOpId[String(op.id)];
-          if (supabaseId) {
-            // Duplicate refs were resolved above — direct update is now safe
-            const { error } = await supabase.from("derivatives").update({ data: op }).eq("id", supabaseId);
-            if (error) saveErrors.push({ ref: op.ref || op.id, error: error.message });
-          } else {
-            saveErrors.push({ ref: op.ref || op.id, error: "Row Supabase introuvable — op non modifiée (aucune donnée perdue)" });
-          }
-        }));
-        savedCount += chunk.length;
-        setBatchProgress({ phase: "Mise à jour en base…", done: savedCount, total: updatedList.length });
+      // Sequential (not parallel) to avoid concurrent writes where two in-memory ops
+      // share the same ref value — parallel updates trigger the unique constraint simultaneously
+      for (let i = 0; i < updatedList.length; i++) {
+        const { op } = updatedList[i];
+        const supabaseId = supabaseRowByOpId[String(op.id)];
+        if (supabaseId) {
+          const { error } = await supabase.from("derivatives").update({ data: op }).eq("id", supabaseId);
+          if (error) saveErrors.push({ ref: op.ref || op.id, error: error.message });
+        } else {
+          saveErrors.push({ ref: op.ref || op.id, error: "Row Supabase introuvable — op non modifiée (aucune donnée perdue)" });
+        }
+        if (i % 20 === 0) setBatchProgress({ phase: "Mise à jour en base…", done: i, total: updatedList.length });
       }
 
       setBatchReport({ total: euronextOps.length, updated: updatedList.length, errors: [...errors, ...saveErrors], updatedList });

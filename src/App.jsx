@@ -3426,7 +3426,15 @@ const BatchEuronextFees = () => {
 
       // Build index: op.id (data field) → supabase row id
       setBatchProgress({ phase: "Chargement index Supabase…", done: 0, total: updatedList.length });
-      const { data: indexRows } = await supabase.from("derivatives").select("id, data");
+      let indexRows = [];
+let indexFrom = 0;
+while (true) {
+  const { data: batch } = await supabase.from("derivatives").select("id, data").range(indexFrom, indexFrom + 999);
+  if (!batch || batch.length === 0) break;
+  indexRows = [...indexRows, ...batch];
+  if (batch.length < 1000) break;
+  indexFrom += 1000;
+}
       const supabaseRowByOpId = {};
       const supabaseRowByRef = {};
       

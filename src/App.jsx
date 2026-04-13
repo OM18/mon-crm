@@ -3311,6 +3311,7 @@ const BatchEuronextFees = () => {
   const [batchProgress, setBatchProgress] = useState({ phase: "", done: 0, total: 0 });
 
   const runBatch = async () => {
+    alert("VERSION OK");
     setBatchState("running");
     setBatchReport(null);
     setBatchProgress({ phase: "Chargement des opérations…", done: 0, total: 0 });

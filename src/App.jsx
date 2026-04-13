@@ -3434,6 +3434,37 @@ const BatchEuronextFees = () => {
         }
       }
 
+      // Fix duplicate refs BEFORE updating fees.
+      // When two rows share the same ref value, any UPDATE on either row retriggers
+      // the unique index on data->>'ref' and finds the other row → duplicate key error.
+      // Solution: rename duplicate rows to ref-DUP{supabaseId} so they become unique first.
+      if (indexRows) {
+        const refToRows = {};
+        for (const r of indexRows) {
+          const ref = r.data?.ref || "";
+          if (!ref) continue;
+          if (!refToRows[ref]) refToRows[ref] = [];
+          refToRows[ref].push(r);
+        }
+        const dupGroups = Object.values(refToRows).filter(rows => rows.length > 1);
+        if (dupGroups.length > 0) {
+          setBatchProgress({ phase: `Correction de ${dupGroups.length} refs en doublon…`, done: 0, total: dupGroups.length });
+          for (const rows of dupGroups) {
+            // Keep first occurrence, rename subsequent duplicates to make refs unique
+            for (let di = 1; di < rows.length; di++) {
+              const r = rows[di];
+              const fixedRef = `${r.data.ref}-DUP${r.id}`;
+              const fixedData = { ...r.data, ref: fixedRef };
+              await supabase.from("derivatives").update({ data: fixedData }).eq("id", r.id);
+              // Keep updatedList in sync so fees update uses the corrected ref
+              const opId = String(r.data?.id ?? "");
+              const entry = updatedList.find(e => String(e.op.id) === opId);
+              if (entry && supabaseRowByOpId[opId] === r.id) entry.op.ref = fixedRef;
+            }
+          }
+        }
+      }
+
       const saveErrors = [];
       setBatchProgress({ phase: "Mise à jour en base…", done: 0, total: updatedList.length });
       for (let i = 0; i < updatedList.length; i += CHUNK) {
@@ -3441,21 +3472,9 @@ const BatchEuronextFees = () => {
         await Promise.all(chunk.map(async ({ op }) => {
           const supabaseId = supabaseRowByOpId[String(op.id)];
           if (supabaseId) {
-            // Use rpc to patch only the fees field inside the jsonb column.
-            // Replacing the entire data object retriggers the unique index on data->>'ref'
-            // and fails when duplicate refs exist in the table.
-            const { error } = await supabase.rpc('patch_derivative_fees', {
-              row_id: supabaseId,
-              new_fees: ""
-            });
-            if (error) {
-              // Fallback: try direct update if RPC not available
-              const { error: err2 } = await supabase
-                .from("derivatives")
-                .update({ data: op })
-                .eq("id", supabaseId);
-              if (err2) saveErrors.push({ ref: op.ref || op.id, error: err2.message });
-            }
+            // Duplicate refs were resolved above — direct update is now safe
+            const { error } = await supabase.from("derivatives").update({ data: op }).eq("id", supabaseId);
+            if (error) saveErrors.push({ ref: op.ref || op.id, error: error.message });
           } else {
             saveErrors.push({ ref: op.ref || op.id, error: "Row Supabase introuvable — op non modifiée (aucune donnée perdue)" });
           }

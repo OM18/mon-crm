@@ -3414,9 +3414,7 @@ const BatchEuronextFees = () => {
         }
 
         const wasManual = op.fees !== undefined && op.fees !== "";
-        // Fix: ops imported from Excel may have empty ref — assign one to avoid duplicate key on the unique constraint
-        const safeRef = (op.ref && op.ref.trim() !== "") ? op.ref : `DRV-${Date.now().toString(36).toUpperCase().slice(-6)}-${op.id}`;
-        const newOp = { ...op, ref: safeRef, fees: "" }; // clear override → auto
+        const newOp = { ...op, fees: "" }; // clear override → auto
         updatedList.push({ op: newOp, oldFees: op.fees, newFees: fees, wasManual });
       }
 
@@ -3443,9 +3441,21 @@ const BatchEuronextFees = () => {
         await Promise.all(chunk.map(async ({ op }) => {
           const supabaseId = supabaseRowByOpId[String(op.id)];
           if (supabaseId) {
-            // Safe in-place update — row is never deleted
-            const { error } = await supabase.from("derivatives").update({ data: op }).eq("id", supabaseId);
-            if (error) saveErrors.push({ ref: op.ref || op.id, error: error.message });
+            // Use rpc to patch only the fees field inside the jsonb column.
+            // Replacing the entire data object retriggers the unique index on data->>'ref'
+            // and fails when duplicate refs exist in the table.
+            const { error } = await supabase.rpc('patch_derivative_fees', {
+              row_id: supabaseId,
+              new_fees: ""
+            });
+            if (error) {
+              // Fallback: try direct update if RPC not available
+              const { error: err2 } = await supabase
+                .from("derivatives")
+                .update({ data: op })
+                .eq("id", supabaseId);
+              if (err2) saveErrors.push({ ref: op.ref || op.id, error: err2.message });
+            }
           } else {
             saveErrors.push({ ref: op.ref || op.id, error: "Row Supabase introuvable — op non modifiée (aucune donnée perdue)" });
           }

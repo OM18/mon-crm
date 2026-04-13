@@ -3375,7 +3375,7 @@ const BatchEuronextFees = () => {
 
         const total = matching.reduce((sum, t) => sum + (parseFloat(t.tarif) || 0), 0);
         const lots = parseFloat(op.quantity) || 1;
-        return { fees: Math.round(total * lots), matched: matching, ambiguous: false };
+        return { fees: Math.round(total * lots * 100) / 100, matched: matching, ambiguous: false };
       };
 
       // 4. Filter Euronext ops
@@ -8277,7 +8277,7 @@ const [exchangeTarifs, setExchangeTarifs] = useState([]);
       if (matching.length === 0) return "";
       const total = matching.reduce((sum, t) => sum + (parseFloat(t.tarif) || 0), 0);
       const lots = parseFloat(op.quantity) || 1;
-      return Math.round(total * lots);
+      return Math.round(total * lots * 100) / 100;
     } catch { return ""; }
   };
 

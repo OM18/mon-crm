@@ -3474,7 +3474,17 @@ const BatchEuronextFees = () => {
         const supabaseId = supabaseRowByOpId[String(op.id)];
         if (supabaseId) {
           const { error } = await supabase.from("derivatives").update({ data: op }).eq("id", supabaseId);
-          if (error) saveErrors.push({ ref: op.ref || op.id, error: error.message });
+          if (error) {
+            console.error("[BatchDiag] UPDATE FAILED", {
+              supabaseId,
+              opJsonId: op.id,
+              opRef: op.ref,
+              errorMsg: error.message,
+              errorDetails: error.details,
+              errorHint: error.hint,
+            });
+            saveErrors.push({ ref: op.ref || op.id, error: error.message, details: error.details || error.hint || "" });
+          }
         } else {
           saveErrors.push({ ref: op.ref || op.id, error: "Row Supabase introuvable — op non modifiée (aucune donnée perdue)" });
         }
@@ -3596,6 +3606,7 @@ const BatchEuronextFees = () => {
                       </div>
                       <div style={{ fontSize: 11, color: COLORS.textSub, lineHeight: 1.7, fontFamily: isSaveError ? "'DM Mono', monospace" : "inherit" }}>
                         {e.reason || e.error || "—"}
+                        {e.details && <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>{e.details}</div>}
                       </div>
                     </div>
                   );

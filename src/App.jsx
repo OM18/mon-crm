@@ -9273,7 +9273,7 @@ const setOps = async (val) => {
                 🗑 Effacer tout ({ops.length})
               </button>
             )}
-            <XlButton onImport={() => setShowImport(true)} onExport={() => setShowExport(true)} />
+            {derivTab === "operations" && <XlButton onImport={() => setShowImport(true)} onExport={() => setShowExport(true)} />}
             {derivTab === "operations" && <button onClick={reloadOps} disabled={isReloading} title="Recharger depuis Supabase"
               style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: isReloading ? "wait" : "pointer", fontSize: 18, padding: "10px 14px", color: isReloading ? COLORS.textMuted : COLORS.textSub, transition: "color 0.2s" }}>
               {isReloading ? "⟳" : "↺"}

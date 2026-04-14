@@ -2492,24 +2492,7 @@ const DERIV_ACCOUNT_FIELD_MAP = {
   "trade":         ["trade", "trade id", "tradeid", "négoce"],
   "isActive":      ["is active", "isactive", "actif", "active", "status", "statut"],
 };
-const FIXING_FIELD_MAP = {
-  "ref":          ["ref", "reference", "référence", "fix ref", "fixing ref"],
-  "type":         ["type", "instrument type", "inst type"],
-  "opType":       ["op type", "optype", "operation type", "type opération"],
-  "side":         ["side", "sens", "buy/sell", "achat/vente"],
-  "instrument":   ["instrument", "product", "produit", "contrat"],
-  "quantity":     ["lots", "quantity", "qty", "nb lots", "number of lots", "quantité"],
-  "price":        ["price", "prix"],
-  "strike":       ["strike", "strike price", "prix exercice"],
-  "optionType":   ["option type", "call/put", "optiontype"],
-  "fixingDate":   ["fixing date", "date fixing", "fixingdate", "date"],
-  "expiryDate":   ["expiry date", "expiry", "date expiration", "expirydate"],
-  "exchange":     ["exchange", "bourse", "marché"],
-  "businessUnit": ["business unit", "bu", "businessunit"],
-  "contract":     ["contract", "contrat", "contract number"],
-  "trade":        ["trade", "trade number", "trade id"],
-  "notes":        ["notes", "note", "comments", "commentaires"],
-};
+
 
 
 const normalizeHeaderDA = (h) => h?.toString().toLowerCase().trim().replace(/[_\-]/g, " ") || "";
@@ -5181,24 +5164,6 @@ const DERIV_FIELD_MAP = {
   "fees":         ["fees", "fee", "frais", "commission", "brokerage", "courtage"],
 };
 
-const FIXING_FIELD_MAP = {
-  "ref":          ["ref", "reference", "référence", "fix ref", "fixing ref"],
-  "type":         ["type", "instrument type", "inst type"],
-  "opType":       ["op type", "optype", "operation type", "type opération"],
-  "side":         ["side", "sens", "buy/sell", "achat/vente"],
-  "instrument":   ["instrument", "product", "produit", "contrat"],
-  "quantity":     ["lots", "quantity", "qty", "nb lots", "number of lots", "quantité"],
-  "price":        ["price", "prix"],
-  "strike":       ["strike", "strike price", "prix exercice"],
-  "optionType":   ["option type", "call/put", "optiontype"],
-  "fixingDate":   ["fixing date", "date fixing", "fixingdate", "date"],
-  "expiryDate":   ["expiry date", "expiry", "date expiration", "expirydate"],
-  "exchange":     ["exchange", "bourse", "marché"],
-  "businessUnit": ["business unit", "bu", "businessunit"],
-  "contract":     ["contract", "contrat", "contract number"],
-  "trade":        ["trade", "trade number", "trade id"],
-  "notes":        ["notes", "note", "comments", "commentaires"],
-};
 
 
 const normalizeHeader = (h) => h?.toString().toLowerCase().trim()

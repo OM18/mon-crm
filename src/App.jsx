@@ -8244,6 +8244,385 @@ const MultiToggle = ({ label, options, values, onChange }) => (
   </div>
 );
 
+// ─── FIXINGS TAB ─────────────────────────────────────────────
+const FixingsTab = ({ config, products }) => {
+  const genRef = () => `FIX-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+
+  const makeEmpty = () => {
+    const instrDefault = config.derivInstrumentTypeDefault;
+    const instrItem = (config.derivInstrumentTypes || []).find(t => t.value === instrDefault || t.label === instrDefault);
+    const instrVal = instrItem?.label || (config.derivInstrumentTypes?.[0]?.label) || "Future";
+    const opDefault = config.derivFixingOpTypeDefault;
+    const opItem = (config.derivFixingOpTypes || []).find(t => t.value === opDefault || t.label === opDefault);
+    const opVal = opItem?.label || (config.derivFixingOpTypes?.[0]?.label) || "";
+    return {
+      id: null, ref: "", recordType: "fixing",
+      type: instrVal, opType: opVal, instrument: "",
+      side: "BUY", quantity: "", price: "",
+      strike: "", optionType: "Call",
+      fixingDate: new Date().toISOString().slice(0, 10), expiryDate: "",
+      businessUnit: config.derivBusinessUnitDefault || "", exchange: "",
+      contract: "", trade: "", notes: "",
+    };
+  };
+
+  const [fixings, setFixingsRaw] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [form, setForm] = useState(makeEmpty());
+  const [formErrors, setFormErrors] = useState({});
+  const [search, setSearch] = useState("");
+  const [refSearch, setRefSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [isReloading, setIsReloading] = useState(false);
+
+  const SIDES = ["BUY", "SELL"];
+  const OPTION_TYPES = ["Call", "Put"];
+
+  // Load fixings from Supabase
+  useEffect(() => {
+    async function load() {
+      const PAGE = 1000;
+      let all = [], from = 0;
+      while (true) {
+        const { data, error } = await supabase.from("fixings").select("data").order("id", { ascending: true }).range(from, from + PAGE - 1);
+        if (error || !data || data.length === 0) break;
+        all = [...all, ...data.map(r => r.data ?? r)];
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      if (all.length) setFixingsRaw(all);
+    }
+    load();
+  }, []);
+
+  const saveOne = async (item) => {
+    const PAGE = 1000;
+    let indexRows = [];
+    let from = 0;
+    while (true) {
+      const { data } = await supabase.from("fixings").select("id, data").range(from, from + PAGE - 1);
+      if (!data || data.length === 0) break;
+      indexRows = [...indexRows, ...data];
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    const byId = {};
+    const byRef = {};
+    for (const r of indexRows) {
+      const id = String(r.data?.id ?? "");
+      if (id && !byId[id]) byId[id] = r.id;
+      const ref = r.data?.ref || "";
+      if (ref && !byRef[ref]) byRef[ref] = r.id;
+    }
+    const supabaseId = byId[String(item.id)] || byRef[String(item.ref || "")];
+    if (supabaseId) {
+      await supabase.from("fixings").update({ data: item }).eq("id", supabaseId);
+    } else {
+      await supabase.from("fixings").insert({ data: item });
+    }
+  };
+
+  const del = async (id) => {
+    if (!window.confirm("Supprimer ce fixing ?")) return;
+    const PAGE = 1000;
+    let indexRows = [];
+    let from = 0;
+    while (true) {
+      const { data } = await supabase.from("fixings").select("id, data").range(from, from + PAGE - 1);
+      if (!data || data.length === 0) break;
+      indexRows = [...indexRows, ...data];
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    const row = indexRows.find(r => String(r.data?.id) === String(id));
+    if (row) await supabase.from("fixings").delete().eq("id", row.id);
+    setFixingsRaw(prev => prev.filter(f => f.id !== id));
+    setSelected(null);
+  };
+
+  const reload = async () => {
+    setIsReloading(true);
+    const PAGE = 1000;
+    let all = [], from = 0;
+    while (true) {
+      const { data, error } = await supabase.from("fixings").select("data").order("id", { ascending: true }).range(from, from + PAGE - 1);
+      if (error || !data || data.length === 0) break;
+      all = [...all, ...data.map(r => r.data ?? r)];
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    setFixingsRaw(all);
+    setIsReloading(false);
+  };
+
+  const openNew = () => { setForm({ ...makeEmpty(), ref: genRef() }); setEditItem(null); setFormErrors({}); setShowForm(true); };
+  const openEdit = (item) => { setForm({ ...item }); setEditItem(item); setFormErrors({}); setShowForm(true); };
+
+  const validate = () => {
+    const e = {};
+    if (!form.ref?.trim()) e.ref = "Obligatoire";
+    else if (fixings.some(f => f.ref?.toLowerCase() === form.ref.trim().toLowerCase() && f.id !== editItem?.id)) e.ref = "Déjà utilisée";
+    if (!form.instrument) e.instrument = "Obligatoire";
+    if (!form.quantity) e.quantity = "Obligatoire";
+    if (!form.side) e.side = "Obligatoire";
+    if (!form.fixingDate) e.fixingDate = "Obligatoire";
+    return e;
+  };
+
+  const save = async () => {
+    const e = validate();
+    if (Object.keys(e).length > 0) { setFormErrors(e); return; }
+    const item = { ...form, id: editItem ? editItem.id : Date.now(), ref: form.ref.trim().toUpperCase() };
+    const updated = editItem ? fixings.map(f => f.id === editItem.id ? item : f) : [...fixings, item];
+    setFixingsRaw(updated);
+    setSelected(item.id);
+    await saveOne(item);
+    setShowForm(false);
+  };
+
+  const norm = v => (v || "").toLowerCase().trim();
+
+  const filtered = useMemo(() => {
+    return fixings.filter(f => {
+      const q = search.toLowerCase();
+      if (q && !f.ref?.toLowerCase().includes(q) && !f.instrument?.toLowerCase().includes(q) && !f.notes?.toLowerCase().includes(q)) return false;
+      if (refSearch && !f.ref?.toLowerCase().includes(refSearch.toLowerCase())) return false;
+      if (dateFrom && (f.fixingDate || "") < dateFrom) return false;
+      if (dateTo && (f.fixingDate || "") > dateTo) return false;
+      return true;
+    }).sort((a, b) => (b.fixingDate || "").localeCompare(a.fixingDate || ""));
+  }, [fixings, search, refSearch, dateFrom, dateTo]);
+
+  const sel = fixings.find(f => f.id === selected);
+
+  const HEADERS = ["REF", "TYPE", "OP TYPE", "SIDE", "INSTRUMENT", "LOTS", "PRICE", "BU", "FIXING DATE", "EXPIRY DATE", "EXCHANGE", "NOTES"];
+  const COLS = "90px 70px 80px 55px 220px 90px 80px 80px 100px 90px 110px 1fr";
+
+  return (
+    <div style={{ display: "flex", gap: 24, height: "calc(100vh - 220px)", width: "100%" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+
+        {/* Toolbar */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, color: COLORS.textMuted }}>{filtered.length} fixing{filtered.length !== 1 ? "s" : ""}</div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button onClick={reload} disabled={isReloading} style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: isReloading ? "wait" : "pointer", fontSize: 18, padding: "10px 14px", color: isReloading ? COLORS.textMuted : COLORS.textSub }}>{isReloading ? "⟳" : "↺"}</button>
+            <button onClick={openNew} style={{ background: COLORS.accent, color: COLORS.textOnAccent, border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", padding: "10px 20px", letterSpacing: 0.5 }}>+ NEW FIXING</button>
+          </div>
+        </div>
+
+        {/* Search bar */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
+          <input placeholder="Search by ref, instrument, notes…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ flex: 1, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+          <input placeholder="Ref…" value={refSearch} onChange={e => setRefSearch(e.target.value)}
+            style={{ width: 120, background: COLORS.card, border: `1px solid ${refSearch ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.card, border: `1px solid ${(dateFrom || dateTo) ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "6px 12px" }}>
+            <span style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600, whiteSpace: "nowrap" }}>DATE</span>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ background: "transparent", border: "none", color: dateFrom ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", cursor: "pointer" }} />
+            <span style={{ color: COLORS.textMuted, fontSize: 12 }}>→</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ background: "transparent", border: "none", color: dateTo ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", cursor: "pointer" }} />
+            {(dateFrom || dateTo) && <span onClick={() => { setDateFrom(""); setDateTo(""); }} style={{ cursor: "pointer", color: COLORS.textMuted, fontSize: 14 }}>✕</span>}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
+          <div style={{ minWidth: 900 }}>
+            <div style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, background: COLORS.tableHeader, borderRadius: "10px 10px 0 0", padding: "10px 16px" }}>
+              {HEADERS.map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: "center" }}>{h}</div>)}
+            </div>
+            {filtered.map((f, i) => {
+              const isSelected = selected === f.id;
+              return (
+                <div key={f.id} onClick={() => setSelected(f.id === selected ? null : f.id)}
+                  style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}
+                  onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
+                  onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`; }}>
+                  <div style={{ fontSize: 11, color: COLORS.accent, fontWeight: 700, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{f.ref || "—"}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: f.type?.toLowerCase() === "future" ? COLORS.blue : COLORS.purple, textAlign: "center" }}>{f.type}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{f.opType || "—"}</div>
+                  <div style={{ textAlign: "center" }}><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: f.side === "BUY" ? `${COLORS.green}20` : `${COLORS.red}20`, color: f.side === "BUY" ? COLORS.green : COLORS.red }}>{f.side}</span></div>
+                  <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 600, whiteSpace: "normal", wordBreak: "break-word", textAlign: "center" }}>{f.instrument || "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{f.quantity ? Number(f.quantity).toLocaleString() : "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center", fontFamily: "'DM Mono', monospace" }}>{f.price || "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{f.businessUnit ? f.businessUnit.toUpperCase() : "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{f.fixingDate ? f.fixingDate.split("-").reverse().join("/") : "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{f.type?.toLowerCase() === "option" ? (f.expiryDate || "—") : <span style={{ color: COLORS.textMuted }}>—</span>}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{f.exchange || "—"}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontStyle: f.notes ? "italic" : "normal", textAlign: "center" }}>{f.notes || "—"}</div>
+                </div>
+              );
+            })}
+            {filtered.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48, background: COLORS.card, borderRadius: "0 0 10px 10px" }}>Aucun fixing</div>}
+          </div>
+        </div>
+      </div>
+
+      {/* Detail panel */}
+      {sel && (
+        <div style={{ width: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 24, overflowY: "auto", flexShrink: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+            <div>
+              <div style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600, letterSpacing: 0.5, marginBottom: 2 }}>REFERENCE</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: COLORS.accent, fontFamily: "'DM Mono', monospace" }}>{sel.ref || "—"}</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 8, background: sel.type?.toLowerCase() === "future" ? `${COLORS.blue}20` : `${COLORS.purple}20`, color: sel.type?.toLowerCase() === "future" ? COLORS.blue : COLORS.purple }}>{sel.type}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 8, background: `${COLORS.accent}15`, color: COLORS.accent }}>{sel.opType}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 8, background: sel.side === "BUY" ? `${COLORS.green}20` : `${COLORS.red}20`, color: sel.side === "BUY" ? COLORS.green : COLORS.red }}>{sel.side}</span>
+          </div>
+          {[
+            { label: "INSTRUMENT",     value: sel.instrument || null },
+            { label: "NUMBER OF LOTS", value: sel.quantity ? `${Number(sel.quantity).toLocaleString()} lots` : null },
+            { label: "PRICE",          value: sel.price || null },
+            sel.type?.toLowerCase() === "option" ? { label: "STRIKE", value: sel.strike || null } : null,
+            sel.type?.toLowerCase() === "option" ? { label: "OPTION TYPE", value: sel.optionType || null } : null,
+            { label: "BUSINESS UNIT",  value: sel.businessUnit ? sel.businessUnit.toUpperCase() : null },
+            { label: "FIXING DATE",    value: sel.fixingDate },
+            sel.type?.toLowerCase() === "option" ? { label: "EXPIRY DATE", value: sel.expiryDate } : null,
+            { label: "EXCHANGE",       value: sel.exchange ? ((config.derivExchanges || []).find(e => e.value === sel.exchange)?.label || sel.exchange).toUpperCase() : null },
+            { label: "CONTRACT",       value: sel.contract },
+            { label: "TRADE",          value: sel.trade },
+          ].filter(Boolean).map(row => (
+            <div key={row.label} style={{ borderBottom: `1px solid ${COLORS.border}`, padding: "8px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600, letterSpacing: 0.4 }}>{row.label}</span>
+              <span style={{ fontSize: 13, color: row.value ? COLORS.text : COLORS.textMuted }}>{row.value || "—"}</span>
+            </div>
+          ))}
+          {sel.notes && <div style={{ marginTop: 12, fontSize: 12, color: COLORS.textSub, lineHeight: 1.6, background: COLORS.bg, borderRadius: 8, padding: "8px 12px" }}>{sel.notes}</div>}
+          <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+            <Btn onClick={() => openEdit(sel)} style={{ flex: 1 }}>Modifier</Btn>
+            <Btn onClick={() => del(sel.id)} variant="danger">Suppr.</Btn>
+          </div>
+        </div>
+      )}
+
+      {/* Modal formulaire */}
+      {showForm && (
+        <Modal title={editItem ? "MODIFIER LE FIXING" : "NEW FIXING"} onClose={() => setShowForm(false)} wide>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            {/* Référence */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 11, color: formErrors.ref ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>REFERENCE <span style={{ color: COLORS.red }}>*</span></label>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input value={form.ref} onChange={e => setForm(f => ({ ...f, ref: e.target.value.toUpperCase() }))}
+                  placeholder="FIX-XXXXXX"
+                  style={{ flex: 1, background: `${COLORS.accent}10`, border: `1px solid ${formErrors.ref ? COLORS.red + "80" : COLORS.accent + "40"}`, borderRadius: 8, padding: "10px 14px", color: COLORS.accent, fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none", fontWeight: 700 }} />
+                <button onClick={() => setForm(f => ({ ...f, ref: genRef() }))} style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, padding: "8px 12px", cursor: "pointer", color: COLORS.accent, fontSize: 11, fontWeight: 700 }}>↺</button>
+              </div>
+              {formErrors.ref && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.ref}</span>}
+            </div>
+
+            {/* Fixing Date */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 11, color: formErrors.fixingDate ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>FIXING DATE <span style={{ color: COLORS.red }}>*</span></label>
+              <input type="date" value={form.fixingDate} onChange={e => setForm(f => ({ ...f, fixingDate: e.target.value }))}
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+              {formErrors.fixingDate && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.fixingDate}</span>}
+            </div>
+
+            {/* Business Unit */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <ToggleGroup label="BUSINESS UNIT" options={(config.derivBusinessUnits || []).map(b => b.value)} value={form.businessUnit}
+                onChange={v => setForm(f => ({ ...f, businessUnit: v }))}
+                colorFn={v => (config.derivBusinessUnits || []).find(b => b.value === v)?.color || COLORS.accent}
+                labelFn={v => (config.derivBusinessUnits || []).find(b => b.value === v)?.label || v} />
+            </div>
+
+            {/* Instrument Type */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <ToggleGroup label="INSTRUMENT TYPE *" options={(config.derivInstrumentTypes || []).map(o => o.label)} value={form.type}
+                onChange={v => setForm(f => ({ ...f, type: v, instrument: "", exchange: "" }))}
+                colorFn={v => v === "Option" ? COLORS.purple : COLORS.blue} />
+            </div>
+
+            {/* Operation Type */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <ToggleGroup label="OPERATION TYPE" options={(config.derivFixingOpTypes || []).map(o => o.label)} value={form.opType}
+                onChange={v => setForm(f => ({ ...f, opType: v }))}
+                colorFn={() => COLORS.accent} />
+            </div>
+
+            {/* Side */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <ToggleGroup label="SIDE *" options={SIDES} value={form.side}
+                onChange={v => { setForm(f => ({ ...f, side: v })); setFormErrors(e => ({ ...e, side: undefined })); }}
+                colorFn={v => v === "BUY" ? COLORS.green : COLORS.red} />
+              {formErrors.side && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.side}</span>}
+            </div>
+
+            {/* Option type si Option */}
+            {form.type?.toLowerCase() === "option"
+              ? <ToggleGroup label="OPTION TYPE" options={OPTION_TYPES} value={form.optionType} onChange={v => setForm(f => ({ ...f, optionType: v }))} colorFn={() => COLORS.purple} />
+              : <div />}
+
+            {/* Instrument */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <DerivAutocomplete form={form} setForm={setForm} requiredError={formErrors.instrument} products={products} />
+            </div>
+
+            {/* Number of Lots */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 11, color: formErrors.quantity ? COLORS.red : COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>NUMBER OF LOTS <span style={{ color: COLORS.red }}>*</span></label>
+              <input value={form.quantity} onChange={e => { setForm(f => ({ ...f, quantity: e.target.value })); setFormErrors(er => ({ ...er, quantity: undefined })); }} placeholder="0"
+                style={{ background: COLORS.bg, border: `1px solid ${formErrors.quantity ? COLORS.red : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none" }} />
+              {formErrors.quantity && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.quantity}</span>}
+            </div>
+
+            {/* Price */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>PRICE</label>
+              <input value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00"
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none" }} />
+            </div>
+
+            {/* Option fields */}
+            {form.type?.toLowerCase() === "option" && <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>STRIKE</label>
+                <input value={form.strike} onChange={e => setForm(f => ({ ...f, strike: e.target.value }))} placeholder="0.00"
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>EXPIRY DATE</label>
+                <input type="date" value={form.expiryDate} onChange={e => setForm(f => ({ ...f, expiryDate: e.target.value }))}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+              </div>
+            </>}
+
+            {/* Exchange */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>EXCHANGE</label>
+              <select value={form.exchange} onChange={e => setForm(f => ({ ...f, exchange: e.target.value }))}
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                <option value="">— Select —</option>
+                {(config.derivExchanges || []).map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+              </select>
+            </div>
+
+            {/* Notes */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
+              <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>NOTES</label>
+              <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} placeholder="Notes…"
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical" }} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+            <Btn variant="secondary" onClick={() => setShowForm(false)}>Annuler</Btn>
+            <Btn onClick={save}>{editItem ? "Enregistrer" : "Créer"}</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+
 const Derivatives = ({ companies, initialOps }) => {
   const { config } = useConfig();
   const [products, setProducts] = useState([]);
@@ -8324,6 +8703,7 @@ const [exchangeTarifs, setExchangeTarifs] = useState([]);
   };
 
   const [ops, setOpsRaw] = useState(() => initialOps || []);
+  const [derivTab, setDerivTab] = useState('operations'); // 'operations' | 'fixings'
 
 useEffect(() => {
   async function loadAllDerivativesData() {
@@ -8753,6 +9133,21 @@ const setOps = async (val) => {
           </div>
         </div>
 
+        {/* Tabs */}
+        <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: `1px solid ${COLORS.border}` }}>
+          {[{ id: "operations", label: "DERIVATIVES OPERATIONS" }, { id: "fixings", label: "FIXINGS" }].map(tab => (
+            <div key={tab.id} onClick={() => setDerivTab(tab.id)} style={{
+              padding: "10px 24px", cursor: "pointer", fontSize: 13, fontWeight: 700, letterSpacing: 0.5,
+              color: derivTab === tab.id ? COLORS.accent : COLORS.textMuted,
+              borderBottom: derivTab === tab.id ? `2px solid ${COLORS.accent}` : "2px solid transparent",
+              marginBottom: -1, transition: "all 0.15s",
+            }}>{tab.label}</div>
+          ))}
+        </div>
+
+        {derivTab === "fixings" && <FixingsTab config={config} products={products} />}
+        {derivTab === "operations" && <>
+
         {/* KPIs */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
           {[
@@ -9057,6 +9452,8 @@ const setOps = async (val) => {
           </div>
         </div>
       </div>
+
+      </>}
 
       {/* Panneau détail */}
       {sel && (

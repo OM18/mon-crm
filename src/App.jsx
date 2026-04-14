@@ -9451,9 +9451,8 @@ const setOps = async (val) => {
             {filtered.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48, background: COLORS.card, borderRadius: "0 0 10px 10px" }}>Aucune opération</div>}
           </div>
         </div>
-      </div>
-
       </>}
+      </div>
 
       {/* Panneau détail */}
       {sel && (

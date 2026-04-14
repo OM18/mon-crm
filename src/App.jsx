@@ -8427,7 +8427,7 @@ const FixingsTab = ({ products }) => {
     return {
       id: null, ref: "", recordType: "fixing",
       type: instrVal, opType: opVal, instrument: "",
-      side: "BUY", quantity: "", price: "",
+      side: "SELL", quantity: "", price: "",
       strike: "", optionType: "Call",
       fixingDate: new Date().toISOString().slice(0, 10), expiryDate: "",
       businessUnit: config.derivBusinessUnitDefault || "", exchange: "",
@@ -8700,12 +8700,9 @@ const FixingsTab = ({ products }) => {
 
             {/* Business Unit */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <ToggleGroupStandalone label="BUSINESS UNIT"
-                options={(config.businessUnit || []).filter(bu => (config.derivBusinessUnits || []).includes(bu.value)).map(bu => bu.value)}
-                value={form.businessUnit}
+              <ToggleGroupStandalone label="BUSINESS UNIT" options={config.derivBusinessUnits || []} value={form.businessUnit}
                 onChange={v => setForm(f => ({ ...f, businessUnit: v }))}
-                colorFn={v => (config.businessUnit || []).find(bu => bu.value === v)?.color || COLORS.accent}
-                labelFn={v => (config.businessUnit || []).find(bu => bu.value === v)?.label?.toUpperCase() || v.toUpperCase()} />
+                colorFn={v => (config.derivBusinessUnits || []).find(b => b.value === v)?.color || COLORS.accent} />
             </div>
 
             {/* Instrument Type */}
@@ -8777,6 +8774,20 @@ const FixingsTab = ({ products }) => {
                 <option value="">— Select —</option>
                 {(config.derivExchanges || []).map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
               </select>
+            </div>
+
+            {/* Contract */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>CONTRACT</label>
+              <input value={form.contract} onChange={e => setForm(f => ({ ...f, contract: e.target.value }))} placeholder="Contract…"
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none" }} />
+            </div>
+
+            {/* Trade */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>TRADE</label>
+              <input value={form.trade} onChange={e => setForm(f => ({ ...f, trade: e.target.value }))} placeholder="Trade…"
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, fontFamily: "'DM Mono', monospace", outline: "none" }} />
             </div>
 
             {/* Notes */}

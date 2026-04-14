@@ -1427,6 +1427,25 @@ const DERIV_PRODUCT_FIELD_MAP = {
   "expiryDate":         ["expiry date", "expirydate", "expiration", "échéance"],
   "active":             ["active", "is active", "isactive", "actif"],
 };
+const FIXING_FIELD_MAP = {
+  "ref":          ["ref", "reference", "référence", "fix ref", "fixing ref"],
+  "type":         ["type", "instrument type", "inst type"],
+  "opType":       ["op type", "optype", "operation type", "type opération"],
+  "side":         ["side", "sens", "buy/sell", "achat/vente"],
+  "instrument":   ["instrument", "product", "produit", "contrat"],
+  "quantity":     ["lots", "quantity", "qty", "nb lots", "number of lots", "quantité"],
+  "price":        ["price", "prix"],
+  "strike":       ["strike", "strike price", "prix exercice"],
+  "optionType":   ["option type", "call/put", "optiontype"],
+  "fixingDate":   ["fixing date", "date fixing", "fixingdate", "date"],
+  "expiryDate":   ["expiry date", "expiry", "date expiration", "expirydate"],
+  "exchange":     ["exchange", "bourse", "marché"],
+  "businessUnit": ["business unit", "bu", "businessunit"],
+  "contract":     ["contract", "contrat", "contract number"],
+  "trade":        ["trade", "trade number", "trade id"],
+  "notes":        ["notes", "note", "comments", "commentaires"],
+};
+
 
 const normalizeHeaderDP = (h) => h?.toString().toLowerCase().trim()
   .replace(/([a-z])([A-Z])/g, '$1 $2') // camelCase → spaces before normalizing
@@ -2473,6 +2492,25 @@ const DERIV_ACCOUNT_FIELD_MAP = {
   "trade":         ["trade", "trade id", "tradeid", "négoce"],
   "isActive":      ["is active", "isactive", "actif", "active", "status", "statut"],
 };
+const FIXING_FIELD_MAP = {
+  "ref":          ["ref", "reference", "référence", "fix ref", "fixing ref"],
+  "type":         ["type", "instrument type", "inst type"],
+  "opType":       ["op type", "optype", "operation type", "type opération"],
+  "side":         ["side", "sens", "buy/sell", "achat/vente"],
+  "instrument":   ["instrument", "product", "produit", "contrat"],
+  "quantity":     ["lots", "quantity", "qty", "nb lots", "number of lots", "quantité"],
+  "price":        ["price", "prix"],
+  "strike":       ["strike", "strike price", "prix exercice"],
+  "optionType":   ["option type", "call/put", "optiontype"],
+  "fixingDate":   ["fixing date", "date fixing", "fixingdate", "date"],
+  "expiryDate":   ["expiry date", "expiry", "date expiration", "expirydate"],
+  "exchange":     ["exchange", "bourse", "marché"],
+  "businessUnit": ["business unit", "bu", "businessunit"],
+  "contract":     ["contract", "contrat", "contract number"],
+  "trade":        ["trade", "trade number", "trade id"],
+  "notes":        ["notes", "note", "comments", "commentaires"],
+};
+
 
 const normalizeHeaderDA = (h) => h?.toString().toLowerCase().trim().replace(/[_\-]/g, " ") || "";
 const guessFieldDA = (header) => {
@@ -5143,6 +5181,25 @@ const DERIV_FIELD_MAP = {
   "fees":         ["fees", "fee", "frais", "commission", "brokerage", "courtage"],
 };
 
+const FIXING_FIELD_MAP = {
+  "ref":          ["ref", "reference", "référence", "fix ref", "fixing ref"],
+  "type":         ["type", "instrument type", "inst type"],
+  "opType":       ["op type", "optype", "operation type", "type opération"],
+  "side":         ["side", "sens", "buy/sell", "achat/vente"],
+  "instrument":   ["instrument", "product", "produit", "contrat"],
+  "quantity":     ["lots", "quantity", "qty", "nb lots", "number of lots", "quantité"],
+  "price":        ["price", "prix"],
+  "strike":       ["strike", "strike price", "prix exercice"],
+  "optionType":   ["option type", "call/put", "optiontype"],
+  "fixingDate":   ["fixing date", "date fixing", "fixingdate", "date"],
+  "expiryDate":   ["expiry date", "expiry", "date expiration", "expirydate"],
+  "exchange":     ["exchange", "bourse", "marché"],
+  "businessUnit": ["business unit", "bu", "businessunit"],
+  "contract":     ["contract", "contrat", "contract number"],
+  "trade":        ["trade", "trade number", "trade id"],
+  "notes":        ["notes", "note", "comments", "commentaires"],
+};
+
 
 const normalizeHeader = (h) => h?.toString().toLowerCase().trim()
   .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -5249,10 +5306,80 @@ const DerivExportModal = ({ ops, filtered, onClose, products = [], config = {} }
   );
 };
 
+// ─── FIXING EXPORT MODAL ─────────────────────────────────────
+const FixingExportModal = ({ fixings, filtered, onClose, products = [], config = {} }) => {
+  const [scope, setScope] = useState("filtered");
+  const [exporting, setExporting] = useState(false);
+  const COLUMNS = [
+    { key: "ref",          label: "Ref" },
+    { key: "fixingDate",   label: "Fixing Date" },
+    { key: "type",         label: "Type" },
+    { key: "opType",       label: "Op Type" },
+    { key: "side",         label: "Side" },
+    { key: "instrument",   label: "Instrument" },
+    { key: "exchange",     label: "Exchange" },
+    { key: "quantity",     label: "Quantity" },
+    { key: "price",        label: "Price" },
+    { key: "strike",       label: "Strike" },
+    { key: "optionType",   label: "Option Type" },
+    { key: "expiryDate",   label: "Expiry Date" },
+    { key: "businessUnit", label: "Business Unit" },
+    { key: "contract",     label: "Contract" },
+    { key: "trade",        label: "Trade" },
+    { key: "notes",        label: "Notes" },
+  ];
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      const XLSX = await import("xlsx");
+      const data = scope === "all" ? fixings : filtered;
+      const rows = data.map(f => Object.fromEntries(COLUMNS.map(c => [c.label, f[c.key] ?? ""])));
+      const ws = XLSX.utils.json_to_sheet(rows, { header: COLUMNS.map(c => c.label) });
+      ws["!cols"] = COLUMNS.map(c => ({ wch: Math.max(c.label.length + 2, 14) }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Fixings");
+      const date = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `fixings_export_${date}.xlsx`);
+    } catch (e) { console.error("[fixing export] error:", e); }
+    setExporting(false);
+    onClose();
+  };
+  return (
+    <Modal title="Exporter les fixings" onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ fontSize: 13, color: COLORS.textSub }}>Choisissez les fixings à exporter :</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {[
+            { value: "filtered", label: "Fixings filtrés", sub: `${filtered.length} fixing${filtered.length !== 1 ? "s" : ""} visibles à l'écran` },
+            { value: "all",      label: "Tous les fixings", sub: `${fixings.length} fixing${fixings.length !== 1 ? "s" : ""} au total` },
+          ].map(opt => (
+            <div key={opt.value} onClick={() => setScope(opt.value)}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 10, border: `1px solid ${scope === opt.value ? COLORS.accent : COLORS.border}`, background: scope === opt.value ? `${COLORS.accent}10` : COLORS.card, cursor: "pointer", transition: "all 0.15s" }}>
+              <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${scope === opt.value ? COLORS.accent : COLORS.border}`, background: scope === opt.value ? COLORS.accent : "transparent", flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{opt.label}</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted }}>{opt.sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.card, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
+          📋 {COLUMNS.length} colonnes : {COLUMNS.map(c => c.label).join(", ")}
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+          <Btn variant="secondary" onClick={onClose}>Annuler</Btn>
+          <Btn onClick={doExport} disabled={exporting}>{exporting ? "Export en cours…" : "⬇ Exporter Excel"}</Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+
 const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivProducts = [], derivCompanies = [] }) => {
   const { config, updateField } = useConfig();
   const [step, setStep] = useState("guide");
-  const [guideTab, setGuideTab] = useState(type === "companies" ? "companies" : type === "derivatives" ? "derivatives" : "contacts");
+  const [guideTab, setGuideTab] = useState(type === "companies" ? "companies" : type === "derivatives" ? "derivatives" : type === "fixings" ? "fixings" : "contacts");
   const [rawRows, setRawRows] = useState([]);
   const [headers, setHeaders] = useState([]);
   const [mapping, setMapping] = useState({});
@@ -5260,7 +5387,7 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef();
-  const fieldMap = type === "companies" ? COMPANY_FIELD_MAP : type === "derivatives" ? DERIV_FIELD_MAP : CONTACT_FIELD_MAP;
+  const fieldMap = type === "companies" ? COMPANY_FIELD_MAP : type === "derivatives" ? DERIV_FIELD_MAP : type === "fixings" ? FIXING_FIELD_MAP : CONTACT_FIELD_MAP;
 
   const [unknownQueue, setUnknownQueue] = useState([]);
   const [currentQueueIdx, setCurrentQueueIdx] = useState(0);
@@ -5349,6 +5476,24 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
     { field: "internalDeal", format: "TRUE / FALSE", note: "" },
     { field: "notes",        format: "Texte",        note: "" },
     { field: "fees",         format: "Nombre",       note: "Frais de courtage (override du calcul automatique)" },
+  ],
+  fixings: [
+    { field: "ref",          format: "Texte",        note: "Référence unique du fixing (ex: FIX-XXXXXX)" },
+    { field: "type",         format: "Texte",        note: "ex: Future, Option" },
+    { field: "opType",       format: "Texte",        note: "Valeur de la liste Fixing Operation Types" },
+    { field: "side",         format: "BUY / SELL",   note: "" },
+    { field: "instrument",   format: "Texte",        note: "Nom de l'instrument" },
+    { field: "quantity",     format: "Nombre",       note: "Nombre de lots" },
+    { field: "price",        format: "Nombre",       note: "" },
+    { field: "strike",       format: "Nombre",       note: "Options uniquement" },
+    { field: "optionType",   format: "Call / Put",   note: "Options uniquement" },
+    { field: "fixingDate",   format: "JJ/MM/AAAA",   note: "" },
+    { field: "expiryDate",   format: "JJ/MM/AAAA",   note: "Options uniquement" },
+    { field: "exchange",     format: "Texte",        note: "" },
+    { field: "businessUnit", format: "Texte",        note: "" },
+    { field: "contract",     format: "Texte",        note: "" },
+    { field: "trade",        format: "Texte",        note: "" },
+    { field: "notes",        format: "Texte",        note: "" },
   ],
   };
   const handleFile = async (file) => {
@@ -5631,12 +5776,43 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
             if (!unknowns[key]) unknowns[key] = { fieldKey: "broker", configKey: "derivBroker", fieldLabel: "Broker", value: obj.broker, infoOnly: true };
           }
         }
+      } else if (type === "fixings") {
+        const parseExcelDate = (val) => {
+          if (!val && val !== 0) return "";
+          const s = val.toString().trim();
+          if (/^\d{4,5}$/.test(s)) {
+            const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+            return d.toISOString().split("T")[0];
+          }
+          const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+          if (m1) return `${m1[3]}-${m1[2].padStart(2,"0")}-${m1[1].padStart(2,"0")}`;
+          if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+          return s;
+        };
+        if (obj.fixingDate)  obj.fixingDate  = parseExcelDate(obj.fixingDate);
+        if (obj.expiryDate)  obj.expiryDate  = parseExcelDate(obj.expiryDate);
+        if (obj.quantity) obj.quantity = String(obj.quantity).replace(/,/g, ".");
+        if (obj.price)    obj.price    = String(obj.price).replace(/,/g, ".");
+        if (obj.strike)   obj.strike   = String(obj.strike).replace(/,/g, ".");
+        if (obj.side) {
+          obj.side = obj.side.toString().toUpperCase().trim();
+          if (obj.side === "LONG") obj.side = "BUY";
+          if (obj.side === "SHORT") obj.side = "SELL";
+        }
+        if (obj.instrument) {
+          const norm = v => v?.toString().toLowerCase().trim() || "";
+          const found = derivProducts.find(p => norm(p.label) === norm(obj.instrument) || norm(p.value) === norm(obj.instrument));
+          if (found && !obj.exchange && found.stoxxExchange) obj.exchange = found.stoxxExchange;
+        }
       }
       return obj;
     }).filter(o => {
       if (type === "derivatives") {
         const hasRequired = !!(o.businessUnit && o.type && o.opType && o.quantity && o.price && o.tradeDate && o.instrument && o.account && o.side && o.broker);
         return !!(o.ref || o.side || o.instrument || o.price || o.quantity) && hasRequired;
+      }
+      if (type === "fixings") {
+        return !!(o.ref || o.side || o.instrument || o.quantity) && !!(o.side && o.instrument);
       }
       return !!o.name;
     });
@@ -8277,6 +8453,8 @@ const FixingsTab = ({ config, products }) => {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [isReloading, setIsReloading] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [showExport, setShowExport] = useState(false);
 
   const SIDES = ["BUY", "SELL"];
   const OPTION_TYPES = ["Call", "Put"];
@@ -8410,6 +8588,41 @@ const FixingsTab = ({ config, products }) => {
           <div style={{ fontSize: 13, color: COLORS.textMuted }}>{filtered.length} fixing{filtered.length !== 1 ? "s" : ""}</div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <button onClick={reload} disabled={isReloading} style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: isReloading ? "wait" : "pointer", fontSize: 18, padding: "10px 14px", color: isReloading ? COLORS.textMuted : COLORS.textSub }}>{isReloading ? "⟳" : "↺"}</button>
+            {(() => {
+              const [xlOpen, setXlOpen] = useState(false);
+              const xlRef = useRef(null);
+              useEffect(() => {
+                if (!xlOpen) return;
+                const handler = (e) => { if (xlRef.current && !xlRef.current.contains(e.target)) setXlOpen(false); };
+                document.addEventListener("mousedown", handler);
+                return () => document.removeEventListener("mousedown", handler);
+              }, [xlOpen]);
+              return (
+                <div ref={xlRef} style={{ position: "relative" }}>
+                  <div onClick={() => setXlOpen(o => !o)}
+                    style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${xlOpen ? COLORS.accent + "80" : COLORS.border}`, background: xlOpen ? `${COLORS.accent}10` : "transparent", transition: "all 0.15s" }}>
+                    <img src="/logoxl.png" style={{ width: 28, height: 28, objectFit: "contain" }} />
+                  </div>
+                  {xlOpen && (
+                    <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", minWidth: 150 }}>
+                      <div onClick={() => { setXlOpen(false); setShowImport(true); }}
+                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", cursor: "pointer", color: COLORS.text, fontSize: 13, fontWeight: 600 }}
+                        onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
+                        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                        <span style={{ fontSize: 16 }}>⬆</span> IMPORT
+                      </div>
+                      <div style={{ height: 1, background: COLORS.border }} />
+                      <div onClick={() => { setXlOpen(false); setShowExport(true); }}
+                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", cursor: "pointer", color: COLORS.text, fontSize: 13, fontWeight: 600 }}
+                        onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
+                        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                        <span style={{ fontSize: 16 }}>⬇</span> EXPORT
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <button onClick={openNew} style={{ background: COLORS.accent, color: COLORS.textOnAccent, border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", padding: "10px 20px", letterSpacing: 0.5 }}>+ NEW FIXING</button>
           </div>
         </div>
@@ -8617,6 +8830,42 @@ const FixingsTab = ({ config, products }) => {
             <Btn onClick={save}>{editItem ? "Enregistrer" : "Créer"}</Btn>
           </div>
         </Modal>
+      )}
+
+      {showExport && (
+        <FixingExportModal
+          fixings={fixings}
+          filtered={filtered}
+          products={products}
+          config={config}
+          onClose={() => setShowExport(false)}
+        />
+      )}
+      {showImport && (
+        <ExcelImportModal type="fixings" derivProducts={products} onClose={() => setShowImport(false)}
+          onImport={async (items) => {
+            const PAGE = 1000;
+            let currentFixings = [];
+            let from = 0;
+            while (true) {
+              const { data, error } = await supabase.from("fixings").select("data").range(from, from + PAGE - 1);
+              if (error || !data || data.length === 0) break;
+              currentFixings = [...currentFixings, ...data.map(r => r.data ?? r)];
+              if (data.length < PAGE) break;
+              from += PAGE;
+            }
+            const ex = new Set(currentFixings.map(f => f.ref?.toLowerCase()).filter(Boolean));
+            const toAdd = items
+              .map(i => ({ ...makeEmpty(), ...i, id: Date.now() + Math.random() }))
+              .filter(i => !i.ref || !ex.has(i.ref?.toLowerCase()));
+            if (toAdd.length === 0) { reload(); return; }
+            const CHUNK = 50;
+            for (let i = 0; i < toAdd.length; i += CHUNK) {
+              const chunk = toAdd.slice(i, i + CHUNK).map(item => ({ data: item }));
+              await supabase.from("fixings").insert(chunk);
+            }
+            reload();
+          }} />
       )}
     </div>
   );

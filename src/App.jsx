@@ -7357,41 +7357,7 @@ return (
               </div>
             )}
           </div>
-          {(() => {
-            const [xlOpen, setXlOpen] = useState(false);
-            const ref = useRef(null);
-            useEffect(() => {
-              if (!xlOpen) return;
-              const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setXlOpen(false); };
-              document.addEventListener("mousedown", handler);
-              return () => document.removeEventListener("mousedown", handler);
-            }, [xlOpen]);
-            return (
-              <div ref={ref} style={{ position: "relative" }}>
-                <div onClick={() => setXlOpen(o => !o)}
-                  style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${xlOpen ? COLORS.accent + "80" : COLORS.border}`, background: xlOpen ? `${COLORS.accent}10` : "transparent", transition: "all 0.15s" }}>
-                  <img src="/logoxl.png" style={{ width: 28, height: 28, objectFit: "contain" }} />
-                </div>
-                {xlOpen && (
-                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", minWidth: 150 }}>
-                    <div onClick={() => { setXlOpen(false); setShowImport(true); }}
-                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", cursor: "pointer", color: COLORS.text, fontSize: 13, fontWeight: 600 }}
-                      onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
-                      onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-                      <span style={{ fontSize: 16 }}>⬆</span> IMPORT
-                    </div>
-                    <div style={{ height: 1, background: COLORS.border }} />
-                    <div onClick={() => { setXlOpen(false); setShowExport(true); }}
-                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", cursor: "pointer", color: COLORS.text, fontSize: 13, fontWeight: 600 }}
-                      onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
-                      onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-                      <span style={{ fontSize: 16 }}>⬇</span> EXPORT
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+          <XlButton onImport={() => setShowImport(true)} onExport={() => setShowExport(true)} />
           {companies.length > 0 && (
             <button onClick={async () => {
               if (window.confirm(`⚠️ Supprimer les ${companies.length} companies ? Cette action est irréversible.`)) {
@@ -9307,41 +9273,7 @@ const setOps = async (val) => {
                 🗑 Effacer tout ({ops.length})
               </button>
             )}
-            {derivTab === "operations" && (() => {
-              const [xlOpen, setXlOpen] = useState(false);
-              const ref = useRef(null);
-              useEffect(() => {
-                if (!xlOpen) return;
-                const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setXlOpen(false); };
-                document.addEventListener("mousedown", handler);
-                return () => document.removeEventListener("mousedown", handler);
-              }, [xlOpen]);
-              return (
-                <div ref={ref} style={{ position: "relative" }}>
-                  <div onClick={() => setXlOpen(o => !o)}
-                    style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 8, border: `1px solid ${xlOpen ? COLORS.accent + "80" : COLORS.border}`, background: xlOpen ? `${COLORS.accent}10` : "transparent", transition: "all 0.15s" }}>
-                    <img src="/logoxl.png" style={{ width: 28, height: 28, objectFit: "contain" }} />
-                  </div>
-                  {xlOpen && (
-                    <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", minWidth: 150 }}>
-                      <div onClick={() => { setXlOpen(false); setShowImport(true); }}
-                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", cursor: "pointer", color: COLORS.text, fontSize: 13, fontWeight: 600 }}
-                        onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
-                        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-                        <span style={{ fontSize: 16 }}>⬆</span> IMPORT
-                      </div>
-                      <div style={{ height: 1, background: COLORS.border }} />
-                      <div onClick={() => { setXlOpen(false); setShowExport(true); }}
-                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", cursor: "pointer", color: COLORS.text, fontSize: 13, fontWeight: 600 }}
-                        onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
-                        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-                        <span style={{ fontSize: 16 }}>⬇</span> EXPORT
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            <XlButton onImport={() => setShowImport(true)} onExport={() => setShowExport(true)} />
             {derivTab === "operations" && <button onClick={reloadOps} disabled={isReloading} title="Recharger depuis Supabase"
               style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: isReloading ? "wait" : "pointer", fontSize: 18, padding: "10px 14px", color: isReloading ? COLORS.textMuted : COLORS.textSub, transition: "color 0.2s" }}>
               {isReloading ? "⟳" : "↺"}

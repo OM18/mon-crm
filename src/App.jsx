@@ -256,6 +256,8 @@ const DEFAULT_CONFIG = {
   ],
   derivOrderTransmissionDefault: "electronic",
   derivOpTypeDefault: "",
+  derivFixingOpTypes: [],
+  derivFixingOpTypeDefault: "",
   derivInstrumentTypeDefault: "",
   derivCommodities: [
     { value: "corn", label: "Corn", underlyingCategory: "commodity" },
@@ -4139,6 +4141,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <DerivPillsEditor configKey="derivInstrumentTypes" label="Instrument Types" icon="📐" description="Types d'instruments disponibles dans la modale (Future, Option…)" config={config} updateField={updateField} defaultKey="derivInstrumentTypeDefault" onSetDefault={v => updateField("derivInstrumentTypeDefault", v)} />
 
           <DerivPillsEditor configKey="derivOpTypes" label="Operation Types" icon="🔁" description="Types d'opérations disponibles dans la modale (Hedging, Rolling…)" config={config} updateField={updateField} defaultKey="derivOpTypeDefault" onSetDefault={v => updateField("derivOpTypeDefault", v)} />
+
+          <DerivPillsEditor configKey="derivFixingOpTypes" label="Fixing Operation Types" icon="📌" description="Types d'opérations de fixing disponibles" config={config} updateField={updateField} defaultKey="derivFixingOpTypeDefault" onSetDefault={v => updateField("derivFixingOpTypeDefault", v)} />
 
           <DerivPillsEditor configKey="derivExchanges" label="Exchanges" icon="🏛" description="Bourses disponibles pour les opérations (CME, Euronext…)" config={config} updateField={updateField} defaultKey="derivDefaultExchange" onSetDefault={v => updateField("derivDefaultExchange", v)} />
 
@@ -8693,7 +8697,7 @@ const setOps = async (val) => {
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>DERIVATIVES OPERATIONS</h1>
+          <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Derivatives</h1>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             {ops.length > 0 && (
               <button onClick={async () => {

@@ -1,6 +1,14 @@
 ﻿import { useState, useEffect, useRef, createContext, useContext, useMemo, memo, useCallback } from "react";
 import { supabase } from './supabase';
 
+// ─── PARSE NUMBER (handles both . and , as decimal separator) ────
+const parseNum = (v) => {
+  if (v === null || v === undefined || v === "") return NaN;
+  const s = String(v).trim().replace(/,/g, ".");
+  return parseFloat(s);
+};
+
+
 // ─── SAFE SUPABASE SAVE ───────────────────────────────────────
 // Prevents data loss: only deletes after confirming items exist,
 // rolls back state on error.
@@ -3373,8 +3381,8 @@ const BatchEuronextFees = () => {
         const ambiguous = Object.values(byType).some(arr => arr.length > 1);
         if (ambiguous) return { fees: null, matched: matching, ambiguous: true };
 
-        const total = matching.reduce((sum, t) => sum + (parseFloat(t.tarif) || 0), 0);
-        const lots = parseFloat(op.quantity) || 1;
+        const total = matching.reduce((sum, t) => sum + (parseNum(t.tarif) || 0), 0);
+        const lots = parseNum(op.quantity) || 1;
         return { fees: Math.round(total * lots * 100) / 100, matched: matching, ambiguous: false };
       };
 
@@ -3748,11 +3756,11 @@ useEffect(() => {
     loadPriceUnits();
   }, []);
 
-  const isPuFormValid = () => puForm.exchange !== "" && String(puForm.unit).trim() !== "" && !isNaN(parseFloat(puForm.unit));
+  const isPuFormValid = () => puForm.exchange !== "" && String(puForm.unit).trim() !== "" && !isNaN(parseNum(puForm.unit));
 
   const savePriceUnit = async () => {
     if (!isPuFormValid()) return;
-    const clean = { ...puForm, unit: parseFloat(puForm.unit) };
+    const clean = { ...puForm, unit: parseNum(puForm.unit) };
     const updated = editPuId
       ? priceUnits.map(p => p.id === editPuId ? { ...clean, id: editPuId } : p)
       : [...priceUnits, { ...clean, id: Date.now() }];
@@ -6898,7 +6906,7 @@ const passFilters = filterMode === "AND"
   });
   return ms && passFilters && passCustom;
 }).sort((a, b) => {
-  const toNum = v => { if (!v) return 0; const n = parseFloat(v.toString()); return isNaN(n) ? 0 : n; };
+  const toNum = v => { if (!v) return 0; const n = parseNum(v); return isNaN(n) ? 0 : n; };
   return toNum(b.complianceCreationDate) - toNum(a.complianceCreationDate);
 }), [companies, search, activeFilters, excludeFilters, onlyFilters, customFilters, filterMode]);
 
@@ -8275,8 +8283,8 @@ const [exchangeTarifs, setExchangeTarifs] = useState([]);
       });
 
       if (matching.length === 0) return "";
-      const total = matching.reduce((sum, t) => sum + (parseFloat(t.tarif) || 0), 0);
-      const lots = parseFloat(op.quantity) || 1;
+      const total = matching.reduce((sum, t) => sum + (parseNum(t.tarif) || 0), 0);
+      const lots = parseNum(op.quantity) || 1;
       return Math.round(total * lots * 100) / 100;
     } catch { return ""; }
   };
@@ -8489,7 +8497,7 @@ const setOps = async (val) => {
       const fmt = prod?.decimals || "decimal";
       const tick = prod?.tickSize || "";
       if (tick && !fmt.includes("/")) {
-        const tickVal = parseFloat(tick);
+        const tickVal = parseNum(tick);
         const priceStr = String(form.price).replace(/,/g, ".");
         const priceVal = parseFloat(priceStr);
         if (!isNaN(tickVal) && tickVal > 0 && !isNaN(priceVal)) {
@@ -8619,7 +8627,7 @@ const setOps = async (val) => {
       if (typeof price === "string" && price.includes(" ") && price.includes("/")) {
         return price;
       }
-      const num = parseFloat(price);
+      const num = parseNum(price);
       if (isNaN(num)) return String(price);
       const intPart = Math.floor(num);
       const fracDecimal = num - intPart;
@@ -8641,7 +8649,7 @@ const setOps = async (val) => {
           return parseFloat(num.toFixed(dp)).toString();
         }
       }
-      const num = parseFloat(price);
+      const num = parseNum(price);
       if (isNaN(num)) return String(price);
       return parseFloat(num.toFixed(dp)).toString();
     }
@@ -9035,7 +9043,7 @@ const setOps = async (val) => {
                           />
                         ) : (
                           <span style={{ fontSize: 13, fontWeight: 600, color: hasManual ? COLORS.accent : COLORS.text }}>
-                            {displayVal !== "" ? `${parseFloat(displayVal).toFixed(2)} ${sym}` : "—"}
+                            {displayVal !== "" ? `${parseNum(displayVal).toFixed(2)} ${sym}` : "—"}
                           </span>
                         )}
                         <span onClick={() => setEditingFeesId(editingFees ? null : o.id)}
@@ -9105,7 +9113,7 @@ const setOps = async (val) => {
               <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: "8px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600, letterSpacing: 0.4 }}>OPERATION FEES</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: hasManual ? COLORS.accent : COLORS.text }}>
-                  {displayVal !== "" ? `${parseFloat(displayVal).toFixed(2)} ${sym}` : "—"}
+                  {displayVal !== "" ? `${parseNum(displayVal).toFixed(2)} ${sym}` : "—"}
                 </span>
               </div>
             );
@@ -10050,7 +10058,7 @@ const resolveLotSize = (exchange, instrument, products, lotSizes) => {
   let match = lotSizes.find(l => _norm(l.exchange) === normExchange && _norm(l.instrument) === normUnderlying);
   if (!match) match = lotSizes.find(l => _norm(l.instrument) === normUnderlying);
   if (!match && normExchange) match = lotSizes.find(l => _norm(l.exchange) === normExchange);
-  return match ? (parseFloat(match.quantity) || 1) : 1;
+  return match ? (parseNum(match.quantity) || 1) : 1;
 };
 
 const resolvePriceUnit = (exchange, instrument, products, priceUnits) => {
@@ -10064,7 +10072,7 @@ const resolvePriceUnit = (exchange, instrument, products, priceUnits) => {
     : null;
   if (!match) match = priceUnits.find(p => _norm(p.exchange) === normExchange && !p.underlying);
   if (!match) match = priceUnits.find(p => _norm(p.exchange) === normExchange);
-  return match ? (parseFloat(match.unit) || 1) : 1;
+  return match ? (parseNum(match.unit) || 1) : 1;
 };
 
 const DerivStatistics = () => {
@@ -10634,7 +10642,7 @@ const DerivativesDashboard = () => {
       const den = parseInt(fmt.split("/")[1] || "8");
       // If already stored as fraction string "201 4/8", display as-is
       if (typeof price === "string" && price.includes(" ") && price.includes("/")) return price;
-      const num = parseFloat(price);
+      const num = parseNum(price);
       if (isNaN(num)) return String(price);
       const intPart = Math.floor(num);
       const fracNum = Math.round((num - intPart) * den);
@@ -10643,7 +10651,7 @@ const DerivativesDashboard = () => {
       return `${intPart} ${fracNum}/${den}`;
     }
     const dpMatch = fmt.match(/^decimal(\d)$/);
-    if (dpMatch) return parseFloat(price).toFixed(parseInt(dpMatch[1]));
+    if (dpMatch) return parseNum(price).toFixed(parseInt(dpMatch[1]));
     return String(price);
   };
   const roundToTick = (val, instrument) => {
@@ -10655,7 +10663,7 @@ const DerivativesDashboard = () => {
       const tickVal = num / den;
       return Math.round(val / tickVal) * tickVal;
     }
-    const tickVal = parseFloat(tick);
+    const tickVal = parseNum(tick);
     if (!tickVal || isNaN(tickVal)) return val;
     return Math.round(val / tickVal) * tickVal;
   };
@@ -10726,8 +10734,8 @@ const DerivativesDashboard = () => {
     const positions = [];
     for (const b of bucketResults) {
       if (!b.openLots || b.openLots === 0) continue;
-      const allBuyLots  = b.ops.filter(o => (o.side||"").toUpperCase() === "BUY").reduce((s,o) => s + (parseFloat(o.quantity)||0), 0);
-      const allSellLots = b.ops.filter(o => (o.side||"").toUpperCase() === "SELL").reduce((s,o) => s + (parseFloat(o.quantity)||0), 0);
+      const allBuyLots  = b.ops.filter(o => (o.side||"").toUpperCase() === "BUY").reduce((s,o) => s + (parseNum(o.quantity)||0), 0);
+      const allSellLots = b.ops.filter(o => (o.side||"").toUpperCase() === "SELL").reduce((s,o) => s + (parseNum(o.quantity)||0), 0);
       const side = allBuyLots >= allSellLots ? "BUY" : "SELL";
       const openPositionSide = side === "BUY" ? "LONG" : "SHORT";
       const accRecord = derivAccounts.find(a => a.accountNumber === b.account);
@@ -10874,7 +10882,7 @@ const DerivativesDashboard = () => {
 
         {openPositions.map((pos, i) => {
           const mktRaw = marketPrices[pos.key];
-          const mktPrice = mktRaw !== undefined ? parseFloat(mktRaw) : null;
+          const mktPrice = mktRaw !== undefined ? parseNum(mktRaw) : null;
           const isEditing = editingMktKey === pos.key;
           const pnlPerLot = (mktPrice !== null && pos.avgOpenPrice)
             ? (pos.side === "BUY" ? mktPrice - pos.avgOpenPrice : pos.avgOpenPrice - mktPrice)

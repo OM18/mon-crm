@@ -8700,9 +8700,12 @@ const FixingsTab = ({ products }) => {
 
             {/* Business Unit */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <ToggleGroupStandalone label="BUSINESS UNIT" options={config.derivBusinessUnits || []} value={form.businessUnit}
+              <ToggleGroupStandalone label="BUSINESS UNIT"
+                options={(config.businessUnit || []).filter(bu => (config.derivBusinessUnits || []).includes(bu.value)).map(bu => bu.value)}
+                value={form.businessUnit}
                 onChange={v => setForm(f => ({ ...f, businessUnit: v }))}
-                colorFn={v => (config.derivBusinessUnits || []).find(b => b.value === v)?.color || COLORS.accent} />
+                colorFn={v => (config.businessUnit || []).find(bu => bu.value === v)?.color || COLORS.accent}
+                labelFn={v => (config.businessUnit || []).find(bu => bu.value === v)?.label?.toUpperCase() || v.toUpperCase()} />
             </div>
 
             {/* Instrument Type */}

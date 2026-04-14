@@ -8357,8 +8357,8 @@ const ToggleGroupStandalone = ({ label, options, value, onChange, colorFn, label
     {label && <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>{label}</label>}
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
       {options.map(opt => {
-        const val = typeof opt === "string" ? opt : opt;
-        const lbl = labelFn ? labelFn(val) : val;
+        const val = typeof opt === "object" && opt !== null ? (opt.value ?? opt.label ?? String(opt)) : String(opt);
+        const lbl = labelFn ? labelFn(val) : (typeof opt === "object" && opt !== null ? (opt.label || val) : val);
         const selected = value === val;
         const color = colorFn ? colorFn(val) : COLORS.accent;
         return (

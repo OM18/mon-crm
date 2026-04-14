@@ -8422,7 +8422,8 @@ const XlButton = ({ onImport, onExport }) => {
   );
 };
 
-const FixingsTab = ({ config, products }) => {
+const FixingsTab = ({ products }) => {
+  const { config } = useConfig();
   const genRef = () => `FIX-${Date.now().toString(36).toUpperCase().slice(-6)}`;
 
   const makeEmpty = () => {
@@ -8447,7 +8448,7 @@ const FixingsTab = ({ config, products }) => {
   const [selected, setSelected] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState(null);
-  const [form, setForm] = useState(makeEmpty());
+  const [form, setForm] = useState(() => makeEmpty());
   const [formErrors, setFormErrors] = useState({});
   const [search, setSearch] = useState("");
   const [refSearch, setRefSearch] = useState("");
@@ -9361,7 +9362,7 @@ const setOps = async (val) => {
           ))}
         </div>
 
-        {derivTab === "fixings" && <FixingsTab config={config} products={products} />}
+        {derivTab === "fixings" && <FixingsTab products={products} />}
         {derivTab === "operations" && <>
 
         {/* KPIs */}

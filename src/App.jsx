@@ -8425,7 +8425,6 @@ const setOps = async (val) => {
   const [selected, setSelected] = useState(null);
   const [search, setSearch]     = useState("");
   const [accountSearch, setAccountSearch] = useState("");
-  const [refSearch, setRefSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo]     = useState("");
   const [editingFeesId, setEditingFeesId] = useState(null);
@@ -8565,8 +8564,6 @@ const setOps = async (val) => {
       if (!ms) return false;
       const aq = accountSearch.toLowerCase().trim();
       if (aq && (!o.account || !o.account.toLowerCase().trim().includes(aq))) return false;
-      const rq = refSearch.toLowerCase().trim();
-      if (rq && (!o.ref || !o.ref.toLowerCase().trim().includes(rq))) return false;
       if (dateFrom && (o.tradeDate || "") < dateFrom) return false;
       if (dateTo   && (o.tradeDate || "") > dateTo)   return false;
       const accRecord = derivAccounts.find(a => a.accountNumber === o.account);
@@ -8602,7 +8599,7 @@ const setOps = async (val) => {
       if (dateDiff !== 0) return dateDiff;
       return (b.id || 0) - (a.id || 0);
     });
-  }, [ops, search, accountSearch, refSearch, dateFrom, dateTo,
+  }, [ops, search, accountSearch, dateFrom, dateTo,
       activeFilters.exchange, activeFilters.type, activeFilters.opType, activeFilters.side,
       activeFilters.status, activeFilters.businessUnit, activeFilters.internalDeal,
       activeFilters.underlying, activeFilters.financingBank,
@@ -8696,7 +8693,7 @@ const setOps = async (val) => {
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Derivatives</h1>
+          <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>DERIVATIVES OPERATIONS</h1>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             {ops.length > 0 && (
               <button onClick={async () => {
@@ -8783,8 +8780,6 @@ const setOps = async (val) => {
               style={{ background: "transparent", border: "none", color: dateTo ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", cursor: "pointer" }} />
             {(dateFrom || dateTo) && <span onClick={() => { setDateFrom(""); setDateTo(""); }} style={{ cursor: "pointer", color: COLORS.textMuted, fontSize: 14, lineHeight: 1 }}>✕</span>}
           </div>
-          <input placeholder="Ref…" value={refSearch} onChange={e => setRefSearch(e.target.value)}
-            style={{ width: 120, background: COLORS.card, border: `1px solid ${refSearch ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }} />
           <input placeholder="Account…" value={accountSearch} onChange={e => setAccountSearch(e.target.value)}
             style={{ width: 160, background: COLORS.card, border: `1px solid ${accountSearch ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }} />
           <div style={{ position: "relative" }}>

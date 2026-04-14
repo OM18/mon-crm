@@ -8351,6 +8351,31 @@ const MultiToggle = ({ label, options, values, onChange }) => (
   </div>
 );
 
+// ─── STANDALONE TOGGLE GROUP (used by FixingsTab) ────────────
+const ToggleGroupStandalone = ({ label, options, value, onChange, colorFn, labelFn }) => (
+  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    {label && <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>{label}</label>}
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      {options.map(opt => {
+        const val = typeof opt === "string" ? opt : opt;
+        const lbl = labelFn ? labelFn(val) : val;
+        const selected = value === val;
+        const color = colorFn ? colorFn(val) : COLORS.accent;
+        return (
+          <div key={val} onClick={() => onChange(val)}
+            style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700,
+              border: `1.5px solid ${selected ? color : COLORS.border}`,
+              background: selected ? `${color}20` : COLORS.bg,
+              color: selected ? color : COLORS.textSub, transition: "all 0.15s", userSelect: "none" }}>
+            {lbl}
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+
+
 // ─── FIXINGS TAB ─────────────────────────────────────────────
 const XlButton = ({ onImport, onExport }) => {
   const [xlOpen, setXlOpen] = useState(false);
@@ -8675,7 +8700,7 @@ const FixingsTab = ({ products }) => {
 
             {/* Business Unit */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <ToggleGroup label="BUSINESS UNIT" options={(config.derivBusinessUnits || []).map(b => b.value)} value={form.businessUnit}
+              <ToggleGroupStandalone label="BUSINESS UNIT" options={(config.derivBusinessUnits || []).map(b => b.value)} value={form.businessUnit}
                 onChange={v => setForm(f => ({ ...f, businessUnit: v }))}
                 colorFn={v => (config.derivBusinessUnits || []).find(b => b.value === v)?.color || COLORS.accent}
                 labelFn={v => (config.derivBusinessUnits || []).find(b => b.value === v)?.label || v} />
@@ -8683,21 +8708,21 @@ const FixingsTab = ({ products }) => {
 
             {/* Instrument Type */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <ToggleGroup label="INSTRUMENT TYPE *" options={(config.derivInstrumentTypes || []).map(o => o.label)} value={form.type}
+              <ToggleGroupStandalone label="INSTRUMENT TYPE *" options={(config.derivInstrumentTypes || []).map(o => o.label)} value={form.type}
                 onChange={v => setForm(f => ({ ...f, type: v, instrument: "", exchange: "" }))}
                 colorFn={v => v === "Option" ? COLORS.purple : COLORS.blue} />
             </div>
 
             {/* Operation Type */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <ToggleGroup label="OPERATION TYPE" options={(config.derivFixingOpTypes || []).map(o => o.label)} value={form.opType}
+              <ToggleGroupStandalone label="OPERATION TYPE" options={(config.derivFixingOpTypes || []).map(o => o.label)} value={form.opType}
                 onChange={v => setForm(f => ({ ...f, opType: v }))}
                 colorFn={() => COLORS.accent} />
             </div>
 
             {/* Side */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <ToggleGroup label="SIDE *" options={SIDES} value={form.side}
+              <ToggleGroupStandalone label="SIDE *" options={SIDES} value={form.side}
                 onChange={v => { setForm(f => ({ ...f, side: v })); setFormErrors(e => ({ ...e, side: undefined })); }}
                 colorFn={v => v === "BUY" ? COLORS.green : COLORS.red} />
               {formErrors.side && <span style={{ fontSize: 11, color: COLORS.red }}>⚠ {formErrors.side}</span>}
@@ -8705,7 +8730,7 @@ const FixingsTab = ({ products }) => {
 
             {/* Option type si Option */}
             {form.type?.toLowerCase() === "option"
-              ? <ToggleGroup label="OPTION TYPE" options={OPTION_TYPES} value={form.optionType} onChange={v => setForm(f => ({ ...f, optionType: v }))} colorFn={() => COLORS.purple} />
+              ? <ToggleGroupStandalone label="OPTION TYPE" options={OPTION_TYPES} value={form.optionType} onChange={v => setForm(f => ({ ...f, optionType: v }))} colorFn={() => COLORS.purple} />
               : <div />}
 
             {/* Instrument */}

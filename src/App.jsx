@@ -8425,6 +8425,7 @@ const setOps = async (val) => {
   const [selected, setSelected] = useState(null);
   const [search, setSearch]     = useState("");
   const [accountSearch, setAccountSearch] = useState("");
+  const [refSearch, setRefSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo]     = useState("");
   const [editingFeesId, setEditingFeesId] = useState(null);
@@ -8564,6 +8565,8 @@ const setOps = async (val) => {
       if (!ms) return false;
       const aq = accountSearch.toLowerCase().trim();
       if (aq && (!o.account || !o.account.toLowerCase().trim().includes(aq))) return false;
+      const rq = refSearch.toLowerCase().trim();
+      if (rq && (!o.ref || !o.ref.toLowerCase().trim().includes(rq))) return false;
       if (dateFrom && (o.tradeDate || "") < dateFrom) return false;
       if (dateTo   && (o.tradeDate || "") > dateTo)   return false;
       const accRecord = derivAccounts.find(a => a.accountNumber === o.account);
@@ -8599,7 +8602,7 @@ const setOps = async (val) => {
       if (dateDiff !== 0) return dateDiff;
       return (b.id || 0) - (a.id || 0);
     });
-  }, [ops, search, accountSearch, dateFrom, dateTo,
+  }, [ops, search, accountSearch, refSearch, dateFrom, dateTo,
       activeFilters.exchange, activeFilters.type, activeFilters.opType, activeFilters.side,
       activeFilters.status, activeFilters.businessUnit, activeFilters.internalDeal,
       activeFilters.underlying, activeFilters.financingBank,
@@ -8684,8 +8687,8 @@ const setOps = async (val) => {
   );
 
   // Colonnes tableau : REF · TYPE · OP TYPE · SIDE · UNDERLYING · QTY · PRICE · TRADE DATE · EXPIRY · BROKER · EXCHANGE · ACCOUNT · STATUS
-  const COLS = "90px 70px 80px 55px 220px 90px 80px 80px 100px 90px 110px 110px 90px 110px 90px 60px 90px 1fr";
-  const HEADERS = ["REF", "TYPE", "OP TYPE", "SIDE", "INSTRUMENT", "LOTS", "PRICE", "BU", "TRADE DATE", "EXPIRY DATE", "BROKER", "EXCHANGE", "TRANS.", "ACCOUNT", "STATUS", "INT.", "FEES", "NOTES"];
+  const COLS = "90px 70px 80px 55px 220px 90px 80px 80px 100px 90px 110px 110px 110px 90px 60px 90px 1fr";
+  const HEADERS = ["REF", "TYPE", "OP TYPE", "SIDE", "INSTRUMENT", "LOTS", "PRICE", "BU", "TRADE DATE", "EXPIRY DATE", "BROKER", "EXCHANGE", "ACCOUNT", "STATUS", "INT.", "FEES", "NOTES"];
 
   return (
     <div style={{ display: "flex", gap: 24, height: "calc(100vh - 130px)", width: "100%" }}>
@@ -8780,6 +8783,8 @@ const setOps = async (val) => {
               style={{ background: "transparent", border: "none", color: dateTo ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", cursor: "pointer" }} />
             {(dateFrom || dateTo) && <span onClick={() => { setDateFrom(""); setDateTo(""); }} style={{ cursor: "pointer", color: COLORS.textMuted, fontSize: 14, lineHeight: 1 }}>✕</span>}
           </div>
+          <input placeholder="Ref…" value={refSearch} onChange={e => setRefSearch(e.target.value)}
+            style={{ width: 120, background: COLORS.card, border: `1px solid ${refSearch ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }} />
           <input placeholder="Account…" value={accountSearch} onChange={e => setAccountSearch(e.target.value)}
             style={{ width: 160, background: COLORS.card, border: `1px solid ${accountSearch ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }} />
           <div style={{ position: "relative" }}>
@@ -9005,7 +9010,6 @@ const setOps = async (val) => {
                   <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{o.type?.toLowerCase() === "option" ? (o.expiryDate || "—") : <span style={{ color: COLORS.textMuted }}>—</span>}</div>
                   <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.broker || "—"}</div>
                   {(() => { const norm = v => (v || "").toLowerCase().trim(); const exch = (config.derivExchanges || []).find(e => norm(e.value) === norm(o.exchange)); return <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{exch?.label || o.exchange || "—"}</div>; })()}
-                  {(() => { const transCfg = (config.derivOrderTransmissionTypes || []).find(t => t.value === o.orderTransmissionType); return <div style={{ fontSize: 11, color: COLORS.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{transCfg?.label || o.orderTransmissionType || "—"}</div>; })()}
                   <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.account || "—"}</div>
                   <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sc.color}20`, color: sc.color }}>{sc.label}</span></div>
                   <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.internalDeal ? `${COLORS.blue}20` : "transparent", color: o.internalDeal ? COLORS.blue : COLORS.textMuted }}>{o.internalDeal ? "YES" : "—"}</span></div>
@@ -9084,7 +9088,6 @@ const setOps = async (val) => {
             sel.type?.toLowerCase() === "option" ? { label: "EXPIRY DATE", value: sel.expiryDate } : null,
             { label: "BROKER",          value: sel.broker },
             { label: "EXCHANGE",        value: sel.exchange ? ((config.derivExchanges || []).find(e => e.value === sel.exchange)?.label || sel.exchange).toUpperCase() : null },
-            { label: "TRANSMISSION",     value: (() => { const t = (config.derivOrderTransmissionTypes || []).find(t => t.value === sel.orderTransmissionType); return t?.label || sel.orderTransmissionType || null; })() },
             { label: "ACCOUNT",         value: sel.account || null },
             { label: "CONTRACT",        value: sel.contract },
             { label: "TRADE",           value: sel.trade },

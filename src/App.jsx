@@ -9293,7 +9293,7 @@ const setOps = async (val) => {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <h1 style={{ margin: 0, fontSize: 28, color: COLORS.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>DERIVATIVES OPERATIONS</h1>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            {ops.length > 0 && (
+            {derivTab === "operations" && ops.length > 0 && (
               <button onClick={async () => {
                 if (window.confirm(`⚠️ Supprimer les ${ops.length} opérations ? Cette action est irréversible.`)) {
                   await supabase.from('derivatives').delete().neq('id', 0);
@@ -9304,7 +9304,7 @@ const setOps = async (val) => {
                 🗑 Effacer tout ({ops.length})
               </button>
             )}
-            {(() => {
+            {derivTab === "operations" && (() => {
               const [xlOpen, setXlOpen] = useState(false);
               const ref = useRef(null);
               useEffect(() => {
@@ -9339,11 +9339,11 @@ const setOps = async (val) => {
                 </div>
               );
             })()}
-            <button onClick={reloadOps} disabled={isReloading} title="Recharger depuis Supabase"
+            {derivTab === "operations" && <button onClick={reloadOps} disabled={isReloading} title="Recharger depuis Supabase"
               style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: isReloading ? "wait" : "pointer", fontSize: 18, padding: "10px 14px", color: isReloading ? COLORS.textMuted : COLORS.textSub, transition: "color 0.2s" }}>
               {isReloading ? "⟳" : "↺"}
-            </button>
-            <button onClick={openNew} style={{ background: COLORS.accent, color: COLORS.textOnAccent, border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", padding: "10px 20px", letterSpacing: 0.5 }}>+ NEW OPERATION</button>
+            </button>}
+            {derivTab === "operations" && <button onClick={openNew} style={{ background: COLORS.accent, color: COLORS.textOnAccent, border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", padding: "10px 20px", letterSpacing: 0.5 }}>+ NEW OPERATION</button>}
           </div>
         </div>
 

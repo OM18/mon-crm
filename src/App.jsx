@@ -3328,6 +3328,248 @@ const ExchangeManagerBlock = () => {
   );
 };
 
+// ─── BATCH FIXINGS OLD TO NEW ────────────────────────────────
+const BatchFixingsOldToNew = () => {
+  const [state, setState] = useState("idle"); // idle | processing | done | error
+  const [result, setResult] = useState(null);
+  const [warnings, setWarnings] = useState([]);
+  const fileRef = useRef(null);
+
+  const processFile = async (file) => {
+    setState("processing");
+    setResult(null);
+    setWarnings([]);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      const COLS_TO_DELETE = [
+        "author__first_name","author__last_name","editor__first_name","editor__last_name",
+        "derivative_account__number","broker__name","tariffs","tariffs_cost_per_deal_with_correction"
+      ];
+
+      const parseDate = (val) => {
+        if (!val) return "";
+        const s = String(val).trim();
+        // Replace dots with slashes
+        const normalized = s.replace(/\./g, "/");
+        // Try DD/MM/YYYY
+        const m = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (m) return `${m[1].padStart(2,"0")}/${m[2].padStart(2,"0")}/${m[3]}`;
+        // Excel serial
+        if (/^\d{4,5}$/.test(s)) {
+          const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+          const dd = String(d.getDate()).padStart(2,"0");
+          const mm = String(d.getMonth()+1).padStart(2,"0");
+          const yyyy = d.getFullYear();
+          return `${dd}/${mm}/${yyyy}`;
+        }
+        // ISO YYYY-MM-DD
+        const iso = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+        return normalized;
+      };
+
+      const warn = [];
+      const converted = rows.map((row, idx) => {
+        const out = {};
+
+        // Mapping
+        out["ref"]           = row["id"] || "";
+        out["opType"]        = row["operation_type"] || "";
+        out["side"]          = (() => {
+          const v = String(row["deal_type"] || "").toLowerCase().trim();
+          if (v === "short") return "SELL";
+          if (v === "long")  return "BUY";
+          return String(row["deal_type"] || "").toUpperCase();
+        })();
+        out["instrument"]    = row["derivative__title"] || "";
+        out["exchange"]      = ""; // empty in source
+        out["businessUnit"]  = (() => {
+          const v = String(row["business_unit__title"] || "").trim();
+          return v === "MOROCCO BU" ? "MOROCCO" : v;
+        })();
+        out["quantity"]      = row["quantity"] || "";
+        out["price"]         = row["price"] || "";
+        out["fixingDate"]    = parseDate(row["business_date"]);
+        out["contract"]      = row["contract_number"] || "";
+        out["trade"]         = row["passport__title"] || "";
+
+        // Fields not in source — warn once
+        if (idx === 0) {
+          warn.push("⚠ Champ 'type' (Instrument Type) absent du fichier source — à renseigner manuellement après import.");
+          warn.push("⚠ Champs 'optionType', 'strike', 'expiryDate', 'notes' absents du fichier source.");
+          warn.push("⚠ Champ 'exchange' laissé vide — à compléter manuellement.");
+        }
+
+        return out;
+      });
+
+      // Build output Excel
+      const outWs = XLSX.utils.json_to_sheet(converted);
+      const colWidths = Object.keys(converted[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 14) }));
+      outWs["!cols"] = colWidths;
+      const outWb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(outWb, outWs, "Fixings");
+      const date = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(outWb, `fixings_converted_${date}.xlsx`);
+
+      setResult({ count: converted.length });
+      setWarnings(warn);
+      setState("done");
+    } catch(e) {
+      setResult({ error: String(e) });
+      setState("error");
+    }
+  };
+
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ padding: "18px 24px", background: `${COLORS.purple}08`, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: `${COLORS.purple}20`, border: `1px solid ${COLORS.purple}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📥</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>BATCH FIXINGS — OLD TO NEW</div>
+          <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Convertit un fichier Excel ancien format vers le format Fixings de l'app</div>
+        </div>
+      </div>
+      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ fontSize: 12, color: COLORS.textMuted, background: COLORS.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
+          <div style={{ fontWeight: 700, marginBottom: 6, color: COLORS.textSub }}>Mapping appliqué :</div>
+          {[
+            "id → ref", "operation_type → opType", "deal_type → side (long→BUY, short→SELL)",
+            "derivative__title → instrument", "business_unit__title → businessUnit (MOROCCO BU → MOROCCO)",
+            "quantity → quantity", "price → price", "business_date → fixingDate (format dd/mm/yyyy)",
+            "contract_number → contract", "passport__title → trade",
+          ].map(m => <div key={m} style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>• {m}</div>)}
+          <div style={{ marginTop: 8, fontWeight: 700, color: COLORS.red, fontSize: 11 }}>Colonnes supprimées : author__first_name, author__last_name, editor__first_name, editor__last_name, derivative_account__number, broker__name, tariffs, tariffs_cost_per_deal_with_correction</div>
+        </div>
+
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
+          onChange={e => { if (e.target.files[0]) processFile(e.target.files[0]); e.target.value = ""; }} />
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Btn onClick={() => { setState("idle"); setResult(null); setWarnings([]); fileRef.current?.click(); }}
+            disabled={state === "processing"}>
+            {state === "processing" ? "⟳ Traitement…" : "📂 Charger fichier Excel"}
+          </Btn>
+          {state === "done" && <span style={{ fontSize: 12, color: COLORS.green, fontWeight: 700 }}>✓ {result?.count} lignes converties — fichier téléchargé</span>}
+          {state === "error" && <span style={{ fontSize: 12, color: COLORS.red }}>❌ {result?.error}</span>}
+        </div>
+
+        {warnings.length > 0 && (
+          <div style={{ background: `${COLORS.orange}10`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "10px 14px" }}>
+            {warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── BATCH FIXINGS NEW TO OLD ────────────────────────────────
+const BatchFixingsNewToOld = () => {
+  const [state, setState] = useState("idle");
+  const [result, setResult] = useState(null);
+  const fileRef = useRef(null);
+
+  const processFile = async (file) => {
+    setState("processing");
+    setResult(null);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      const parseDate = (val) => {
+        if (!val) return "";
+        const s = String(val).trim();
+        // ISO YYYY-MM-DD → DD.MM.YYYY
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (iso) return `${iso[3]}.${iso[2]}.${iso[1]}`;
+        // DD/MM/YYYY → DD.MM.YYYY
+        const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (slash) return `${slash[1].padStart(2,"0")}.${slash[2].padStart(2,"0")}.${slash[3]}`;
+        return s;
+      };
+
+      const converted = rows.map(row => ({
+        "id":                   row["ref"] || "",
+        "operation_type":       row["opType"] || "",
+        "deal_type":            (() => {
+          const v = String(row["side"] || "").toUpperCase().trim();
+          if (v === "BUY")  return "long";
+          if (v === "SELL") return "short";
+          return v.toLowerCase();
+        })(),
+        "derivative__title":    row["instrument"] || "",
+        "business_unit__title": (() => {
+          const v = String(row["businessUnit"] || "").trim().toUpperCase();
+          return v === "MOROCCO" ? "MOROCCO BU" : v;
+        })(),
+        "quantity":             row["quantity"] || "",
+        "price":                row["price"] || "",
+        "business_date":        parseDate(row["fixingDate"]),
+        "contract_number":      row["contract"] || "",
+        "passport__title":      row["trade"] || "",
+      }));
+
+      const outWs = XLSX.utils.json_to_sheet(converted);
+      outWs["!cols"] = Object.keys(converted[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 14) }));
+      const outWb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(outWb, outWs, "Fixings");
+      const date = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(outWb, `fixings_old_format_${date}.xlsx`);
+
+      setResult({ count: converted.length });
+      setState("done");
+    } catch(e) {
+      setResult({ error: String(e) });
+      setState("error");
+    }
+  };
+
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ padding: "18px 24px", background: `${COLORS.purple}08`, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: `${COLORS.purple}20`, border: `1px solid ${COLORS.purple}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📤</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>BATCH FIXINGS — NEW TO OLD</div>
+          <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Convertit un fichier Excel nouveau format vers l'ancien format</div>
+        </div>
+      </div>
+      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ fontSize: 12, color: COLORS.textMuted, background: COLORS.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
+          <div style={{ fontWeight: 700, marginBottom: 6, color: COLORS.textSub }}>Mapping appliqué :</div>
+          {[
+            "ref → id", "opType → operation_type", "side → deal_type (BUY→long, SELL→short)",
+            "instrument → derivative__title", "businessUnit → business_unit__title (MOROCCO → MOROCCO BU)",
+            "quantity → quantity", "price → price", "fixingDate → business_date (format dd.mm.yyyy)",
+            "contract → contract_number", "trade → passport__title",
+          ].map(m => <div key={m} style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>• {m}</div>)}
+        </div>
+
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
+          onChange={e => { if (e.target.files[0]) processFile(e.target.files[0]); e.target.value = ""; }} />
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Btn onClick={() => { setState("idle"); setResult(null); fileRef.current?.click(); }}
+            disabled={state === "processing"}>
+            {state === "processing" ? "⟳ Traitement…" : "📂 Charger fichier Excel"}
+          </Btn>
+          {state === "done" && <span style={{ fontSize: 12, color: COLORS.green, fontWeight: 700 }}>✓ {result?.count} lignes converties — fichier téléchargé</span>}
+          {state === "error" && <span style={{ fontSize: 12, color: COLORS.red }}>❌ {result?.error}</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 const BatchEuronextFees = () => {
   const [batchState, setBatchState] = useState("idle"); // idle | confirm | running | done | error
   const [batchReport, setBatchReport] = useState(null);
@@ -3973,8 +4215,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        {[["fields", "📋 Champs CRM"], ["derivatives", "◬ Derivatives"], ["company", "🏢 Company"]].map(([t, l]) => (
-          <span key={t} onClick={() => setAdminTab(t)} style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, padding: "6px 18px", borderRadius: 10, background: adminTab === t ? (t === "derivatives" ? COLORS.blue : COLORS.accent) : COLORS.bg, color: adminTab === t ? "#fff" : COLORS.textMuted, border: `1px solid ${adminTab === t ? (t === "derivatives" ? COLORS.blue : COLORS.accent) : COLORS.border}` }}>{l}</span>
+        {[["fields", "📋 Champs CRM"], ["derivatives", "◬ Derivatives"], ["company", "🏢 Company"], ["batch", "⚙ Batch"]].map(([t, l]) => (
+          <span key={t} onClick={() => setAdminTab(t)} style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, padding: "6px 18px", borderRadius: 10, background: adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : COLORS.accent) : COLORS.bg, color: adminTab === t ? "#fff" : COLORS.textMuted, border: `1px solid ${adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : COLORS.accent) : COLORS.border}` }}>{l}</span>
         ))}
       </div>
 
@@ -4977,6 +5219,14 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
         </div>
       )}
+
+      {adminTab === "batch" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <BatchFixingsOldToNew />
+          <BatchFixingsNewToOld />
+        </div>
+      )}
+
 
       {adminTab === "company" && (
         <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>

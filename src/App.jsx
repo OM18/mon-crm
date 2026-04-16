@@ -6224,7 +6224,7 @@ if (Array.isArray(resolved.contractsCurrency)) {
         const FIXING_RESOLVE_MAP = {
           type:         { configKey: "derivInstrumentTypes", getValue: (v, cfg) => cfg.derivInstrumentTypes?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.label },
           opType:       { configKey: "derivFixingOpTypes",   getValue: (v, cfg) => cfg.derivFixingOpTypes?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.label },
-          exchange:     { configKey: "derivExchanges",       getValue: (v, cfg) => cfg.derivExchanges?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.value },
+          exchange:     { configKey: "derivExchanges",       getValue: (v, cfg) => cfg.derivExchanges?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.label },
           businessUnit: { configKey: "businessUnit",         getValue: (v, cfg) => cfg.businessUnit?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.value },
         };
         Object.entries(FIXING_RESOLVE_MAP).forEach(([fieldKey, { configKey, getValue }]) => {

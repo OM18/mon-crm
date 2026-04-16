@@ -3456,6 +3456,10 @@ const BatchEuronextFees = () => {
       for (const op of euronextOps) {
         const { fees, matched, ambiguous } = computeFeesForOp(op, allTarifs, allProducts);
 
+        if (String(op.ref) === "2199") {
+          console.log("[LOOP DEBUG] ref=2199", { fees, ambiguous, matchedCount: matched.length, opId: op.id });
+        }
+
         if (ambiguous) {
           errors.push({
             ref: op.ref || op.id,

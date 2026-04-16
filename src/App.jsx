@@ -3420,8 +3420,8 @@ const BatchEuronextFees = () => {
           }
         }
 
-        const total = resolved.reduce((sum, t) => sum + (parseNum(t.tarif) || 0), 0);
-        const lots = parseNum(op.quantity) || 1;
+        const total = resolved.reduce((sum, t) => sum + (parseFloat(String(t.tarif || "").replace(/,/g, ".")) || 0), 0);
+        const lots = parseFloat(String(op.quantity || "").replace(/,/g, ".")) || 1;
         return { fees: Math.round(total * lots * 100) / 100, matched: resolved, ambiguous: false };
       };
 

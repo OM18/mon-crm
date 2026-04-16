@@ -9289,8 +9289,8 @@ const setOps = async (val) => {
   );
 
   // Colonnes tableau : REF · TYPE · OP TYPE · SIDE · UNDERLYING · QTY · PRICE · TRADE DATE · EXPIRY · BROKER · EXCHANGE · ACCOUNT · STATUS
-  const COLS = "90px 70px 80px 55px 220px 90px 80px 80px 100px 90px 110px 110px 110px 90px 60px 90px 1fr";
-  const HEADERS = ["REF", "TYPE", "OP TYPE", "SIDE", "INSTRUMENT", "LOTS", "PRICE", "BU", "TRADE DATE", "EXPIRY DATE", "BROKER", "EXCHANGE", "ACCOUNT", "STATUS", "INT.", "FEES", "NOTES"];
+  const COLS = "90px 70px 80px 55px 220px 90px 80px 80px 100px 90px 110px 110px 90px 110px 90px 60px 90px 1fr";
+  const HEADERS = ["REF", "TYPE", "OP TYPE", "SIDE", "INSTRUMENT", "LOTS", "PRICE", "BU", "TRADE DATE", "EXPIRY DATE", "BROKER", "EXCHANGE", "TRANS.", "ACCOUNT", "STATUS", "INT.", "FEES", "NOTES"];
 
   return (
     <div style={{ display: "flex", gap: 24, height: "calc(100vh - 130px)", width: "100%" }}>
@@ -9591,6 +9591,7 @@ const setOps = async (val) => {
                   <div style={{ fontSize: 13, color: COLORS.text, textAlign: "center" }}>{o.type?.toLowerCase() === "option" ? (o.expiryDate || "—") : <span style={{ color: COLORS.textMuted }}>—</span>}</div>
                   <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.broker || "—"}</div>
                   {(() => { const norm = v => (v || "").toLowerCase().trim(); const exch = (config.derivExchanges || []).find(e => norm(e.value) === norm(o.exchange)); return <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{exch?.label || o.exchange || "—"}</div>; })()}
+                  {(() => { const transCfg = (config.derivOrderTransmissionTypes || []).find(t => t.value === o.orderTransmissionType); return <div style={{ fontSize: 11, color: COLORS.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{transCfg?.label || o.orderTransmissionType || "—"}</div>; })()}
                   <div style={{ fontSize: 13, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{o.account || "—"}</div>
                   <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${sc.color}20`, color: sc.color }}>{sc.label}</span></div>
                   <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: o.internalDeal ? `${COLORS.blue}20` : "transparent", color: o.internalDeal ? COLORS.blue : COLORS.textMuted }}>{o.internalDeal ? "YES" : "—"}</span></div>
@@ -9670,6 +9671,7 @@ const setOps = async (val) => {
             sel.type?.toLowerCase() === "option" ? { label: "EXPIRY DATE", value: sel.expiryDate } : null,
             { label: "BROKER",          value: sel.broker },
             { label: "EXCHANGE",        value: sel.exchange ? ((config.derivExchanges || []).find(e => e.value === sel.exchange)?.label || sel.exchange).toUpperCase() : null },
+            { label: "TRANSMISSION",     value: (() => { const t = (config.derivOrderTransmissionTypes || []).find(t => t.value === sel.orderTransmissionType); return t?.label || sel.orderTransmissionType || null; })() },
             { label: "ACCOUNT",         value: sel.account || null },
             { label: "CONTRACT",        value: sel.contract },
             { label: "TRADE",           value: sel.trade },

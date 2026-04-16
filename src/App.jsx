@@ -3378,26 +3378,27 @@ const BatchFixingsOldToNew = () => {
         const out = {};
 
         // Mapping
-        out["ref"]           = row["id"] || "";
+        const up = v => v ? String(v).toUpperCase().trim() : "";
+        out["ref"]           = up(row["id"]);
         out["type"]          = ""; // absent du fichier source — à renseigner manuellement
         out["opType"]        = "HEDGING";
         out["side"]          = (() => {
           const v = String(row["deal_type"] || "").toLowerCase().trim();
           if (v === "short") return "SELL";
           if (v === "long")  return "BUY";
-          return String(row["deal_type"] || "").toUpperCase();
+          return up(row["deal_type"]);
         })();
-        out["instrument"]    = row["derivative__title"] || "";
+        out["instrument"]    = up(row["derivative__title"]);
         out["exchange"]      = ""; // empty in source
         out["businessUnit"]  = (() => {
-          const v = String(row["business_unit__title"] || "").trim();
+          const v = String(row["business_unit__title"] || "").trim().toUpperCase();
           return v === "MOROCCO BU" ? "MOROCCO" : v;
         })();
         out["quantity"]      = row["quantity"] || "";
         out["price"]         = row["price"] || "";
         out["fixingDate"]    = parseDate(row["business_date"]);
-        out["contract"]      = row["contract_number"] || "";
-        out["trade"]         = row["passport__title"] || "";
+        out["contract"]      = up(row["contract_number"]);
+        out["trade"]         = up(row["passport__title"]);
 
         // Fields not in source — warn once
         if (idx === 0) {

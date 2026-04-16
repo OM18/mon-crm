@@ -258,6 +258,9 @@ const DEFAULT_CONFIG = {
   derivOpTypeDefault: "",
   derivFixingOpTypes: [],
   derivFixingOpTypeDefault: "",
+  contractTypes: [],
+  contractStatuses: [],
+  contractCommodities: [],
   derivInstrumentTypeDefault: "",
   derivCommodities: [
     { value: "corn", label: "Corn", underlyingCategory: "commodity" },
@@ -2273,13 +2276,15 @@ const UnderlyingOriginEditor = ({ config, updateField, setAdminTab }) => {
 // ─── GENERIC DERIV PILLS EDITOR ──────────────────────────────
 // Reusable pill-style editor for any config list field
 // Pills are white/neutral by default (no color)
-const DerivPillsEditor = ({ configKey, label, icon, description, config, updateField, defaultKey, defaultValue, onSetDefault }) => {
+const DerivPillsEditor = ({ configKey, label, icon, description, config, updateField, defaultKey, defaultValue, onSetDefault, hasColor = false }) => {
   const rawItems = config[configKey];
   const items = Array.isArray(rawItems) ? rawItems : [];
   const [localItems, setLocalItems] = useState(items);
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [newLabel, setNewLabel] = useState("");
+  const [newColor, setNewColor] = useState(COLORS.accent);
+  const PRESET_COLORS = [COLORS.green, COLORS.orange, COLORS.red, COLORS.blue, COLORS.purple, COLORS.gold, COLORS.accent];
 
   useEffect(() => {
     const raw = config[configKey];
@@ -2291,8 +2296,10 @@ const DerivPillsEditor = ({ configKey, label, icon, description, config, updateF
 
   const add = () => {
     if (!newLabel.trim()) return;
-    mark([...localItems, { value: newLabel.trim().toLowerCase().replace(/\s+/g, "_"), label: newLabel.trim() }]);
-    setNewLabel("");
+    const newItem = { value: newLabel.trim().toLowerCase().replace(/\s+/g, "_"), label: newLabel.trim() };
+    if (hasColor) newItem.color = newColor;
+    mark([...localItems, newItem]);
+    setNewLabel(""); if (hasColor) setNewColor(COLORS.accent);
   };
 
   const save = (e) => {
@@ -2339,7 +2346,7 @@ const DerivPillsEditor = ({ configKey, label, icon, description, config, updateF
               const isDefault = defaultKey && currentDefault === s.value;
               return (
                 <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: hasColor && s.color ? s.color : COLORS.textMuted, flexShrink: 0 }} />
                   <input value={s.label} onChange={e => { const v = e.target.value; mark(localItems.map((x, i) => i === idx ? { ...x, label: v } : x)); }}
                     style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
                   {defaultKey && onSetDefault && (
@@ -2366,6 +2373,17 @@ const DerivPillsEditor = ({ configKey, label, icon, description, config, updateF
               <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Nouvelle valeur…" onKeyDown={e => e.key === "Enter" && add()}
                 style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
             </div>
+            {hasColor && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>COULEUR</label>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {PRESET_COLORS.map(c => (
+                    <div key={c} onClick={() => setNewColor(c)}
+                      style={{ width: 22, height: 22, borderRadius: "50%", background: c, cursor: "pointer", border: newColor === c ? `2px solid #fff` : "2px solid transparent", boxShadow: newColor === c ? `0 0 0 1px ${c}` : "none" }} />
+                  ))}
+                </div>
+              </div>
+            )}
             <Btn onClick={add} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>+ Ajouter</Btn>
           </div>
         </div>
@@ -4219,8 +4237,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        {[["fields", "📋 Champs CRM"], ["derivatives", "◬ Derivatives"], ["company", "🏢 Company"], ["batch", "⚙ Batch"]].map(([t, l]) => (
-          <span key={t} onClick={() => setAdminTab(t)} style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, padding: "6px 18px", borderRadius: 10, background: adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : COLORS.accent) : COLORS.bg, color: adminTab === t ? "#fff" : COLORS.textMuted, border: `1px solid ${adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : COLORS.accent) : COLORS.border}` }}>{l}</span>
+        {[["fields", "📋 Champs CRM"], ["derivatives", "◬ Derivatives"], ["contracts", "📄 Contracts"], ["company", "🏢 Company"], ["batch", "⚙ Batch"]].map(([t, l]) => (
+          <span key={t} onClick={() => setAdminTab(t)} style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, padding: "6px 18px", borderRadius: 10, background: adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : t === "contracts" ? COLORS.green : COLORS.accent) : COLORS.bg, color: adminTab === t ? "#fff" : COLORS.textMuted, border: `1px solid ${adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : t === "contracts" ? COLORS.green : COLORS.accent) : COLORS.border}` }}>{l}</span>
         ))}
       </div>
 
@@ -5231,6 +5249,39 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
         </div>
       )}
 
+
+
+      {adminTab === "contracts" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <DerivPillsEditor
+            configKey="contractTypes"
+            label="Contract Types"
+            icon="📋"
+            description="Types de contrats disponibles"
+            config={config}
+            updateField={updateField}
+            hasColor={true}
+          />
+          <DerivPillsEditor
+            configKey="contractStatuses"
+            label="Contract Statuses"
+            icon="🔖"
+            description="Statuts de contrats disponibles"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+          />
+          <DerivPillsEditor
+            configKey="contractCommodities"
+            label="Contract Commodities"
+            icon="🌾"
+            description="Commodités disponibles pour les contrats"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+          />
+        </div>
+      )}
 
       {adminTab === "company" && (
         <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>

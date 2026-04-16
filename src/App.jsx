@@ -6219,6 +6219,41 @@ if (Array.isArray(resolved.contractsCurrency)) {
             resolved.instrument = decision === "add" ? resolved.instrument : "";
           }
         }
+      } else if (type === "fixings") {
+        // Apply decisions for config-linked fields, preserve original case for non-config fields
+        const FIXING_RESOLVE_MAP = {
+          type:         { configKey: "derivInstrumentTypes", getValue: (v, cfg) => cfg.derivInstrumentTypes?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.label },
+          opType:       { configKey: "derivFixingOpTypes",   getValue: (v, cfg) => cfg.derivFixingOpTypes?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.label },
+          exchange:     { configKey: "derivExchanges",       getValue: (v, cfg) => cfg.derivExchanges?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.value },
+          businessUnit: { configKey: "businessUnit",         getValue: (v, cfg) => cfg.businessUnit?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.value },
+        };
+        Object.entries(FIXING_RESOLVE_MAP).forEach(([fieldKey, { configKey, getValue }]) => {
+          const val = resolved[fieldKey];
+          if (!val) return;
+          const found = getValue(val, config);
+          if (found) {
+            resolved[fieldKey] = found;
+          } else {
+            const key = `${configKey}:${val}`;
+            const decision = finalDecisions[key];
+            resolved[fieldKey] = decision === "add" ? val : "";
+          }
+        });
+        // instrument
+        if (resolved.instrument) {
+          const norm = v => v?.toString().toLowerCase().trim() || "";
+          const found = derivProducts.find(p => norm(p.label) === norm(resolved.instrument) || norm(p.value) === norm(resolved.instrument));
+          if (found) {
+            resolved.instrument = found.label || found.value;
+          } else {
+            const key = `derivProducts:${resolved.instrument}`;
+            const decision = finalDecisions[key];
+            resolved.instrument = decision === "add" ? resolved.instrument : "";
+          }
+        }
+        // Preserve uppercase for free-text fields
+        const upFields = ["ref", "contract", "trade"];
+        upFields.forEach(f => { if (resolved[f]) resolved[f] = String(resolved[f]).toUpperCase().trim(); });
       }
       return resolved;
     });

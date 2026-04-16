@@ -3362,7 +3362,7 @@ const BatchEuronextFees = () => {
 
       const norm = v => (v || "").toString().toLowerCase().trim();
 
-      const DEBUG_REFS = new Set(["2038","2177","2157","2059","1763"]);
+      const DEBUG_REFS = new Set(["2199"]);
 
       const computeFeesForOp = (op, tarifs, prods) => {
         const opBroker = norm(op.broker);

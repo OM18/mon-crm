@@ -3547,8 +3547,16 @@ console.log("REF INDEX CHECK", {
         // Look up by json id first, then fall back to ref (handles ops whose json id differs between memory and DB)
         const supabaseId = supabaseRowByOpId[String(op.id)] || supabaseRowByRef[String(op.ref || "")];
         if (supabaseId) {
-          const { error } = await supabase.from("derivatives").update({ data: op }).eq("id", supabaseId);
-          if (error) saveErrors.push({ ref: op.ref || op.id, error: error.message });
+          // Retry up to 3 times on network errors (Failed to fetch, timeout)
+          let lastError = null;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt)); // backoff
+            const { error } = await supabase.from("derivatives").update({ data: op }).eq("id", supabaseId);
+            if (!error) { lastError = null; break; }
+            lastError = error;
+            if (!error.message?.includes("fetch")) break; // only retry network errors
+          }
+          if (lastError) saveErrors.push({ ref: op.ref || op.id, error: lastError.message });
         } else {
           saveErrors.push({ ref: op.ref || op.id, error: "Row Supabase introuvable — op non modifiée (aucune donnée perdue)" });
         }

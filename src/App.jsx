@@ -6088,7 +6088,27 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
           const norm = v => v?.toString().toLowerCase().trim() || "";
           const found = derivProducts.find(p => norm(p.label) === norm(obj.instrument) || norm(p.value) === norm(obj.instrument));
           if (found && !obj.exchange && found.stoxxExchange) obj.exchange = found.stoxxExchange;
+          if (!found) {
+            const key = `derivProducts:${obj.instrument}`;
+            if (!unknowns[key]) unknowns[key] = { fieldKey: "instrument", configKey: "derivProducts", fieldLabel: "Instrument", value: obj.instrument };
+          }
         }
+        // Validate config-linked fields for fixings
+        const FIXING_FIELD_CONFIG_MAP = {
+          type:         { configKey: "derivInstrumentTypes", label: "Instrument Type",  getValue: (v, cfg) => cfg.derivInstrumentTypes?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.label },
+          opType:       { configKey: "derivFixingOpTypes",   label: "Fixing Op. Type",  getValue: (v, cfg) => cfg.derivFixingOpTypes?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.label },
+          exchange:     { configKey: "derivExchanges",       label: "Exchange",         getValue: (v, cfg) => cfg.derivExchanges?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.value },
+          businessUnit: { configKey: "businessUnit",         label: "Business Unit",    getValue: (v, cfg) => cfg.businessUnit?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.value },
+        };
+        Object.entries(FIXING_FIELD_CONFIG_MAP).forEach(([fieldKey, { configKey, label, getValue }]) => {
+          const val = obj[fieldKey];
+          if (!val) return;
+          const found = getValue(val, config);
+          if (!found) {
+            const key = `${configKey}:${val}`;
+            if (!unknowns[key]) unknowns[key] = { fieldKey, configKey, fieldLabel: label, value: val };
+          }
+        });
       }
       return obj;
     }).filter(o => {

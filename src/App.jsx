@@ -3384,12 +3384,12 @@ const BatchEuronextFees = () => {
           const dateFrom = t.validFrom || "";
           const dateTo = t.validTo || "";
           const dateMatch = (!dateFrom || tradeDate >= dateFrom) && (!dateTo || tradeDate <= dateTo);
+          const allMatch = brokerMatch && exchangeMatch && transMatch && opTypeMatch && dateMatch;
           if (isDebug) {
-            console.log(`[DEBUG] ref=${op.ref} tarif=${t.tarifType} active=${t.isActive} from=${dateFrom} to=${dateTo} tarif=${t.tarif}`,
-              { brokerMatch, exchangeMatch, transMatch, opTypeMatch, dateMatch,
-                opBroker, tBrokers: brokers, opTrans, tTrans: transmissions, opOpType, tOpTypes: opTypes, tradeDate });
+            const status = allMatch ? "✅ MATCH" : `❌ FAIL(broker=${brokerMatch},exch=${exchangeMatch},trans=${transMatch},opType=${opTypeMatch},date=${dateMatch})`;
+            console.log(`[DEBUG] ref=${op.ref} ${status} | ${t.tarifType} ${t.tarif}€ | broker=${brokers.join(",")} | exch=${t.exchange} | from=${dateFrom} to=${dateTo}`);
           }
-          return brokerMatch && exchangeMatch && transMatch && opTypeMatch && dateMatch;
+          return allMatch;
         });
 
         if (matching.length === 0) return { fees: null, matched: [], ambiguous: false };

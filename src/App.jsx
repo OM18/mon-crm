@@ -3559,6 +3559,9 @@ console.log("REF INDEX CHECK", {
         const { op } = updatedList[i];
         // Look up by json id first, then fall back to ref (handles ops whose json id differs between memory and DB)
         const supabaseId = supabaseRowByOpId[String(op.id)] || supabaseRowByRef[String(op.ref || "")];
+        if (String(op.ref) === "2199") {
+          console.log("[SAVE DEBUG] ref=2199", { opId: op.id, opRef: op.ref, byId: supabaseRowByOpId[String(op.id)], byRef: supabaseRowByRef["2199"], supabaseId });
+        }
         if (supabaseId) {
           // Retry up to 3 times on network errors (Failed to fetch, timeout)
           let lastError = null;

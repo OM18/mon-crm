@@ -3460,11 +3460,13 @@ const BatchFixingsOldToNew = () => {
           {state === "error" && <span style={{ fontSize: 12, color: COLORS.red }}>❌ {result?.error}</span>}
         </div>
 
-        {warnings.length > 0 && (
-          <div style={{ background: `${COLORS.orange}10`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "10px 14px" }}>
-            {warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
-          </div>
-        )}
+        <div style={{ background: `${COLORS.orange}10`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "10px 14px" }}>
+          {[
+            "⚠ Colonne 'type' (Instrument Type) absente du fichier source — à renseigner manuellement dans le fichier généré.",
+            "⚠ Colonnes 'optionType', 'strike', 'expiryDate', 'notes' absentes du fichier source — non incluses.",
+            "⚠ Colonne 'exchange' laissée vide — à compléter manuellement.",
+          ].map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
+        </div>
       </div>
     </div>
   );

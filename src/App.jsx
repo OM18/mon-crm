@@ -8789,7 +8789,7 @@ const XlButton = ({ onImport, onExport }) => {
   );
 };
 
-const FixingsTab = ({ products }) => {
+const FixingsTab = ({ products, initialFixings }) => {
   const { config } = useConfig();
   const genRef = () => `FIX-${Date.now().toString(36).toUpperCase().slice(-6)}`;
 
@@ -8811,7 +8811,7 @@ const FixingsTab = ({ products }) => {
     };
   };
 
-  const [fixings, setFixingsRaw] = useState([]);
+  const [fixings, setFixingsRaw] = useState(() => initialFixings || []);
   const [selected, setSelected] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -8830,6 +8830,7 @@ const FixingsTab = ({ products }) => {
 
   // Load fixings from Supabase
   useEffect(() => {
+    if (initialFixings && initialFixings.length > 0) return; // already loaded via global cache
     async function load() {
       const PAGE = 1000;
       let all = [], from = 0;
@@ -9087,9 +9088,12 @@ const FixingsTab = ({ products }) => {
 
             {/* Business Unit */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <ToggleGroupStandalone label="BUSINESS UNIT" options={config.derivBusinessUnits || []} value={form.businessUnit}
+              <ToggleGroupStandalone label="BUSINESS UNIT"
+                options={(config.businessUnit || []).filter(bu => (config.derivBusinessUnits || []).includes(bu.value)).map(bu => bu.value)}
+                value={form.businessUnit}
                 onChange={v => setForm(f => ({ ...f, businessUnit: v }))}
-                colorFn={v => (config.derivBusinessUnits || []).find(b => b.value === v)?.color || COLORS.accent} />
+                colorFn={v => (config.businessUnit || []).find(b => b.value === v)?.color || COLORS.accent}
+                labelFn={v => (config.businessUnit || []).find(b => b.value === v)?.label?.toUpperCase() || v.toUpperCase()} />
             </div>
 
             {/* Instrument Type */}
@@ -9231,7 +9235,7 @@ const FixingsTab = ({ products }) => {
 };
 
 
-const Derivatives = ({ companies, initialOps }) => {
+const Derivatives = ({ companies, initialOps, initialFixings }) => {
   const { config } = useConfig();
   const [products, setProducts] = useState([]);
 
@@ -9749,7 +9753,7 @@ const setOps = async (val) => {
           ))}
         </div>
 
-        {derivTab === "fixings" && <FixingsTab products={products} />}
+        {derivTab === "fixings" && <FixingsTab products={products} initialFixings={initialFixings} />}
         {derivTab === "operations" && <>
 
         {/* KPIs */}
@@ -12429,6 +12433,7 @@ export default function CRM() {
   const [companies, setCompanies] = useState([]);
   const [tasks, setTasks] = useState(initialTasks);
   const [derivativesCache, setDerivativesCache] = useState(null);
+  const [fixingsCache, setFixingsCache] = useState(null);
   const [page, setPage] = useState("dashboard");
   const dataLoaded = useRef(false);
 
@@ -12483,16 +12488,18 @@ export default function CRM() {
     }
 
     async function loadData() {
-      const [contacts, companies, tasks, derivOps] = await Promise.all([
+      const [contacts, companies, tasks, derivOps, fixingOps] = await Promise.all([
         loadAllPages('contacts'),
         loadAllPages('companies'),
         loadAllPages('tasks'),
         loadAllPages('derivatives'),
+        loadAllPages('fixings'),
       ]);
       if (contacts.length) setContacts(contacts);
       if (companies.length) setCompanies(companies);
       if (tasks.length) setTasks(tasks);
       if (derivOps.length) setDerivativesCache(derivOps);
+      if (fixingOps.length) setFixingsCache(fixingOps);
       dataLoaded.current = true;
     }
     loadData();
@@ -12605,7 +12612,7 @@ export default function CRM() {
           {page === "tasks" && <Tasks tasks={tasks} setTasks={setTasks} contacts={contacts} companies={companies} />}
           {page === "pipeline" && <Pipeline contacts={contacts} setContacts={setContacts} companies={companies} setCompanies={setCompanies} />}
           {page === "companies-dashboard" && <CompaniesDashboard companies={companies} setCompanies={setCompanies} />}
-          {page === "derivatives" && <Derivatives companies={companies} initialOps={derivativesCache} />}
+          {page === "derivatives" && <Derivatives companies={companies} initialOps={derivativesCache} initialFixings={fixingsCache} />}
           {page === "derivatives-dashboard" && <DerivativesDashboard />}
           {page === "derivatives-statistics" && <DerivStatistics />}
           {page === "admin" && <AdminPanel companies={companies} />}

@@ -3512,7 +3512,8 @@ if (indexRows) {
 }
 console.log("REF INDEX CHECK", {
   ref_1823: supabaseRowByRef["1823"],
-  ref_4500: supabaseRowByRef["4500"],
+  ref_2199: supabaseRowByRef["2199"],
+  id_2199_ts: supabaseRowByOpId["1776009385845.6333"],
   total_refs: Object.keys(supabaseRowByRef).length,
 });
       if (indexRows) {
@@ -3563,8 +3564,8 @@ console.log("REF INDEX CHECK", {
         const { op } = updatedList[i];
         // Look up by json id first, then fall back to ref (handles ops whose json id differs between memory and DB)
         const supabaseId = supabaseRowByOpId[String(op.id)] || supabaseRowByRef[String(op.ref || "")];
-        if (String(op.ref) === "2199") {
-          console.log("[SAVE DEBUG] ref=2199", { opId: op.id, opRef: op.ref, byId: supabaseRowByOpId[String(op.id)], byRef: supabaseRowByRef["2199"], supabaseId });
+        if (String(op.ref) === "2199" || String(op.id) === "1776009385845.6333") {
+          console.log("[SAVE DEBUG] ref=2199", { opId: op.id, opRef: op.ref, byId: supabaseRowByOpId[String(op.id)], byRef: supabaseRowByRef[String(op.ref)], supabaseId });
         }
         if (supabaseId) {
           // Retry up to 3 times on network errors (Failed to fetch, timeout)

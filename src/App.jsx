@@ -3798,7 +3798,7 @@ useEffect(() => {
   const [editEtId, setEditEtId] = useState(null);
   const [showEtForm, setShowEtForm] = useState(false);
   const [expandedExchangeTarifs, setExpandedExchangeTarifs] = useState(false);
-  const [etFilters, setEtFilters] = useState({ exchange: [], tarifType: [], opType: [], transmission: [], broker: [], isActive: "all" });
+  const [etFilters, setEtFilters] = useState({ exchange: [], tarifType: [], opType: [], transmission: [], broker: [], isActive: "all", year: "" });
 
   // ── Price Units state ──
   const EMPTY_PU = { exchange: "", underlying: "", unit: "" };
@@ -4544,7 +4544,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                   const allTarifTypes = [...new Set(exchangeTarifs.map(et => et.tarifType).filter(Boolean))].sort();
                   const allOpTypes = [...new Set(exchangeTarifs.flatMap(et => Array.isArray(et.opType) ? et.opType : (et.opType ? [et.opType] : [])))].sort();
                   const allTransmissions = [...new Set(exchangeTarifs.flatMap(et => Array.isArray(et.orderTransmissionType) ? et.orderTransmissionType : (et.orderTransmissionType ? [et.orderTransmissionType] : [])))].sort();
-                  const hasFilters = etFilters.exchange.length > 0 || etFilters.tarifType.length > 0 || etFilters.opType.length > 0 || etFilters.transmission.length > 0 || etFilters.broker.length > 0 || etFilters.isActive !== "all";
+                  const hasFilters = etFilters.exchange.length > 0 || etFilters.tarifType.length > 0 || etFilters.opType.length > 0 || etFilters.transmission.length > 0 || etFilters.broker.length > 0 || etFilters.isActive !== "all" || etFilters.year !== "";
+                  const allYears = [...new Set(exchangeTarifs.flatMap(et => { const years = []; const from = et.validFrom ? parseInt(et.validFrom.slice(0,4)) : null; const to = et.validTo ? parseInt(et.validTo.slice(0,4)) : null; if (from) for (let y = from; y <= (to || new Date().getFullYear()); y++) years.push(String(y)); return years; }))].sort();
                   const toggle = (key, val) => setEtFilters(f => ({ ...f, [key]: f[key].includes(val) ? f[key].filter(v => v !== val) : [...f[key], val] }));
                   const pillStyle = (active, color) => ({ cursor: "pointer", fontSize: 11, fontWeight: active ? 700 : 500, padding: "3px 10px", borderRadius: 8, border: `1px solid ${active ? color : COLORS.border}`, background: active ? `${color}22` : COLORS.bg, color: active ? color : COLORS.textMuted, transition: "all 0.12s", userSelect: "none" });
                   return (
@@ -4552,8 +4553,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5 }}>FILTRES</span>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          {hasFilters && <span style={{ fontSize: 11, color: COLORS.purple, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>{(() => { const n = exchangeTarifs.filter(et => { if (etFilters.broker.length > 0) { const brokers = Array.isArray(et.financialBroker) ? et.financialBroker : (et.financialBroker ? [et.financialBroker] : []); if (!etFilters.broker.some(b => brokers.includes(b))) return false; } if (etFilters.exchange.length > 0 && !etFilters.exchange.includes(et.exchange)) return false; if (etFilters.tarifType.length > 0 && !etFilters.tarifType.includes(et.tarifType)) return false; if (etFilters.opType.length > 0) { const ops = Array.isArray(et.opType) ? et.opType : (et.opType ? [et.opType] : []); if (!etFilters.opType.some(o => ops.includes(o))) return false; } if (etFilters.transmission.length > 0) { const trans = Array.isArray(et.orderTransmissionType) ? et.orderTransmissionType : (et.orderTransmissionType ? [et.orderTransmissionType] : []); if (!etFilters.transmission.some(t => trans.includes(t))) return false; } if (etFilters.isActive !== "all") { const active = et.isActive !== false && String(et.isActive) !== "false"; if (etFilters.isActive === "active" && !active) return false; if (etFilters.isActive === "inactive" && active) return false; } return true; }).length; return `${n} résultat${n !== 1 ? "s" : ""}`; })()}</span>}
-                          {hasFilters && <span onClick={() => setEtFilters({ exchange: [], tarifType: [], opType: [], transmission: [], broker: [], isActive: "all" })} style={{ cursor: "pointer", fontSize: 11, color: COLORS.red, fontWeight: 600 }}>✕ Reset</span>}
+                          {hasFilters && <span style={{ fontSize: 11, color: COLORS.purple, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>{(() => { const n = exchangeTarifs.filter(et => { if (etFilters.broker.length > 0) { const brokers = Array.isArray(et.financialBroker) ? et.financialBroker : (et.financialBroker ? [et.financialBroker] : []); if (!etFilters.broker.some(b => brokers.includes(b))) return false; } if (etFilters.exchange.length > 0 && !etFilters.exchange.includes(et.exchange)) return false; if (etFilters.tarifType.length > 0 && !etFilters.tarifType.includes(et.tarifType)) return false; if (etFilters.opType.length > 0) { const ops = Array.isArray(et.opType) ? et.opType : (et.opType ? [et.opType] : []); if (!etFilters.opType.some(o => ops.includes(o))) return false; } if (etFilters.transmission.length > 0) { const trans = Array.isArray(et.orderTransmissionType) ? et.orderTransmissionType : (et.orderTransmissionType ? [et.orderTransmissionType] : []); if (!etFilters.transmission.some(t => trans.includes(t))) return false; } if (etFilters.year !== "") { const y = parseInt(etFilters.year); const from = et.validFrom ? parseInt(et.validFrom.slice(0,4)) : null; const to = et.validTo ? parseInt(et.validTo.slice(0,4)) : null; if (from && y < from) return false; if (to && y > to) return false; } if (etFilters.isActive !== "all") { const active = et.isActive !== false && String(et.isActive) !== "false"; if (etFilters.isActive === "active" && !active) return false; if (etFilters.isActive === "inactive" && active) return false; } return true; }).length; return `${n} résultat${n !== 1 ? "s" : ""}`; })()}</span>}
+                          {hasFilters && <span onClick={() => setEtFilters({ exchange: [], tarifType: [], opType: [], transmission: [], broker: [], isActive: "all", year: "" })} style={{ cursor: "pointer", fontSize: 11, color: COLORS.red, fontWeight: 600 }}>✕ Reset</span>}
                         </div>
                       </div>
                       {/* Broker */}
@@ -4610,6 +4611,18 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                           ))}
                         </div>
                       </div>
+                      {/* Year */}
+                      {allYears.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 700, letterSpacing: 0.5, marginBottom: 5 }}>ANNÉE DE VALIDITÉ</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                            {allYears.map(y => (
+                              <span key={y} onClick={() => setEtFilters(f => ({ ...f, year: f.year === y ? "" : y }))}
+                                style={pillStyle(etFilters.year === y, COLORS.blue)}>{y}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -4641,6 +4654,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                         const trans = Array.isArray(et.orderTransmissionType) ? et.orderTransmissionType : (et.orderTransmissionType ? [et.orderTransmissionType] : []);
                         if (!etFilters.transmission.some(t => trans.includes(t))) return false;
                       }
+                      if (etFilters.year !== "") { const y = parseInt(etFilters.year); const from = et.validFrom ? parseInt(et.validFrom.slice(0,4)) : null; const to = et.validTo ? parseInt(et.validTo.slice(0,4)) : null; if (from && y < from) return false; if (to && y > to) return false; }
                       if (etFilters.isActive !== "all") {
                         const active = et.isActive !== false && String(et.isActive) !== "false";
                         if (etFilters.isActive === "active" && !active) return false;

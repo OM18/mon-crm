@@ -9123,6 +9123,8 @@ const setOps = async (val) => {
   const [search, setSearch]     = useState("");
   const [accountSearch, setAccountSearch] = useState("");
   const [refSearch, setRefSearch] = useState("");
+  const [blotterScrollTop, setBlotterScrollTop] = useState(0);
+  const blotterRef = useRef(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo]     = useState("");
   const [editingFeesId, setEditingFeesId] = useState(null);
@@ -9660,15 +9662,30 @@ const setOps = async (val) => {
           </div>
         </div>
 
-        {/* Tableau */}
-        <div ref={el => { if (el) el._scrollRef = el; }} id="deriv-scroll-container" style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
+        {/* Tableau virtualisé */}
+        {(() => {
+          const ROW_H = 44;
+          const OVERSCAN = 5;
+          const visibleHeight = 600;
+          const totalHeight = filtered.length * ROW_H;
+          const startIdx = Math.max(0, Math.floor(blotterScrollTop / ROW_H) - OVERSCAN);
+          const endIdx = Math.min(filtered.length, Math.ceil((blotterScrollTop + visibleHeight) / ROW_H) + OVERSCAN);
+          const visibleRows = filtered.slice(startIdx, endIdx);
+          const offsetY = startIdx * ROW_H;
+          return (
+        <div ref={blotterRef} id="deriv-scroll-container"
+          onScroll={e => setBlotterScrollTop(e.currentTarget.scrollTop)}
+          style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
           <div key={JSON.stringify(activeFilters) + filterMode} style={{ minWidth: 1100 }}>
             {/* Header */}
-            <div style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, background: COLORS.tableHeader, borderRadius: "10px 10px 0 0", padding: "10px 16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, background: COLORS.tableHeader, borderRadius: "10px 10px 0 0", padding: "10px 16px", position: "sticky", top: 0, zIndex: 2 }}>
               {HEADERS.map(h => <div key={h} style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textAlign: "center" }}>{h}</div>)}
             </div>
-            {/* Lignes */}
-            {filtered.map((o, i) => {
+            {/* Lignes virtualisées */}
+            <div style={{ height: totalHeight, position: "relative" }}>
+              <div style={{ position: "absolute", top: offsetY, left: 0, right: 0 }}>
+            {visibleRows.map((o, vi) => {
+              const i = startIdx + vi;
               const sc = getStatusCfg(o.status);
               const isSelected = selected === o.id;
               return (
@@ -9733,9 +9750,13 @@ const setOps = async (val) => {
                 </div>
               );
             })}
+              </div>
+            </div>
             {filtered.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48, background: COLORS.card, borderRadius: "0 0 10px 10px" }}>Aucune opération</div>}
           </div>
         </div>
+          );
+        })()}
       </>}
       </div>
 

@@ -3380,7 +3380,7 @@ const BatchFixingsOldToNew = () => {
         // Mapping
         out["ref"]           = row["id"] || "";
         out["type"]          = ""; // absent du fichier source — à renseigner manuellement
-        out["opType"]        = row["operation_type"] || "";
+        out["opType"]        = "HEDGING";
         out["side"]          = (() => {
           const v = String(row["deal_type"] || "").toLowerCase().trim();
           if (v === "short") return "SELL";

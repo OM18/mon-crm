@@ -8926,28 +8926,53 @@ const [exchangeTarifs, setExchangeTarifs] = useState([]);
       if (!tarifs || tarifs.length === 0 || !op) return "";
       const norm = v => (v || "").toString().toLowerCase().trim();
       const opBroker = norm(op.broker);
-      // Resolve exchange from product if not set on the operation
       const resolvedExchange = products.find(p => norm(p.label) === norm(op.instrument))?.stoxxExchange || op.exchange || "";
       const opExchange = norm(resolvedExchange);
       const opTrans = norm(op.orderTransmissionType);
       const opOpType = norm(op.opType);
+      const tradeDate = op.tradeDate || "";
 
-      const matching = tarifs.filter(t => {
-        if (!t.isActive) return false;
+      // Use active-only tarifs when no tradeDate (live/new ops), use all tarifs with date filter for historical ops
+      const candidates = tarifs.filter(t => {
         const brokers = Array.isArray(t.financialBroker) ? t.financialBroker : [t.financialBroker];
         const transmissions = Array.isArray(t.orderTransmissionType) ? t.orderTransmissionType : [t.orderTransmissionType];
         const opTypes = Array.isArray(t.opType) ? t.opType : (t.opType ? [t.opType] : []);
-        const brokerMatch = brokers.some(b => norm(b) === opBroker || norm(b).includes(opBroker) || opBroker.includes(norm(b)));
-        const exchangeMatch = norm(t.exchange) === opExchange || norm(t.exchange).includes(opExchange) || opExchange.includes(norm(t.exchange));
+        const brokerMatch = opBroker === "" || brokers.some(b => norm(b) === opBroker || (opBroker.length > 2 && norm(b).includes(opBroker)) || (norm(b).length > 2 && opBroker.includes(norm(b))));
+        const exchangeMatch = opExchange !== "" && (norm(t.exchange) === opExchange || (opExchange.length > 2 && norm(t.exchange).includes(opExchange)) || (norm(t.exchange).length > 2 && opExchange.includes(norm(t.exchange))));
         const transMatch = opTrans === "" || transmissions.some(tr => norm(tr) === opTrans);
-        // If the tarif has no opType defined, it applies to all operation types
         const opTypeMatch = opTypes.length === 0 || opOpType === "" || opTypes.some(ot => norm(ot) === opOpType);
-        return brokerMatch && exchangeMatch && transMatch && opTypeMatch;
+        const dateFrom = t.validFrom || "";
+        const dateTo = t.validTo || "";
+        const dateMatch = tradeDate ? ((!dateFrom || tradeDate >= dateFrom) && (!dateTo || tradeDate <= dateTo)) : (t.isActive !== false && String(t.isActive) !== "false");
+        return brokerMatch && exchangeMatch && transMatch && opTypeMatch && dateMatch;
       });
 
-      if (matching.length === 0) return "";
-      const total = matching.reduce((sum, t) => sum + (parseFloat(t.tarif) || 0), 0);
-      const lots = parseFloat(op.quantity) || 1;
+      if (candidates.length === 0) return "";
+
+      // For each tarifType group, pick the narrowest date range (most specific)
+      const byType = {};
+      candidates.forEach(t => {
+        const k = t.tarifType || "__none__";
+        if (!byType[k]) byType[k] = [];
+        byType[k].push(t);
+      });
+      const DAY_MS = 86400000;
+      const rangeSize = t => {
+        if (!t.validFrom && !t.validTo) return Infinity;
+        const from = t.validFrom ? new Date(t.validFrom).getTime() : -Infinity;
+        const to = t.validTo ? new Date(t.validTo).getTime() : Infinity;
+        return (to - from) / DAY_MS;
+      };
+      const resolved = [];
+      for (const group of Object.values(byType)) {
+        if (group.length === 1) { resolved.push(group[0]); continue; }
+        const minSize = Math.min(...group.map(t => rangeSize(t)));
+        const best = group.filter(t => rangeSize(t) === minSize);
+        if (best.length >= 1) resolved.push(best[0]);
+      }
+
+      const total = resolved.reduce((sum, t) => sum + (parseFloat(String(t.tarif || "").replace(/,/g, ".")) || 0), 0);
+      const lots = parseFloat(String(op.quantity || "").replace(/,/g, ".")) || 1;
       return Math.round(total * lots * 100) / 100;
     } catch { return ""; }
   };

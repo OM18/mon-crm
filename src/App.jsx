@@ -3387,18 +3387,42 @@ const BatchEuronextFees = () => {
         if (matching.length === 0) return { fees: null, matched: [], ambiguous: false };
 
         // Detect ambiguity: multiple tarifs of same tarifType matching same op
+        // Resolution strategy: for each tarifType group, prefer the tarif with the most
+        // specific date range (both validFrom AND validTo defined) over one without dates.
+        // If two tarifs with equally specific ranges match, that is a true ambiguity.
         const byType = {};
         matching.forEach(t => {
           const k = t.tarifType || "__none__";
           if (!byType[k]) byType[k] = [];
           byType[k].push(t);
         });
-        const ambiguous = Object.values(byType).some(arr => arr.length > 1);
-        if (ambiguous) return { fees: null, matched: matching, ambiguous: true };
 
-        const total = matching.reduce((sum, t) => sum + (parseFloat(t.tarif) || 0), 0);
-        const lots = parseFloat(op.quantity) || 1;
-        return { fees: Math.round(total * lots * 100) / 100, matched: matching, ambiguous: false };
+        const resolved = [];
+        for (const [, group] of Object.entries(byType)) {
+          if (group.length === 1) {
+            resolved.push(group[0]);
+            continue;
+          }
+          // Score each tarif: prefer tarifs with explicit date ranges over open-ended ones
+          // Score: 2 = both validFrom+validTo, 1 = one of them, 0 = neither
+          const scored = group.map(t => ({
+            t,
+            score: (t.validFrom ? 1 : 0) + (t.validTo ? 1 : 0),
+          }));
+          const maxScore = Math.max(...scored.map(s => s.score));
+          const best = scored.filter(s => s.score === maxScore);
+          if (best.length === 1) {
+            // Unique best match — use it, no ambiguity
+            resolved.push(best[0].t);
+          } else {
+            // True ambiguity: multiple equally-specific tarifs for same type
+            return { fees: null, matched: matching, ambiguous: true };
+          }
+        }
+
+        const total = resolved.reduce((sum, t) => sum + (parseNum(t.tarif) || 0), 0);
+        const lots = parseNum(op.quantity) || 1;
+        return { fees: Math.round(total * lots * 100) / 100, matched: resolved, ambiguous: false };
       };
 
       // 4. Filter Euronext ops

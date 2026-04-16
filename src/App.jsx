@@ -3362,6 +3362,8 @@ const BatchEuronextFees = () => {
 
       const norm = v => (v || "").toString().toLowerCase().trim();
 
+      const DEBUG_REFS = new Set(["2038","2177","2157","2059","1763"]);
+
       const computeFeesForOp = (op, tarifs, prods) => {
         const opBroker = norm(op.broker);
         const resolvedExchange = prods.find(p => norm(p.label) === norm(op.instrument))?.stoxxExchange || op.exchange || "";
@@ -3369,6 +3371,7 @@ const BatchEuronextFees = () => {
         const opTrans = norm(op.orderTransmissionType);
         const opOpType = norm(op.opType);
         const tradeDate = op.tradeDate || "";
+        const isDebug = DEBUG_REFS.has(String(op.ref));
 
         const matching = tarifs.filter(t => {
           const brokers = Array.isArray(t.financialBroker) ? t.financialBroker : [t.financialBroker];
@@ -3381,6 +3384,11 @@ const BatchEuronextFees = () => {
           const dateFrom = t.validFrom || "";
           const dateTo = t.validTo || "";
           const dateMatch = (!dateFrom || tradeDate >= dateFrom) && (!dateTo || tradeDate <= dateTo);
+          if (isDebug) {
+            console.log(`[DEBUG] ref=${op.ref} tarif=${t.tarifType} active=${t.isActive} from=${dateFrom} to=${dateTo} tarif=${t.tarif}`,
+              { brokerMatch, exchangeMatch, transMatch, opTypeMatch, dateMatch,
+                opBroker, tBrokers: brokers, opTrans, tTrans: transmissions, opOpType, tOpTypes: opTypes, tradeDate });
+          }
           return brokerMatch && exchangeMatch && transMatch && opTypeMatch && dateMatch;
         });
 
@@ -3403,19 +3411,24 @@ const BatchEuronextFees = () => {
             resolved.push(group[0]);
             continue;
           }
-          // Score each tarif: prefer tarifs with explicit date ranges over open-ended ones
-          // Score: 2 = both validFrom+validTo, 1 = one of them, 0 = neither
-          const scored = group.map(t => ({
-            t,
-            score: (t.validFrom ? 1 : 0) + (t.validTo ? 1 : 0),
-          }));
-          const maxScore = Math.max(...scored.map(s => s.score));
-          const best = scored.filter(s => s.score === maxScore);
+          // Prefer the tarif with the narrowest (shortest) date range — most specific for this tradeDate.
+          // This handles cases where a broad "catch-all" tarif overlaps with a more precise period tarif.
+          // Narrowness = smallest (validTo - validFrom) in days. Open-ended tarifs (no dates) = infinite range.
+          const DAY_MS = 86400000;
+          const rangeSize = t => {
+            if (!t.validFrom && !t.validTo) return Infinity;
+            const from = t.validFrom ? new Date(t.validFrom).getTime() : -Infinity;
+            const to   = t.validTo   ? new Date(t.validTo).getTime()   : Infinity;
+            return (to - from) / DAY_MS;
+          };
+          const sized = group.map(t => ({ t, size: rangeSize(t) }));
+          const minSize = Math.min(...sized.map(s => s.size));
+          const best = sized.filter(s => s.size === minSize);
           if (best.length === 1) {
-            // Unique best match — use it, no ambiguity
+            // Unique narrowest range — use it, no ambiguity
             resolved.push(best[0].t);
           } else {
-            // True ambiguity: multiple equally-specific tarifs for same type
+            // True ambiguity: multiple tarifs with identical range sizes
             return { fees: null, matched: matching, ambiguous: true };
           }
         }

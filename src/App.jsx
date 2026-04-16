@@ -8900,6 +8900,17 @@ const FixingsTab = ({ products }) => {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 13, color: COLORS.textMuted }}>{filtered.length} fixing{filtered.length !== 1 ? "s" : ""}</div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {fixings.length > 0 && (
+              <button onClick={async () => {
+                if (window.confirm(`⚠️ Supprimer les ${fixings.length} fixings ? Cette action est irréversible.`)) {
+                  await supabase.from('fixings').delete().neq('id', 0);
+                  setFixingsRaw([]);
+                  setSelected(null);
+                }
+              }} style={{ background: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: "10px 14px", letterSpacing: 0.3 }}>
+                🗑 Effacer tout ({fixings.length})
+              </button>
+            )}
             <button onClick={reload} disabled={isReloading} style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: isReloading ? "wait" : "pointer", fontSize: 18, padding: "10px 14px", color: isReloading ? COLORS.textMuted : COLORS.textSub }}>{isReloading ? "⟳" : "↺"}</button>
 <XlButton onImport={() => setShowImport(true)} onExport={() => setShowExport(true)} />
             <button onClick={openNew} style={{ background: COLORS.accent, color: COLORS.textOnAccent, border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", padding: "10px 20px", letterSpacing: 0.5 }}>+ NEW FIXING</button>

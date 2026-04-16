@@ -3377,8 +3377,8 @@ const BatchEuronextFees = () => {
           const brokers = Array.isArray(t.financialBroker) ? t.financialBroker : [t.financialBroker];
           const transmissions = Array.isArray(t.orderTransmissionType) ? t.orderTransmissionType : [t.orderTransmissionType];
           const opTypes = Array.isArray(t.opType) ? t.opType : (t.opType ? [t.opType] : []);
-          const brokerMatch = brokers.some(b => norm(b) === opBroker || norm(b).includes(opBroker) || opBroker.includes(norm(b)));
-          const exchangeMatch = norm(t.exchange) === opExchange || norm(t.exchange).includes(opExchange) || opExchange.includes(norm(t.exchange));
+          const brokerMatch = opBroker === "" || brokers.some(b => norm(b) === opBroker || (opBroker.length > 2 && norm(b).includes(opBroker)) || (norm(b).length > 2 && opBroker.includes(norm(b))));
+          const exchangeMatch = opExchange !== "" && (norm(t.exchange) === opExchange || (opExchange.length > 2 && norm(t.exchange).includes(opExchange)) || (norm(t.exchange).length > 2 && opExchange.includes(norm(t.exchange))));
           const transMatch = opTrans === "" || transmissions.some(tr => norm(tr) === opTrans);
           const opTypeMatch = opTypes.length === 0 || opOpType === "" || opTypes.some(ot => norm(ot) === opOpType);
           const dateFrom = t.validFrom || "";

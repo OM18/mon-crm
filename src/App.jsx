@@ -3346,6 +3346,208 @@ const ExchangeManagerBlock = () => {
   );
 };
 
+
+// ─── BATCH DERIVATIVES OPERATIONS — OLD TO NEW ───────────────
+const BatchDerivativesOldToNew = () => {
+  const [state, setState] = useState("idle"); // idle | processing | done | error
+  const [result, setResult] = useState(null);
+  const [warnings, setWarnings] = useState([]);
+  const fileRef = useRef(null);
+
+  const processFile = async (file) => {
+    setState("processing");
+    setResult(null);
+    setWarnings([]);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      const up = v => v ? String(v).toUpperCase().trim() : "";
+
+      const parseDate = (val) => {
+        if (!val) return "";
+        const s = String(val).trim();
+        // dd.mm.yyyy → dd/mm/yyyy
+        const dotMatch = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (dotMatch) return `${dotMatch[1].padStart(2,"0")}/${dotMatch[2].padStart(2,"0")}/${dotMatch[3]}`;
+        // already dd/mm/yyyy
+        const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (slashMatch) return `${slashMatch[1].padStart(2,"0")}/${slashMatch[2].padStart(2,"0")}/${slashMatch[3]}`;
+        // Excel serial
+        if (/^\d{4,5}$/.test(s)) {
+          const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+          return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+        }
+        // ISO YYYY-MM-DD
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+        return s;
+      };
+
+      // ── 1. Filtrer les lignes ──────────────────────────────
+      const filtered = rows.filter(row => {
+        // Supprimer les lignes où operation_type === "fixing"
+        if (String(row["operation_type"] || "").toLowerCase().trim() === "fixing") return false;
+        // Supprimer les lignes où derivative__title ne commence pas par "CBOT" ou "MATIF"
+        const title = String(row["derivative__title"] || "").toUpperCase().trim();
+        if (!title.startsWith("CBOT") && !title.startsWith("MATIF")) return false;
+        // Supprimer les lignes où operation_type === "paper_trade" ET derivative_account__number est vide
+        const isPaperTrade = String(row["operation_type"] || "").toLowerCase().trim() === "paper_trade";
+        const accountEmpty = !row["derivative_account__number"] || String(row["derivative_account__number"]).trim() === "";
+        if (isPaperTrade && accountEmpty) return false;
+        return true;
+      });
+
+      // ── 2. Convertir chaque ligne ──────────────────────────
+      const converted = filtered.map(row => {
+        const out = {};
+
+        out["ref"] = up(row["id"]);
+
+        out["opType"] = (() => {
+          const v = String(row["operation_type"] || "").toLowerCase().trim();
+          if (v === "hedging")    return "HEDGING";
+          if (v === "paper_trade") return "TRADE";
+          return up(row["operation_type"]);
+        })();
+
+        out["side"] = (() => {
+          const v = String(row["deal_type"] || "").toLowerCase().trim();
+          if (v === "short") return "SELL";
+          if (v === "long")  return "BUY";
+          return up(row["deal_type"]);
+        })();
+
+        out["instrument"] = up(row["derivative__title"]);
+        out["quantity"]   = row["quantity"] || "";
+        out["price"]      = row["price"] || "";
+        out["tradeDate"]  = parseDate(row["business_date"]);
+        out["broker"]     = up(row["broker__name"]);
+
+        out["account"] = (() => {
+          const v = String(row["derivative_account__number"] || "").trim();
+          return v.slice(0, 5).toUpperCase();
+        })();
+
+        out["businessUnit"] = (() => {
+          const v = String(row["business_unit__title"] || "").trim().toUpperCase();
+          return v === "MOROCCO BU" ? "MOROCCO" : v;
+        })();
+
+        out["contract"] = up(row["contract_number"]);
+        out["trade"]    = up(row["passport__title"]);
+        out["fees"]     = row["tariffs_cost_per_deal_with_correction"] || "";
+
+        // Champs absents du fichier source — laissés vides
+        out["type"]                 = "";
+        out["strike"]               = "";
+        out["optionType"]           = "";
+        out["expiryDate"]           = "";
+        out["exchange"]             = "";
+        out["status"]               = "";
+        out["internalDeal"]         = "";
+        out["orderTransmissionType"] = "";
+        out["notes"]                = "";
+
+        return out;
+      });
+
+      if (converted.length === 0) {
+        setResult({ error: "Aucune ligne valide après filtrage." });
+        setState("error");
+        return;
+      }
+
+      // ── 3. Export Excel ────────────────────────────────────
+      const outWs = XLSX.utils.json_to_sheet(converted);
+      outWs["!cols"] = Object.keys(converted[0]).map(k => ({ wch: Math.max(k.length + 2, 14) }));
+      const outWb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(outWb, outWs, "Derivatives");
+      const date = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(outWb, `derivatives_converted_${date}.xlsx`);
+
+      const removedCount = rows.length - filtered.length;
+      setResult({ total: rows.length, converted: converted.length, removed: removedCount });
+      setWarnings([
+        "⚠ Champ 'type' (Instrument Type) absent du fichier source — à renseigner manuellement après import.",
+        "⚠ Champs 'strike', 'optionType', 'expiryDate', 'exchange', 'status', 'orderTransmissionType', 'notes' absents — colonnes vides incluses.",
+        "⚠ Champ 'account' tronqué aux 5 premiers caractères.",
+      ]);
+      setState("done");
+    } catch(e) {
+      setResult({ error: String(e) });
+      setState("error");
+    }
+  };
+
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ padding: "18px 24px", background: `${COLORS.blue}08`, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: `${COLORS.blue}20`, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>◬</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>BATCH DERIVATIVES OPERATIONS — OLD TO NEW</div>
+          <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Convertit un fichier export ancien format vers le format Operations de l'app</div>
+        </div>
+      </div>
+      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+        {/* Mapping info */}
+        <div style={{ fontSize: 12, color: COLORS.textMuted, background: COLORS.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
+          <div style={{ fontWeight: 700, marginBottom: 6, color: COLORS.textSub }}>Mapping appliqué :</div>
+          {[
+            "id → ref",
+            "operation_type → opType  (hedging → HEDGING, paper_trade → TRADE)",
+            "deal_type → side  (long → BUY, short → SELL)",
+            "derivative__title → instrument",
+            "quantity → quantity",
+            "price → price",
+            "business_date → tradeDate  (dd.mm.yyyy → dd/mm/yyyy)",
+            "broker__name → broker",
+            "derivative_account__number → account  (5 premiers caractères)",
+            "business_unit__title → businessUnit  (MOROCCO BU → MOROCCO)",
+            "contract_number → contract",
+            "passport__title → trade",
+            "tariffs_cost_per_deal_with_correction → fees",
+          ].map(m => <div key={m} style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>• {m}</div>)}
+          <div style={{ marginTop: 8, fontWeight: 700, color: COLORS.red, fontSize: 11 }}>
+            Colonnes supprimées : author__first_name, author__last_name, editor__first_name, editor__last_name, tariffs
+          </div>
+          <div style={{ marginTop: 6, fontWeight: 700, color: COLORS.orange, fontSize: 11 }}>
+            Lignes filtrées : operation_type = "fixing" | derivative__title ne commence pas par CBOT/MATIF | paper_trade sans account
+          </div>
+        </div>
+
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
+          onChange={e => { if (e.target.files[0]) processFile(e.target.files[0]); e.target.value = ""; }} />
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <Btn onClick={() => { setState("idle"); setResult(null); setWarnings([]); fileRef.current?.click(); }}
+            disabled={state === "processing"}>
+            {state === "processing" ? "⟳ Traitement…" : "📂 Charger fichier Excel"}
+          </Btn>
+          {state === "done" && result && (
+            <span style={{ fontSize: 12, color: COLORS.green, fontWeight: 700 }}>
+              ✓ {result.converted} lignes converties ({result.removed} supprimées sur {result.total}) — fichier téléchargé
+            </span>
+          )}
+          {state === "error" && <span style={{ fontSize: 12, color: COLORS.red }}>❌ {result?.error}</span>}
+        </div>
+
+        <div style={{ background: `${COLORS.orange}10`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "10px 14px" }}>
+          {[
+            "⚠ Colonne 'type' (Instrument Type) absente — à renseigner manuellement dans le fichier généré avant import.",
+            "⚠ Colonnes 'strike', 'optionType', 'expiryDate', 'exchange', 'status', 'orderTransmissionType', 'notes' absentes du fichier source.",
+            "⚠ Toutes les valeurs texte sont converties en MAJUSCULES.",
+          ].map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── BATCH FIXINGS OLD TO NEW ────────────────────────────────
 const BatchFixingsOldToNew = () => {
   const [state, setState] = useState("idle"); // idle | processing | done | error
@@ -5244,6 +5446,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
       {adminTab === "batch" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <BatchDerivativesOldToNew />
           <BatchFixingsOldToNew />
           <BatchFixingsNewToOld />
         </div>

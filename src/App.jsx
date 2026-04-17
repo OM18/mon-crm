@@ -9257,26 +9257,45 @@ const FixingsTab = ({ products, initialFixings }) => {
       )}
       {showImport && (
         <ExcelImportModal type="fixings" derivProducts={products} onClose={() => setShowImport(false)}
-          onImport={async (items) => {
+          onImport={async (items, mappedFields = []) => {
+            // Load full index (supabase row id + data) to match by ref
             const PAGE = 1000;
-            let currentFixings = [];
+            let indexRows = [];
             let from = 0;
             while (true) {
-              const { data, error } = await supabase.from("fixings").select("data").range(from, from + PAGE - 1);
+              const { data, error } = await supabase.from("fixings").select("id, data").range(from, from + PAGE - 1);
               if (error || !data || data.length === 0) break;
-              currentFixings = [...currentFixings, ...data.map(r => r.data ?? r)];
+              indexRows = [...indexRows, ...data];
               if (data.length < PAGE) break;
               from += PAGE;
             }
-            const ex = new Set(currentFixings.map(f => f.ref?.toLowerCase()).filter(Boolean));
-            const toAdd = items
-              .map(i => ({ ...makeEmpty(), ...i, id: Date.now() + Math.random() }))
-              .filter(i => !i.ref || !ex.has(i.ref?.toLowerCase()));
-            if (toAdd.length === 0) { reload(); return; }
-            const CHUNK = 50;
-            for (let i = 0; i < toAdd.length; i += CHUNK) {
-              const chunk = toAdd.slice(i, i + CHUNK).map(item => ({ data: item }));
-              await supabase.from("fixings").insert(chunk);
+            const byRef = {};
+            for (const r of indexRows) {
+              const ref = r.data?.ref?.toLowerCase();
+              if (ref && !byRef[ref]) byRef[ref] = { supabaseId: r.id, existing: r.data };
+            }
+            const toInsert = [];
+            for (const incoming of items) {
+              const key = incoming.ref?.toLowerCase();
+              if (key && byRef[key]) {
+                // Merge: only overwrite fields that were mapped and non-empty
+                const merged = { ...byRef[key].existing };
+                mappedFields.forEach(field => {
+                  const val = incoming[field];
+                  const isEmpty = val === undefined || val === null || val === "" || (Array.isArray(val) && val.length === 0);
+                  if (!isEmpty) merged[field] = val;
+                });
+                await supabase.from("fixings").update({ data: merged }).eq("id", byRef[key].supabaseId);
+              } else {
+                toInsert.push({ ...makeEmpty(), ...incoming, id: Date.now() + Math.random() });
+              }
+            }
+            if (toInsert.length > 0) {
+              const CHUNK = 50;
+              for (let i = 0; i < toInsert.length; i += CHUNK) {
+                const chunk = toInsert.slice(i, i + CHUNK).map(item => ({ data: item }));
+                await supabase.from("fixings").insert(chunk);
+              }
             }
             reload();
           }} />
@@ -10573,27 +10592,48 @@ const setOps = async (val) => {
       )}
       {showImport && (
         <ExcelImportModal type="derivatives" derivAccounts={derivAccounts} derivProducts={products} derivCompanies={companies} onClose={() => setShowImport(false)}
-          onImport={async (items) => {
+          onImport={async (items, mappedFields = []) => {
+            // Load full index (supabase row id + data) to match by ref
             const PAGE = 1000;
-            let currentOps = [];
+            let indexRows = [];
             let from = 0;
             while (true) {
-              const { data, error } = await supabase.from('derivatives').select('data').range(from, from + PAGE - 1);
+              const { data, error } = await supabase.from('derivatives').select('id, data').range(from, from + PAGE - 1);
               if (error || !data || data.length === 0) break;
-              currentOps = [...currentOps, ...data.map(r => r.data ?? r)];
+              indexRows = [...indexRows, ...data];
               if (data.length < PAGE) break;
               from += PAGE;
             }
-            const ex = new Set(currentOps.map(o => o.ref?.toLowerCase()).filter(Boolean));
-            const toAdd = items
-              .map(i => ({ ...makeEmpty(), ...i, id: Date.now() + Math.random(), internalDeal: String(i.internalDeal).toLowerCase() === "true" }))
-              .filter(i => !i.ref || !ex.has(i.ref?.toLowerCase()));
-            if (toAdd.length === 0) { reloadOps(); return; }
-            const CHUNK = 50;
-            for (let i = 0; i < toAdd.length; i += CHUNK) {
-              const chunk = toAdd.slice(i, i + CHUNK).map(item => ({ data: item }));
-              const { error } = await supabase.from('derivatives').insert(chunk);
-              if (error) console.error('[import] insert error:', error);
+            const byRef = {};
+            for (const r of indexRows) {
+              const ref = r.data?.ref?.toLowerCase();
+              if (ref && !byRef[ref]) byRef[ref] = { supabaseId: r.id, existing: r.data };
+            }
+            const toInsert = [];
+            for (const incoming of items) {
+              const key = incoming.ref?.toLowerCase();
+              if (key && byRef[key]) {
+                // Merge: only overwrite fields that were mapped and non-empty
+                const merged = { ...byRef[key].existing };
+                mappedFields.forEach(field => {
+                  const val = incoming[field];
+                  const isEmpty = val === undefined || val === null || val === "" || (Array.isArray(val) && val.length === 0);
+                  if (!isEmpty) merged[field] = val;
+                });
+                if (merged.internalDeal !== undefined) merged.internalDeal = String(merged.internalDeal).toLowerCase() === "true";
+                const { error } = await supabase.from('derivatives').update({ data: merged }).eq('id', byRef[key].supabaseId);
+                if (error) console.error('[import] update error:', error);
+              } else {
+                toInsert.push({ ...makeEmpty(), ...incoming, id: Date.now() + Math.random(), internalDeal: String(incoming.internalDeal).toLowerCase() === "true" });
+              }
+            }
+            if (toInsert.length > 0) {
+              const CHUNK = 50;
+              for (let i = 0; i < toInsert.length; i += CHUNK) {
+                const chunk = toInsert.slice(i, i + CHUNK).map(item => ({ data: item }));
+                const { error } = await supabase.from('derivatives').insert(chunk);
+                if (error) console.error('[import] insert error:', error);
+              }
             }
             reloadOps();
           }} />

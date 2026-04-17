@@ -9563,7 +9563,7 @@ const setOps = async (val) => {
   const [editingFeesId, setEditingFeesId] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filterMode, setFilterMode]   = useState("AND");
-  const EMPTY_FILTERS = { type: [], opType: [], side: [], status: [], businessUnit: [], internalDeal: [], exchange: [], underlying: [], financingBank: [] };
+  const EMPTY_FILTERS = { type: [], opType: [], side: [], status: [], businessUnit: [], internalDeal: [], exchange: [], underlying: [], financingBank: [], transmission: [] };
   const [activeFilters, setActiveFilters] = useState(EMPTY_FILTERS);
   const [customFilters, setCustomFilters] = useState([]);
   const [filterSearch, setFilterSearch]   = useState("");
@@ -9691,6 +9691,7 @@ const setOps = async (val) => {
     const dealFilter = activeFilters.internalDeal;
     const underFilter = activeFilters.underlying;
     const bankFilter = activeFilters.financingBank;
+    const transmFilter = activeFilters.transmission;
     return ops.filter(o => {
       const q = search.toLowerCase();
       const ms = !q || o.ref?.toLowerCase().includes(q) || o.instrument?.toLowerCase().includes(q) || o.broker?.toLowerCase().includes(q) || o.exchange?.toLowerCase().includes(q) || o.contract?.toLowerCase().includes(q) || o.notes?.toLowerCase().includes(q);
@@ -9716,6 +9717,7 @@ const setOps = async (val) => {
       if (statusFilter.length > 0 && !statusFilter.includes(o.status) && !statusFilter.some(s => o.status?.toLowerCase() === s?.toLowerCase())) return false;
       if (underFilter.length > 0  && !underFilter.some(u => norm(opUnderlying) === norm(u))) return false;
       if (bankFilter.length > 0   && !bankFilter.some(fb => norm(opFinancingBank) === norm(fb))) return false;
+      if (transmFilter.length > 0  && !transmFilter.some(t => norm(o.orderTransmissionType) === norm(t))) return false;
       // Custom filters
       for (const cf of customFilters) {
         const val = o[cf.key];
@@ -9737,7 +9739,7 @@ const setOps = async (val) => {
   }, [ops, search, accountSearch, refSearch, dateFrom, dateTo,
       activeFilters.exchange, activeFilters.type, activeFilters.opType, activeFilters.side,
       activeFilters.status, activeFilters.businessUnit, activeFilters.internalDeal,
-      activeFilters.underlying, activeFilters.financingBank,
+      activeFilters.underlying, activeFilters.financingBank, activeFilters.transmission,
       customFilters, filterMode, derivAccounts, products, config]);
 
   const sel = ops.find(o => o.id === selected);
@@ -10039,6 +10041,32 @@ const setOps = async (val) => {
                                 color: isActive ? COLORS.textOnAccent : COLORS.accent,
                                 border: `1px solid ${COLORS.accent}55` }}>
                               {bank}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Transmission Type filter */}
+                {(() => {
+                  const transmissions = [...new Set(ops.map(o => o.orderTransmissionType).filter(Boolean))].sort();
+                  if (transmissions.length === 0) return null;
+                  return (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSub, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Transmission</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {transmissions.map(t => {
+                          const isActive = activeFilters.transmission.includes(t);
+                          const label = (config.derivOrderTransmissionTypes || []).find(c => c.value === t)?.label || t;
+                          return (
+                            <span key={t} onClick={() => setActiveFilters(f => ({ ...f, transmission: isActive ? f.transmission.filter(v => v !== t) : [...f.transmission, t] }))}
+                              style={{ cursor: "pointer", fontSize: 11, padding: "3px 10px", borderRadius: 8, fontWeight: 600, transition: "all 0.15s",
+                                background: isActive ? COLORS.purple : `${COLORS.purple}22`,
+                                color: isActive ? "#fff" : COLORS.purple,
+                                border: `1px solid ${COLORS.purple}55` }}>
+                              {label}
                             </span>
                           );
                         })}

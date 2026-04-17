@@ -5811,8 +5811,9 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
     { field: "contract",     format: "Texte",        note: "" },
     { field: "trade",        format: "Texte",        note: "" },
     { field: "status",       format: "Texte",        note: "ex: traded, pending" },
-    { field: "internalDeal", format: "TRUE / FALSE", note: "" },
-    { field: "notes",        format: "Texte",        note: "" },
+    { field: "internalDeal",        format: "TRUE / FALSE", note: "" },
+    { field: "orderTransmissionType", format: "Texte",        note: "ex: Electronic, Manual" },
+    { field: "notes",                format: "Texte",        note: "" },
     { field: "fees",         format: "Nombre",       note: "Frais de courtage (override du calcul automatique)" },
   ],
   fixings: [

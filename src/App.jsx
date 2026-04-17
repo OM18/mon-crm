@@ -5879,7 +5879,8 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
     type:         { configKey: "derivInstrumentTypes", label: "Instrument Type",  getValue: (v, cfg) => cfg.derivInstrumentTypes?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.label },
     opType:       { configKey: "derivOpTypes",         label: "Operation Type",   getValue: (v, cfg) => cfg.derivOpTypes?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.label },
     exchange:     { configKey: "derivExchanges",       label: "Exchange",         getValue: (v, cfg) => cfg.derivExchanges?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.value },
-    businessUnit: { configKey: "businessUnit",         label: "Business Unit",    getValue: (v, cfg) => cfg.businessUnit?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.value },
+    businessUnit:         { configKey: "businessUnit",              label: "Business Unit",         getValue: (v, cfg) => cfg.businessUnit?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.value },
+    orderTransmissionType: { configKey: "derivOrderTransmissionTypes", label: "Order Transmission Type", getValue: (v, cfg) => cfg.derivOrderTransmissionTypes?.find(t => t.label?.toLowerCase() === v?.toLowerCase() || t.value?.toLowerCase() === v?.toLowerCase())?.value },
   };
 
   const mapToConfigValue = (configKey, val) => {

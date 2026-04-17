@@ -6064,30 +6064,33 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
             if (!unknowns[key]) unknowns[key] = { fieldKey, configKey, fieldLabel: label, value: val };
           }
         });
-        // Validate required fields — same as REQUIRED_FIELDS in the form
-        const DERIV_REQUIRED = [
-          { key: "businessUnit", label: "Business Unit" },
-          { key: "type",         label: "Instrument Type" },
-          { key: "opType",       label: "Operation Type" },
-          { key: "quantity",     label: "Number of Lots" },
-          { key: "price",        label: "Price" },
-          { key: "tradeDate",    label: "Trade Date" },
-          { key: "instrument",   label: "Instrument" },
-          { key: "account",      label: "Account" },
-          { key: "side",         label: "Side" },
-          { key: "broker",       label: "Broker" },
-        ];
-        DERIV_REQUIRED.forEach(({ key, label }) => {
-          const val = obj[key];
-          const isEmpty = !val || String(val).trim() === "";
-          if (isEmpty) {
-            const uKey = `missing_${key}`;
-            if (!unknowns[uKey]) unknowns[uKey] = {
-              fieldKey: key, configKey: `missing_${key}`,
-              fieldLabel: label, value: "(vide)", missingRequired: true
-            };
-          }
-        });
+        // Validate required fields — skipped if this is a partial update (ref is present and mapped)
+        const isPartialUpdate = !!(obj.ref && obj.ref.trim() !== "" && Object.values(mapping).includes("ref"));
+        if (!isPartialUpdate) {
+          const DERIV_REQUIRED = [
+            { key: "businessUnit", label: "Business Unit" },
+            { key: "type",         label: "Instrument Type" },
+            { key: "opType",       label: "Operation Type" },
+            { key: "quantity",     label: "Number of Lots" },
+            { key: "price",        label: "Price" },
+            { key: "tradeDate",    label: "Trade Date" },
+            { key: "instrument",   label: "Instrument" },
+            { key: "account",      label: "Account" },
+            { key: "side",         label: "Side" },
+            { key: "broker",       label: "Broker" },
+          ];
+          DERIV_REQUIRED.forEach(({ key, label }) => {
+            const val = obj[key];
+            const isEmpty = !val || String(val).trim() === "";
+            if (isEmpty) {
+              const uKey = `missing_${key}`;
+              if (!unknowns[uKey]) unknowns[uKey] = {
+                fieldKey: key, configKey: `missing_${key}`,
+                fieldLabel: label, value: "(vide)", missingRequired: true
+              };
+            }
+          });
+        }
         // Validate account against derivAccounts table (only if account is present)
         if (obj.account && obj.account.toString().trim()) {
           const norm = v => v?.toString().toLowerCase().trim() || "";
@@ -6170,8 +6173,9 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
       return obj;
     }).filter(o => {
       if (type === "derivatives") {
+        const isPartialUpd = !!(o.ref && o.ref.trim() !== "" && Object.values(mapping).includes("ref"));
         const hasRequired = !!(o.businessUnit && o.type && o.opType && o.quantity && o.price && o.tradeDate && o.instrument && o.account && o.side && o.broker);
-        return !!(o.ref || o.side || o.instrument || o.price || o.quantity) && hasRequired;
+        return isPartialUpd ? !!(o.ref && o.ref.trim() !== "") : (!!(o.ref || o.side || o.instrument || o.price || o.quantity) && hasRequired);
       }
       if (type === "fixings") {
         return !!(o.ref || o.side || o.instrument || o.quantity) && !!(o.side && o.instrument);

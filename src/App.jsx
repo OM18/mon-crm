@@ -5533,7 +5533,8 @@ const DERIV_FIELD_MAP = {
   "status":       ["status", "statut", "op status", "operation status"],
   "internalDeal": ["internal deal", "internal", "internaldeal"],
   "notes":        ["notes", "note", "comments", "commentaires"],
-  "fees":         ["fees", "fee", "frais", "commission", "brokerage", "courtage"],
+  "fees":                 ["fees", "fee", "frais", "commission", "brokerage", "courtage"],
+  "orderTransmissionType": ["order transmission", "order transmission type", "transmission", "ordertransmissiontype", "order transm"],
 };
 
 

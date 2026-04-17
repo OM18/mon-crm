@@ -5547,13 +5547,9 @@ const normalizeHeader = (h) => h?.toString().toLowerCase().trim()
 
 const guessField = (header, fieldMap) => {
   const norm = normalizeHeader(header);
-  console.log("HEADER:", JSON.stringify(header), "NORM:", JSON.stringify(norm), "LEN:", norm.length);
   for (const [field, aliases] of Object.entries(fieldMap)) {
-if (aliases.some(a => { console.log("COMPARE:", JSON.stringify(norm), JSON.stringify(a), norm.length, a.length); if (norm === a) console.log("MATCH:", field, a); return norm === a; })) {
-      return field;
-    }
+    if (aliases.some(a => norm === a)) return field;
   }
-  
   return null;
 };
 
@@ -5835,26 +5831,33 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
     { field: "notes",        format: "Texte",        note: "" },
   ],
   };
+  const [fileLoading, setFileLoading] = useState(false);
+
   const handleFile = async (file) => {
     setError("");
+    setFileLoading(true);
     try {
       const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
+      const wb = XLSX.read(buf, { type: "array", cellDates: false });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-      if (!json.length) { setError("Le fichier est vide."); return; }
+      if (!json.length) { setError("Le fichier est vide."); setFileLoading(false); return; }
       const hdrs = json[0].map(h => h?.toString() || "");
       const rows = json.slice(1).filter(r => r.some(c => c !== ""));
       setHeaders(hdrs); setRawRows(rows);
       const autoMap = {};
-      hdrs.forEach((h, i) => { 
-  const norm = normalizeHeader(h);
-
-const g = guessField(h, fieldMap);  if (g && !Object.values(autoMap).includes(g)) autoMap[i] = g; 
-});
+      hdrs.forEach((h, i) => {
+        const g = guessField(h, fieldMap);
+        if (g && !Object.values(autoMap).includes(g)) autoMap[i] = g;
+      });
       setMapping(autoMap); setStep("mapping");
-    } catch { setError("Erreur de lecture du fichier."); }
+    } catch (err) {
+      console.error("[handleFile] Erreur lecture fichier:", err);
+      setError("Erreur de lecture du fichier : " + (err?.message || String(err)));
+    } finally {
+      setFileLoading(false);
+    }
   };
 
   const buildPreview = () => {
@@ -6413,13 +6416,21 @@ if (Array.isArray(resolved.contractsCurrency)) {
 
         {step === "upload" && (
           <div>
-            <div onClick={() => fileRef.current.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); }}
-              style={{ border: `2px dashed ${COLORS.border}`, borderRadius: 14, padding: "48px 24px", textAlign: "center", cursor: "pointer" }}
-              onMouseOver={e => e.currentTarget.style.borderColor = COLORS.accent} onMouseOut={e => e.currentTarget.style.borderColor = COLORS.border}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>📂</div>
-              <div style={{ color: COLORS.text, fontSize: 15, fontWeight: 600 }}>Glissez votre fichier ici</div>
-              <div style={{ color: COLORS.textSub, fontSize: 13, marginTop: 6 }}>ou cliquez pour parcourir</div>
-            </div>
+            {fileLoading ? (
+              <div style={{ border: `2px dashed ${COLORS.border}`, borderRadius: 14, padding: "48px 24px", textAlign: "center" }}>
+                <div style={{ fontSize: 36, marginBottom: 12, animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</div>
+                <div style={{ color: COLORS.text, fontSize: 15, fontWeight: 600 }}>Lecture du fichier en cours…</div>
+                <div style={{ color: COLORS.textSub, fontSize: 13, marginTop: 6 }}>Veuillez patienter</div>
+              </div>
+            ) : (
+              <div onClick={() => fileRef.current.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); }}
+                style={{ border: `2px dashed ${COLORS.border}`, borderRadius: 14, padding: "48px 24px", textAlign: "center", cursor: "pointer" }}
+                onMouseOver={e => e.currentTarget.style.borderColor = COLORS.accent} onMouseOut={e => e.currentTarget.style.borderColor = COLORS.border}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>📂</div>
+                <div style={{ color: COLORS.text, fontSize: 15, fontWeight: 600 }}>Glissez votre fichier ici</div>
+                <div style={{ color: COLORS.textSub, fontSize: 13, marginTop: 6 }}>ou cliquez pour parcourir</div>
+              </div>
+            )}
             <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); }} />
             {error && <div style={{ marginTop: 14, padding: "10px 14px", background: `${COLORS.red}15`, borderRadius: 8, color: COLORS.red, fontSize: 13 }}>{error}</div>}
           </div>

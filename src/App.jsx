@@ -5728,6 +5728,7 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
   const [decisions, setDecisions] = useState({});
   const [parsedItems, setParsedItems] = useState([]);
   const [rejectedValues, setRejectedValues] = useState([]);
+  const [abortReason, setAbortReason] = useState(null);
 
   const GUIDE_CONFIG_MAP = {
   status: "activityStatus",
@@ -6323,6 +6324,14 @@ if (Array.isArray(resolved.contractsCurrency)) {
   const handleDecision = (decision) => {
     const current = unknownQueue[currentQueueIdx];
     const key = `${current.configKey}:${current.value}`;
+
+    // "Ne pas intégrer" = stopper tout l'import
+    if (decision === "skip") {
+      setStep("aborted");
+      setAbortReason({ field: current.fieldLabel, value: current.value });
+      return;
+    }
+
     const newDecisions = { ...decisions, [key]: decision };
     setDecisions(newDecisions);
     if (decision === "add") {
@@ -6342,8 +6351,6 @@ if (Array.isArray(resolved.contractsCurrency)) {
     if (currentQueueIdx < unknownQueue.length - 1) {
       setCurrentQueueIdx(currentQueueIdx + 1);
     } else {
-      const skipped = unknownQueue.filter(u => newDecisions[`${u.configKey}:${u.value}`] === "skip").map(u => ({ field: u.fieldLabel, value: u.value }));
-      setRejectedValues(skipped);
       const resolved = resolveItems(parsedItems, newDecisions);
       onImport(resolved, Object.values(mapping).filter(Boolean)); setStep("summary");
     }
@@ -6596,6 +6603,20 @@ if (Array.isArray(resolved.contractsCurrency)) {
                 </>
               )}
             </div>
+          </div>
+        )}
+
+        {step === "aborted" && abortReason && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: "32px 24px", textAlign: "center" }}>
+            <span style={{ fontSize: 48 }}>🚫</span>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: COLORS.red, marginBottom: 8 }}>Import annulé</div>
+              <div style={{ fontSize: 14, color: COLORS.textSub, marginBottom: 16 }}>
+                La valeur <strong style={{ color: COLORS.text }}>"{abortReason.value}"</strong> du champ <strong style={{ color: COLORS.text }}>{abortReason.field}</strong> n'est pas définie dans l'Admin Panel.<br />
+                <span style={{ fontSize: 13, color: COLORS.textMuted, marginTop: 6, display: "block" }}>Ajoutez cette valeur dans l'Admin Panel puis relancez l'import.</span>
+              </div>
+            </div>
+            <Btn onClick={onClose}>Fermer</Btn>
           </div>
         )}
 

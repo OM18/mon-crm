@@ -10254,15 +10254,22 @@ const setOps = async (val) => {
 
                 {/* Transmission Type filter */}
                 {(() => {
-                  const transmissions = [...new Set(ops.map(o => o.orderTransmissionType).filter(Boolean))].sort();
-                  if (transmissions.length === 0) return null;
+                  const configTypes = config.derivOrderTransmissionTypes || [];
+                  const opsValues = [...new Set(ops.map(o => o.orderTransmissionType).filter(Boolean))];
+                  // Merge: config items first, then any extra values from ops not in config
+                  const configValues = configTypes.map(t => t.value);
+                  const extraFromOps = opsValues.filter(v => !configValues.includes(v));
+                  const allItems = [
+                    ...configTypes.map(t => ({ value: t.value, label: t.label })),
+                    ...extraFromOps.map(v => ({ value: v, label: v })),
+                  ];
+                  if (allItems.length === 0) return null;
                   return (
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSub, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Transmission</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {transmissions.map(t => {
+                        {allItems.map(({ value: t, label }) => {
                           const isActive = activeFilters.transmission.includes(t);
-                          const label = (config.derivOrderTransmissionTypes || []).find(c => c.value === t)?.label || t;
                           return (
                             <span key={t} onClick={() => setActiveFilters(f => ({ ...f, transmission: isActive ? f.transmission.filter(v => v !== t) : [...f.transmission, t] }))}
                               style={{ cursor: "pointer", fontSize: 11, padding: "3px 10px", borderRadius: 8, fontWeight: 600, transition: "all 0.15s",

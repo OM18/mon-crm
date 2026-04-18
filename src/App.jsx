@@ -261,6 +261,13 @@ const DEFAULT_CONFIG = {
   contractTypes: [],
   contractStatuses: [],
   contractCommodities: [],
+  contractBusinessUnits: [],
+  contractCurrencies: [],
+  contractPorts: [],
+  contractPaymentTerms: [],
+  contractOrigins: [],
+  contractDestinations: [],
+  contractDeliveryTerms: [],
   derivInstrumentTypeDefault: "",
   derivCommodities: [
     { value: "corn", label: "Corn", underlyingCategory: "commodity" },
@@ -4182,6 +4189,155 @@ console.log("REF INDEX CHECK", {
   );
 };
 
+// ─── CONTRACT BUSINESS UNITS EDITOR ──────────────────────────
+// Toggle BUs from CRM config for the Contracts module
+const ContractBUEditor = ({ config, updateField }) => {
+  const allBUs = config.businessUnit || [];
+  const selected = config.contractBusinessUnits || [];
+  const [localSelected, setLocalSelected] = useState(selected);
+  const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => { setLocalSelected(config.contractBusinessUnits || []); setDirty(false); }, [config.contractBusinessUnits]);
+
+  const toggle = (value) => {
+    setLocalSelected(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]);
+    setDirty(true);
+  };
+
+  const save = (e) => {
+    e.stopPropagation();
+    updateField("contractBusinessUnits", localSelected);
+    setDirty(false);
+  };
+
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
+      <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
+        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>◈</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Contract Business Units</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Business Units actives dans les contrats — source : Champs CRM</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 400 }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {localSelected.map(v => {
+              const bu = allBUs.find(b => b.value === v);
+              return <span key={v} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: COLORS.card, color: COLORS.text, border: `1px solid ${COLORS.border}` }}>{bu?.label || v}</span>;
+            })}
+            {localSelected.length === 0 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>Aucune BU active</span>}
+          </div>
+          {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>✓ Sauvegarder</div>}
+          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+        </div>
+      </div>
+      {expanded && (
+        <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
+          {allBUs.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, fontSize: 13, padding: "16px 0" }}>Aucune Business Unit définie — configurez-les dans le bloc CRM</div>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {allBUs.map(bu => {
+              const isOn = localSelected.includes(bu.value);
+              return (
+                <div key={bu.value} onClick={() => toggle(bu.value)}
+                  style={{ display: "flex", alignItems: "center", gap: 12, background: isOn ? `${bu.color || COLORS.accent}12` : COLORS.card, border: `1px solid ${isOn ? (bu.color || COLORS.accent) + "40" : COLORS.border}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer", transition: "all 0.15s" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: `${bu.color || COLORS.accent}20`, border: `1px solid ${bu.color || COLORS.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: bu.color || COLORS.accent, flexShrink: 0 }}>
+                    {bu.label.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{bu.label}</div>
+                    <div style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{bu.value}</div>
+                  </div>
+                  <div style={{ width: 40, height: 22, borderRadius: 11, background: isOn ? (bu.color || COLORS.green) : COLORS.border, position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+                    <div style={{ position: "absolute", top: 3, left: isOn ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px #0005" }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── CONTRACT COUNTRY EDITOR ──────────────────────────────────
+// Generic country selector for Origins / Destinations using CRM country list
+const ContractCountryEditor = ({ configKey, label, icon, description, config, updateField, setAdminTab }) => {
+  const allCountries = [...(config.country || [])].sort((a, b) => a.label.localeCompare(b.label));
+  const [localSelected, setLocalSelected] = useState(config[configKey] || []);
+  const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => { setLocalSelected(config[configKey] || []); setDirty(false); }, [config[configKey]]);
+
+  const toggle = (value) => {
+    setLocalSelected(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]);
+    setDirty(true);
+  };
+
+  const save = (e) => {
+    e.stopPropagation();
+    updateField(configKey, localSelected);
+    setDirty(false);
+  };
+
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
+      <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
+        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>{icon}</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>{label}</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>{description} — source : <span style={{ color: COLORS.accent, cursor: "pointer", textDecoration: "underline" }} onClick={e => { e.stopPropagation(); setAdminTab("fields"); }}>Champs CRM → Country</span></div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 500 }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {localSelected.map(v => {
+              const country = allCountries.find(c => c.value === v);
+              return country ? <span key={v} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: COLORS.card, color: COLORS.text, border: `1px solid ${COLORS.border}` }}>{country.label}</span> : null;
+            })}
+            {localSelected.length === 0 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>Aucune sélection</span>}
+          </div>
+          {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>✓ Sauvegarder</div>}
+          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+        </div>
+      </div>
+      {expanded && (
+        <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
+          {allCountries.length === 0 && (
+            <div style={{ textAlign: "center", color: COLORS.textMuted, fontSize: 13, padding: "16px 0" }}>
+              Aucun pays défini — configurez-les dans <span style={{ color: COLORS.accent, cursor: "pointer", textDecoration: "underline" }} onClick={() => setAdminTab("fields")}>Champs CRM → Country</span>
+            </div>
+          )}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {allCountries.map(c => {
+              const isOn = localSelected.includes(c.value);
+              return (
+                <div key={c.value} onClick={() => toggle(c.value)}
+                  style={{ padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: isOn ? 700 : 500, transition: "all 0.15s", border: `1.5px solid ${isOn ? COLORS.accent : COLORS.border}`, background: isOn ? `${COLORS.accent}18` : COLORS.card, color: isOn ? COLORS.accent : COLORS.textSub, userSelect: "none" }}>
+                  {c.label}
+                </div>
+              );
+            })}
+          </div>
+          {localSelected.length > 0 && (
+            <div style={{ marginTop: 12, fontSize: 11, color: COLORS.textMuted }}>
+              <span style={{ color: COLORS.accent, cursor: "pointer" }} onClick={() => { setLocalSelected([]); setDirty(true); }}>✕ Tout désélectionner</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -5479,6 +5635,61 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             label="Contract Commodities"
             icon="🌾"
             description="Commodités disponibles pour les contrats"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+          />
+          <ContractBUEditor config={config} updateField={updateField} />
+          <DerivPillsEditor
+            configKey="contractCurrencies"
+            label="Contract Currencies"
+            icon="💱"
+            description="Devises utilisées dans les contrats (ex : USD, EUR, MAD…)"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+          />
+          <DerivPillsEditor
+            configKey="contractPorts"
+            label="Contract Ports"
+            icon="⚓"
+            description="Ports disponibles pour les contrats (ex : Casablanca, Rotterdam…)"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+          />
+          <DerivPillsEditor
+            configKey="contractPaymentTerms"
+            label="Contract Payment Terms"
+            icon="💳"
+            description="Conditions de paiement disponibles (ex : CAD, LC, TT…)"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+          />
+          <ContractCountryEditor
+            configKey="contractOrigins"
+            label="Contract Origins"
+            icon="🌍"
+            description="Pays d'origine disponibles pour les contrats"
+            config={config}
+            updateField={updateField}
+            setAdminTab={setAdminTab}
+          />
+          <ContractCountryEditor
+            configKey="contractDestinations"
+            label="Contract Destinations"
+            icon="🎯"
+            description="Pays de destination disponibles pour les contrats"
+            config={config}
+            updateField={updateField}
+            setAdminTab={setAdminTab}
+          />
+          <DerivPillsEditor
+            configKey="contractDeliveryTerms"
+            label="Delivery Terms"
+            icon="🚢"
+            description="Incoterms et conditions de livraison (ex : CIF, FOB, CFR…)"
             config={config}
             updateField={updateField}
             hasColor={false}

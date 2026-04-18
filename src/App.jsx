@@ -4190,23 +4190,22 @@ console.log("REF INDEX CHECK", {
 };
 
 // ─── CONTRACT COMMODITIES EDITOR ─────────────────────────────
-// Pills editor with Excel import capability
+// Pills editor for contract commodities with Excel import button (logo style = Instruments bloc)
 const ContractCommoditiesEditor = ({ config, updateField }) => {
-  const rawItems = config.contractCommodities;
-  const items = Array.isArray(rawItems) ? rawItems : [];
+  const items = Array.isArray(config.contractCommodities) ? config.contractCommodities : [];
   const [localItems, setLocalItems] = useState(items);
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [newLabel, setNewLabel] = useState("");
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState(null); // { added, skipped, preview }
-  const [importStep, setImportStep] = useState("idle"); // idle | preview | done
-  const [pendingItems, setPendingItems] = useState([]);
+  const [showImport, setShowImport] = useState(false);
+  const [importStep, setImportStep] = useState("guide"); // guide | preview | summary
+  const [importRows, setImportRows] = useState([]);
+  const [importError, setImportError] = useState("");
+  const [importResult, setImportResult] = useState(null);
   const fileRef = useRef(null);
 
   useEffect(() => {
-    const raw = config.contractCommodities;
-    setLocalItems(Array.isArray(raw) ? raw : []);
+    setLocalItems(Array.isArray(config.contractCommodities) ? config.contractCommodities : []);
     setDirty(false);
   }, [config.contractCommodities]);
 
@@ -4214,8 +4213,9 @@ const ContractCommoditiesEditor = ({ config, updateField }) => {
 
   const add = () => {
     if (!newLabel.trim()) return;
-    const newItem = { value: newLabel.trim().toLowerCase().replace(/\s+/g, "_"), label: newLabel.trim() };
-    mark([...localItems, newItem]);
+    const value = newLabel.trim().toLowerCase().replace(/\s+/g, "_");
+    if (localItems.find(i => i.value === value)) return;
+    mark([...localItems, { value, label: newLabel.trim() }]);
     setNewLabel("");
   };
 
@@ -4225,173 +4225,195 @@ const ContractCommoditiesEditor = ({ config, updateField }) => {
     setDirty(false);
   };
 
-  const handleExcelFile = async (file) => {
-    setImporting(true);
-    setImportResult(null);
+  const handleFile = async (file) => {
+    setImportError("");
     try {
-      const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
+      const XLSX = await import("xlsx");
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-      if (!json.length) { setImportResult({ error: "Fichier vide." }); setImporting(false); return; }
-
-      // Find label column: look for header "label", "name", "commodity", "valeur", "libellé" or just use col 0
-      const headers = json[0].map(h => h?.toString().toLowerCase().trim());
-      let colIdx = 0;
-      const colNames = ["label", "name", "commodity", "valeur", "libellé", "libelle", "designation", "désignation"];
-      for (const name of colNames) {
-        const found = headers.indexOf(name);
-        if (found !== -1) { colIdx = found; break; }
-      }
-
-      const hasHeader = headers.some(h => colNames.includes(h) || h === "label");
-      const dataRows = hasHeader ? json.slice(1) : json;
-
-      const existingValues = new Set(localItems.map(i => i.value));
-      const existingLabels = new Set(localItems.map(i => i.label.toLowerCase().trim()));
-
-      const toAdd = [];
-      const skipped = [];
-
-      dataRows.forEach(row => {
-        const raw = row[colIdx]?.toString().trim();
-        if (!raw) return;
-        const value = raw.toLowerCase().replace(/\s+/g, "_");
-        if (existingValues.has(value) || existingLabels.has(raw.toLowerCase())) {
-          skipped.push(raw);
-        } else {
-          toAdd.push({ value, label: raw });
-          existingValues.add(value);
-          existingLabels.add(raw.toLowerCase());
-        }
-      });
-
-      setPendingItems(toAdd);
-      setImportResult({ added: toAdd.length, skipped: skipped.length, preview: toAdd.slice(0, 10), skippedList: skipped.slice(0, 5) });
+      // Find column containing commodity labels (first non-empty header or first col)
+      const headers = (json[0] || []).map(h => String(h).trim());
+      const rows = json.slice(1).map(row => {
+        // Try to find a column named label/commodity/name/commodité, else use col 0
+        const colIdx = headers.findIndex(h => /label|name|commodity|commodit/i.test(h));
+        const val = String(row[colIdx >= 0 ? colIdx : 0] || "").trim();
+        return val;
+      }).filter(Boolean);
+      if (rows.length === 0) { setImportError("Aucune donnée trouvée dans le fichier."); return; }
+      setImportRows(rows);
       setImportStep("preview");
     } catch (err) {
-      setImportResult({ error: "Erreur de lecture : " + err.message });
+      setImportError("Erreur de lecture du fichier : " + err.message);
     }
-    setImporting(false);
   };
 
   const confirmImport = () => {
-    mark([...localItems, ...pendingItems]);
-    setImportStep("done");
-    setPendingItems([]);
-    setTimeout(() => setImportStep("idle"), 3000);
+    const newItems = importRows.map(label => ({
+      value: label.toLowerCase().replace(/\s+/g, "_"),
+      label,
+    }));
+    // Merge: keep existing, add new ones not already present
+    const merged = [...localItems];
+    let added = 0;
+    newItems.forEach(item => {
+      if (!merged.find(i => i.value === item.value)) {
+        merged.push(item);
+        added++;
+      }
+    });
+    mark(merged);
+    setImportResult({ added, skipped: newItems.length - added });
+    setImportStep("summary");
   };
 
-  const cancelImport = () => { setImportStep("idle"); setPendingItems([]); setImportResult(null); };
+  const closeImport = () => {
+    setShowImport(false);
+    setImportStep("guide");
+    setImportRows([]);
+    setImportError("");
+    setImportResult(null);
+  };
 
   return (
-    <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
-      {/* Header */}
-      <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
-        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
-        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>🌾</span>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Contract Commodities</div>
-            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Commodités disponibles pour les contrats — import Excel supporté</div>
+    <>
+      <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
+        <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
+          onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
+          onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>🌾</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Contract Commodities</div>
+              <div style={{ fontSize: 11, color: COLORS.textMuted }}>Commodités disponibles pour les contrats</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 360 }}>
+              {localItems.map(s => (
+                <span key={s.value} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: COLORS.card, color: COLORS.text, border: `1px solid ${COLORS.border}` }}>{s.label}</span>
+              ))}
+              {localItems.length === 0 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>Aucune commodité</span>}
+            </div>
+            {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>✓ Sauvegarder</div>}
+            {/* Excel import button — same style as Instruments bloc */}
+            <div onClick={e => { e.stopPropagation(); setShowImport(true); if (!expanded) setExpanded(true); }}
+              style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 10px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent" }}
+              title="Importer depuis Excel">
+              <img src="/logoxl.png" style={{ width: 22, height: 22, objectFit: "contain" }} />
+            </div>
+            <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 400 }}>
-            {localItems.slice(0, 6).map(s => (
-              <span key={s.value} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: COLORS.card, color: COLORS.text, border: `1px solid ${COLORS.border}` }}>{s.label}</span>
-            ))}
-            {localItems.length > 6 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>+{localItems.length - 6}</span>}
-            {localItems.length === 0 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>Aucune valeur</span>}
+
+        {expanded && (
+          <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+              {localItems.map((s, idx) => (
+                <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
+                  <input value={s.label} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, label: e.target.value } : x))}
+                    style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
+                  <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
+                    style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                    onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                    onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+                </div>
+              ))}
+              {localItems.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "16px 0", fontSize: 13 }}>Aucune commodité — ajoutez-en ci-dessous ou importez via Excel</div>}
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>LABEL *</label>
+                <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Nouvelle commodité…" onKeyDown={e => e.key === "Enter" && add()}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+              </div>
+              <Btn onClick={add} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>+ Ajouter</Btn>
+            </div>
           </div>
-          {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>✓ Sauvegarder</div>}
-          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
-        </div>
+        )}
       </div>
 
-      {expanded && (
-        <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
-
-          {/* Excel import zone */}
-          <div style={{ marginBottom: 16, background: `${COLORS.green}08`, border: `1px dashed ${COLORS.green}50`, borderRadius: 12, padding: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: importStep === "preview" ? 12 : 0 }}>
+      {/* Excel import modal */}
+      {showImport && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.green, marginBottom: 2 }}>📥 Import Excel / CSV</div>
-                <div style={{ fontSize: 11, color: COLORS.textMuted }}>Colonne attendue : <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>label</span>, <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>name</span> ou <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textSub }}>commodity</span> — ou première colonne par défaut</div>
+                <h2 style={{ margin: 0, fontSize: 20, color: COLORS.text, display: "flex", alignItems: "center", gap: 10 }}>
+                  <img src="/logoxl.png" style={{ width: 26, height: 26, objectFit: "contain" }} />
+                  Import Excel — Contract Commodities
+                </h2>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: COLORS.textSub }}>Formats acceptés : .xlsx, .xls, .csv</p>
               </div>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) { handleExcelFile(e.target.files[0]); e.target.value = ""; } }} />
-              {importStep === "idle" && (
-                <button onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}
-                  style={{ background: COLORS.green, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}>
-                  {importing ? "⏳ Lecture…" : "📂 Choisir un fichier"}
-                </button>
-              )}
-              {importStep === "done" && <span style={{ fontSize: 12, color: COLORS.green, fontWeight: 700 }}>✓ Import réussi !</span>}
+              <button onClick={closeImport} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
             </div>
 
-            {/* Preview */}
-            {importStep === "preview" && importResult && !importResult.error && (
+            {importStep === "guide" && (
               <div>
-                <div style={{ display: "flex", gap: 16, marginBottom: 10, fontSize: 12 }}>
-                  <span style={{ color: COLORS.green, fontWeight: 700 }}>✓ {importResult.added} à ajouter</span>
-                  {importResult.skipped > 0 && <span style={{ color: COLORS.textMuted }}>⊘ {importResult.skipped} doublon{importResult.skipped > 1 ? "s" : ""} ignoré{importResult.skipped > 1 ? "s" : ""}</span>}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-                  {importResult.preview.map(item => (
-                    <span key={item.value} style={{ fontSize: 11, padding: "2px 10px", borderRadius: 6, background: `${COLORS.green}18`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, fontWeight: 600 }}>{item.label}</span>
-                  ))}
-                  {importResult.added > 10 && <span style={{ fontSize: 11, color: COLORS.textMuted, alignSelf: "center" }}>…et {importResult.added - 10} autres</span>}
-                </div>
-                {importResult.skippedList?.length > 0 && (
-                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 10 }}>
-                    Doublons ignorés : {importResult.skippedList.join(", ")}{importResult.skipped > 5 ? "…" : ""}
+                <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, marginBottom: 8 }}>Format attendu</div>
+                  <div style={{ fontSize: 12, color: COLORS.textSub, lineHeight: 1.7 }}>
+                    Le fichier doit contenir une colonne avec les noms des commodités.<br />
+                    La première ligne est traitée comme en-tête (ex : <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.accent }}>label</span>, <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.accent }}>commodity</span> ou <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.accent }}>name</span>).<br />
+                    Les doublons avec les commodités existantes seront ignorés.
                   </div>
-                )}
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={confirmImport}
-                    style={{ background: COLORS.green, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                    ✓ Confirmer l'import
-                  </button>
-                  <button onClick={cancelImport}
-                    style={{ background: "transparent", color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                    Annuler
-                  </button>
+                </div>
+                <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); }} />
+                {importError && <div style={{ marginBottom: 12, fontSize: 13, color: COLORS.red, background: `${COLORS.red}10`, border: `1px solid ${COLORS.red}30`, borderRadius: 8, padding: "10px 14px" }}>⚠ {importError}</div>}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <Btn onClick={() => fileRef.current.click()}>📂 Choisir un fichier</Btn>
                 </div>
               </div>
             )}
-            {importResult?.error && <div style={{ fontSize: 12, color: COLORS.red, marginTop: 8 }}>⚠ {importResult.error}</div>}
-          </div>
 
-          {/* Items list */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-            {localItems.map((s, idx) => (
-              <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
-                <input value={s.label} onChange={e => { const v = e.target.value; mark(localItems.map((x, i) => i === idx ? { ...x, label: v } : x)); }}
-                  style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
-                <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
-                  style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
-                  onMouseOver={e => e.currentTarget.style.color = COLORS.red}
-                  onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+            {importStep === "preview" && (
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 12 }}>{importRows.length} commodité{importRows.length !== 1 ? "s" : ""} détectée{importRows.length !== 1 ? "s" : ""}</div>
+                <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 20, maxHeight: 320, overflowY: "auto" }}>
+                  {importRows.map((label, i) => {
+                    const exists = localItems.find(x => x.value === label.toLowerCase().replace(/\s+/g, "_"));
+                    return (
+                      <div key={i} style={{ padding: "9px 16px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10, background: i % 2 === 0 ? "transparent" : `${COLORS.surface}80` }}>
+                        <span style={{ fontSize: 13, color: COLORS.text, flex: 1 }}>{label}</span>
+                        {exists
+                          ? <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, background: COLORS.bg, padding: "2px 7px", borderRadius: 4, border: `1px solid ${COLORS.border}` }}>EXISTANT</span>
+                          : <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.green, background: `${COLORS.green}15`, padding: "2px 7px", borderRadius: 4 }}>NOUVEAU</span>
+                        }
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <Btn variant="secondary" onClick={() => { setImportStep("guide"); setImportRows([]); }}>← Retour</Btn>
+                  <Btn onClick={confirmImport} style={{ background: COLORS.green }}>✓ Importer {importRows.filter(l => !localItems.find(x => x.value === l.toLowerCase().replace(/\s+/g, "_"))).length} nouvelle{importRows.filter(l => !localItems.find(x => x.value === l.toLowerCase().replace(/\s+/g, "_"))).length !== 1 ? "s" : ""}</Btn>
+                </div>
               </div>
-            ))}
-            {localItems.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "16px 0", fontSize: 13 }}>Aucune valeur — ajoutez-en manuellement ou importez un fichier Excel</div>}
-          </div>
+            )}
 
-          {/* Manual add */}
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px" }}>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>LABEL *</label>
-              <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Nouvelle commodité…" onKeyDown={e => e.key === "Enter" && add()}
-                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
-            </div>
-            <Btn onClick={add} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>+ Ajouter</Btn>
+            {importStep === "summary" && importResult && (
+              <div>
+                <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+                  <div style={{ flex: 1, background: `${COLORS.green}12`, border: `1px solid ${COLORS.green}30`, borderRadius: 12, padding: "16px 20px", textAlign: "center" }}>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: COLORS.green }}>{importResult.added}</div>
+                    <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>commodité{importResult.added !== 1 ? "s" : ""} ajoutée{importResult.added !== 1 ? "s" : ""}</div>
+                  </div>
+                  <div style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "16px 20px", textAlign: "center" }}>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: COLORS.textMuted }}>{importResult.skipped}</div>
+                    <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>doublon{importResult.skipped !== 1 ? "s" : ""} ignoré{importResult.skipped !== 1 ? "s" : ""}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <Btn variant="secondary" onClick={closeImport}>Fermer</Btn>
+                  <Btn onClick={() => { updateField("contractCommodities", localItems); setDirty(false); closeImport(); }} style={{ background: COLORS.green }}>✓ Sauvegarder</Btn>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

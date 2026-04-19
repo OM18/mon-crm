@@ -13790,6 +13790,63 @@ const initialTasks = [
   { id: 2, title: "Envoyer devis", contactId: 2, due: "2024-01-30", done: false, priority: "moyenne" },
 ];
 
+// ─── CONTRACT FORM FIELD COMPONENTS ──────────────────────────
+// Defined outside Contracts to prevent re-creation on each render (fixes focus loss)
+const CFL = ({ children, req }) => (
+  <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.4, marginBottom: 4, display: "block", textTransform: "uppercase" }}>
+    {children}{req && <span style={{ color: COLORS.red }}> *</span>}
+  </label>
+);
+const CFInput = ({ label, value, onChange, placeholder, req }) => (
+  <div>
+    <CFL req={req}>{label}</CFL>
+    <input value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder || ""}
+      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+  </div>
+);
+const CFSelect = ({ label, value, onChange, opts, req }) => (
+  <div>
+    <CFL req={req}>{label}</CFL>
+    <select value={value || ""} onChange={e => onChange(e.target.value)}
+      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: value ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+      <option value="">— Sélectionner —</option>
+      {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  </div>
+);
+const CFCombo = ({ label, value, onChange, suggestions = [], placeholder, req }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+  const filtered = suggestions.filter(s => s.toLowerCase().includes((value || "").toLowerCase()) && s !== value);
+  const display = open ? (!(value || "").trim() ? suggestions : filtered) : [];
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <CFL req={req}>{label}</CFL>
+      <input value={value || ""} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
+        placeholder={placeholder || "Saisir ou choisir…"}
+        style={{ width: "100%", background: COLORS.bg, border: `1px solid ${open ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", transition: "border-color 0.15s" }} />
+      {open && display.length > 0 && (
+        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, boxShadow: "0 8px 24px #00000050", maxHeight: 200, overflowY: "auto", marginTop: 2 }}>
+          {display.map(s => (
+            <div key={s} onMouseDown={() => { onChange(s); setOpen(false); }}
+              style={{ padding: "9px 12px", fontSize: 13, color: COLORS.text, cursor: "pointer", borderBottom: `1px solid ${COLORS.border}` }}
+              onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
+              onMouseOut={e => e.currentTarget.style.background = "transparent"}>{s}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+const CFSec = ({ label }) => (
+  <div style={{ gridColumn: "1 / -1", fontSize: 11, fontWeight: 700, color: COLORS.accent, letterSpacing: 1, textTransform: "uppercase", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 5, marginTop: 6 }}>{label}</div>
+);
+
 // ─── CONTRACTS ───────────────────────────────────────────────
 const EMPTY_CONTRACT = () => ({
   id: null,
@@ -13951,76 +14008,7 @@ const Contracts = ({ companies = [] }) => {
     return <span style={{ color: val ? COLORS.text : COLORS.textMuted }}>{val || "—"}</span>;
   };
 
-  // ── Form helpers ──
-  const FLabel = ({ children, req }) => (
-    <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.4, marginBottom: 4, display: "block", textTransform: "uppercase" }}>
-      {children}{req && <span style={{ color: COLORS.red }}> *</span>}
-    </label>
-  );
-  const FInput = ({ label, field, placeholder, req }) => (
-    <div><FLabel req={req}>{label}</FLabel>
-      <input value={form[field] || ""} onChange={e => f(field, e.target.value)} placeholder={placeholder || ""}
-        style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-    </div>
-  );
-  const FSelect = ({ label, field, opts, req }) => (
-    <div><FLabel req={req}>{label}</FLabel>
-      <select value={form[field] || ""} onChange={e => f(field, e.target.value)}
-        style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: form[field] ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
-        <option value="">— Sélectionner —</option>
-        {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </div>
-  );
-
-  // Combo = free-text input + dropdown suggestions from admin list
-  const FCombo = ({ label, field, suggestions = [], placeholder, req }) => {
-    const [open, setOpen] = useState(false);
-    const [localQ, setLocalQ] = useState(form[field] || "");
-    const ref = useRef(null);
-
-    useEffect(() => { setLocalQ(form[field] || ""); }, [form[field]]);
-
-    useEffect(() => {
-      const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-      document.addEventListener("mousedown", handler);
-      return () => document.removeEventListener("mousedown", handler);
-    }, []);
-
-    const filtered = suggestions.filter(s => s.toLowerCase().includes(localQ.toLowerCase()) && s !== localQ);
-    const showDrop = open && (filtered.length > 0 || localQ.trim() === "");
-    const display = showDrop && localQ.trim() === "" ? suggestions : filtered;
-
-    return (
-      <div ref={ref} style={{ position: "relative" }}>
-        <FLabel req={req}>{label}</FLabel>
-        <input
-          value={localQ}
-          onChange={e => { setLocalQ(e.target.value); f(field, e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          placeholder={placeholder || "Saisir ou choisir…"}
-          style={{ width: "100%", background: COLORS.bg, border: `1px solid ${open ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", transition: "border-color 0.15s" }}
-        />
-        {showDrop && display.length > 0 && (
-          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, boxShadow: "0 8px 24px #00000050", maxHeight: 200, overflowY: "auto", marginTop: 2 }}>
-            {display.map(s => (
-              <div key={s} onMouseDown={() => { f(field, s); setLocalQ(s); setOpen(false); }}
-                style={{ padding: "9px 12px", fontSize: 13, color: COLORS.text, cursor: "pointer", borderBottom: `1px solid ${COLORS.border}` }}
-                onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
-                onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-                {s}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const FSec = ({ label }) => (
-    <div style={{ gridColumn: "1 / -1", fontSize: 11, fontWeight: 700, color: COLORS.accent, letterSpacing: 1, textTransform: "uppercase", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 5, marginTop: 6 }}>{label}</div>
-  );
-
+  // ── Country opts helper ──
   const countryOpts = (list) => (list || []).map(v => {
     const c = (config.country || []).find(x => x.value === v);
     return { value: v, label: c?.label || v };
@@ -14106,32 +14094,28 @@ const Contracts = ({ companies = [] }) => {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
 
-              <FSec label="Identification" />
-              <FInput label="Contract Number" field="contractNumber" placeholder="ex : CTR-2024-001" />
-              <FSelect label="Contract Type" field="contractType"
+              <CFSec label="Identification" />
+              <CFInput label="Contract Number" value={form.contractNumber} onChange={v => f("contractNumber", v)} placeholder="ex : CTR-2024-001" />
+              <CFSelect label="Contract Type" value={form.contractType} onChange={v => f("contractType", v)}
                 opts={(config.contractTypes || []).map(t => ({ value: t.label, label: t.label }))} />
-              <FSelect label="Status" field="status"
+              <CFSelect label="Status" value={form.status} onChange={v => f("status", v)}
                 opts={(config.contractStatuses || []).map(s => ({ value: s.label || s.value, label: s.label || s.value }))} />
 
-              <FSec label="Parties" />
-              <FCombo label="Buyer" field="buyerId"
-                suggestions={getBuyers().map(c => c.name)}
-                placeholder="Saisir ou choisir un acheteur…" />
-              <FCombo label="Seller" field="sellerId"
-                suggestions={getSellers().map(c => c.name)}
-                placeholder="Saisir ou choisir un vendeur…" />
-              <FCombo label="Broker" field="brokerId"
-                suggestions={getBrokers().map(c => c.name)}
-                placeholder="Saisir ou choisir un broker…" />
+              <CFSec label="Parties" />
+              <CFCombo label="Buyer" value={form.buyerId} onChange={v => f("buyerId", v)}
+                suggestions={getBuyers().map(c => c.name)} placeholder="Saisir ou choisir un acheteur…" />
+              <CFCombo label="Seller" value={form.sellerId} onChange={v => f("sellerId", v)}
+                suggestions={getSellers().map(c => c.name)} placeholder="Saisir ou choisir un vendeur…" />
+              <CFCombo label="Broker" value={form.brokerId} onChange={v => f("brokerId", v)}
+                suggestions={getBrokers().map(c => c.name)} placeholder="Saisir ou choisir un broker…" />
 
-              <FSec label="Produit" />
-              <FCombo label="Commodity" field="commodity"
-                suggestions={(config.contractCommodities || []).map(c => c.label)}
-                placeholder="Saisir ou choisir une commodité…" />
+              <CFSec label="Produit" />
+              <CFCombo label="Commodity" value={form.commodity} onChange={v => f("commodity", v)}
+                suggestions={(config.contractCommodities || []).map(c => c.label)} placeholder="Saisir ou choisir une commodité…" />
 
               {/* Transformation toggle */}
               <div>
-                <FLabel>Transformation</FLabel>
+                <CFL>Transformation</CFL>
                 <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
                   {[{ v: true, l: "YES" }, { v: false, l: "NO" }].map(({ v, l }) => (
                     <div key={l} onClick={() => f("transformation", v)}
@@ -14145,10 +14129,10 @@ const Contracts = ({ companies = [] }) => {
                 </div>
               </div>
 
-              <FSec label="Prix" />
+              <CFSec label="Prix" />
               {/* Price type toggle */}
               <div style={{ gridColumn: "1 / -1" }}>
-                <FLabel>Type de prix</FLabel>
+                <CFL>Type de prix</CFL>
                 <div style={{ display: "flex", gap: 8, marginTop: 2, maxWidth: 280 }}>
                   {[{ v: "flat", l: "FLAT" }, { v: "prime", l: "PRIME" }].map(({ v, l }) => (
                     <div key={v} onClick={() => f("priceType", form.priceType === v ? "" : v)}
@@ -14165,73 +14149,54 @@ const Contracts = ({ companies = [] }) => {
               {/* FLAT fields */}
               {form.priceType === "flat" && <>
                 <div>
-                  <FLabel>Flat Price</FLabel>
-                  <input
-                    type="number" step="0.01" min="0"
-                    value={form.flatPrice || ""}
-                    onChange={e => f("flatPrice", e.target.value)}
-                    placeholder="0.00"
-                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
-                  />
+                  <CFL>Flat Price</CFL>
+                  <input type="number" step="0.01" min="0" value={form.flatPrice || ""} onChange={e => f("flatPrice", e.target.value)} placeholder="0.00"
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
                 </div>
-                <FSelect label="Price Currency" field="flatCurrency"
+                <CFSelect label="Price Currency" value={form.flatCurrency} onChange={v => f("flatCurrency", v)}
                   opts={(config.contractCurrencies || []).map(c => ({ value: c.label, label: c.label }))} />
               </>}
 
               {/* PRIME fields */}
               {form.priceType === "prime" && <>
                 <div>
-                  <FLabel>Premium</FLabel>
-                  <input
-                    type="number" step="1"
-                    value={form.premium || ""}
-                    onChange={e => f("premium", e.target.value)}
-                    placeholder="ex : 25"
-                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
-                  />
+                  <CFL>Premium</CFL>
+                  <input type="number" step="1" value={form.premium || ""} onChange={e => f("premium", e.target.value)} placeholder="ex : 25"
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
                 </div>
                 <div>
-                  <FLabel>Derivative Instrument</FLabel>
-                  <select
-                    value={form.derivativeId || ""}
-                    onChange={e => f("derivativeId", e.target.value)}
+                  <CFL>Derivative Instrument</CFL>
+                  <select value={form.derivativeId || ""} onChange={e => f("derivativeId", e.target.value)}
                     style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: form.derivativeId ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
                     <option value="">— Sélectionner un instrument —</option>
-                    {instruments.map(p => (
-                      <option key={p.id} value={p.id}>{p.label}</option>
-                    ))}
+                    {instruments.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
                   </select>
                 </div>
               </>}
 
-              <FSec label="Logistique" />
-              <FSelect label="Incoterm" field="incoterm"
+              <CFSec label="Logistique" />
+              <CFSelect label="Incoterm" value={form.incoterm} onChange={v => f("incoterm", v)}
                 opts={(config.contractIncoterms || []).map(c => ({ value: c.label, label: c.label }))} />
-              <FCombo label="Port" field="port"
-                suggestions={(config.contractPorts || []).map(p => p.label)}
-                placeholder="Saisir ou choisir un port…" />
-              <FSelect label="Payment Terms" field="paymentTerms"
+              <CFCombo label="Port" value={form.port} onChange={v => f("port", v)}
+                suggestions={(config.contractPorts || []).map(p => p.label)} placeholder="Saisir ou choisir un port…" />
+              <CFSelect label="Payment Terms" value={form.paymentTerms} onChange={v => f("paymentTerms", v)}
                 opts={(config.contractPaymentTerms || []).map(p => ({ value: p.label, label: p.label }))} />
-              <FCombo label="Execution Loadport" field="loadport"
-                suggestions={(config.contractPorts || []).map(p => p.label)}
-                placeholder="Saisir ou choisir un port…" />
-              <FCombo label="Execution Disport" field="disport"
-                suggestions={(config.contractPorts || []).map(p => p.label)}
-                placeholder="Saisir ou choisir un port…" />
-              <FSelect label="Delivery Conditions" field="deliveryConditions"
+              <CFCombo label="Execution Loadport" value={form.loadport} onChange={v => f("loadport", v)}
+                suggestions={(config.contractPorts || []).map(p => p.label)} placeholder="Saisir ou choisir un port…" />
+              <CFCombo label="Execution Disport" value={form.disport} onChange={v => f("disport", v)}
+                suggestions={(config.contractPorts || []).map(p => p.label)} placeholder="Saisir ou choisir un port…" />
+              <CFSelect label="Delivery Conditions" value={form.deliveryConditions} onChange={v => f("deliveryConditions", v)}
                 opts={(config.contractDeliveryTerms || []).map(d => ({ value: d.label, label: d.label }))} />
 
-              <FSec label="Géographie" />
-              <FCombo label="Origin Country" field="originCountry"
-                suggestions={countryOpts(config.contractOrigins).map(o => o.label)}
-                placeholder="Saisir ou choisir un pays…" />
-              <FCombo label="Destination Country" field="destinationCountry"
-                suggestions={countryOpts(config.contractDestinations).map(o => o.label)}
-                placeholder="Saisir ou choisir un pays…" />
+              <CFSec label="Géographie" />
+              <CFCombo label="Origin Country" value={form.originCountry} onChange={v => f("originCountry", v)}
+                suggestions={countryOpts(config.contractOrigins).map(o => o.label)} placeholder="Saisir ou choisir un pays…" />
+              <CFCombo label="Destination Country" value={form.destinationCountry} onChange={v => f("destinationCountry", v)}
+                suggestions={countryOpts(config.contractDestinations).map(o => o.label)} placeholder="Saisir ou choisir un pays…" />
 
-              <FSec label="À définir ultérieurement" />
-              <FInput label="Warehouse" field="warehouse" placeholder="À définir" />
-              <FInput label="Shipment Terminal" field="shipmentTerminal" placeholder="À définir" />
+              <CFSec label="À définir ultérieurement" />
+              <CFInput label="Warehouse" value={form.warehouse} onChange={v => f("warehouse", v)} placeholder="À définir" />
+              <CFInput label="Shipment Terminal" value={form.shipmentTerminal} onChange={v => f("shipmentTerminal", v)} placeholder="À définir" />
 
             </div>
 

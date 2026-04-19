@@ -13980,11 +13980,13 @@ const Contracts = ({ companies = [] }) => {
   const persist = async (updated) => {
     setContractsRaw(updated);
     try {
-      await supabase.from('contracts').delete().neq('id', 0);
+      const { error: delError } = await supabase.from('contracts').delete().neq('id', 0);
+      if (delError) { console.error('[Contracts] delete error:', delError); return; }
       const CHUNK = 50;
       for (let i = 0; i < updated.length; i += CHUNK) {
         const chunk = updated.slice(i, i + CHUNK).map(c => ({ data: c }));
-        await supabase.from('contracts').insert(chunk);
+        const { error: insError } = await supabase.from('contracts').insert(chunk);
+        if (insError) { console.error('[Contracts] insert error:', insError); return; }
       }
     } catch (err) { console.error('[Contracts] save error:', err); }
   };
@@ -14123,7 +14125,7 @@ const Contracts = ({ companies = [] }) => {
             {COLS.map(col => (
               <div key={col.key} style={{ padding: "10px 12px", fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textTransform: "uppercase", whiteSpace: "nowrap" }}>{col.label}</div>
             ))}
-            <div />
+            <div style={{ position: "sticky", right: 0, background: COLORS.tableHeader, borderLeft: `1px solid ${COLORS.border}`, width: 56 }} />
           </div>
 
           {/* Body */}
@@ -14147,8 +14149,8 @@ const Contracts = ({ companies = [] }) => {
                       {cellContent(c, col.key)}
                     </div>
                   ))}
-                  {/* Row actions */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }} onClick={e => e.stopPropagation()}>
+                  {/* Row actions — sticky right */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, position: "sticky", right: 0, background: "inherit", borderLeft: `1px solid ${COLORS.border}`, padding: "0 8px" }} onClick={e => e.stopPropagation()}>
                     <button onClick={() => openEdit(c)} title="Modifier"
                       style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
                       onMouseOver={e => e.currentTarget.style.color = COLORS.accent}

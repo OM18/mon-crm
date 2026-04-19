@@ -14284,11 +14284,24 @@ const Contracts = ({ companies = [] }) => {
               </div>
               <div>
                 <CFL req>Contract Type</CFL>
-                <select value={form.contractType || ""} onChange={e => { f("contractType", e.target.value); setFormErrors(p => ({...p, contractType: false})); }}
-                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${formErrors.contractType ? COLORS.red+"80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: form.contractType ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
-                  <option value="">— Sélectionner —</option>
-                  {(config.contractTypes || []).map(t => <option key={t.label} value={t.label}>{t.label}</option>)}
-                </select>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
+                  {(config.contractTypes || []).map(t => {
+                    const isActive = form.contractType === t.label;
+                    const col = t.color || COLORS.accent;
+                    return (
+                      <div key={t.label} onClick={() => { f("contractType", isActive ? "" : t.label); setFormErrors(p => ({...p, contractType: false})); }}
+                        style={{ flex: 1, minWidth: 80, padding: "9px 12px", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
+                          border: `1px solid ${formErrors.contractType ? COLORS.red+"80" : isActive ? col+"80" : COLORS.border}`,
+                          background: isActive ? `${col}20` : COLORS.bg,
+                          color: isActive ? col : COLORS.textMuted }}>
+                        {t.label}
+                      </div>
+                    );
+                  })}
+                  {(config.contractTypes || []).length === 0 && (
+                    <div style={{ fontSize: 12, color: COLORS.textMuted, padding: "8px 0" }}>Aucun type — configurez-les dans l'Admin Panel</div>
+                  )}
+                </div>
                 {formErrors.contractType && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Champ obligatoire</div>}
               </div>
               <CFSelect label="Status" value={form.status} onChange={v => f("status", v)}

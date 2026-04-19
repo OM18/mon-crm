@@ -14132,9 +14132,8 @@ const Contracts = ({ companies = [] }) => {
               </div>
 
               <FSec label="Logistique" />
-              <FCombo label="Incoterm" field="incoterm"
-                suggestions={(config.contractIncoterms || []).map(c => c.label)}
-                placeholder="Saisir ou choisir un incoterm…" />
+              <FSelect label="Incoterm" field="incoterm"
+                opts={(config.contractIncoterms || []).map(c => ({ value: c.label, label: c.label }))} />
               <FCombo label="Port" field="port"
                 suggestions={(config.contractPorts || []).map(p => p.label)}
                 placeholder="Saisir ou choisir un port…" />
@@ -14146,9 +14145,8 @@ const Contracts = ({ companies = [] }) => {
               <FCombo label="Execution Disport" field="disport"
                 suggestions={(config.contractPorts || []).map(p => p.label)}
                 placeholder="Saisir ou choisir un port…" />
-              <FCombo label="Delivery Conditions" field="deliveryConditions"
-                suggestions={(config.contractDeliveryTerms || []).map(d => d.label)}
-                placeholder="Saisir ou choisir une condition…" />
+              <FSelect label="Delivery Conditions" field="deliveryConditions"
+                opts={(config.contractDeliveryTerms || []).map(d => ({ value: d.label, label: d.label }))} />
 
               <FSec label="Géographie" />
               <FCombo label="Origin Country" field="originCountry"

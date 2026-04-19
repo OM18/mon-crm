@@ -13944,10 +13944,11 @@ const ContractPortMulti = ({ values, onChange, suggestions }) => {
 // ─── EXECUTION PERIOD PICKER ─────────────────────────────────
 const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
-const ExecutionPeriodPicker = ({ dateFrom, dateTo, periodType, onChange, onClose, hasError }) => {
+const ExecutionPeriodPicker = ({ dateFrom, dateTo, periodType, withoutExtension, onChange, onClose, hasError }) => {
   const [localFrom, setLocalFrom] = useState(dateFrom || "");
   const [localTo, setLocalTo]     = useState(dateTo || "");
   const [localType, setLocalType] = useState(periodType || "LOADING");
+  const [localNoExt, setLocalNoExt] = useState(withoutExtension || false);
 
   const thisYear = new Date().getFullYear();
   const years = [thisYear, thisYear + 1];
@@ -13984,7 +13985,7 @@ const ExecutionPeriodPicker = ({ dateFrom, dateTo, periodType, onChange, onClose
   };
 
   const confirm = () => {
-    onChange({ dateFrom: localFrom, dateTo: localTo, periodType: localType });
+    onChange({ dateFrom: localFrom, dateTo: localTo, periodType: localType, withoutExtension: localNoExt });
     onClose();
   };
 
@@ -14071,7 +14072,7 @@ const ExecutionPeriodPicker = ({ dateFrom, dateTo, periodType, onChange, onClose
         </div>
 
         {/* Loading / Arrival */}
-        <div style={{ display: "flex", gap: 20, marginBottom: 20 }}>
+        <div style={{ display: "flex", gap: 20, marginBottom: 16 }}>
           {["LOADING", "ARRIVAL"].map(opt => (
             <div key={opt} onClick={() => setLocalType(opt)}
               style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
@@ -14084,6 +14085,20 @@ const ExecutionPeriodPicker = ({ dateFrom, dateTo, periodType, onChange, onClose
               <span style={{ fontSize: 13, fontWeight: 700, color: localType === opt ? COLORS.accent : COLORS.textMuted }}>{opt}</span>
             </div>
           ))}
+        </div>
+
+        {/* Without Extension */}
+        <div onClick={() => setLocalNoExt(v => !v)}
+          style={{ display: "inline-flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none", padding: "8px 14px", borderRadius: 8, marginBottom: 20, transition: "all 0.15s",
+            border: `1px solid ${localNoExt ? COLORS.orange + "80" : COLORS.border}`,
+            background: localNoExt ? `${COLORS.orange}12` : COLORS.bg }}>
+          {/* Checkbox-style square */}
+          <div style={{ width: 18, height: 18, borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s",
+            border: `2px solid ${localNoExt ? COLORS.orange : COLORS.border}`,
+            background: localNoExt ? COLORS.orange : "transparent" }}>
+            {localNoExt && <span style={{ color: "#fff", fontSize: 12, fontWeight: 900, lineHeight: 1 }}>✓</span>}
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.5, color: localNoExt ? COLORS.orange : COLORS.textMuted }}>WITHOUT EXTENSION</span>
         </div>
 
         {/* Footer */}
@@ -14184,6 +14199,7 @@ const EMPTY_CONTRACT = () => ({
   executionDateFrom: "",
   executionDateTo: "",
   executionPeriodType: "LOADING", // "LOADING" | "ARRIVAL"
+  withoutExtension: false,
   createdAt: "",
 });
 
@@ -14487,6 +14503,11 @@ const Contracts = ({ companies = [] }) => {
                           {form.executionPeriodType}
                         </span>
                       )}
+                      {form.withoutExtension && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.orange, background: `${COLORS.orange}12`, padding: "1px 7px", borderRadius: 4, border: `1px solid ${COLORS.orange}40` }}>
+                          W/O EXT
+                        </span>
+                      )}
                       <button onClick={() => { f("executionDateFrom",""); f("executionDateTo",""); }} style={{ marginLeft: "auto", background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16 }}>×</button>
                     </div>
                   ) : (
@@ -14643,10 +14664,12 @@ const Contracts = ({ companies = [] }) => {
           dateFrom={form.executionDateFrom}
           dateTo={form.executionDateTo}
           periodType={form.executionPeriodType}
-          onChange={({ dateFrom, dateTo, periodType }) => {
+          withoutExtension={form.withoutExtension}
+          onChange={({ dateFrom, dateTo, periodType, withoutExtension }) => {
             f("executionDateFrom", dateFrom);
             f("executionDateTo", dateTo);
             f("executionPeriodType", periodType);
+            f("withoutExtension", withoutExtension);
             setFormErrors(p => ({...p, executionPeriod: false}));
           }}
           onClose={() => setShowPeriodPicker(false)}

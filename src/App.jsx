@@ -14370,6 +14370,21 @@ const Contracts = ({ companies = [] }) => {
 
   const nextId = () => contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;
   const todayDDMMYYYY = () => { const d = new Date(); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; };
+
+  // Auto-fill buyer/seller based on contract type and company name from admin
+  const handleContractTypeChange = (newType) => {
+    const companyName = config.companyName || "";
+    const norm = s => (s || "").toLowerCase().trim();
+    const isPurchase = /purchase|buy|achat|acqui/i.test(norm(newType));
+    const isSale     = /sale|sell|vente/i.test(norm(newType));
+    setForm(p => ({
+      ...p,
+      contractType: newType,
+      ...(isPurchase && companyName ? { buyerId: companyName } : {}),
+      ...(isSale     && companyName ? { sellerId: companyName } : {}),
+    }));
+    setFormErrors(p => ({...p, contractType: false}));
+  };
   const openNew  = () => { setForm({ ...EMPTY_CONTRACT(), conclusionDate: todayDDMMYYYY() }); setEditId(null); setShowModal(true); };
   const openEdit = (c) => { setForm({ ...c }); setEditId(c.id); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setForm(EMPTY_CONTRACT()); setEditId(null); setFormErrors({}); };
@@ -14576,7 +14591,7 @@ const Contracts = ({ companies = [] }) => {
                     const isActive = form.contractType === t.label;
                     const col = t.color || COLORS.accent;
                     return (
-                      <div key={t.label} onClick={() => { f("contractType", isActive ? "" : t.label); setFormErrors(p => ({...p, contractType: false})); }}
+                      <div key={t.label} onClick={() => { handleContractTypeChange(isActive ? "" : t.label); }}
                         style={{ flex: 1, minWidth: 80, padding: "9px 12px", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
                           border: `1px solid ${formErrors.contractType ? COLORS.red+"80" : isActive ? col+"80" : COLORS.border}`,
                           background: isActive ? `${col}20` : COLORS.bg,

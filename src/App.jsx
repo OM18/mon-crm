@@ -268,6 +268,7 @@ const DEFAULT_CONFIG = {
   contractOrigins: [],
   contractDestinations: [],
   contractDeliveryTerms: [],
+  contractCountryAreas: [],
   derivInstrumentTypeDefault: "",
   derivCommodities: [
     { value: "corn", label: "Corn", underlyingCategory: "commodity" },
@@ -4814,6 +4815,186 @@ const ContractPaymentTermsEditor = ({ config, updateField }) => {
   );
 };
 
+// ─── CONTRACT COUNTRY AREA EDITOR ────────────────────────────
+// Each area has: label (text) + countries (multiple, from CRM country list)
+const ContractCountryAreaEditor = ({ config, updateField }) => {
+  const allCountries = [...(config.country || [])].sort((a, b) => a.label.localeCompare(b.label));
+  const areas = Array.isArray(config.contractCountryAreas) ? config.contractCountryAreas : [];
+  const [localAreas, setLocalAreas] = useState(areas);
+  const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [openAreaIdx, setOpenAreaIdx] = useState(null); // which area has country picker open
+  const [newLabel, setNewLabel] = useState("");
+  const [labelError, setLabelError] = useState("");
+
+  useEffect(() => {
+    setLocalAreas(Array.isArray(config.contractCountryAreas) ? config.contractCountryAreas : []);
+    setDirty(false);
+  }, [config.contractCountryAreas]);
+
+  const mark = (next) => { setLocalAreas(next); setDirty(true); };
+
+  const addArea = () => {
+    if (!newLabel.trim()) return;
+    const norm = s => s.trim().toLowerCase();
+    if (localAreas.some(a => norm(a.label) === norm(newLabel))) {
+      setLabelError("Cette zone existe déjà"); return;
+    }
+    mark([...localAreas, { label: newLabel.trim(), countries: [] }]);
+    setNewLabel(""); setLabelError("");
+  };
+
+  const removeArea = (idx) => {
+    if (openAreaIdx === idx) setOpenAreaIdx(null);
+    mark(localAreas.filter((_, i) => i !== idx));
+  };
+
+  const updateAreaLabel = (idx, val) => {
+    mark(localAreas.map((a, i) => i === idx ? { ...a, label: val } : a));
+  };
+
+  const toggleCountry = (areaIdx, countryValue) => {
+    mark(localAreas.map((a, i) => {
+      if (i !== areaIdx) return a;
+      const countries = a.countries || [];
+      return { ...a, countries: countries.includes(countryValue) ? countries.filter(c => c !== countryValue) : [...countries, countryValue] };
+    }));
+  };
+
+  const save = (e) => { e.stopPropagation(); updateField("contractCountryAreas", localAreas); setDirty(false); };
+
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
+      {/* Header */}
+      <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
+        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>🗺</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Contract Country Areas</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Zones géographiques regroupant des pays (source : Champs CRM → Country)</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+            {localAreas.length > 0 ? `${localAreas.length} zone${localAreas.length !== 1 ? "s" : ""}` : "Aucune zone"}
+          </span>
+          {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>✓ Sauvegarder</div>}
+          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
+
+          {/* Area list */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+            {localAreas.length === 0 && (
+              <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "16px 0", fontSize: 13 }}>
+                Aucune zone — ajoutez-en ci-dessous
+              </div>
+            )}
+            {localAreas.map((area, aIdx) => {
+              const isOpen = openAreaIdx === aIdx;
+              const selectedCountries = area.countries || [];
+              return (
+                <div key={aIdx} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden" }}>
+                  {/* Area header row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px" }}>
+                    <span style={{ fontSize: 14, flexShrink: 0 }}>🗺</span>
+                    <input
+                      value={area.label}
+                      onChange={e => updateAreaLabel(aIdx, e.target.value)}
+                      placeholder="Nom de la zone…"
+                      style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 700, fontFamily: "inherit", outline: "none" }}
+                    />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap" }}>
+                      {selectedCountries.length} pays
+                    </span>
+                    <div onClick={() => setOpenAreaIdx(isOpen ? null : aIdx)}
+                      style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, cursor: "pointer", border: `1px solid ${COLORS.border}`,
+                        background: isOpen ? `${COLORS.accent}18` : "transparent",
+                        color: isOpen ? COLORS.accent : COLORS.textSub }}>
+                      {isOpen ? "▲ Fermer" : "▼ Pays"}
+                    </div>
+                    <button onClick={() => removeArea(aIdx)}
+                      style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1, flexShrink: 0 }}
+                      onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                      onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+                  </div>
+
+                  {/* Selected country chips */}
+                  {selectedCountries.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5, padding: "0 14px 10px" }}>
+                      {selectedCountries.map(cv => {
+                        const c = allCountries.find(x => x.value === cv);
+                        return (
+                          <span key={cv} onClick={() => toggleCountry(aIdx, cv)}
+                            style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, cursor: "pointer",
+                              background: `${COLORS.accent}18`, color: COLORS.accent, border: `1px solid ${COLORS.accent}40` }}>
+                            {c?.label || cv} ×
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Country picker */}
+                  {isOpen && (
+                    <div style={{ borderTop: `1px solid ${COLORS.border}`, padding: "12px 14px", background: `${COLORS.surface}` }}>
+                      {allCountries.length === 0 && (
+                        <div style={{ fontSize: 12, color: COLORS.textMuted, textAlign: "center", padding: "8px 0" }}>
+                          Aucun pays défini dans les Champs CRM → Country
+                        </div>
+                      )}
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {allCountries.map(c => {
+                          const isOn = selectedCountries.includes(c.value);
+                          return (
+                            <div key={c.value} onClick={() => toggleCountry(aIdx, c.value)}
+                              style={{ padding: "4px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: isOn ? 700 : 500,
+                                transition: "all 0.15s", userSelect: "none",
+                                border: `1.5px solid ${isOn ? COLORS.accent : COLORS.border}`,
+                                background: isOn ? `${COLORS.accent}18` : COLORS.card,
+                                color: isOn ? COLORS.accent : COLORS.textSub }}>
+                              {c.label}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {selectedCountries.length > 0 && (
+                        <div style={{ marginTop: 10, fontSize: 11, color: COLORS.textMuted }}>
+                          <span style={{ color: COLORS.accent, cursor: "pointer" }}
+                            onClick={() => mark(localAreas.map((a, i) => i === aIdx ? { ...a, countries: [] } : a))}>
+                            ✕ Tout désélectionner
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Add new area */}
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>NOM DE LA ZONE *</label>
+              <input value={newLabel} onChange={e => { setNewLabel(e.target.value); setLabelError(""); }} placeholder="ex : Europe de l'Ouest, Afrique du Nord…"
+                onKeyDown={e => e.key === "Enter" && addArea()}
+                style={{ background: COLORS.bg, border: `1px solid ${labelError ? COLORS.red + "80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }} />
+              {labelError && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 2 }}>⚠ {labelError}</div>}
+            </div>
+            <Btn onClick={addArea} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0, marginTop: 18 }}>+ Ajouter</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── CONTRACT BUSINESS UNITS EDITOR ──────────────────────────
 // Toggle BUs from CRM config for the Contracts module
 const ContractBUEditor = ({ config, updateField }) => {
@@ -6287,6 +6468,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             updateField={updateField}
             hasColor={false}
           />
+          <ContractCountryAreaEditor config={config} updateField={updateField} />
         </div>
       )}
 

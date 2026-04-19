@@ -4622,6 +4622,106 @@ const ContractPortsEditor = ({ config, updateField }) => {
   );
 };
 
+// ─── CONTRACT INCOTERMS EDITOR ───────────────────────────────
+const ContractIncotermsEditor = ({ config, updateField }) => {
+  const raw = config.contractIncoterms || [];
+  // Normalize: support both string items and {value, label, favorite} objects
+  const normalize = (items) => items.map(i =>
+    typeof i === "string" ? { value: i.toLowerCase().replace(/\s+/g, "_"), label: i, favorite: false } : { favorite: false, ...i }
+  );
+  const [localItems, setLocalItems] = useState(normalize(raw));
+  const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+
+  useEffect(() => { setLocalItems(normalize(config.contractIncoterms || [])); setDirty(false); }, [config.contractIncoterms]);
+
+  const mark = (next) => { setLocalItems(next); setDirty(true); };
+  const add = () => {
+    if (!newLabel.trim()) return;
+    const value = newLabel.trim().toLowerCase().replace(/\s+/g, "_");
+    if (localItems.find(i => i.value === value)) return;
+    mark([...localItems, { value, label: newLabel.trim(), favorite: false }]);
+    setNewLabel("");
+  };
+  const toggleFav = (idx) => mark(localItems.map((item, i) => i === idx ? { ...item, favorite: !item.favorite } : item));
+  const updateLabel = (idx, val) => mark(localItems.map((item, i) => i === idx ? { ...item, label: val } : item));
+  const remove = (idx) => mark(localItems.filter((_, i) => i !== idx));
+  const save = (e) => { e.stopPropagation(); updateField("contractIncoterms", localItems); setDirty(false); };
+
+  const favorites = localItems.filter(i => i.favorite);
+
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
+      <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
+        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>📦</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Incoterms</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Incoterms disponibles — ★ pour marquer les favoris</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* Show favorites as gold stars in header */}
+          {favorites.length > 0 && (
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 300 }}>
+              {favorites.map(f => (
+                <span key={f.value} style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${COLORS.gold}20`, color: COLORS.gold, border: `1px solid ${COLORS.gold}40` }}>
+                  ★ {f.label}
+                </span>
+              ))}
+            </div>
+          )}
+          <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+            {localItems.length} valeur{localItems.length !== 1 ? "s" : ""}
+          </span>
+          {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>✓ Sauvegarder</div>}
+          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 10 }}>
+            ☆ Cliquez sur l'étoile pour marquer un incoterm comme favori
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+            {localItems.map((item, idx) => (
+              <div key={item.value} style={{ display: "flex", alignItems: "center", gap: 10, background: item.favorite ? `${COLORS.gold}10` : COLORS.card, border: `1px solid ${item.favorite ? COLORS.gold + "40" : COLORS.border}`, borderRadius: 10, padding: "10px 14px", transition: "all 0.15s" }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
+                <input value={item.label} onChange={e => updateLabel(idx, e.target.value)}
+                  style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
+                {/* Favorite star */}
+                <div onClick={() => toggleFav(idx)} title={item.favorite ? "Retirer des favoris" : "Marquer comme favori"}
+                  style={{ fontSize: 18, color: item.favorite ? COLORS.gold : COLORS.textMuted, cursor: "pointer", transition: "color 0.15s", flexShrink: 0, lineHeight: 1 }}
+                  onMouseOver={e => e.currentTarget.style.color = COLORS.gold}
+                  onMouseOut={e => e.currentTarget.style.color = item.favorite ? COLORS.gold : COLORS.textMuted}>
+                  {item.favorite ? "★" : "☆"}
+                </div>
+                <button onClick={() => remove(idx)}
+                  style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                  onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                  onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+              </div>
+            ))}
+            {localItems.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "16px 0", fontSize: 13 }}>Aucune valeur — ajoutez-en ci-dessous</div>}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>LABEL *</label>
+              <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Nouvel incoterm… (ex : CIF, FOB)" onKeyDown={e => e.key === "Enter" && add()}
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+            </div>
+            <Btn onClick={add} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>+ Ajouter</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── CONTRACT PAYMENT TERMS EDITOR ───────────────────────────
 const ContractPaymentTermsEditor = ({ config, updateField }) => {
   const items = Array.isArray(config.contractPaymentTerms) ? config.contractPaymentTerms : [];
@@ -6470,15 +6570,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             updateField={updateField}
             hasColor={false}
           />
-          <DerivPillsEditor
-            configKey="contractIncoterms"
-            label="Incoterms"
-            icon="📦"
-            description="Incoterms disponibles pour les contrats (ex : CIF, FOB, DAP…)"
-            config={config}
-            updateField={updateField}
-            hasColor={false}
-          />
+          <ContractIncotermsEditor config={config} updateField={updateField} />
         </div>
       )}
 

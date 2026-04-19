@@ -13941,6 +13941,156 @@ const ContractPortMulti = ({ values, onChange, suggestions }) => {
   );
 };
 
+// ─── EXECUTION PERIOD PICKER ─────────────────────────────────
+const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+const ExecutionPeriodPicker = ({ dateFrom, dateTo, periodType, onChange, onClose, hasError }) => {
+  const [localFrom, setLocalFrom] = useState(dateFrom || "");
+  const [localTo, setLocalTo]     = useState(dateTo || "");
+  const [localType, setLocalType] = useState(periodType || "LOADING");
+
+  const thisYear = new Date().getFullYear();
+  const years = [thisYear, thisYear + 1];
+
+  const pad2 = n => String(n).padStart(2, "0");
+  const daysInMonth = (m, y) => new Date(y, m, 0).getDate();
+
+  const applyMonthHalf = (month, half, year) => {
+    const m = pad2(month);
+    const y = String(year);
+    if (half === "full") {
+      setLocalFrom(`01/${m}/${y}`);
+      setLocalTo(`${daysInMonth(month, year)}/${m}/${y}`);
+    } else if (half === "first") {
+      setLocalFrom(`01/${m}/${y}`);
+      setLocalTo(`15/${m}/${y}`);
+    } else {
+      setLocalFrom(`16/${m}/${y}`);
+      setLocalTo(`${daysInMonth(month, year)}/${m}/${y}`);
+    }
+  };
+
+  const [selMonth, setSelMonth] = useState(null);
+  const [selYear, setSelYear]   = useState(thisYear);
+
+  const fmtDate = (val, setter) => {
+    const digits = val.replace(/\D/g, "").slice(0, 8);
+    let out = digits;
+    if (digits.length > 4) out = digits.slice(0,2) + "/" + digits.slice(2,4) + "/" + digits.slice(4);
+    else if (digits.length > 2) out = digits.slice(0,2) + "/" + digits.slice(2);
+    setter(out);
+  };
+
+  const confirm = () => {
+    onChange({ dateFrom: localFrom, dateTo: localTo, periodType: localType });
+    onClose();
+  };
+
+  const summary = localFrom || localTo
+    ? `${localFrom || "…"} → ${localTo || "…"}`
+    : null;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#00000099", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 20 }}>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 24, width: "100%", maxWidth: 520, boxShadow: "0 16px 48px #00000080" }}>
+
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>📅 Execution Period</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 20 }}>×</button>
+        </div>
+
+        {/* Year selector */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          {years.map(y => (
+            <div key={y} onClick={() => { setSelYear(y); setSelMonth(null); }}
+              style={{ flex: 1, padding: "7px 0", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
+                border: `1px solid ${selYear === y ? COLORS.accent + "80" : COLORS.border}`,
+                background: selYear === y ? `${COLORS.accent}18` : COLORS.bg,
+                color: selYear === y ? COLORS.accent : COLORS.textMuted }}>
+              {y}
+            </div>
+          ))}
+        </div>
+
+        {/* Months grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6, marginBottom: 10 }}>
+          {MONTHS.map((m, i) => {
+            const isActive = selMonth === i + 1;
+            return (
+              <div key={m} onClick={() => { setSelMonth(i + 1); applyMonthHalf(i + 1, "full", selYear); }}
+                style={{ padding: "7px 0", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 12, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
+                  border: `1px solid ${isActive ? COLORS.blue + "80" : COLORS.border}`,
+                  background: isActive ? `${COLORS.blue}20` : COLORS.bg,
+                  color: isActive ? COLORS.blue : COLORS.textSub }}>
+                {m}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* First / Second Half — only when a month is selected */}
+        {selMonth !== null && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            {[
+              { key: "first",  label: "FIRST HALF",  sub: `01 → 15` },
+              { key: "second", label: "SECOND HALF", sub: `16 → ${daysInMonth(selMonth, selYear)}` },
+            ].map(({ key, label, sub }) => (
+              <div key={key} onClick={() => applyMonthHalf(selMonth, key, selYear)}
+                style={{ flex: 1, padding: "8px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, transition: "all 0.15s", userSelect: "none", textAlign: "center",
+                  border: `1px solid ${COLORS.border}`, background: COLORS.bg, color: COLORS.textSub }}
+                onMouseOver={e => { e.currentTarget.style.background = `${COLORS.accent}15`; e.currentTarget.style.color = COLORS.accent; e.currentTarget.style.borderColor = COLORS.accent + "60"; }}
+                onMouseOut={e => { e.currentTarget.style.background = COLORS.bg; e.currentTarget.style.color = COLORS.textSub; e.currentTarget.style.borderColor = COLORS.border; }}>
+                {label}
+                <div style={{ fontSize: 10, fontWeight: 400, color: COLORS.textMuted, marginTop: 2 }}>{sub}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ height: 1, background: COLORS.border, margin: "14px 0" }} />
+
+        {/* Manual date inputs */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 10, fontWeight: 600, color: COLORS.textSub, display: "block", marginBottom: 4, textTransform: "uppercase" }}>From</label>
+            <input type="text" value={localFrom} onChange={e => fmtDate(e.target.value, setLocalFrom)} placeholder="ddmmyyyy" maxLength={10}
+              style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", boxSizing: "border-box", letterSpacing: 1 }} />
+          </div>
+          <span style={{ color: COLORS.textMuted, fontSize: 14, marginTop: 18 }}>→</span>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 10, fontWeight: 600, color: COLORS.textSub, display: "block", marginBottom: 4, textTransform: "uppercase" }}>To</label>
+            <input type="text" value={localTo} onChange={e => fmtDate(e.target.value, setLocalTo)} placeholder="ddmmyyyy" maxLength={10}
+              style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", boxSizing: "border-box", letterSpacing: 1 }} />
+          </div>
+        </div>
+
+        {/* Loading / Arrival */}
+        <div style={{ display: "flex", gap: 20, marginBottom: 20 }}>
+          {["LOADING", "ARRIVAL"].map(opt => (
+            <div key={opt} onClick={() => setLocalType(opt)}
+              style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
+              <div style={{ width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                border: `2px solid ${localType === opt ? COLORS.accent : COLORS.border}`,
+                background: localType === opt ? COLORS.accent : "transparent", transition: "all 0.15s",
+                boxShadow: localType === opt ? `0 0 0 3px ${COLORS.accent}25` : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {localType === opt && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff" }} />}
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 700, color: localType === opt ? COLORS.accent : COLORS.textMuted }}>{opt}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <Btn variant="secondary" onClick={onClose}>Annuler</Btn>
+          <Btn onClick={confirm} disabled={!localFrom && !localTo}>✓ Confirmer</Btn>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── CONTRACT FORM FIELD COMPONENTS ──────────────────────────
 // Defined outside Contracts to prevent re-creation on each render (fixes focus loss)
 const CFL = ({ children, req }) => (
@@ -14091,6 +14241,7 @@ const Contracts = ({ companies = [] }) => {
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const [formErrors, setFormErrors] = useState({});
+  const [showPeriodPicker, setShowPeriodPicker] = useState(false);
 
   const validate = () => {
     const errs = {};
@@ -14320,42 +14471,25 @@ const Contracts = ({ companies = [] }) => {
               <div style={{ gridColumn: "2 / -1" }}>
                 <CFL req>Execution Period</CFL>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <input type="text" value={form.executionDateFrom || ""}
-                    onChange={e => {
-                      const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
-                      let out = digits;
-                      if (digits.length > 4) out = digits.slice(0,2) + "/" + digits.slice(2,4) + "/" + digits.slice(4);
-                      else if (digits.length > 2) out = digits.slice(0,2) + "/" + digits.slice(2);
-                      f("executionDateFrom", out); setFormErrors(p => ({...p, executionPeriod: false}));
-                    }}
-                    placeholder="ddmmyyyy" maxLength={10}
-                    style={{ width: 120, background: COLORS.bg, border: `1px solid ${formErrors.executionPeriod ? COLORS.red+"80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", boxSizing: "border-box", letterSpacing: 1 }} />
-                  <span style={{ color: COLORS.textMuted, fontSize: 12 }}>→</span>
-                  <input type="text" value={form.executionDateTo || ""}
-                    onChange={e => {
-                      const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
-                      let out = digits;
-                      if (digits.length > 4) out = digits.slice(0,2) + "/" + digits.slice(2,4) + "/" + digits.slice(4);
-                      else if (digits.length > 2) out = digits.slice(0,2) + "/" + digits.slice(2);
-                      f("executionDateTo", out); setFormErrors(p => ({...p, executionPeriod: false}));
-                    }}
-                    placeholder="ddmmyyyy" maxLength={10}
-                    style={{ width: 120, background: COLORS.bg, border: `1px solid ${formErrors.executionPeriod ? COLORS.red+"80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", boxSizing: "border-box", letterSpacing: 1 }} />
-                  <div style={{ display: "flex", gap: 14, marginLeft: 4 }}>
-                    {["LOADING", "ARRIVAL"].map(opt => (
-                      <div key={opt} onClick={() => f("executionPeriodType", opt)}
-                        style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
-                        <div style={{ width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
-                          border: `2px solid ${form.executionPeriodType === opt ? COLORS.accent : COLORS.border}`,
-                          background: form.executionPeriodType === opt ? COLORS.accent : "transparent",
-                          transition: "all 0.15s",
-                          boxShadow: form.executionPeriodType === opt ? `0 0 0 3px ${COLORS.accent}25` : "none" }}>
-                          {form.executionPeriodType === opt && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff", margin: "3px auto" }} />}
-                        </div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: form.executionPeriodType === opt ? COLORS.accent : COLORS.textMuted }}>{opt}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {/* Summary display */}
+                  {(form.executionDateFrom || form.executionDateTo) ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, background: `${COLORS.accent}10`, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, padding: "7px 12px", flex: 1 }}>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: COLORS.accent, fontWeight: 700 }}>
+                        {form.executionDateFrom || "…"} → {form.executionDateTo || "…"}
+                      </span>
+                      {form.executionPeriodType && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, background: COLORS.bg, padding: "1px 7px", borderRadius: 4, border: `1px solid ${COLORS.border}` }}>
+                          {form.executionPeriodType}
+                        </span>
+                      )}
+                      <button onClick={() => { f("executionDateFrom",""); f("executionDateTo",""); }} style={{ marginLeft: "auto", background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16 }}>×</button>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: formErrors.executionPeriod ? COLORS.red : COLORS.textMuted, fontStyle: "italic" }}>Aucune période sélectionnée</div>
+                  )}
+                  <Btn variant="secondary" onClick={() => setShowPeriodPicker(true)} style={{ padding: "8px 14px", fontSize: 12 }}>
+                    📅 Choisir
+                  </Btn>
                 </div>
                 {formErrors.executionPeriod && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Au moins une date est obligatoire</div>}
               </div>
@@ -14496,6 +14630,22 @@ const Contracts = ({ companies = [] }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Execution Period Picker sub-modal */}
+      {showPeriodPicker && (
+        <ExecutionPeriodPicker
+          dateFrom={form.executionDateFrom}
+          dateTo={form.executionDateTo}
+          periodType={form.executionPeriodType}
+          onChange={({ dateFrom, dateTo, periodType }) => {
+            f("executionDateFrom", dateFrom);
+            f("executionDateTo", dateTo);
+            f("executionPeriodType", periodType);
+            setFormErrors(p => ({...p, executionPeriod: false}));
+          }}
+          onClose={() => setShowPeriodPicker(false)}
+        />
       )}
     </div>
   );

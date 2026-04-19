@@ -13874,6 +13874,10 @@ const EMPTY_CONTRACT = () => ({
   flatCurrency: "",    // from contractCurrencies
   premium: "",         // integer
   derivativeId: "",    // instrument id from deriv_products
+  conclusionDate: new Date().toLocaleDateString("fr-FR").split("/").join("/"), // dd/mm/yyyy
+  executionDateFrom: "",
+  executionDateTo: "",
+  executionPeriodType: "LOADING", // "LOADING" | "ARRIVAL"
   createdAt: "",
 });
 
@@ -13927,7 +13931,8 @@ const Contracts = ({ companies = [] }) => {
   };
 
   const nextId = () => contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;
-  const openNew  = () => { setForm(EMPTY_CONTRACT()); setEditId(null); setShowModal(true); };
+  const todayDDMMYYYY = () => { const d = new Date(); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; };
+  const openNew  = () => { setForm({ ...EMPTY_CONTRACT(), conclusionDate: todayDDMMYYYY() }); setEditId(null); setShowModal(true); };
   const openEdit = (c) => { setForm({ ...c }); setEditId(c.id); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setForm(EMPTY_CONTRACT()); setEditId(null); };
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -14103,6 +14108,65 @@ const Contracts = ({ companies = [] }) => {
                 opts={(config.contractTypes || []).map(t => ({ value: t.label, label: t.label }))} />
               <CFSelect label="Status" value={form.status} onChange={v => f("status", v)}
                 opts={(config.contractStatuses || []).map(s => ({ value: s.label || s.value, label: s.label || s.value }))} />
+
+              <CFSec label="Dates" />
+              {/* Conclusion Date */}
+              <div>
+                <CFL>Conclusion Date</CFL>
+                <input
+                  type="text"
+                  value={form.conclusionDate || ""}
+                  onChange={e => f("conclusionDate", e.target.value)}
+                  placeholder="dd/mm/yyyy"
+                  maxLength={10}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+                />
+              </div>
+
+              {/* Execution Period */}
+              <div style={{ gridColumn: "2 / -1" }}>
+                <CFL>Execution Period</CFL>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <input
+                    type="text"
+                    value={form.executionDateFrom || ""}
+                    onChange={e => f("executionDateFrom", e.target.value)}
+                    placeholder="dd/mm/yyyy"
+                    maxLength={10}
+                    style={{ width: 130, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+                  />
+                  <span style={{ color: COLORS.textMuted, fontSize: 12 }}>→</span>
+                  <input
+                    type="text"
+                    value={form.executionDateTo || ""}
+                    onChange={e => f("executionDateTo", e.target.value)}
+                    placeholder="dd/mm/yyyy"
+                    maxLength={10}
+                    style={{ width: 130, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+                  />
+                  <div style={{ display: "flex", gap: 14, marginLeft: 4 }}>
+                    {["LOADING", "ARRIVAL"].map(opt => (
+                      <div key={opt} onClick={() => f("executionPeriodType", opt)}
+                        style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
+                        <div style={{
+                          width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
+                          border: `2px solid ${form.executionPeriodType === opt ? COLORS.accent : COLORS.border}`,
+                          background: form.executionPeriodType === opt ? COLORS.accent : "transparent",
+                          transition: "all 0.15s",
+                          boxShadow: form.executionPeriodType === opt ? `0 0 0 3px ${COLORS.accent}25` : "none",
+                        }}>
+                          {form.executionPeriodType === opt && (
+                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff", margin: "3px auto" }} />
+                          )}
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: form.executionPeriodType === opt ? COLORS.accent : COLORS.textMuted }}>
+                          {opt}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
               <CFSec label="Parties" />
               <CFCombo label="Buyer" value={form.buyerId} onChange={v => f("buyerId", v)}

@@ -14462,19 +14462,14 @@ const Contracts = ({ companies = [] }) => {
 
   // ── Table columns ──
   const COLS = [
-    { key: "id",                  label: "ID",           w: 55  },
-    { key: "contractNumber",      label: "Contract #",   w: 130 },
+    { key: "contractRef",         label: "Contract #",   w: 150 },
     { key: "conclusionDate",      label: "Date",         w: 100 },
     { key: "contractType",        label: "Type",         w: 110 },
-    { key: "status",              label: "Status",       w: 120 },
     { key: "commodity",           label: "Commodity",    w: 110 },
-    { key: "buyerId",             label: "Buyer",        w: 155 },
-    { key: "sellerId",            label: "Seller",       w: 155 },
+    { key: "buyerSeller",         label: "Buyer / Seller", w: 180 },
     { key: "brokerId",            label: "Broker",       w: 130 },
-    { key: "incoterm",            label: "Incoterm",     w: 90  },
-    { key: "port",                label: "Port",         w: 120 },
-    { key: "loadport",            label: "Loadport",     w: 120 },
-    { key: "disport",             label: "Disport",      w: 120 },
+    { key: "incotermPort",        label: "Port",         w: 150 },
+    { key: "loadDisport",         label: "Loadport / Disport", w: 180 },
     { key: "originCountry",       label: "Origin",       w: 130 },
     { key: "destinationCountry",  label: "Destination",  w: 140 },
     { key: "paymentTerms",        label: "Pmt Terms",    w: 110 },
@@ -14505,24 +14500,44 @@ const Contracts = ({ companies = [] }) => {
   };
 
   const cellContent = (c, key) => {
-    if (key === "id") return <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textMuted, fontSize: 11 }}>{c.id}</span>;
-    if (key === "buyerId" || key === "sellerId" || key === "brokerId") {
-      const name = c[key] || "";
-      return <span style={{ color: name ? COLORS.text : COLORS.textMuted }}>{name || "—"}</span>;
+    // CONTRACT REF — ID + Contract # on 2 lines
+    if (key === "contractRef") return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>{c.contractNumber || `#${c.id}`}</span>
+        <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textMuted, fontSize: 10 }}>ID {c.id}</span>
+      </div>
+    );
+    // BUYER / SELLER — 2 lines
+    if (key === "buyerSeller") return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }}>{c.buyerId || <span style={{ color: COLORS.textMuted }}>—</span>}</span>
+        <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }}>{c.sellerId || "—"}</span>
+      </div>
+    );
+    // INCOTERM + PORT — 2 lines
+    if (key === "incotermPort") {
+      const ports = Array.isArray(c.port) ? c.port : (c.port ? [c.port] : []);
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap" }}>{c.incoterm || <span style={{ color: COLORS.textMuted }}>—</span>}</span>
+          <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>{ports.length > 0 ? ports.join(" · ") : "—"}</span>
+        </div>
+      );
     }
-    if (key === "status") {
-      const si = statusItem(c.status);
-      const col = si?.color || COLORS.textMuted;
-      return c.status
-        ? <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}22`, color: col, border: `1px solid ${col}40`, whiteSpace: "nowrap" }}>{c.status}</span>
-        : <span style={{ color: COLORS.textMuted }}>—</span>;
-    }
+    // LOADPORT / DISPORT — 2 lines
+    if (key === "loadDisport") return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }}>{c.loadport || <span style={{ color: COLORS.textMuted }}>—</span>}</span>
+        <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }}>{c.disport || "—"}</span>
+      </div>
+    );
     if (key === "contractType") {
       if (!c.contractType) return <span style={{ color: COLORS.textMuted }}>—</span>;
       const t = (config.contractTypes || []).find(x => x.label === c.contractType);
       const col = t?.color || COLORS.accent;
       return <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}20`, color: col, border: `1px solid ${col}40`, whiteSpace: "nowrap" }}>{c.contractType}</span>;
     }
+    if (key === "brokerId") return <span style={{ color: c.brokerId ? COLORS.text : COLORS.textMuted }}>{c.brokerId || "—"}</span>;
     if (key === "transformation") return (
       <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5,
         background: c.transformation ? `${COLORS.blue}20` : COLORS.bg,
@@ -14533,12 +14548,6 @@ const Contracts = ({ companies = [] }) => {
     );
     if (key === "originCountry") return <FlagCell countryVal={c.originCountry} />;
     if (key === "destinationCountry") return <FlagCell countryVal={c.destinationCountry} />;
-    if (key === "port") {
-      const ports = Array.isArray(c.port) ? c.port : (c.port ? [c.port] : []);
-      return ports.length > 0
-        ? <span style={{ color: COLORS.text, fontSize: 12 }}>{ports.join(" · ")}</span>
-        : <span style={{ color: COLORS.textMuted }}>—</span>;
-    }
     if (key === "priceType") {
       if (!c.priceType) return <span style={{ color: COLORS.textMuted }}>—</span>;
       if (c.priceType === "flat") return (

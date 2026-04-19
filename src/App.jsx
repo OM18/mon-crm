@@ -13812,18 +13812,33 @@ const EMPTY_CONTRACT = () => ({
   deliveryConditions: "",
   warehouse: "",
   shipmentTerminal: "",
+  priceType: "",       // "flat" | "prime"
+  flatPrice: "",       // number, 2 decimals
+  flatCurrency: "",    // from contractCurrencies
+  premium: "",         // integer
+  derivativeId: "",    // instrument id from deriv_products
   createdAt: "",
 });
 
 const Contracts = ({ companies = [] }) => {
   const { config } = useConfig();
   const [contracts, setContractsRaw] = useState([]);
+  const [instruments, setInstruments] = useState([]);
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY_CONTRACT());
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
   const dataLoaded = useRef(false);
+
+  // ── Load instruments (active only) ──
+  useEffect(() => {
+    async function loadInstruments() {
+      const { data } = await supabase.from('deriv_products').select('data');
+      if (data?.length) setInstruments(data.map(r => r.data).filter(p => p.active !== false));
+    }
+    loadInstruments();
+  }, []);
 
   // ── Load from Supabase ──
   useEffect(() => {
@@ -14130,6 +14145,65 @@ const Contracts = ({ companies = [] }) => {
                   ))}
                 </div>
               </div>
+
+              <FSec label="Prix" />
+              {/* Price type toggle */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <FLabel>Type de prix</FLabel>
+                <div style={{ display: "flex", gap: 8, marginTop: 2, maxWidth: 280 }}>
+                  {[{ v: "flat", l: "FLAT" }, { v: "prime", l: "PRIME" }].map(({ v, l }) => (
+                    <div key={v} onClick={() => f("priceType", form.priceType === v ? "" : v)}
+                      style={{ flex: 1, padding: "9px 0", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: 700, letterSpacing: 0.5, transition: "all 0.15s",
+                        border: `1px solid ${form.priceType === v ? COLORS.accent + "80" : COLORS.border}`,
+                        background: form.priceType === v ? `${COLORS.accent}18` : COLORS.bg,
+                        color: form.priceType === v ? COLORS.accent : COLORS.textMuted }}>
+                      {l}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* FLAT fields */}
+              {form.priceType === "flat" && <>
+                <div>
+                  <FLabel>Flat Price</FLabel>
+                  <input
+                    type="number" step="0.01" min="0"
+                    value={form.flatPrice || ""}
+                    onChange={e => f("flatPrice", e.target.value)}
+                    placeholder="0.00"
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+                  />
+                </div>
+                <FSelect label="Price Currency" field="flatCurrency"
+                  opts={(config.contractCurrencies || []).map(c => ({ value: c.label, label: c.label }))} />
+              </>}
+
+              {/* PRIME fields */}
+              {form.priceType === "prime" && <>
+                <div>
+                  <FLabel>Premium</FLabel>
+                  <input
+                    type="number" step="1"
+                    value={form.premium || ""}
+                    onChange={e => f("premium", e.target.value)}
+                    placeholder="ex : 25"
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+                  />
+                </div>
+                <div>
+                  <FLabel>Derivative Instrument</FLabel>
+                  <select
+                    value={form.derivativeId || ""}
+                    onChange={e => f("derivativeId", e.target.value)}
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: form.derivativeId ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                    <option value="">— Sélectionner un instrument —</option>
+                    {instruments.map(p => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </>}
 
               <FSec label="Logistique" />
               <FSelect label="Incoterm" field="incoterm"

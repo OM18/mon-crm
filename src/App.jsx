@@ -14462,9 +14462,9 @@ const Contracts = ({ companies = [] }) => {
 
   // ── Table columns ──
   const COLS = [
-    { key: "contractRef",         label: "Contract #",   w: 150 },
-    { key: "contractType",        label: "Type",         w: 130 },
-    { key: "commodity",           label: "Commodity",    w: 110 },
+    { key: "contractRef",         label: "Contract #",   w: 140 },
+    { key: "contractType",        label: "Type",         w: 110 },
+    { key: "commodity",           label: "Commodity",    w: 100 },
     { key: "buyerSeller",         label: "Buyer / Seller", w: 180 },
     { key: "brokerId",            label: "Broker",       w: 130 },
     { key: "incotermPort",        label: "Port",         w: 150 },
@@ -14546,7 +14546,20 @@ const Contracts = ({ companies = [] }) => {
         </div>
       );
     }
-    if (key === "brokerId") return <span style={{ color: c.brokerId ? COLORS.text : COLORS.textMuted }}>{c.brokerId || "—"}</span>;
+    if (key === "commodity") {
+      if (!c.commodity) return <span style={{ color: COLORS.textMuted }}>—</span>;
+      // Split into at most 2 lines at word boundary
+      const words = c.commodity.split(" ");
+      const mid = Math.ceil(words.length / 2);
+      const line1 = words.slice(0, mid).join(" ");
+      const line2 = words.slice(mid).join(" ");
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap" }}>{line1}</span>
+          {line2 && <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap" }}>{line2}</span>}
+        </div>
+      );
+    }
     if (key === "transformation") return (
       <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5,
         background: c.transformation ? `${COLORS.blue}20` : COLORS.bg,

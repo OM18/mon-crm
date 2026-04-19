@@ -14464,29 +14464,64 @@ const Contracts = ({ companies = [] }) => {
   const COLS = [
     { key: "id",                  label: "ID",           w: 55  },
     { key: "contractNumber",      label: "Contract #",   w: 130 },
+    { key: "conclusionDate",      label: "Date",         w: 100 },
     { key: "contractType",        label: "Type",         w: 110 },
-    { key: "status",              label: "Status",       w: 130 },
+    { key: "status",              label: "Status",       w: 120 },
     { key: "commodity",           label: "Commodity",    w: 110 },
     { key: "buyerId",             label: "Buyer",        w: 155 },
     { key: "sellerId",            label: "Seller",       w: 155 },
     { key: "brokerId",            label: "Broker",       w: 130 },
-    { key: "currency",            label: "Currency",     w: 85  },
-    { key: "incoterm",            label: "Incoterm",     w: 95  },
-    { key: "originCountry",       label: "Origin",       w: 120 },
-    { key: "destinationCountry",  label: "Destination",  w: 120 },
-    { key: "paymentTerms",        label: "Pmt Terms",    w: 120 },
+    { key: "incoterm",            label: "Incoterm",     w: 90  },
+    { key: "port",                label: "Port",         w: 120 },
+    { key: "loadport",            label: "Loadport",     w: 120 },
+    { key: "disport",             label: "Disport",      w: 120 },
+    { key: "originCountry",       label: "Origin",       w: 130 },
+    { key: "destinationCountry",  label: "Destination",  w: 140 },
+    { key: "paymentTerms",        label: "Pmt Terms",    w: 110 },
+    { key: "priceType",           label: "Price",        w: 130 },
+    { key: "deliveryConditions",  label: "Delivery",     w: 110 },
     { key: "transformation",      label: "Transform.",   w: 85  },
+    { key: "executionPeriod",     label: "Exec. Period", w: 180 },
   ];
 
   const gridTpl = COLS.map(c => `${c.w}px`).join(" ") + " 56px";
 
+  const FlagCell = ({ countryVal }) => {
+    if (!countryVal) return <span style={{ color: COLORS.textMuted }}>—</span>;
+    const code = getCountryCode(countryVal);
+    const label = (config.country || []).find(x => x.value === countryVal)?.label || countryVal;
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {code && (
+          <img src={`https://flagcdn.com/20x15/${code.toLowerCase()}.png`}
+            alt={label}
+            style={{ width: 20, height: 15, objectFit: "cover", borderRadius: 2, flexShrink: 0, border: `1px solid ${COLORS.border}` }}
+            onError={e => { e.target.style.display = "none"; }}
+          />
+        )}
+        <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap" }}>{label}</span>
+      </div>
+    );
+  };
+
   const cellContent = (c, key) => {
     if (key === "id") return <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textMuted, fontSize: 11 }}>{c.id}</span>;
-    if (key === "buyerId" || key === "sellerId" || key === "brokerId") return <span style={{ color: COLORS.text }}>{companyName(c[key])}</span>;
+    if (key === "buyerId" || key === "sellerId" || key === "brokerId") {
+      const name = c[key] || "";
+      return <span style={{ color: name ? COLORS.text : COLORS.textMuted }}>{name || "—"}</span>;
+    }
     if (key === "status") {
       const si = statusItem(c.status);
       const col = si?.color || COLORS.textMuted;
-      return c.status ? <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}22`, color: col, border: `1px solid ${col}40`, whiteSpace: "nowrap" }}>{c.status}</span> : <span style={{ color: COLORS.textMuted }}>—</span>;
+      return c.status
+        ? <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}22`, color: col, border: `1px solid ${col}40`, whiteSpace: "nowrap" }}>{c.status}</span>
+        : <span style={{ color: COLORS.textMuted }}>—</span>;
+    }
+    if (key === "contractType") {
+      if (!c.contractType) return <span style={{ color: COLORS.textMuted }}>—</span>;
+      const t = (config.contractTypes || []).find(x => x.label === c.contractType);
+      const col = t?.color || COLORS.accent;
+      return <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}20`, color: col, border: `1px solid ${col}40`, whiteSpace: "nowrap" }}>{c.contractType}</span>;
     }
     if (key === "transformation") return (
       <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5,
@@ -14496,8 +14531,43 @@ const Contracts = ({ companies = [] }) => {
         {c.transformation ? "YES" : "NO"}
       </span>
     );
+    if (key === "originCountry") return <FlagCell countryVal={c.originCountry} />;
+    if (key === "destinationCountry") return <FlagCell countryVal={c.destinationCountry} />;
+    if (key === "port") {
+      const ports = Array.isArray(c.port) ? c.port : (c.port ? [c.port] : []);
+      return ports.length > 0
+        ? <span style={{ color: COLORS.text, fontSize: 12 }}>{ports.join(" · ")}</span>
+        : <span style={{ color: COLORS.textMuted }}>—</span>;
+    }
+    if (key === "priceType") {
+      if (!c.priceType) return <span style={{ color: COLORS.textMuted }}>—</span>;
+      if (c.priceType === "flat") return (
+        <span style={{ fontSize: 12, color: COLORS.text }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.green, background: `${COLORS.green}15`, padding: "1px 6px", borderRadius: 4, marginRight: 4 }}>FLAT</span>
+          {c.flatPrice ? `${c.flatPrice}${c.flatCurrency ? " " + c.flatCurrency : ""}` : "—"}
+        </span>
+      );
+      if (c.priceType === "prime") return (
+        <span style={{ fontSize: 12, color: COLORS.text }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.purple, background: `${COLORS.purple}15`, padding: "1px 6px", borderRadius: 4, marginRight: 4 }}>PRIME</span>
+          {c.premium ? `+${c.premium}` : "—"}
+        </span>
+      );
+    }
+    if (key === "executionPeriod") {
+      const from = c.executionDateFrom || "";
+      const to = c.executionDateTo || "";
+      if (!from && !to) return <span style={{ color: COLORS.textMuted }}>—</span>;
+      return (
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "nowrap" }}>
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.text }}>{from || "…"} → {to || "…"}</span>
+          {c.executionPeriodType && <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, background: COLORS.bg, padding: "1px 5px", borderRadius: 3, border: `1px solid ${COLORS.border}`, whiteSpace: "nowrap" }}>{c.executionPeriodType}</span>}
+          {c.withoutExtension && <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.orange, whiteSpace: "nowrap" }}>W/O</span>}
+        </div>
+      );
+    }
     const val = c[key] || "";
-    return <span style={{ color: val ? COLORS.text : COLORS.textMuted }}>{val || "—"}</span>;
+    return <span style={{ color: val ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap" }}>{val || "—"}</span>;
   };
 
   // ── Country opts helper ──
@@ -14506,8 +14576,104 @@ const Contracts = ({ companies = [] }) => {
     return { value: v, label: c?.label || v };
   });
 
+  // ── Detail panel ──
+  const DetailPanel = ({ c }) => {
+    if (!c) return null;
+    const si = statusItem(c.status);
+    const col = si?.color || COLORS.textMuted;
+    const instrument = c.derivativeId ? instruments.find(p => String(p.id) === String(c.derivativeId)) : null;
+    const DRow = ({ label, children }) => (
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+        <div style={{ fontSize: 13, color: COLORS.text }}>{children || <span style={{ color: COLORS.textMuted }}>—</span>}</div>
+      </div>
+    );
+    const Sec = ({ label }) => (
+      <div style={{ gridColumn: "1 / -1", fontSize: 10, fontWeight: 700, color: COLORS.accent, letterSpacing: 1, textTransform: "uppercase", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 4, marginTop: 4 }}>{label}</div>
+    );
+    return (
+      <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 14, margin: "12px 0 0", padding: "20px 24px" }}>
+        {/* Detail header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>{c.contractNumber || `Contrat #${c.id}`}</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+              {c.contractType && (() => { const t = (config.contractTypes || []).find(x => x.label === c.contractType); const tc = t?.color || COLORS.accent; return <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${tc}20`, color: tc, border: `1px solid ${tc}40` }}>{c.contractType}</span>; })()}
+              {c.status && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}22`, color: col, border: `1px solid ${col}40` }}>{c.status}</span>}
+              {c.transformation && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${COLORS.blue}20`, color: COLORS.blue, border: `1px solid ${COLORS.blue}40` }}>TRANSFORMATION</span>}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn variant="secondary" onClick={() => openEdit(c)} style={{ padding: "7px 14px", fontSize: 12 }}>✏ Modifier</Btn>
+            <button onClick={() => { remove(c.id); setSelected(null); }} style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}30`, color: COLORS.red, borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>🗑</button>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px 20px" }}>
+          <Sec label="Identification" />
+          <DRow label="Contract #">{c.contractNumber}</DRow>
+          <DRow label="Conclusion Date">{c.conclusionDate}</DRow>
+          <DRow label="Contract Type">{c.contractType}</DRow>
+          <DRow label="Status">{c.status}</DRow>
+
+          <Sec label="Parties" />
+          <DRow label="Buyer">{c.buyerId}</DRow>
+          <DRow label="Seller">{c.sellerId}</DRow>
+          <DRow label="Broker">{c.brokerId}</DRow>
+
+          <Sec label="Produit" />
+          <DRow label="Commodity">{c.commodity}</DRow>
+          <DRow label="Transformation">{c.transformation ? "YES" : "NO"}</DRow>
+
+          <Sec label="Prix" />
+          <DRow label="Price Type">{c.priceType?.toUpperCase() || "—"}</DRow>
+          {c.priceType === "flat" && <>
+            <DRow label="Flat Price">{c.flatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>
+          </>}
+          {c.priceType === "prime" && <>
+            <DRow label="Premium">{c.premium ? `+${c.premium}` : "—"}</DRow>
+            <DRow label="Instrument">{instrument?.label || c.derivativeId || "—"}</DRow>
+          </>}
+          <DRow label="Payment Terms">{c.paymentTerms}</DRow>
+
+          <Sec label="Exécution" />
+          <div style={{ gridColumn: "1 / 3" }}>
+            <DRow label="Execution Period">
+              {(c.executionDateFrom || c.executionDateTo)
+                ? <span style={{ fontFamily: "'DM Mono', monospace" }}>{c.executionDateFrom || "…"} → {c.executionDateTo || "…"}{c.executionPeriodType ? ` · ${c.executionPeriodType}` : ""}{c.withoutExtension ? " · W/O EXT" : ""}</span>
+                : null}
+            </DRow>
+          </div>
+
+          <Sec label="Logistique" />
+          <DRow label="Incoterm">{c.incoterm}</DRow>
+          <DRow label="Port">{Array.isArray(c.port) ? c.port.join(", ") : c.port}</DRow>
+          <DRow label="Loadport">{c.loadport}</DRow>
+          <DRow label="Disport">{c.disport}</DRow>
+          <DRow label="Delivery Conditions">{c.deliveryConditions}</DRow>
+          <DRow label="Warehouse">{c.warehouse}</DRow>
+          <DRow label="Shipment Terminal">{c.shipmentTerminal}</DRow>
+
+          <Sec label="Géographie" />
+          <DRow label="Origin">
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {c.originCountry && getCountryCode(c.originCountry) && <img src={`https://flagcdn.com/20x15/${getCountryCode(c.originCountry).toLowerCase()}.png`} style={{ width: 20, height: 15, objectFit: "cover", borderRadius: 2, border: `1px solid ${COLORS.border}` }} />}
+              {(config.country || []).find(x => x.value === c.originCountry)?.label || c.originCountry || "—"}
+            </div>
+          </DRow>
+          <DRow label="Destination">
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {c.destinationCountry && getCountryCode(c.destinationCountry) && <img src={`https://flagcdn.com/20x15/${getCountryCode(c.destinationCountry).toLowerCase()}.png`} style={{ width: 20, height: 15, objectFit: "cover", borderRadius: 2, border: `1px solid ${COLORS.border}` }} />}
+              {(config.country || []).find(x => x.value === c.destinationCountry)?.label || c.destinationCountry || "—"}
+            </div>
+          </DRow>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 0 }}>
 
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
@@ -14521,7 +14687,7 @@ const Contracts = ({ companies = [] }) => {
       </div>
 
       {/* Blotter table */}
-      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden", flex: 1, display: "flex", flexDirection: "column" }}>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden", flex: selected ? "0 0 auto" : 1, display: "flex", flexDirection: "column", maxHeight: selected ? "45vh" : undefined }}>
         <div style={{ overflowX: "auto", flex: 1, display: "flex", flexDirection: "column" }}>
           {/* Header row */}
           <div style={{ display: "grid", gridTemplateColumns: gridTpl, background: COLORS.tableHeader, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content", position: "sticky", top: 0, zIndex: 2 }}>
@@ -14569,6 +14735,13 @@ const Contracts = ({ companies = [] }) => {
           </div>
         </div>
       </div>
+
+      {/* Detail panel */}
+      {selected && (
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          <DetailPanel c={selected} />
+        </div>
+      )}
 
       {/* ── Create / Edit Modal ── */}
       {showModal && (

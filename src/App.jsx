@@ -4427,10 +4427,12 @@ const ContractCommoditiesEditor = ({ config, updateField }) => {
 // Pills editor for contract ports with Excel import (same style as Instruments bloc)
 const ContractPortsEditor = ({ config, updateField }) => {
   const items = Array.isArray(config.contractPorts) ? config.contractPorts : [];
+  const allCountries = [...(config.country || [])].sort((a, b) => a.label.localeCompare(b.label));
   const [localItems, setLocalItems] = useState(items);
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [newLabel, setNewLabel] = useState("");
+  const [newCountry, setNewCountry] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [importStep, setImportStep] = useState("guide");
   const [importRows, setImportRows] = useState([]);
@@ -4448,8 +4450,8 @@ const ContractPortsEditor = ({ config, updateField }) => {
     if (!newLabel.trim()) return;
     const value = newLabel.trim().toLowerCase().replace(/\s+/g, "_");
     if (localItems.find(i => i.value === value)) return;
-    mark([...localItems, { value, label: newLabel.trim() }]);
-    setNewLabel("");
+    mark([...localItems, { value, label: newLabel.trim(), country: newCountry }]);
+    setNewLabel(""); setNewCountry("");
   };
   const save = (e) => { e.stopPropagation(); updateField("contractPorts", localItems); setDirty(false); };
 
@@ -4514,24 +4516,40 @@ const ContractPortsEditor = ({ config, updateField }) => {
         {expanded && (
           <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-              {localItems.map((s, idx) => (
-                <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
-                  <input value={s.label} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, label: e.target.value } : x))}
-                    style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
-                  <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
-                    style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
-                    onMouseOver={e => e.currentTarget.style.color = COLORS.red}
-                    onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
-                </div>
-              ))}
+              {localItems.map((s, idx) => {
+                const countryLabel = allCountries.find(c => c.value === s.country)?.label || s.country || "";
+                return (
+                  <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
+                    <input value={s.label} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, label: e.target.value } : x))}
+                      style={{ flex: 2, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none", minWidth: 80 }} />
+                    <select value={s.country || ""} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, country: e.target.value } : x))}
+                      style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: s.country ? COLORS.textSub : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit", minWidth: 100 }}>
+                      <option value="">— Country —</option>
+                      {allCountries.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                    <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
+                      style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                      onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                      onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+                  </div>
+                );
+              })}
               {localItems.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "16px 0", fontSize: 13 }}>Aucun port — ajoutez-en ci-dessous ou importez via Excel</div>}
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px" }}>
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>LABEL *</label>
+              <div style={{ flex: 2, display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>PORT *</label>
                 <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Nouveau port…" onKeyDown={e => e.key === "Enter" && add()}
                   style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+              </div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>COUNTRY</label>
+                <select value={newCountry} onChange={e => setNewCountry(e.target.value)}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: newCountry ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit" }}>
+                  <option value="">— Country —</option>
+                  {allCountries.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
               </div>
               <Btn onClick={add} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>+ Ajouter</Btn>
             </div>
@@ -4743,9 +4761,10 @@ const ContractPaymentTermsEditor = ({ config, updateField }) => {
     if (!newLabel.trim()) return;
     const value = newLabel.trim().toLowerCase().replace(/\s+/g, "_");
     if (localItems.find(i => i.value === value)) return;
-    mark([...localItems, { value, label: newLabel.trim() }]);
+    mark([...localItems, { value, label: newLabel.trim(), favorite: false }]);
     setNewLabel("");
   };
+  const toggleFav = (idx) => mark(localItems.map((item, i) => i === idx ? { ...item, favorite: !item.favorite } : item));
   const save = (e) => { e.stopPropagation(); updateField("contractPaymentTerms", localItems); setDirty(false); };
 
   const handleFile = async (file) => {
@@ -4793,6 +4812,15 @@ const ContractPaymentTermsEditor = ({ config, updateField }) => {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {localItems.filter(i => i.favorite).length > 0 && (
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 300 }}>
+                {localItems.filter(i => i.favorite).map(f => (
+                  <span key={f.value} style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${COLORS.gold}20`, color: COLORS.gold, border: `1px solid ${COLORS.gold}40` }}>
+                    ★ {f.label}
+                  </span>
+                ))}
+              </div>
+            )}
             <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
               {localItems.length > 0 ? `${localItems.length} valeur${localItems.length !== 1 ? "s" : ""}` : "Aucune valeur"}
             </span>
@@ -4809,10 +4837,16 @@ const ContractPaymentTermsEditor = ({ config, updateField }) => {
           <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
               {localItems.map((s, idx) => (
-                <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: s.favorite ? `${COLORS.gold}10` : COLORS.card, border: `1px solid ${s.favorite ? COLORS.gold+"40" : COLORS.border}`, borderRadius: 10, padding: "10px 14px", transition: "all 0.15s" }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
                   <input value={s.label} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, label: e.target.value } : x))}
                     style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
+                  <div onClick={() => toggleFav(idx)} title={s.favorite ? "Retirer des favoris" : "Marquer comme favori"}
+                    style={{ fontSize: 18, color: s.favorite ? COLORS.gold : COLORS.textMuted, cursor: "pointer", transition: "color 0.15s", flexShrink: 0, lineHeight: 1 }}
+                    onMouseOver={e => e.currentTarget.style.color = COLORS.gold}
+                    onMouseOut={e => e.currentTarget.style.color = s.favorite ? COLORS.gold : COLORS.textMuted}>
+                    {s.favorite ? "★" : "☆"}
+                  </div>
                   <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
                     style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
                     onMouseOver={e => e.currentTarget.style.color = COLORS.red}

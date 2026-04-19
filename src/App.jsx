@@ -14474,7 +14474,6 @@ const Contracts = ({ companies = [] }) => {
     { key: "destinationCountry",  label: "Destination",  w: 140 },
     { key: "paymentTerms",        label: "Pmt Terms",    w: 110 },
     { key: "priceType",           label: "Price",        w: 130 },
-    { key: "deliveryConditions",  label: "Delivery",     w: 110 },
     { key: "transformation",      label: "Transform.",   w: 85  },
     { key: "executionPeriod",     label: "Exec. Period", w: 180 },
   ];
@@ -14514,13 +14513,14 @@ const Contracts = ({ companies = [] }) => {
         <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }}>{c.sellerId || "—"}</span>
       </div>
     );
-    // INCOTERM + PORT — 2 lines
+    // INCOTERM + PORT + DELIVERY — 3 lines
     if (key === "incotermPort") {
       const ports = Array.isArray(c.port) ? c.port : (c.port ? [c.port] : []);
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap" }}>{c.incoterm || <span style={{ color: COLORS.textMuted }}>—</span>}</span>
           <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>{ports.length > 0 ? ports.join(" · ") : "—"}</span>
+          {c.deliveryConditions && <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>{c.deliveryConditions}</span>}
         </div>
       );
     }

@@ -13977,7 +13977,7 @@ const Contracts = ({ companies = [] }) => {
         </div>
         <input placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ width: 220, background: COLORS.card, border: `1px solid ${search ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
-        <Btn onClick={openNew}>+ Nouveau contrat</Btn>
+        <Btn onClick={openNew}>+ NEW CONTRACT</Btn>
       </div>
 
       {/* Blotter table */}

@@ -5274,11 +5274,20 @@ const ContractCountryEditor = ({ configKey, label, icon, description, config, up
 
 // ─── COMPANY NAME BLOCK ──────────────────────────────────────
 const CompanyNameBlock = ({ config, updateField, companies = [] }) => {
-  const [localName, setLocalName] = useState(config.companyName || "");
+  // Normalize: if stored value is a numeric ID, resolve to company name
+  const resolveStored = (val) => {
+    if (!val) return "";
+    const byId = companies.find(c => String(c.id) === String(val));
+    if (byId) return byId.name;
+    // If it looks like a numeric ID (no spaces, all digits) and no company matches, clear it
+    if (/^\d+$/.test(String(val).trim())) return "";
+    return val;
+  };
+  const [localName, setLocalName] = useState(() => resolveStored(config.companyName));
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  useEffect(() => { setLocalName(config.companyName || ""); }, [config.companyName]);
+  useEffect(() => { setLocalName(resolveStored(config.companyName)); }, [config.companyName, companies.length]);
 
   useEffect(() => {
     const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };

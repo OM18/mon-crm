@@ -13993,10 +13993,30 @@ const Contracts = ({ companies = [] }) => {
   const todayDDMMYYYY = () => { const d = new Date(); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; };
   const openNew  = () => { setForm({ ...EMPTY_CONTRACT(), conclusionDate: todayDDMMYYYY() }); setEditId(null); setShowModal(true); };
   const openEdit = (c) => { setForm({ ...c }); setEditId(c.id); setShowModal(true); };
-  const closeModal = () => { setShowModal(false); setForm(EMPTY_CONTRACT()); setEditId(null); };
+  const closeModal = () => { setShowModal(false); setForm(EMPTY_CONTRACT()); setEditId(null); setFormErrors({}); };
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
+  const [formErrors, setFormErrors] = useState({});
+
+  const validate = () => {
+    const errs = {};
+    if (!form.contractNumber?.trim())   errs.contractNumber   = true;
+    if (!form.contractType?.trim())     errs.contractType     = true;
+    if (!form.conclusionDate?.trim())   errs.conclusionDate   = true;
+    if (!form.executionDateFrom?.trim() && !form.executionDateTo?.trim()) errs.executionPeriod = true;
+    if (!form.buyerId?.trim())          errs.buyerId          = true;
+    if (!form.sellerId?.trim())         errs.sellerId         = true;
+    if (!form.commodity?.trim())        errs.commodity        = true;
+    if (!form.priceType)                errs.priceType        = true;
+    if (!form.incoterm?.trim())         errs.incoterm         = true;
+    if (!form.paymentTerms?.trim())     errs.paymentTerms     = true;
+    return errs;
+  };
+
   const submit = () => {
+    const errs = validate();
+    if (Object.keys(errs).length > 0) { setFormErrors(errs); return; }
+    setFormErrors({});
     if (editId !== null) {
       persist(contracts.map(c => c.id === editId ? { ...form, id: editId } : c));
     } else {
@@ -14162,94 +14182,97 @@ const Contracts = ({ companies = [] }) => {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
 
               <CFSec label="Identification" />
-              <CFInput label="Contract Number" value={form.contractNumber} onChange={v => f("contractNumber", v)} placeholder="ex : CTR-2024-001" />
-              <CFSelect label="Contract Type" value={form.contractType} onChange={v => f("contractType", v)}
-                opts={(config.contractTypes || []).map(t => ({ value: t.label, label: t.label }))} />
+              <div>
+                <CFL req>Contract Number</CFL>
+                <input value={form.contractNumber || ""} onChange={e => { f("contractNumber", e.target.value); setFormErrors(p => ({...p, contractNumber: false})); }} placeholder="ex : CTR-2024-001"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${formErrors.contractNumber ? COLORS.red+"80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                {formErrors.contractNumber && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Champ obligatoire</div>}
+              </div>
+              <div>
+                <CFL req>Contract Type</CFL>
+                <select value={form.contractType || ""} onChange={e => { f("contractType", e.target.value); setFormErrors(p => ({...p, contractType: false})); }}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${formErrors.contractType ? COLORS.red+"80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: form.contractType ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                  <option value="">— Sélectionner —</option>
+                  {(config.contractTypes || []).map(t => <option key={t.label} value={t.label}>{t.label}</option>)}
+                </select>
+                {formErrors.contractType && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Champ obligatoire</div>}
+              </div>
               <CFSelect label="Status" value={form.status} onChange={v => f("status", v)}
                 opts={(config.contractStatuses || []).map(s => ({ value: s.label || s.value, label: s.label || s.value }))} />
 
               <CFSec label="Dates" />
               {/* Conclusion Date */}
               <div>
-                <CFL>Conclusion Date</CFL>
-                <input
-                  type="text"
-                  value={form.conclusionDate || ""}
-                  onChange={e => f("conclusionDate", e.target.value)}
-                  placeholder="dd/mm/yyyy"
-                  maxLength={10}
-                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
-                />
+                <CFL req>Conclusion Date</CFL>
+                <input type="text" value={form.conclusionDate || ""} onChange={e => { f("conclusionDate", e.target.value); setFormErrors(p => ({...p, conclusionDate: false})); }} placeholder="dd/mm/yyyy" maxLength={10}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${formErrors.conclusionDate ? COLORS.red+"80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                {formErrors.conclusionDate && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Champ obligatoire</div>}
               </div>
 
               {/* Execution Period */}
               <div style={{ gridColumn: "2 / -1" }}>
-                <CFL>Execution Period</CFL>
+                <CFL req>Execution Period</CFL>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <input
-                    type="text"
-                    value={form.executionDateFrom || ""}
+                  <input type="text" value={form.executionDateFrom || ""}
                     onChange={e => {
                       const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
                       let out = digits;
                       if (digits.length > 4) out = digits.slice(0,2) + "/" + digits.slice(2,4) + "/" + digits.slice(4);
                       else if (digits.length > 2) out = digits.slice(0,2) + "/" + digits.slice(2);
-                      f("executionDateFrom", out);
+                      f("executionDateFrom", out); setFormErrors(p => ({...p, executionPeriod: false}));
                     }}
-                    placeholder="ddmmyyyy"
-                    maxLength={10}
-                    style={{ width: 120, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", boxSizing: "border-box", letterSpacing: 1 }}
-                  />
+                    placeholder="ddmmyyyy" maxLength={10}
+                    style={{ width: 120, background: COLORS.bg, border: `1px solid ${formErrors.executionPeriod ? COLORS.red+"80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", boxSizing: "border-box", letterSpacing: 1 }} />
                   <span style={{ color: COLORS.textMuted, fontSize: 12 }}>→</span>
-                  <input
-                    type="text"
-                    value={form.executionDateTo || ""}
+                  <input type="text" value={form.executionDateTo || ""}
                     onChange={e => {
                       const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
                       let out = digits;
                       if (digits.length > 4) out = digits.slice(0,2) + "/" + digits.slice(2,4) + "/" + digits.slice(4);
                       else if (digits.length > 2) out = digits.slice(0,2) + "/" + digits.slice(2);
-                      f("executionDateTo", out);
+                      f("executionDateTo", out); setFormErrors(p => ({...p, executionPeriod: false}));
                     }}
-                    placeholder="ddmmyyyy"
-                    maxLength={10}
-                    style={{ width: 120, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", boxSizing: "border-box", letterSpacing: 1 }}
-                  />
+                    placeholder="ddmmyyyy" maxLength={10}
+                    style={{ width: 120, background: COLORS.bg, border: `1px solid ${formErrors.executionPeriod ? COLORS.red+"80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", boxSizing: "border-box", letterSpacing: 1 }} />
                   <div style={{ display: "flex", gap: 14, marginLeft: 4 }}>
                     {["LOADING", "ARRIVAL"].map(opt => (
                       <div key={opt} onClick={() => f("executionPeriodType", opt)}
                         style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
-                        <div style={{
-                          width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
+                        <div style={{ width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
                           border: `2px solid ${form.executionPeriodType === opt ? COLORS.accent : COLORS.border}`,
                           background: form.executionPeriodType === opt ? COLORS.accent : "transparent",
                           transition: "all 0.15s",
-                          boxShadow: form.executionPeriodType === opt ? `0 0 0 3px ${COLORS.accent}25` : "none",
-                        }}>
-                          {form.executionPeriodType === opt && (
-                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff", margin: "3px auto" }} />
-                          )}
+                          boxShadow: form.executionPeriodType === opt ? `0 0 0 3px ${COLORS.accent}25` : "none" }}>
+                          {form.executionPeriodType === opt && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff", margin: "3px auto" }} />}
                         </div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: form.executionPeriodType === opt ? COLORS.accent : COLORS.textMuted }}>
-                          {opt}
-                        </span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: form.executionPeriodType === opt ? COLORS.accent : COLORS.textMuted }}>{opt}</span>
                       </div>
                     ))}
                   </div>
                 </div>
+                {formErrors.executionPeriod && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Au moins une date est obligatoire</div>}
               </div>
 
               <CFSec label="Parties" />
-              <CFCombo label="Buyer" value={form.buyerId} onChange={v => f("buyerId", v)}
-                suggestions={getBuyers().map(c => c.name)} placeholder="Saisir ou choisir un acheteur…" />
-              <CFCombo label="Seller" value={form.sellerId} onChange={v => f("sellerId", v)}
-                suggestions={getSellers().map(c => c.name)} placeholder="Saisir ou choisir un vendeur…" />
+              <div>
+                <CFCombo label="Buyer" value={form.buyerId} onChange={v => { f("buyerId", v); setFormErrors(p => ({...p, buyerId: false})); }}
+                  suggestions={getBuyers().map(c => c.name)} placeholder="Saisir ou choisir un acheteur…" req />
+                {formErrors.buyerId && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Champ obligatoire</div>}
+              </div>
+              <div>
+                <CFCombo label="Seller" value={form.sellerId} onChange={v => { f("sellerId", v); setFormErrors(p => ({...p, sellerId: false})); }}
+                  suggestions={getSellers().map(c => c.name)} placeholder="Saisir ou choisir un vendeur…" req />
+                {formErrors.sellerId && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Champ obligatoire</div>}
+              </div>
               <CFCombo label="Broker" value={form.brokerId} onChange={v => f("brokerId", v)}
                 suggestions={getBrokers().map(c => c.name)} placeholder="Saisir ou choisir un broker…" />
 
               <CFSec label="Produit" />
-              <CFCombo label="Commodity" value={form.commodity} onChange={v => f("commodity", v)}
-                suggestions={(config.contractCommodities || []).map(c => c.label)} placeholder="Saisir ou choisir une commodité…" />
+              <div>
+                <CFCombo label="Commodity" value={form.commodity} onChange={v => { f("commodity", v); setFormErrors(p => ({...p, commodity: false})); }}
+                  suggestions={(config.contractCommodities || []).map(c => c.label)} placeholder="Saisir ou choisir une commodité…" req />
+                {formErrors.commodity && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Champ obligatoire</div>}
+              </div>
 
               {/* Transformation toggle */}
               <div>
@@ -14270,18 +14293,19 @@ const Contracts = ({ companies = [] }) => {
               <CFSec label="Prix" />
               {/* Price type toggle */}
               <div style={{ gridColumn: "1 / -1" }}>
-                <CFL>Type de prix</CFL>
+                <CFL req>Type de prix</CFL>
                 <div style={{ display: "flex", gap: 8, marginTop: 2, maxWidth: 280 }}>
                   {[{ v: "flat", l: "FLAT" }, { v: "prime", l: "PRIME" }].map(({ v, l }) => (
-                    <div key={v} onClick={() => f("priceType", form.priceType === v ? "" : v)}
+                    <div key={v} onClick={() => { f("priceType", form.priceType === v ? "" : v); setFormErrors(p => ({...p, priceType: false})); }}
                       style={{ flex: 1, padding: "9px 0", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: 700, letterSpacing: 0.5, transition: "all 0.15s",
-                        border: `1px solid ${form.priceType === v ? COLORS.accent + "80" : COLORS.border}`,
+                        border: `1px solid ${formErrors.priceType ? COLORS.red+"80" : form.priceType === v ? COLORS.accent + "80" : COLORS.border}`,
                         background: form.priceType === v ? `${COLORS.accent}18` : COLORS.bg,
                         color: form.priceType === v ? COLORS.accent : COLORS.textMuted }}>
                       {l}
                     </div>
                   ))}
                 </div>
+                {formErrors.priceType && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Sélectionner FLAT ou PRIME</div>}
               </div>
 
               {/* FLAT fields */}
@@ -14313,8 +14337,15 @@ const Contracts = ({ companies = [] }) => {
               </>}
 
               <CFSec label="Logistique" />
-              <CFSelect label="Incoterm" value={form.incoterm} onChange={v => f("incoterm", v)}
-                opts={(config.contractIncoterms || []).map(c => ({ value: c.label, label: c.label }))} />
+              <div>
+                <CFL req>Incoterm</CFL>
+                <select value={form.incoterm || ""} onChange={e => { f("incoterm", e.target.value); setFormErrors(p => ({...p, incoterm: false})); }}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${formErrors.incoterm ? COLORS.red+"80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: form.incoterm ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                  <option value="">— Sélectionner —</option>
+                  {(config.contractIncoterms || []).map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
+                </select>
+                {formErrors.incoterm && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Champ obligatoire</div>}
+              </div>
               {/* Port — multi-value */}
               <div style={{ gridColumn: "1 / 2" }}>
                 <CFL>Port</CFL>
@@ -14324,8 +14355,15 @@ const Contracts = ({ companies = [] }) => {
                   suggestions={(config.contractPorts || []).map(p => p.label)}
                 />
               </div>
-              <CFSelect label="Payment Terms" value={form.paymentTerms} onChange={v => f("paymentTerms", v)}
-                opts={(config.contractPaymentTerms || []).map(p => ({ value: p.label, label: p.label }))} />
+              <div>
+                <CFL req>Payment Terms</CFL>
+                <select value={form.paymentTerms || ""} onChange={e => { f("paymentTerms", e.target.value); setFormErrors(p => ({...p, paymentTerms: false})); }}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${formErrors.paymentTerms ? COLORS.red+"80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: form.paymentTerms ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                  <option value="">— Sélectionner —</option>
+                  {(config.contractPaymentTerms || []).map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
+                </select>
+                {formErrors.paymentTerms && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Champ obligatoire</div>}
+              </div>
               <CFCombo label="Execution Loadport" value={form.loadport} onChange={v => f("loadport", v)}
                 suggestions={(config.contractPorts || []).map(p => p.label)} placeholder="Saisir ou choisir un port…" />
               <CFCombo label="Execution Disport" value={form.disport} onChange={v => f("disport", v)}

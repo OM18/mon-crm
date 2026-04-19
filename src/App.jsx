@@ -298,6 +298,7 @@ const DEFAULT_CONFIG = {
   ],
   derivUnderlyingOrigins: ["FRANCE", "UKRAINE", "MOROCCO", "BRAZIL", "ARGENTINA", "UNITED STATES", "AUSTRALIA"],
   companyTimezone: "Europe/Paris",
+  companyName: "",
   companyViews: [],
 };
 
@@ -6615,6 +6616,40 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>Paramètres spécifiques aux sociétés</div>
           </div>
           <div style={{ padding: "20px 24px" }}>
+
+            {/* ── COMPANY NAME BLOCK ── */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>🏢 COMPANY NAME</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ flex: 1, position: "relative" }}>
+                  <select
+                    value={config.companyName || ""}
+                    onChange={e => updateField("companyName", e.target.value)}
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px", color: config.companyName ? COLORS.text : COLORS.textMuted, fontSize: 14, outline: "none", fontFamily: "inherit" }}>
+                    <option value="">— Sélectionner une société —</option>
+                    {companies.map(co => (
+                      <option key={co.id} value={co.id}>{co.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {config.companyName && (() => {
+                  const co = companies.find(c => c.id === config.companyName || c.name === config.companyName);
+                  return co ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, background: `${COLORS.accent}10`, border: `1px solid ${COLORS.accent}30`, borderRadius: 10, padding: "8px 14px" }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: COLORS.hover, border: `1px solid ${COLORS.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: COLORS.accent, flexShrink: 0 }}>
+                        {(co.name || "").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{co.name}</div>
+                        {co.country && <div style={{ fontSize: 11, color: COLORS.textMuted }}>{co.country}</div>}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+            </div>
+
+            <div style={{ height: 1, background: COLORS.border, margin: "20px 0" }} />
 
             {/* ── TIMEZONE BLOCK ── */}
             <TimezoneBlock config={config} updateField={updateField} />

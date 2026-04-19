@@ -13957,6 +13957,51 @@ const Contracts = ({ companies = [] }) => {
       </select>
     </div>
   );
+
+  // Combo = free-text input + dropdown suggestions from admin list
+  const FCombo = ({ label, field, suggestions = [], placeholder, req }) => {
+    const [open, setOpen] = useState(false);
+    const [localQ, setLocalQ] = useState(form[field] || "");
+    const ref = useRef(null);
+
+    useEffect(() => { setLocalQ(form[field] || ""); }, [form[field]]);
+
+    useEffect(() => {
+      const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+      document.addEventListener("mousedown", handler);
+      return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    const filtered = suggestions.filter(s => s.toLowerCase().includes(localQ.toLowerCase()) && s !== localQ);
+    const showDrop = open && (filtered.length > 0 || localQ.trim() === "");
+    const display = showDrop && localQ.trim() === "" ? suggestions : filtered;
+
+    return (
+      <div ref={ref} style={{ position: "relative" }}>
+        <FLabel req={req}>{label}</FLabel>
+        <input
+          value={localQ}
+          onChange={e => { setLocalQ(e.target.value); f(field, e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder || "Saisir ou choisir…"}
+          style={{ width: "100%", background: COLORS.bg, border: `1px solid ${open ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", transition: "border-color 0.15s" }}
+        />
+        {showDrop && display.length > 0 && (
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, boxShadow: "0 8px 24px #00000050", maxHeight: 200, overflowY: "auto", marginTop: 2 }}>
+            {display.map(s => (
+              <div key={s} onMouseDown={() => { f(field, s); setLocalQ(s); setOpen(false); }}
+                style={{ padding: "9px 12px", fontSize: 13, color: COLORS.text, cursor: "pointer", borderBottom: `1px solid ${COLORS.border}` }}
+                onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
+                onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                {s}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const FSec = ({ label }) => (
     <div style={{ gridColumn: "1 / -1", fontSize: 11, fontWeight: 700, color: COLORS.accent, letterSpacing: 1, textTransform: "uppercase", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 5, marginTop: 6 }}>{label}</div>
   );
@@ -14054,16 +14099,20 @@ const Contracts = ({ companies = [] }) => {
                 opts={(config.contractStatuses || []).map(s => ({ value: s.label || s.value, label: s.label || s.value }))} />
 
               <FSec label="Parties" />
-              <FSelect label="Buyer" field="buyerId"
-                opts={getBuyers().map(c => ({ value: c.id, label: c.name }))} />
-              <FSelect label="Seller" field="sellerId"
-                opts={getSellers().map(c => ({ value: c.id, label: c.name }))} />
-              <FSelect label="Broker" field="brokerId"
-                opts={getBrokers().map(c => ({ value: c.id, label: c.name }))} />
+              <FCombo label="Buyer" field="buyerId"
+                suggestions={getBuyers().map(c => c.name)}
+                placeholder="Saisir ou choisir un acheteur…" />
+              <FCombo label="Seller" field="sellerId"
+                suggestions={getSellers().map(c => c.name)}
+                placeholder="Saisir ou choisir un vendeur…" />
+              <FCombo label="Broker" field="brokerId"
+                suggestions={getBrokers().map(c => c.name)}
+                placeholder="Saisir ou choisir un broker…" />
 
               <FSec label="Produit" />
-              <FSelect label="Commodity" field="commodity"
-                opts={(config.contractCommodities || []).map(c => ({ value: c.label, label: c.label }))} />
+              <FCombo label="Commodity" field="commodity"
+                suggestions={(config.contractCommodities || []).map(c => c.label)}
+                placeholder="Saisir ou choisir une commodité…" />
               <FSelect label="Currency" field="currency"
                 opts={(config.contractCurrencies || []).map(c => ({ value: c.label, label: c.label }))} />
               {/* Transformation toggle */}
@@ -14085,22 +14134,27 @@ const Contracts = ({ companies = [] }) => {
               <FSec label="Logistique" />
               <FSelect label="Incoterm" field="incoterm"
                 opts={(config.contractIncoterms || []).map(c => ({ value: c.label, label: c.label }))} />
-              <FSelect label="Port" field="port"
-                opts={(config.contractPorts || []).map(p => ({ value: p.label, label: p.label }))} />
+              <FCombo label="Port" field="port"
+                suggestions={(config.contractPorts || []).map(p => p.label)}
+                placeholder="Saisir ou choisir un port…" />
               <FSelect label="Payment Terms" field="paymentTerms"
                 opts={(config.contractPaymentTerms || []).map(p => ({ value: p.label, label: p.label }))} />
-              <FSelect label="Execution Loadport" field="loadport"
-                opts={(config.contractPorts || []).map(p => ({ value: p.label, label: p.label }))} />
-              <FSelect label="Execution Disport" field="disport"
-                opts={(config.contractPorts || []).map(p => ({ value: p.label, label: p.label }))} />
+              <FCombo label="Execution Loadport" field="loadport"
+                suggestions={(config.contractPorts || []).map(p => p.label)}
+                placeholder="Saisir ou choisir un port…" />
+              <FCombo label="Execution Disport" field="disport"
+                suggestions={(config.contractPorts || []).map(p => p.label)}
+                placeholder="Saisir ou choisir un port…" />
               <FSelect label="Delivery Conditions" field="deliveryConditions"
                 opts={(config.contractDeliveryTerms || []).map(d => ({ value: d.label, label: d.label }))} />
 
               <FSec label="Géographie" />
-              <FSelect label="Origin Country" field="originCountry"
-                opts={countryOpts(config.contractOrigins)} />
-              <FSelect label="Destination Country" field="destinationCountry"
-                opts={countryOpts(config.contractDestinations)} />
+              <FCombo label="Origin Country" field="originCountry"
+                suggestions={countryOpts(config.contractOrigins).map(o => o.label)}
+                placeholder="Saisir ou choisir un pays…" />
+              <FCombo label="Destination Country" field="destinationCountry"
+                suggestions={countryOpts(config.contractDestinations).map(o => o.label)}
+                placeholder="Saisir ou choisir un pays…" />
 
               <FSec label="À définir ultérieurement" />
               <FInput label="Warehouse" field="warehouse" placeholder="À définir" />

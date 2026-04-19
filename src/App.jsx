@@ -4620,6 +4620,12 @@ const ContractPaymentTermsEditor = ({ config, updateField }) => {
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [newLabel, setNewLabel] = useState("");
+  const [showImport, setShowImport] = useState(false);
+  const [importStep, setImportStep] = useState("guide");
+  const [importRows, setImportRows] = useState([]);
+  const [importError, setImportError] = useState("");
+  const [importResult, setImportResult] = useState(null);
+  const fileRef = useRef(null);
 
   useEffect(() => { setLocalItems(Array.isArray(config.contractPaymentTerms) ? config.contractPaymentTerms : []); setDirty(false); }, [config.contractPaymentTerms]);
 
@@ -4633,53 +4639,171 @@ const ContractPaymentTermsEditor = ({ config, updateField }) => {
   };
   const save = (e) => { e.stopPropagation(); updateField("contractPaymentTerms", localItems); setDirty(false); };
 
+  const handleFile = async (file) => {
+    setImportError("");
+    try {
+      const buf = await file.arrayBuffer();
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      const headers = (json[0] || []).map(h => String(h).trim());
+      const colIdx = headers.findIndex(h => /label|name|payment|term|condition/i.test(h));
+      const rows = json.slice(1).map(row => String(row[colIdx >= 0 ? colIdx : 0] || "").trim()).filter(Boolean);
+      if (rows.length === 0) { setImportError("Aucune donnée trouvée dans le fichier."); return; }
+      setImportRows(rows);
+      setImportStep("preview");
+    } catch (err) { setImportError("Erreur de lecture : " + err.message); }
+  };
+
+  const confirmImport = () => {
+    const merged = [...localItems];
+    let added = 0;
+    importRows.forEach(label => {
+      const value = label.toLowerCase().replace(/\s+/g, "_");
+      if (!merged.find(i => i.value === value)) { merged.push({ value, label }); added++; }
+    });
+    mark(merged);
+    setImportResult({ added, skipped: importRows.length - added });
+    setImportStep("summary");
+  };
+
+  const closeImport = () => { setShowImport(false); setImportStep("guide"); setImportRows([]); setImportError(""); setImportResult(null); };
+
   return (
-    <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
-      <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
-        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
-        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>💳</span>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Contract Payment Terms</div>
-            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Conditions de paiement disponibles (ex : CAD, LC, TT…)</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
-            {localItems.length > 0 ? `${localItems.length} valeur${localItems.length !== 1 ? "s" : ""}` : "Aucune valeur"}
-          </span>
-          {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>✓ Sauvegarder</div>}
-          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
-        </div>
-      </div>
-      {expanded && (
-        <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-            {localItems.map((s, idx) => (
-              <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
-                <input value={s.label} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, label: e.target.value } : x))}
-                  style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
-                <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
-                  style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
-                  onMouseOver={e => e.currentTarget.style.color = COLORS.red}
-                  onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
-              </div>
-            ))}
-            {localItems.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "16px 0", fontSize: 13 }}>Aucune valeur — ajoutez-en ci-dessous</div>}
-          </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px" }}>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>LABEL *</label>
-              <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Nouveau terme de paiement…" onKeyDown={e => e.key === "Enter" && add()}
-                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+    <>
+      <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
+        <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
+          onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
+          onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>💳</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Contract Payment Terms</div>
+              <div style={{ fontSize: 11, color: COLORS.textMuted }}>Conditions de paiement disponibles (ex : CAD, LC, TT…)</div>
             </div>
-            <Btn onClick={add} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>+ Ajouter</Btn>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+              {localItems.length > 0 ? `${localItems.length} valeur${localItems.length !== 1 ? "s" : ""}` : "Aucune valeur"}
+            </span>
+            {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>✓ Sauvegarder</div>}
+            <div onClick={e => { e.stopPropagation(); setShowImport(true); if (!expanded) setExpanded(true); }}
+              style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 10px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent" }}
+              title="Importer depuis Excel">
+              <img src="/logoxl.png" style={{ width: 22, height: 22, objectFit: "contain" }} />
+            </div>
+            <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+          </div>
+        </div>
+        {expanded && (
+          <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+              {localItems.map((s, idx) => (
+                <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
+                  <input value={s.label} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, label: e.target.value } : x))}
+                    style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
+                  <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
+                    style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                    onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                    onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+                </div>
+              ))}
+              {localItems.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "16px 0", fontSize: 13 }}>Aucune valeur — ajoutez-en ci-dessous ou importez via Excel</div>}
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: `${COLORS.accent}08`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>LABEL *</label>
+                <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Nouveau terme de paiement…" onKeyDown={e => e.key === "Enter" && add()}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+              </div>
+              <Btn onClick={add} disabled={!newLabel.trim()} style={{ padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>+ Ajouter</Btn>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {showImport && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 20, color: COLORS.text, display: "flex", alignItems: "center", gap: 10 }}>
+                  <img src="/logoxl.png" style={{ width: 26, height: 26, objectFit: "contain" }} />
+                  Import Excel — Contract Payment Terms
+                </h2>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: COLORS.textSub }}>Formats acceptés : .xlsx, .xls, .csv</p>
+              </div>
+              <button onClick={closeImport} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
+            </div>
+
+            {importStep === "guide" && (
+              <div>
+                <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, marginBottom: 8 }}>Format attendu</div>
+                  <div style={{ fontSize: 12, color: COLORS.textSub, lineHeight: 1.7 }}>
+                    Une colonne avec les termes de paiement.<br />
+                    En-tête reconnu : <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.accent }}>label</span>, <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.accent }}>payment</span> ou <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.accent }}>term</span> — sinon première colonne.<br />
+                    Les doublons existants seront ignorés.
+                  </div>
+                </div>
+                <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); }} />
+                {importError && <div style={{ marginBottom: 12, fontSize: 13, color: COLORS.red, background: `${COLORS.red}10`, border: `1px solid ${COLORS.red}30`, borderRadius: 8, padding: "10px 14px" }}>⚠ {importError}</div>}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <Btn onClick={() => fileRef.current.click()}>📂 Choisir un fichier</Btn>
+                </div>
+              </div>
+            )}
+
+            {importStep === "preview" && (
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 12 }}>{importRows.length} terme{importRows.length !== 1 ? "s" : ""} détecté{importRows.length !== 1 ? "s" : ""}</div>
+                <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 20, maxHeight: 320, overflowY: "auto" }}>
+                  {importRows.map((label, i) => {
+                    const exists = localItems.find(x => x.value === label.toLowerCase().replace(/\s+/g, "_"));
+                    return (
+                      <div key={i} style={{ padding: "9px 16px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10, background: i % 2 === 0 ? "transparent" : `${COLORS.surface}80` }}>
+                        <span style={{ fontSize: 13, color: COLORS.text, flex: 1 }}>{label}</span>
+                        {exists
+                          ? <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, background: COLORS.bg, padding: "2px 7px", borderRadius: 4, border: `1px solid ${COLORS.border}` }}>EXISTANT</span>
+                          : <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.green, background: `${COLORS.green}15`, padding: "2px 7px", borderRadius: 4 }}>NOUVEAU</span>
+                        }
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <Btn variant="secondary" onClick={() => { setImportStep("guide"); setImportRows([]); }}>← Retour</Btn>
+                  <Btn onClick={confirmImport} style={{ background: COLORS.green }}>
+                    ✓ Importer {importRows.filter(l => !localItems.find(x => x.value === l.toLowerCase().replace(/\s+/g, "_"))).length} nouveau{importRows.filter(l => !localItems.find(x => x.value === l.toLowerCase().replace(/\s+/g, "_"))).length !== 1 ? "x" : ""}
+                  </Btn>
+                </div>
+              </div>
+            )}
+
+            {importStep === "summary" && importResult && (
+              <div>
+                <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+                  <div style={{ flex: 1, background: `${COLORS.green}12`, border: `1px solid ${COLORS.green}30`, borderRadius: 12, padding: "16px 20px", textAlign: "center" }}>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: COLORS.green }}>{importResult.added}</div>
+                    <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>terme{importResult.added !== 1 ? "s" : ""} ajouté{importResult.added !== 1 ? "s" : ""}</div>
+                  </div>
+                  <div style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "16px 20px", textAlign: "center" }}>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: COLORS.textMuted }}>{importResult.skipped}</div>
+                    <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 4 }}>doublon{importResult.skipped !== 1 ? "s" : ""} ignoré{importResult.skipped !== 1 ? "s" : ""}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <Btn variant="secondary" onClick={closeImport}>Fermer</Btn>
+                  <Btn onClick={() => { updateField("contractPaymentTerms", localItems); setDirty(false); closeImport(); }} style={{ background: COLORS.green }}>✓ Sauvegarder</Btn>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

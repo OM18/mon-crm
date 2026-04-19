@@ -13965,12 +13965,14 @@ const ExecutionPeriodPicker = ({ dateFrom, dateTo, periodType, onChange, onClose
       setLocalFrom(`01/${m}/${y}`);
       setLocalTo(`15/${m}/${y}`);
     } else {
-      setLocalFrom(`16/${m}/${y}`);
+      setLocalFrom(`15/${m}/${y}`);
       setLocalTo(`${daysInMonth(month, year)}/${m}/${y}`);
     }
+    setSelHalf(half);
   };
 
   const [selMonth, setSelMonth] = useState(null);
+  const [selHalf, setSelHalf]   = useState(null);
   const [selYear, setSelYear]   = useState(thisYear);
 
   const fmtDate = (val, setter) => {
@@ -14018,7 +14020,7 @@ const ExecutionPeriodPicker = ({ dateFrom, dateTo, periodType, onChange, onClose
           {MONTHS.map((m, i) => {
             const isActive = selMonth === i + 1;
             return (
-              <div key={m} onClick={() => { setSelMonth(i + 1); applyMonthHalf(i + 1, "full", selYear); }}
+              <div key={m} onClick={() => { setSelMonth(i + 1); setSelHalf(null); applyMonthHalf(i + 1, "full", selYear); }}
                 style={{ padding: "7px 0", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 12, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
                   border: `1px solid ${isActive ? COLORS.blue + "80" : COLORS.border}`,
                   background: isActive ? `${COLORS.blue}20` : COLORS.bg,
@@ -14034,17 +14036,20 @@ const ExecutionPeriodPicker = ({ dateFrom, dateTo, periodType, onChange, onClose
           <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
             {[
               { key: "first",  label: "FIRST HALF",  sub: `01 → 15` },
-              { key: "second", label: "SECOND HALF", sub: `16 → ${daysInMonth(selMonth, selYear)}` },
-            ].map(({ key, label, sub }) => (
-              <div key={key} onClick={() => applyMonthHalf(selMonth, key, selYear)}
-                style={{ flex: 1, padding: "8px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, transition: "all 0.15s", userSelect: "none", textAlign: "center",
-                  border: `1px solid ${COLORS.border}`, background: COLORS.bg, color: COLORS.textSub }}
-                onMouseOver={e => { e.currentTarget.style.background = `${COLORS.accent}15`; e.currentTarget.style.color = COLORS.accent; e.currentTarget.style.borderColor = COLORS.accent + "60"; }}
-                onMouseOut={e => { e.currentTarget.style.background = COLORS.bg; e.currentTarget.style.color = COLORS.textSub; e.currentTarget.style.borderColor = COLORS.border; }}>
-                {label}
-                <div style={{ fontSize: 10, fontWeight: 400, color: COLORS.textMuted, marginTop: 2 }}>{sub}</div>
-              </div>
-            ))}
+              { key: "second", label: "SECOND HALF", sub: `15 → ${daysInMonth(selMonth, selYear)}` },
+            ].map(({ key, label, sub }) => {
+              const isActive = selHalf === key;
+              return (
+                <div key={key} onClick={() => applyMonthHalf(selMonth, key, selYear)}
+                  style={{ flex: 1, padding: "8px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, transition: "all 0.15s", userSelect: "none", textAlign: "center",
+                    border: `1px solid ${isActive ? COLORS.accent + "80" : COLORS.border}`,
+                    background: isActive ? `${COLORS.accent}18` : COLORS.bg,
+                    color: isActive ? COLORS.accent : COLORS.textSub }}>
+                  {label}
+                  <div style={{ fontSize: 10, fontWeight: 400, color: isActive ? COLORS.accent : COLORS.textMuted, marginTop: 2 }}>{sub}</div>
+                </div>
+              );
+            })}
           </div>
         )}
 

@@ -14377,11 +14377,19 @@ const Contracts = ({ companies = [] }) => {
     const norm = s => (s || "").toLowerCase().trim();
     const isPurchase = /purchase|buy|achat|acqui/i.test(norm(newType));
     const isSale     = /sale|sell|vente/i.test(norm(newType));
+    const isDeselect = newType === "";
     setForm(p => ({
       ...p,
       contractType: newType,
+      // Auto-fill on selection
       ...(isPurchase && companyName ? { buyerId: companyName } : {}),
       ...(isSale     && companyName ? { sellerId: companyName } : {}),
+      // Reset on deselect
+      ...(isDeselect ? { buyerId: "", sellerId: "" } : {}),
+      // Reset buyer when deselecting purchase
+      ...(!isDeselect && !isPurchase && /purchase|buy|achat|acqui/i.test(norm(p.contractType)) ? { buyerId: "" } : {}),
+      // Reset seller when deselecting sale
+      ...(!isDeselect && !isSale && /sale|sell|vente/i.test(norm(p.contractType)) ? { sellerId: "" } : {}),
     }));
     setFormErrors(p => ({...p, contractType: false}));
   };

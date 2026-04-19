@@ -14128,8 +14128,7 @@ const Contracts = ({ companies = [] }) => {
               <FCombo label="Commodity" field="commodity"
                 suggestions={(config.contractCommodities || []).map(c => c.label)}
                 placeholder="Saisir ou choisir une commodité…" />
-              <FSelect label="Currency" field="currency"
-                opts={(config.contractCurrencies || []).map(c => ({ value: c.label, label: c.label }))} />
+
               {/* Transformation toggle */}
               <div>
                 <FLabel>Transformation</FLabel>

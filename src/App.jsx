@@ -14401,6 +14401,7 @@ const Contracts = ({ companies = [] }) => {
   const [formErrors, setFormErrors] = useState({});
   const [showPeriodPicker, setShowPeriodPicker] = useState(false);
   const [showIncotermPicker, setShowIncotermPicker] = useState(false);
+  const [showPaymentTermsPicker, setShowPaymentTermsPicker] = useState(false);
 
   const validate = () => {
     const errs = {};
@@ -14821,19 +14822,87 @@ const Contracts = ({ companies = [] }) => {
               </div>
               <div>
                 <CFL req>Payment Terms</CFL>
-                <select value={form.paymentTerms || ""} onChange={e => { f("paymentTerms", e.target.value); setFormErrors(p => ({...p, paymentTerms: false})); }}
-                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${formErrors.paymentTerms ? COLORS.red+"80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: form.paymentTerms ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
-                  <option value="">— Sélectionner —</option>
-                  {(config.contractPaymentTerms || []).map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
-                </select>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
+                  {(config.contractPaymentTerms || []).filter(p => p.favorite).map(pt => {
+                    const isActive = form.paymentTerms === pt.label;
+                    return (
+                      <div key={pt.label} onClick={() => { f("paymentTerms", isActive ? "" : pt.label); setFormErrors(p => ({...p, paymentTerms: false})); }}
+                        style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
+                          border: `1px solid ${formErrors.paymentTerms && !form.paymentTerms ? COLORS.red+"80" : isActive ? COLORS.accent+"80" : COLORS.border}`,
+                          background: isActive ? `${COLORS.accent}20` : COLORS.bg,
+                          color: isActive ? COLORS.accent : COLORS.textSub }}>
+                        {pt.label}
+                      </div>
+                    );
+                  })}
+                  {(config.contractPaymentTerms || []).filter(p => !p.favorite).length > 0 && (
+                    <div onClick={() => setShowPaymentTermsPicker(true)}
+                      style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
+                        border: `1px solid ${COLORS.border}`, background: COLORS.bg, color: COLORS.textMuted }}>
+                      OTHER ▾
+                    </div>
+                  )}
+                  {form.paymentTerms && !(config.contractPaymentTerms || []).filter(p => p.favorite).find(p => p.label === form.paymentTerms) && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700,
+                      border: `1px solid ${COLORS.accent}80`, background: `${COLORS.accent}20`, color: COLORS.accent }}>
+                      {form.paymentTerms}
+                      <span onClick={() => f("paymentTerms", "")} style={{ cursor: "pointer", fontSize: 14, lineHeight: 1 }}>×</span>
+                    </div>
+                  )}
+                  {(config.contractPaymentTerms || []).length === 0 && (
+                    <div style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>Aucun terme — configurez-les dans l'Admin Panel</div>
+                  )}
+                </div>
                 {formErrors.paymentTerms && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Champ obligatoire</div>}
+                {showPaymentTermsPicker && (
+                  <div style={{ position: "fixed", inset: 0, background: "#00000088", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 20 }}>
+                    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 24, width: "100%", maxWidth: 420 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Autres Payment Terms</div>
+                        <button onClick={() => setShowPaymentTermsPicker(false)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 20 }}>×</button>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {(config.contractPaymentTerms || []).filter(p => !p.favorite).map(pt => {
+                          const isActive = form.paymentTerms === pt.label;
+                          return (
+                            <div key={pt.label} onClick={() => { f("paymentTerms", isActive ? "" : pt.label); setFormErrors(p => ({...p, paymentTerms: false})); setShowPaymentTermsPicker(false); }}
+                              style={{ padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
+                                border: `1px solid ${isActive ? COLORS.accent+"80" : COLORS.border}`,
+                                background: isActive ? `${COLORS.accent}20` : COLORS.bg,
+                                color: isActive ? COLORS.accent : COLORS.textSub }}>
+                              {pt.label}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <CFCombo label="Execution Loadport" value={form.loadport} onChange={v => f("loadport", v)}
                 suggestions={(config.contractPorts || []).map(p => p.label)} placeholder="Saisir ou choisir un port…" />
               <CFCombo label="Execution Disport" value={form.disport} onChange={v => f("disport", v)}
                 suggestions={(config.contractPorts || []).map(p => p.label)} placeholder="Saisir ou choisir un port…" />
-              <CFSelect label="Delivery Conditions" value={form.deliveryConditions} onChange={v => f("deliveryConditions", v)}
-                opts={(config.contractDeliveryTerms || []).map(d => ({ value: d.label, label: d.label }))} />
+              <div>
+                <CFL>Delivery Conditions</CFL>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
+                  {(config.contractDeliveryTerms || []).map(d => {
+                    const isActive = form.deliveryConditions === d.label;
+                    return (
+                      <div key={d.label} onClick={() => f("deliveryConditions", isActive ? "" : d.label)}
+                        style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
+                          border: `1px solid ${isActive ? COLORS.blue+"80" : COLORS.border}`,
+                          background: isActive ? `${COLORS.blue}18` : COLORS.bg,
+                          color: isActive ? COLORS.blue : COLORS.textSub }}>
+                        {d.label}
+                      </div>
+                    );
+                  })}
+                  {(config.contractDeliveryTerms || []).length === 0 && (
+                    <div style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>Aucune valeur — configurez-les dans l'Admin Panel</div>
+                  )}
+                </div>
+              </div>
 
               <CFSec label="Géographie" />
               <CFCombo label="Origin Country" value={form.originCountry} onChange={v => f("originCountry", v)}

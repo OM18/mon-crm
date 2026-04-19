@@ -14463,8 +14463,7 @@ const Contracts = ({ companies = [] }) => {
   // ── Table columns ──
   const COLS = [
     { key: "contractRef",         label: "Contract #",   w: 150 },
-    { key: "conclusionDate",      label: "Date",         w: 100 },
-    { key: "contractType",        label: "Type",         w: 110 },
+    { key: "contractType",        label: "Type",         w: 130 },
     { key: "commodity",           label: "Commodity",    w: 110 },
     { key: "buyerSeller",         label: "Buyer / Seller", w: 180 },
     { key: "brokerId",            label: "Broker",       w: 130 },
@@ -14532,10 +14531,20 @@ const Contracts = ({ companies = [] }) => {
       </div>
     );
     if (key === "contractType") {
-      if (!c.contractType) return <span style={{ color: COLORS.textMuted }}>—</span>;
+      if (!c.contractType) return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ color: COLORS.textMuted }}>—</span>
+          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{c.conclusionDate}</span>}
+        </div>
+      );
       const t = (config.contractTypes || []).find(x => x.label === c.contractType);
       const col = t?.color || COLORS.accent;
-      return <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}20`, color: col, border: `1px solid ${col}40`, whiteSpace: "nowrap" }}>{c.contractType}</span>;
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}20`, color: col, border: `1px solid ${col}40`, whiteSpace: "nowrap", alignSelf: "flex-start" }}>{c.contractType}</span>
+          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{c.conclusionDate}</span>}
+        </div>
+      );
     }
     if (key === "brokerId") return <span style={{ color: c.brokerId ? COLORS.text : COLORS.textMuted }}>{c.brokerId || "—"}</span>;
     if (key === "transformation") return (

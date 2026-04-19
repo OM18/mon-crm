@@ -269,6 +269,7 @@ const DEFAULT_CONFIG = {
   contractDestinations: [],
   contractDeliveryTerms: [],
   contractCountryAreas: [],
+  contractIncoterms: [],
   derivInstrumentTypeDefault: "",
   derivCommodities: [
     { value: "corn", label: "Corn", underlyingCategory: "commodity" },
@@ -6465,6 +6466,15 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             label="Delivery Terms"
             icon="🚢"
             description="Incoterms et conditions de livraison (ex : CIF, FOB, CFR…)"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+          />
+          <DerivPillsEditor
+            configKey="contractIncoterms"
+            label="Incoterms"
+            icon="📦"
+            description="Incoterms disponibles pour les contrats (ex : CIF, FOB, DAP…)"
             config={config}
             updateField={updateField}
             hasColor={false}

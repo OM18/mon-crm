@@ -13790,6 +13790,65 @@ const initialTasks = [
   { id: 2, title: "Envoyer devis", contactId: 2, due: "2024-01-30", done: false, priority: "moyenne" },
 ];
 
+// ─── CONTRACT PORT MULTI-VALUE ───────────────────────────────
+const ContractPortMulti = ({ values, onChange, suggestions }) => {
+  const [input, setInput] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const add = (val) => {
+    const v = val.trim();
+    if (!v || values.includes(v)) return;
+    onChange([...values, v]);
+    setInput(""); setOpen(false);
+  };
+  const remove = (v) => onChange(values.filter(x => x !== v));
+  const filtered = suggestions.filter(s => !values.includes(s) && s.toLowerCase().includes(input.toLowerCase()));
+  const display = input.trim() === "" ? suggestions.filter(s => !values.includes(s)) : filtered;
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      {/* Tags */}
+      {values.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 6 }}>
+          {values.map(v => (
+            <span key={v} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: `${COLORS.accent}18`, color: COLORS.accent, border: `1px solid ${COLORS.accent}40` }}>
+              {v}
+              <span onClick={() => remove(v)} style={{ cursor: "pointer", fontSize: 14, lineHeight: 1, color: COLORS.accent, marginLeft: 2 }}>×</span>
+            </span>
+          ))}
+        </div>
+      )}
+      {/* Input */}
+      <input
+        value={input}
+        onChange={e => { setInput(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={e => { if (e.key === "Enter" && input.trim()) { e.preventDefault(); add(input); } }}
+        placeholder="Ajouter un port…"
+        style={{ width: "100%", background: COLORS.bg, border: `1px solid ${open ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", transition: "border-color 0.15s" }}
+      />
+      {/* Dropdown */}
+      {open && display.length > 0 && (
+        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, boxShadow: "0 8px 24px #00000050", maxHeight: 180, overflowY: "auto", marginTop: 2 }}>
+          {display.map(s => (
+            <div key={s} onMouseDown={() => add(s)}
+              style={{ padding: "9px 12px", fontSize: 13, color: COLORS.text, cursor: "pointer", borderBottom: `1px solid ${COLORS.border}` }}
+              onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
+              onMouseOut={e => e.currentTarget.style.background = "transparent"}>{s}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── CONTRACT FORM FIELD COMPONENTS ──────────────────────────
 // Defined outside Contracts to prevent re-creation on each render (fixes focus loss)
 const CFL = ({ children, req }) => (
@@ -13860,7 +13919,7 @@ const EMPTY_CONTRACT = () => ({
   brokerId: "",
   currency: "",
   incoterm: "",
-  port: "",
+  port: [],
   loadport: "",
   disport: "",
   originCountry: "",
@@ -14127,23 +14186,23 @@ const Contracts = ({ companies = [] }) => {
               <div style={{ gridColumn: "2 / -1" }}>
                 <CFL>Execution Period</CFL>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <input
-                    type="text"
-                    value={form.executionDateFrom || ""}
-                    onChange={e => f("executionDateFrom", e.target.value)}
-                    placeholder="dd/mm/yyyy"
-                    maxLength={10}
-                    style={{ width: 130, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
-                  />
-                  <span style={{ color: COLORS.textMuted, fontSize: 12 }}>→</span>
-                  <input
-                    type="text"
-                    value={form.executionDateTo || ""}
-                    onChange={e => f("executionDateTo", e.target.value)}
-                    placeholder="dd/mm/yyyy"
-                    maxLength={10}
-                    style={{ width: 130, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
-                  />
+                  {["executionDateFrom", "executionDateTo"].map((field, i) => (
+                    <input key={field}
+                      type="text"
+                      value={form[field] || ""}
+                      onChange={e => {
+                        // Only digits, auto-insert /
+                        const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
+                        let out = digits;
+                        if (digits.length > 4) out = digits.slice(0,2) + "/" + digits.slice(2,4) + "/" + digits.slice(4);
+                        else if (digits.length > 2) out = digits.slice(0,2) + "/" + digits.slice(2);
+                        f(field, out);
+                      }}
+                      placeholder="ddmmyyyy"
+                      maxLength={10}
+                      style={{ width: 120, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", boxSizing: "border-box", letterSpacing: 1 }}
+                    />
+                  ).reduce((acc, el, i) => i === 0 ? [el] : [...acc, <span key="arr" style={{ color: COLORS.textMuted, fontSize: 12 }}>→</span>, el], [])}
                   <div style={{ display: "flex", gap: 14, marginLeft: 4 }}>
                     {["LOADING", "ARRIVAL"].map(opt => (
                       <div key={opt} onClick={() => f("executionPeriodType", opt)}
@@ -14244,8 +14303,15 @@ const Contracts = ({ companies = [] }) => {
               <CFSec label="Logistique" />
               <CFSelect label="Incoterm" value={form.incoterm} onChange={v => f("incoterm", v)}
                 opts={(config.contractIncoterms || []).map(c => ({ value: c.label, label: c.label }))} />
-              <CFCombo label="Port" value={form.port} onChange={v => f("port", v)}
-                suggestions={(config.contractPorts || []).map(p => p.label)} placeholder="Saisir ou choisir un port…" />
+              {/* Port — multi-value */}
+              <div style={{ gridColumn: "1 / 2" }}>
+                <CFL>Port</CFL>
+                <ContractPortMulti
+                  values={Array.isArray(form.port) ? form.port : (form.port ? [form.port] : [])}
+                  onChange={v => f("port", v)}
+                  suggestions={(config.contractPorts || []).map(p => p.label)}
+                />
+              </div>
               <CFSelect label="Payment Terms" value={form.paymentTerms} onChange={v => f("paymentTerms", v)}
                 opts={(config.contractPaymentTerms || []).map(p => ({ value: p.label, label: p.label }))} />
               <CFCombo label="Execution Loadport" value={form.loadport} onChange={v => f("loadport", v)}

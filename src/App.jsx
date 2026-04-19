@@ -5273,22 +5273,58 @@ const ContractCountryEditor = ({ configKey, label, icon, description, config, up
 };
 
 // ─── COMPANY NAME BLOCK ──────────────────────────────────────
-const CompanyNameBlock = ({ config, updateField }) => {
+const CompanyNameBlock = ({ config, updateField, companies = [] }) => {
   const [localName, setLocalName] = useState(config.companyName || "");
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
   useEffect(() => { setLocalName(config.companyName || ""); }, [config.companyName]);
+
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   const dirty = localName !== (config.companyName || "");
+  const suggestions = companies
+    .filter(c => c.name && c.name.toLowerCase().includes(localName.toLowerCase()))
+    .slice(0, 8);
+  const showDrop = open && localName.trim() !== "" && suggestions.length > 0;
+
   return (
     <div style={{ marginBottom: 20 }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>🏢 COMPANY NAME</div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <input
-          value={localName}
-          onChange={e => setLocalName(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter" && dirty) updateField("companyName", localName); }}
-          placeholder="Nom de la société…"
-          style={{ flex: 1, background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 10, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }}
-        />
-        <Btn onClick={() => updateField("companyName", localName)} disabled={!dirty} style={{ padding: "10px 18px", fontSize: 13 }}>
+        <div ref={ref} style={{ flex: 1, position: "relative" }}>
+          <input
+            value={localName}
+            onChange={e => { setLocalName(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={e => { if (e.key === "Enter" && dirty) { updateField("companyName", localName); setOpen(false); } if (e.key === "Escape") setOpen(false); }}
+            placeholder="Nom de la société…"
+            style={{ width: "100%", background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 10, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s", boxSizing: "border-box" }}
+          />
+          {showDrop && (
+            <div style={{ position: "absolute", top: "110%", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, boxShadow: "0 8px 24px #00000050", overflow: "hidden" }}>
+              {suggestions.map(co => (
+                <div key={co.id} onMouseDown={() => { setLocalName(co.name); setOpen(false); }}
+                  style={{ padding: "10px 14px", cursor: "pointer", fontSize: 13, color: COLORS.text, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10 }}
+                  onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
+                  onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                  <div style={{ width: 28, height: 28, borderRadius: 6, background: COLORS.hover, border: `1px solid ${COLORS.accent}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: COLORS.accent, flexShrink: 0 }}>
+                    {(co.name || "").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{co.name}</div>
+                    {co.country && <div style={{ fontSize: 11, color: COLORS.textMuted }}>{co.country}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <Btn onClick={() => { updateField("companyName", localName); setOpen(false); }} disabled={!dirty} style={{ padding: "10px 18px", fontSize: 13, flexShrink: 0 }}>
           ✓ Sauvegarder
         </Btn>
       </div>
@@ -6647,7 +6683,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <div style={{ padding: "20px 24px" }}>
 
             {/* ── COMPANY NAME BLOCK ── */}
-            <CompanyNameBlock config={config} updateField={updateField} />
+            <CompanyNameBlock config={config} updateField={updateField} companies={companies} />
 
             <div style={{ height: 1, background: COLORS.border, margin: "20px 0" }} />
 

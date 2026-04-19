@@ -13951,7 +13951,7 @@ const Contracts = ({ companies = [] }) => {
   const companyName = (id) => companies.find(c => c.id === id)?.name || id || "—";
   const hasRole = (c, role) => Array.isArray(c.roles) ? c.roles.includes(role) : c.roles === role;
   const getBuyers  = () => companies.filter(c => hasRole(c, "Buyer"));
-  const getSellers = () => companies.filter(c => hasRole(c, "Exporter"));
+  const getSellers = () => companies.filter(c => hasRole(c, "Supplier"));
   const getBrokers = () => companies.filter(c => hasRole(c, "Broker"));
 
   const statusItem = (s) => (config.contractStatuses || []).find(x => (x.label || x.value) === s);

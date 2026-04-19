@@ -14186,23 +14186,35 @@ const Contracts = ({ companies = [] }) => {
               <div style={{ gridColumn: "2 / -1" }}>
                 <CFL>Execution Period</CFL>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  {["executionDateFrom", "executionDateTo"].map((field, i) => (
-                    <input key={field}
-                      type="text"
-                      value={form[field] || ""}
-                      onChange={e => {
-                        // Only digits, auto-insert /
-                        const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
-                        let out = digits;
-                        if (digits.length > 4) out = digits.slice(0,2) + "/" + digits.slice(2,4) + "/" + digits.slice(4);
-                        else if (digits.length > 2) out = digits.slice(0,2) + "/" + digits.slice(2);
-                        f(field, out);
-                      }}
-                      placeholder="ddmmyyyy"
-                      maxLength={10}
-                      style={{ width: 120, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", boxSizing: "border-box", letterSpacing: 1 }}
-                    />
-                  ).reduce((acc, el, i) => i === 0 ? [el] : [...acc, <span key="arr" style={{ color: COLORS.textMuted, fontSize: 12 }}>→</span>, el], [])}
+                  <input
+                    type="text"
+                    value={form.executionDateFrom || ""}
+                    onChange={e => {
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
+                      let out = digits;
+                      if (digits.length > 4) out = digits.slice(0,2) + "/" + digits.slice(2,4) + "/" + digits.slice(4);
+                      else if (digits.length > 2) out = digits.slice(0,2) + "/" + digits.slice(2);
+                      f("executionDateFrom", out);
+                    }}
+                    placeholder="ddmmyyyy"
+                    maxLength={10}
+                    style={{ width: 120, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", boxSizing: "border-box", letterSpacing: 1 }}
+                  />
+                  <span style={{ color: COLORS.textMuted, fontSize: 12 }}>→</span>
+                  <input
+                    type="text"
+                    value={form.executionDateTo || ""}
+                    onChange={e => {
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
+                      let out = digits;
+                      if (digits.length > 4) out = digits.slice(0,2) + "/" + digits.slice(2,4) + "/" + digits.slice(4);
+                      else if (digits.length > 2) out = digits.slice(0,2) + "/" + digits.slice(2);
+                      f("executionDateTo", out);
+                    }}
+                    placeholder="ddmmyyyy"
+                    maxLength={10}
+                    style={{ width: 120, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "'DM Mono', monospace", boxSizing: "border-box", letterSpacing: 1 }}
+                  />
                   <div style={{ display: "flex", gap: 14, marginLeft: 4 }}>
                     {["LOADING", "ARRIVAL"].map(opt => (
                       <div key={opt} onClick={() => f("executionPeriodType", opt)}

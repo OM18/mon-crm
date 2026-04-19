@@ -13949,7 +13949,10 @@ const Contracts = ({ companies = [] }) => {
 
   // ── Company helpers ──
   const companyName = (id) => companies.find(c => c.id === id)?.name || id || "—";
-  const hasRole = (c, role) => Array.isArray(c.roles) ? c.roles.includes(role) : c.roles === role;
+  const hasRole = (c, role) => {
+    const r = role.toLowerCase();
+    return Array.isArray(c.roles) ? c.roles.some(x => (x || "").toLowerCase() === r) : (c.roles || "").toLowerCase() === r;
+  };
   const getBuyers  = () => companies.filter(c => hasRole(c, "Buyer"));
   const getSellers = () => companies.filter(c => hasRole(c, "Supplier"));
   const getBrokers = () => companies.filter(c => hasRole(c, "Broker"));

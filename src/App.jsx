@@ -6459,6 +6459,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             updateField={updateField}
             setAdminTab={setAdminTab}
           />
+          <ContractCountryAreaEditor config={config} updateField={updateField} />
           <DerivPillsEditor
             configKey="contractDeliveryTerms"
             label="Delivery Terms"
@@ -6468,7 +6469,6 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             updateField={updateField}
             hasColor={false}
           />
-          <ContractCountryAreaEditor config={config} updateField={updateField} />
         </div>
       )}
 

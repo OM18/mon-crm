@@ -13790,6 +13790,335 @@ const initialTasks = [
   { id: 2, title: "Envoyer devis", contactId: 2, due: "2024-01-30", done: false, priority: "moyenne" },
 ];
 
+// ─── CONTRACTS ───────────────────────────────────────────────
+const EMPTY_CONTRACT = () => ({
+  id: null,
+  contractNumber: "",
+  contractType: "",
+  buyerId: "",
+  sellerId: "",
+  status: "",
+  transformation: false,
+  commodity: "",
+  brokerId: "",
+  currency: "",
+  incoterm: "",
+  port: "",
+  loadport: "",
+  disport: "",
+  originCountry: "",
+  destinationCountry: "",
+  paymentTerms: "",
+  deliveryConditions: "",
+  warehouse: "",
+  shipmentTerminal: "",
+  createdAt: "",
+});
+
+const Contracts = ({ companies = [] }) => {
+  const { config } = useConfig();
+  const [contracts, setContractsRaw] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState(EMPTY_CONTRACT());
+  const [editId, setEditId] = useState(null);
+  const [search, setSearch] = useState("");
+  const dataLoaded = useRef(false);
+
+  // ── Load from Supabase ──
+  useEffect(() => {
+    async function load() {
+      const PAGE = 1000; let all = []; let from = 0;
+      while (true) {
+        const { data, error } = await supabase.from('contracts').select('data').range(from, from + PAGE - 1);
+        if (error || !data || data.length === 0) break;
+        all = [...all, ...data.map(r => r.data ?? r)];
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      if (all.length) setContractsRaw(all);
+      dataLoaded.current = true;
+    }
+    load();
+  }, []);
+
+  const persist = async (updated) => {
+    setContractsRaw(updated);
+    try {
+      await supabase.from('contracts').delete().neq('id', 0);
+      const CHUNK = 50;
+      for (let i = 0; i < updated.length; i += CHUNK) {
+        const chunk = updated.slice(i, i + CHUNK).map(c => ({ data: c }));
+        await supabase.from('contracts').insert(chunk);
+      }
+    } catch (err) { console.error('[Contracts] save error:', err); }
+  };
+
+  const nextId = () => contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;
+  const openNew  = () => { setForm(EMPTY_CONTRACT()); setEditId(null); setShowModal(true); };
+  const openEdit = (c) => { setForm({ ...c }); setEditId(c.id); setShowModal(true); };
+  const closeModal = () => { setShowModal(false); setForm(EMPTY_CONTRACT()); setEditId(null); };
+  const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const submit = () => {
+    if (editId !== null) {
+      persist(contracts.map(c => c.id === editId ? { ...form, id: editId } : c));
+    } else {
+      persist([...contracts, { ...form, id: nextId(), createdAt: new Date().toISOString() }]);
+    }
+    closeModal();
+  };
+
+  const remove = (id) => {
+    if (!window.confirm("Supprimer ce contrat ?")) return;
+    persist(contracts.filter(c => c.id !== id));
+    if (selected?.id === id) setSelected(null);
+  };
+
+  // ── Company helpers ──
+  const companyName = (id) => companies.find(c => c.id === id)?.name || id || "—";
+  const hasRole = (c, role) => Array.isArray(c.roles) ? c.roles.includes(role) : c.roles === role;
+  const getBuyers  = () => companies.filter(c => hasRole(c, "Buyer"));
+  const getSellers = () => companies.filter(c => hasRole(c, "Exporter"));
+  const getBrokers = () => companies.filter(c => hasRole(c, "Broker"));
+
+  const statusItem = (s) => (config.contractStatuses || []).find(x => (x.label || x.value) === s);
+
+  // ── Search filter ──
+  const q = search.toLowerCase();
+  const filtered = contracts.filter(c =>
+    !q ||
+    String(c.id).includes(q) ||
+    (c.contractNumber || "").toLowerCase().includes(q) ||
+    companyName(c.buyerId).toLowerCase().includes(q) ||
+    companyName(c.sellerId).toLowerCase().includes(q) ||
+    (c.commodity || "").toLowerCase().includes(q) ||
+    (c.status || "").toLowerCase().includes(q)
+  ).sort((a, b) => (b.id || 0) - (a.id || 0));
+
+  // ── Table columns ──
+  const COLS = [
+    { key: "id",                  label: "ID",           w: 55  },
+    { key: "contractNumber",      label: "Contract #",   w: 130 },
+    { key: "contractType",        label: "Type",         w: 110 },
+    { key: "status",              label: "Status",       w: 130 },
+    { key: "commodity",           label: "Commodity",    w: 110 },
+    { key: "buyerId",             label: "Buyer",        w: 155 },
+    { key: "sellerId",            label: "Seller",       w: 155 },
+    { key: "brokerId",            label: "Broker",       w: 130 },
+    { key: "currency",            label: "Currency",     w: 85  },
+    { key: "incoterm",            label: "Incoterm",     w: 95  },
+    { key: "originCountry",       label: "Origin",       w: 120 },
+    { key: "destinationCountry",  label: "Destination",  w: 120 },
+    { key: "paymentTerms",        label: "Pmt Terms",    w: 120 },
+    { key: "transformation",      label: "Transform.",   w: 85  },
+  ];
+
+  const gridTpl = COLS.map(c => `${c.w}px`).join(" ") + " 56px";
+
+  const cellContent = (c, key) => {
+    if (key === "id") return <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textMuted, fontSize: 11 }}>{c.id}</span>;
+    if (key === "buyerId" || key === "sellerId" || key === "brokerId") return <span style={{ color: COLORS.text }}>{companyName(c[key])}</span>;
+    if (key === "status") {
+      const si = statusItem(c.status);
+      const col = si?.color || COLORS.textMuted;
+      return c.status ? <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}22`, color: col, border: `1px solid ${col}40`, whiteSpace: "nowrap" }}>{c.status}</span> : <span style={{ color: COLORS.textMuted }}>—</span>;
+    }
+    if (key === "transformation") return (
+      <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5,
+        background: c.transformation ? `${COLORS.blue}20` : COLORS.bg,
+        color: c.transformation ? COLORS.blue : COLORS.textMuted,
+        border: `1px solid ${c.transformation ? COLORS.blue + "40" : COLORS.border}` }}>
+        {c.transformation ? "YES" : "NO"}
+      </span>
+    );
+    const val = c[key] || "";
+    return <span style={{ color: val ? COLORS.text : COLORS.textMuted }}>{val || "—"}</span>;
+  };
+
+  // ── Form helpers ──
+  const FLabel = ({ children, req }) => (
+    <label style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.4, marginBottom: 4, display: "block", textTransform: "uppercase" }}>
+      {children}{req && <span style={{ color: COLORS.red }}> *</span>}
+    </label>
+  );
+  const FInput = ({ label, field, placeholder, req }) => (
+    <div><FLabel req={req}>{label}</FLabel>
+      <input value={form[field] || ""} onChange={e => f(field, e.target.value)} placeholder={placeholder || ""}
+        style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+    </div>
+  );
+  const FSelect = ({ label, field, opts, req }) => (
+    <div><FLabel req={req}>{label}</FLabel>
+      <select value={form[field] || ""} onChange={e => f(field, e.target.value)}
+        style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: form[field] ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+        <option value="">— Sélectionner —</option>
+        {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  );
+  const FSec = ({ label }) => (
+    <div style={{ gridColumn: "1 / -1", fontSize: 11, fontWeight: 700, color: COLORS.accent, letterSpacing: 1, textTransform: "uppercase", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 5, marginTop: 6 }}>{label}</div>
+  );
+
+  const countryOpts = (list) => (list || []).map(v => {
+    const c = (config.country || []).find(x => x.value === v);
+    return { value: v, label: c?.label || v };
+  });
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+
+      {/* Toolbar */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: COLORS.text }}>📄 Contracts</div>
+          <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>{contracts.length} contrat{contracts.length !== 1 ? "s" : ""}</div>
+        </div>
+        <input placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
+          style={{ width: 220, background: COLORS.card, border: `1px solid ${search ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+        <Btn onClick={openNew}>+ Nouveau contrat</Btn>
+      </div>
+
+      {/* Blotter table */}
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden", flex: 1, display: "flex", flexDirection: "column" }}>
+        <div style={{ overflowX: "auto", flex: 1, display: "flex", flexDirection: "column" }}>
+          {/* Header row */}
+          <div style={{ display: "grid", gridTemplateColumns: gridTpl, background: COLORS.tableHeader, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content", position: "sticky", top: 0, zIndex: 2 }}>
+            {COLS.map(col => (
+              <div key={col.key} style={{ padding: "10px 12px", fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textTransform: "uppercase", whiteSpace: "nowrap" }}>{col.label}</div>
+            ))}
+            <div />
+          </div>
+
+          {/* Body */}
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            {filtered.length === 0 && (
+              <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "56px 0", fontSize: 14 }}>
+                {search ? "Aucun résultat pour « " + search + " »" : "Aucun contrat — cliquez sur « + Nouveau contrat »"}
+              </div>
+            )}
+            {filtered.map((c, i) => {
+              const isSel = selected?.id === c.id;
+              return (
+                <div key={c.id} onClick={() => setSelected(isSel ? null : c)}
+                  style={{ display: "grid", gridTemplateColumns: gridTpl, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content",
+                    background: isSel ? COLORS.rowSelected : i % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
+                    cursor: "pointer", transition: "background 0.1s" }}
+                  onMouseOver={e => { if (!isSel) e.currentTarget.style.background = COLORS.hover; }}
+                  onMouseOut={e => { if (!isSel) e.currentTarget.style.background = i % 2 === 0 ? "transparent" : `${COLORS.surface}60`; }}>
+                  {COLS.map(col => (
+                    <div key={col.key} style={{ padding: "10px 12px", fontSize: 12, display: "flex", alignItems: "center", overflow: "hidden" }}>
+                      {cellContent(c, col.key)}
+                    </div>
+                  ))}
+                  {/* Row actions */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }} onClick={e => e.stopPropagation()}>
+                    <button onClick={() => openEdit(c)} title="Modifier"
+                      style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+                      onMouseOver={e => e.currentTarget.style.color = COLORS.accent}
+                      onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>✏</button>
+                    <button onClick={() => remove(c.id)} title="Supprimer"
+                      style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+                      onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                      onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>🗑</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Create / Edit Modal ── */}
+      {showModal && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000088", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 28, width: "100%", maxWidth: 800, maxHeight: "92vh", overflowY: "auto" }}>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 20, color: COLORS.text }}>
+                  {editId !== null ? `Modifier le contrat #${editId}` : "Nouveau contrat"}
+                </h2>
+              </div>
+              <button onClick={closeModal} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+
+              <FSec label="Identification" />
+              <FInput label="Contract Number" field="contractNumber" placeholder="ex : CTR-2024-001" />
+              <FSelect label="Contract Type" field="contractType"
+                opts={(config.contractTypes || []).map(t => ({ value: t.label, label: t.label }))} />
+              <FSelect label="Status" field="status"
+                opts={(config.contractStatuses || []).map(s => ({ value: s.label || s.value, label: s.label || s.value }))} />
+
+              <FSec label="Parties" />
+              <FSelect label="Buyer" field="buyerId"
+                opts={getBuyers().map(c => ({ value: c.id, label: c.name }))} />
+              <FSelect label="Seller" field="sellerId"
+                opts={getSellers().map(c => ({ value: c.id, label: c.name }))} />
+              <FSelect label="Broker" field="brokerId"
+                opts={getBrokers().map(c => ({ value: c.id, label: c.name }))} />
+
+              <FSec label="Produit" />
+              <FSelect label="Commodity" field="commodity"
+                opts={(config.contractCommodities || []).map(c => ({ value: c.label, label: c.label }))} />
+              <FSelect label="Currency" field="currency"
+                opts={(config.contractCurrencies || []).map(c => ({ value: c.label, label: c.label }))} />
+              {/* Transformation toggle */}
+              <div>
+                <FLabel>Transformation</FLabel>
+                <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+                  {[{ v: true, l: "YES" }, { v: false, l: "NO" }].map(({ v, l }) => (
+                    <div key={l} onClick={() => f("transformation", v)}
+                      style={{ flex: 1, padding: "8px 0", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: 600, transition: "all 0.15s",
+                        border: `1px solid ${form.transformation === v ? COLORS.blue + "80" : COLORS.border}`,
+                        background: form.transformation === v ? `${COLORS.blue}18` : COLORS.bg,
+                        color: form.transformation === v ? COLORS.blue : COLORS.textMuted }}>
+                      {l}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <FSec label="Logistique" />
+              <FSelect label="Incoterm" field="incoterm"
+                opts={(config.contractIncoterms || []).map(c => ({ value: c.label, label: c.label }))} />
+              <FSelect label="Port" field="port"
+                opts={(config.contractPorts || []).map(p => ({ value: p.label, label: p.label }))} />
+              <FSelect label="Payment Terms" field="paymentTerms"
+                opts={(config.contractPaymentTerms || []).map(p => ({ value: p.label, label: p.label }))} />
+              <FSelect label="Execution Loadport" field="loadport"
+                opts={(config.contractPorts || []).map(p => ({ value: p.label, label: p.label }))} />
+              <FSelect label="Execution Disport" field="disport"
+                opts={(config.contractPorts || []).map(p => ({ value: p.label, label: p.label }))} />
+              <FSelect label="Delivery Conditions" field="deliveryConditions"
+                opts={(config.contractDeliveryTerms || []).map(d => ({ value: d.label, label: d.label }))} />
+
+              <FSec label="Géographie" />
+              <FSelect label="Origin Country" field="originCountry"
+                opts={countryOpts(config.contractOrigins)} />
+              <FSelect label="Destination Country" field="destinationCountry"
+                opts={countryOpts(config.contractDestinations)} />
+
+              <FSec label="À définir ultérieurement" />
+              <FInput label="Warehouse" field="warehouse" placeholder="À définir" />
+              <FInput label="Shipment Terminal" field="shipmentTerminal" placeholder="À définir" />
+
+            </div>
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
+              <Btn variant="secondary" onClick={closeModal}>Annuler</Btn>
+              <Btn onClick={submit}>{editId !== null ? "✓ Enregistrer" : "✓ Créer le contrat"}</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function CRM() {
   const [currentUser, setCurrentUser] = useState(() => { try { return JSON.parse(localStorage.getItem("crm_current_user") || "null"); } catch { return null; } });
   const logoSize = 50;
@@ -13949,6 +14278,7 @@ export default function CRM() {
               <span style={{ fontSize: 10 }}>◇</span>
               <span style={{ fontSize: 12, fontWeight: page === "derivatives-statistics" ? 700 : 400 }}>Statistics</span>
             </div>
+            <NavItem n={{ id: "contracts", label: "Contracts", icon: "📄" }} />
             <div style={{ height: 1, background: COLORS.border, margin: "16px 24px" }} />
             <div style={{ padding: "0 24px 10px", fontSize: 14, color: "#D4AF37", fontWeight: 700, letterSpacing: 1 }}>ACTIVITÉ</div>
             {[{ id: "dashboard", label: "Dashboard", icon: "◇" }, { id: "tasks", label: "Tâches", icon: "◎" }, { id: "pipeline", label: "Pipeline", icon: "◈" }].map(n => <NavItem key={n.id} n={n} />)}
@@ -13979,6 +14309,7 @@ export default function CRM() {
           {page === "derivatives" && <Derivatives companies={companies} initialOps={derivativesCache} initialFixings={fixingsCache} />}
           {page === "derivatives-dashboard" && <DerivativesDashboard />}
           {page === "derivatives-statistics" && <DerivStatistics />}
+          {page === "contracts" && <Contracts companies={companies} />}
           {page === "admin" && <AdminPanel companies={companies} />}
         </div>
       </div>

@@ -5272,6 +5272,35 @@ const ContractCountryEditor = ({ configKey, label, icon, description, config, up
   );
 };
 
+// ─── COMPANY NAME BLOCK ──────────────────────────────────────
+const CompanyNameBlock = ({ config, updateField }) => {
+  const [localName, setLocalName] = useState(config.companyName || "");
+  useEffect(() => { setLocalName(config.companyName || ""); }, [config.companyName]);
+  const dirty = localName !== (config.companyName || "");
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>🏢 COMPANY NAME</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <input
+          value={localName}
+          onChange={e => setLocalName(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && dirty) updateField("companyName", localName); }}
+          placeholder="Nom de la société…"
+          style={{ flex: 1, background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 10, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }}
+        />
+        <Btn onClick={() => updateField("companyName", localName)} disabled={!dirty} style={{ padding: "10px 18px", fontSize: 13 }}>
+          ✓ Sauvegarder
+        </Btn>
+      </div>
+      {config.companyName && !dirty && (
+        <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 6 }}>
+          Société active : <span style={{ color: COLORS.accent, fontWeight: 600 }}>{config.companyName}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -6618,33 +6647,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <div style={{ padding: "20px 24px" }}>
 
             {/* ── COMPANY NAME BLOCK ── */}
-            {(() => {
-              const [localName, setLocalName] = useState(config.companyName || "");
-              useEffect(() => { setLocalName(config.companyName || ""); }, [config.companyName]);
-              const dirty = localName !== (config.companyName || "");
-              return (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>🏢 COMPANY NAME</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <input
-                      value={localName}
-                      onChange={e => setLocalName(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter" && dirty) updateField("companyName", localName); }}
-                      placeholder="Nom de la société…"
-                      style={{ flex: 1, background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 10, padding: "10px 14px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }}
-                    />
-                    <Btn onClick={() => updateField("companyName", localName)} disabled={!dirty} style={{ padding: "10px 18px", fontSize: 13 }}>
-                      ✓ Sauvegarder
-                    </Btn>
-                  </div>
-                  {config.companyName && !dirty && (
-                    <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 6 }}>
-                      Société active : <span style={{ color: COLORS.accent, fontWeight: 600 }}>{config.companyName}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            <CompanyNameBlock config={config} updateField={updateField} />
 
             <div style={{ height: 1, background: COLORS.border, margin: "20px 0" }} />
 

@@ -619,6 +619,7 @@ const FieldEditor = ({ fieldDef, values, onUpdate, defaultValue, onSetDefault })
   const [dirty, setDirty] = useState(false);
   const [colorPickerIdx, setColorPickerIdx] = useState(null);
   const [expanded, setExpanded] = useState(false);
+  const [duplicateError, setDuplicateError] = useState(false);
 
   useEffect(() => { setItems(values); setDirty(false); }, [values]);
 
@@ -628,8 +629,13 @@ const FieldEditor = ({ fieldDef, values, onUpdate, defaultValue, onSetDefault })
   const addItem = () => {
     if (!newLabel.trim()) return;
     const isCountry = fieldDef.key === "country";
-const val = fieldDef.hasValue ? (newValue.trim() || newLabel.toLowerCase().replace(/\s+/g, "_")) : isCountry ? newLabel.toUpperCase() : newLabel;
-const item = { value: isCountry ? newLabel.toUpperCase() : val, label: isCountry ? newLabel.toUpperCase() : newLabel.trim() };
+    const val = fieldDef.hasValue ? (newValue.trim() || newLabel.toLowerCase().replace(/\s+/g, "_")) : isCountry ? newLabel.toUpperCase() : newLabel;
+    const item = { value: isCountry ? newLabel.toUpperCase() : val, label: isCountry ? newLabel.toUpperCase() : newLabel.trim() };
+    // Prevent duplicate: check value or label already exists (case-insensitive)
+    const norm = s => (s || "").trim().toLowerCase();
+    const isDuplicate = items.some(i => norm(i.value) === norm(item.value) || norm(i.label) === norm(item.label));
+    if (isDuplicate) { setDuplicateError(true); return; }
+    setDuplicateError(false);
     if (fieldDef.hasColor) item.color = newColor;
     markDirtyAndSave([...items, item]);
     setNewLabel(""); setNewValue(""); setNewColor(COLORS.accent);
@@ -756,9 +762,10 @@ const item = { value: isCountry ? newLabel.toUpperCase() : val, label: isCountry
             )}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
               <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600 }}>LABEL *</label>
-              <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Nouvelle valeur..."
+              <input value={newLabel} onChange={e => { setNewLabel(e.target.value); setDuplicateError(false); }} placeholder="Nouvelle valeur..."
                 onKeyDown={e => e.key === "Enter" && addItem()}
-                style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+                style={{ background: COLORS.bg, border: `1px solid ${duplicateError ? COLORS.red + "80" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", transition: "border-color 0.2s" }} />
+              {duplicateError && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>⚠ Cette valeur existe déjà</div>}
             </div>
             {fieldDef.hasValue && (
               <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>

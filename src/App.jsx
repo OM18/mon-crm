@@ -393,6 +393,13 @@ const COUNTRY_TO_CODE = {
   "marshall islands": "MH", "iles marshall": "MH", "îles marshall": "MH",
   "seychelles": "SC", "republic of seychelles": "SC", "république des seychelles": "SC",
   "liberia": "LR", "republic of liberia": "LR",
+  "benin": "BJ", "bénin": "BJ", "republic of benin": "BJ", "république du bénin": "BJ",
+  "togo": "TG", "gabon": "GA", "mauritania": "MR", "mauritanie": "MR",
+  "guinea": "GN", "guinée": "GN", "guinea-bissau": "GW", "sierra leone": "SL",
+  "gambia": "GM", "djibouti": "DJ", "eritrea": "ER", "namibia": "NA",
+  "botswana": "BW", "lesotho": "LS", "eswatini": "SZ", "swaziland": "SZ",
+  "malawi": "MW", "burundi": "BI", "chad": "TD", "comoros": "KM",
+  "cape verde": "CV", "mauritius": "MU", "île maurice": "MU",
 };
 
 const getCountryCode = (country) => {

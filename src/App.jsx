@@ -4034,22 +4034,31 @@ while (true) {
       }
 
       const saveErrors = [];
+      // Build a map of supabase row id → current data, so we can patch only fees
+      // without overwriting ref or other fields (avoids triggering the unique constraint)
+      const currentDataBySupabaseId = {};
+      for (const r of indexRows) {
+        currentDataBySupabaseId[r.id] = r.data;
+      }
+      // Also apply merged data from dedup step to the keeper rows
+      // (already done in DB, just keep the map consistent)
+
       setBatchProgress({ phase: "Mise à jour en base…", done: 0, total: updatedList.length });
-      // Sequential (not parallel) to avoid concurrent writes where two in-memory ops
-      // share the same ref value — parallel updates trigger the unique constraint simultaneously
       for (let i = 0; i < updatedList.length; i++) {
         const { op } = updatedList[i];
-        // Look up by json id first, then fall back to ref (handles ops whose json id differs between memory and DB)
         const supabaseId = supabaseRowByOpId[String(op.id)] || supabaseRowByRef[String(op.ref || "")];
         if (supabaseId) {
-          // Retry up to 3 times on network errors (Failed to fetch, timeout)
+          // Patch only the fees field on the existing row data — never overwrite ref or other fields
+          // This avoids triggering the unique constraint on data->>'ref'
+          const existingData = currentDataBySupabaseId[supabaseId] || op;
+          const patched = { ...existingData, fees: op.fees };
           let lastError = null;
           for (let attempt = 0; attempt < 3; attempt++) {
-            if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt)); // backoff
-            const { error } = await supabase.from("derivatives").update({ data: op }).eq("id", supabaseId);
+            if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt));
+            const { error } = await supabase.from("derivatives").update({ data: patched }).eq("id", supabaseId);
             if (!error) { lastError = null; break; }
             lastError = error;
-            if (!error.message?.includes("fetch")) break; // only retry network errors
+            if (!error.message?.includes("fetch")) break;
           }
           if (lastError) saveErrors.push({ ref: op.ref || op.id, error: lastError.message });
         } else {

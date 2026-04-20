@@ -3992,9 +3992,8 @@ while (true) {
       }
 
       // Fix duplicate refs BEFORE updating fees.
-      // When two rows share the same ref value, any UPDATE on either row retriggers
-      // the unique index on data->>'ref' and finds the other row → duplicate key error.
-      // Solution: rename duplicate rows to ref-DUP{supabaseId} so they become unique first.
+      // Strategy: merge all duplicate rows into one (keeping the most complete data),
+      // delete the extras, and update the index accordingly.
       if (indexRows) {
         const refToRows = {};
         for (const r of indexRows) {
@@ -4005,19 +4004,31 @@ while (true) {
         }
         const dupGroups = Object.values(refToRows).filter(rows => rows.length > 1);
         if (dupGroups.length > 0) {
-          setBatchProgress({ phase: `Correction de ${dupGroups.length} refs en doublon…`, done: 0, total: dupGroups.length });
+          setBatchProgress({ phase: `Fusion de ${dupGroups.length} refs en doublon…`, done: 0, total: dupGroups.length });
           for (const rows of dupGroups) {
-            // Keep first occurrence, rename subsequent duplicates to make refs unique
+            // Merge all rows into one: start from first, overlay non-empty fields from duplicates
+            const keeper = rows[0];
+            let merged = { ...keeper.data };
             for (let di = 1; di < rows.length; di++) {
-              const r = rows[di];
-              const fixedRef = `${r.data.ref}-DUP${r.id}`;
-              const fixedData = { ...r.data, ref: fixedRef };
-              await supabase.from("derivatives").update({ data: fixedData }).eq("id", r.id);
-              // Keep updatedList in sync so fees update uses the corrected ref
-              const opId = String(r.data?.id ?? "");
-              const entry = updatedList.find(e => String(e.op.id) === opId);
-              if (entry && supabaseRowByOpId[opId] === r.id) entry.op.ref = fixedRef;
+              const dupData = rows[di].data || {};
+              Object.entries(dupData).forEach(([k, v]) => {
+                const empty = v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+                const currentEmpty = merged[k] === undefined || merged[k] === null || merged[k] === "" || (Array.isArray(merged[k]) && merged[k].length === 0);
+                if (!empty && currentEmpty) merged[k] = v;
+              });
             }
+            // Update keeper with merged data
+            await supabase.from("derivatives").update({ data: merged }).eq("id", keeper.id);
+            // Delete duplicate rows and reroute index entries to keeper
+            for (let di = 1; di < rows.length; di++) {
+              await supabase.from("derivatives").delete().eq("id", rows[di].id);
+              const dupOpId = String(rows[di].data?.id ?? "");
+              if (dupOpId && supabaseRowByOpId[dupOpId] === rows[di].id) supabaseRowByOpId[dupOpId] = keeper.id;
+              const dupRef = rows[di].data?.ref || "";
+              if (dupRef && supabaseRowByRef[dupRef] === rows[di].id) supabaseRowByRef[dupRef] = keeper.id;
+            }
+            const keeperOpId = String(keeper.data?.id ?? "");
+            if (keeperOpId) supabaseRowByOpId[keeperOpId] = keeper.id;
           }
         }
       }
@@ -12073,14 +12084,29 @@ const setOps = async (val) => {
               if (data.length < PAGE) break;
               from += PAGE;
             }
+            // Build ref index — normalize with trim to avoid whitespace mismatches
+            // If multiple Supabase rows share the same ref (duplicates), keep only the first
+            // but record all duplicate supabase ids so we can clean them up
+            const normRef = r => (r || "").toLowerCase().trim();
             const byRef = {};
+            const dupRowsToDelete = [];
             for (const r of indexRows) {
-              const ref = r.data?.ref?.toLowerCase();
-              if (ref && !byRef[ref]) byRef[ref] = { supabaseId: r.id, existing: r.data };
+              const ref = normRef(r.data?.ref);
+              if (!ref) continue;
+              if (!byRef[ref]) {
+                byRef[ref] = { supabaseId: r.id, existing: r.data };
+              } else {
+                // Already have a row for this ref — this is a pre-existing duplicate, delete it
+                dupRowsToDelete.push(r.id);
+              }
+            }
+            // Clean up pre-existing duplicates before merging
+            for (const dupId of dupRowsToDelete) {
+              await supabase.from('derivatives').delete().eq('id', dupId);
             }
             const toInsert = [];
             for (const incoming of items) {
-              const key = incoming.ref?.toLowerCase();
+              const key = normRef(incoming.ref);
               if (key && byRef[key]) {
                 // Merge: only overwrite fields that were mapped and non-empty
                 const merged = { ...byRef[key].existing };
@@ -12092,7 +12118,8 @@ const setOps = async (val) => {
                 if (merged.internalDeal !== undefined) merged.internalDeal = String(merged.internalDeal).toLowerCase() === "true";
                 const { error } = await supabase.from('derivatives').update({ data: merged }).eq('id', byRef[key].supabaseId);
                 if (error) console.error('[import] update error:', error);
-              } else {
+              } else if (key) {
+                // Only insert if ref is truly not in DB (avoid inserting when ref was missing from incoming)
                 toInsert.push({ ...makeEmpty(), ...incoming, id: Date.now() + Math.random(), internalDeal: String(incoming.internalDeal).toLowerCase() === "true" });
               }
             }

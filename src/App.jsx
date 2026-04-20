@@ -3939,10 +3939,6 @@ const BatchEuronextFees = () => {
       for (const op of euronextOps) {
         const { fees, matched, ambiguous } = computeFeesForOp(op, allTarifs, allProducts);
 
-        if (String(op.ref) === "2199") {
-          console.log("[LOOP DEBUG] ref=2199", { fees, ambiguous, matchedCount: matched.length, opId: op.id });
-        }
-
         if (ambiguous) {
           errors.push({
             ref: op.ref || op.id,
@@ -3984,21 +3980,6 @@ while (true) {
 }
       const supabaseRowByOpId = {};
       const supabaseRowByRef = {};
-      
-if (indexRows) {
-  for (const r of indexRows) {
-    const opId = String(r.data?.id ?? "");
-    if (opId && !supabaseRowByOpId[opId]) supabaseRowByOpId[opId] = r.id;
-    const ref = r.data?.ref || "";
-    if (ref && !supabaseRowByRef[ref]) supabaseRowByRef[ref] = r.id;
-  }
-}
-console.log("REF INDEX CHECK", {
-  ref_1823: supabaseRowByRef["1823"],
-  ref_2199: supabaseRowByRef["2199"],
-  id_2199_ts: supabaseRowByOpId["1776009385845.6333"],
-  total_refs: Object.keys(supabaseRowByRef).length,
-});
       if (indexRows) {
         for (const r of indexRows) {
           const opId = String(r.data?.id ?? "");
@@ -4047,9 +4028,6 @@ console.log("REF INDEX CHECK", {
         const { op } = updatedList[i];
         // Look up by json id first, then fall back to ref (handles ops whose json id differs between memory and DB)
         const supabaseId = supabaseRowByOpId[String(op.id)] || supabaseRowByRef[String(op.ref || "")];
-        if (String(op.ref) === "2199" || String(op.id) === "1776009385845.6333") {
-          console.log("[SAVE DEBUG] ref=2199", { opId: op.id, opRef: op.ref, byId: supabaseRowByOpId[String(op.id)], byRef: supabaseRowByRef[String(op.ref)], supabaseId });
-        }
         if (supabaseId) {
           // Retry up to 3 times on network errors (Failed to fetch, timeout)
           let lastError = null;
@@ -4068,6 +4046,9 @@ console.log("REF INDEX CHECK", {
       }
 
       setBatchReport({ total: euronextOps.length, updated: updatedList.length, errors: [...errors, ...saveErrors], updatedList });
+      // Notify Derivatives component to reload from Supabase so its in-memory state
+      // matches what the batch just wrote — fixes the wrong-op-in-detail-panel bug
+      window.dispatchEvent(new CustomEvent("derivatives:reload"));
       setBatchState("done");
     } catch (err) {
       setBatchReport({ fatalError: String(err) });
@@ -11196,6 +11177,12 @@ const setOps = async (val) => {
   const pendingCount = ops.filter(o => o.status === "pending").length;
   const tradedCount  = ops.filter(o => o.status === "traded").length;
   const totalNominal = ops.filter(o => o.quantity && o.price).reduce((s, o) => s + Number(o.quantity) * Number(o.price), 0);
+
+  useEffect(() => {
+    const handler = () => reloadOps();
+    window.addEventListener("derivatives:reload", handler);
+    return () => window.removeEventListener("derivatives:reload", handler);
+  }, []);
 
   useEffect(() => {
     const handleKey = (e) => {

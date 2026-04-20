@@ -14505,8 +14505,7 @@ const Contracts = ({ companies = [] }) => {
   const COLS = [
     { key: "contractRef",         label: "Contract #",        w: 100 },
     { key: "contractType",        label: "Type",              w: 90  },
-    { key: "buyerSeller",         label: "Buyer / Seller",    w: 190 },
-    { key: "brokerId",            label: "Broker",            w: 140 },
+    { key: "buyerSeller",         label: "Buyer / Seller",    w: 210 },
     { key: "commodity",           label: "Commodity",         w: 120 },
     { key: "incotermPort",        label: "Port",              w: 150 },
     { key: "executionPeriod",     label: "Exec. Period",      w: 120 },
@@ -14525,7 +14524,7 @@ const Contracts = ({ companies = [] }) => {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
         <CountryFlag country={countryVal} size={28} />
-        <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.textSub, whiteSpace: "nowrap", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.text, whiteSpace: "nowrap", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
       </div>
     );
   };
@@ -14539,20 +14538,24 @@ const Contracts = ({ companies = [] }) => {
       </div>
     );
     // BUYER / SELLER — 2 lines
-    if (key === "buyerSeller") return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170 }}>{c.buyerId || <span style={{ color: COLORS.textMuted }}>—</span>}</span>
-        <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170, marginTop: 2 }}>{c.sellerId || "—"}</span>
-      </div>
-    );
+    if (key === "buyerSeller") {
+      const brokerName = c.brokerId ? (companies.find(co => String(co.id) === String(c.brokerId))?.name || c.brokerId) : null;
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 }}>{c.buyerId || "—"}</span>
+          <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 }}>{c.sellerId || "—"}</span>
+          {brokerName && <span style={{ fontSize: 11, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 }}><span style={{ color: COLORS.accent, fontWeight: 700, marginRight: 4 }}>(B)</span>{brokerName}</span>}
+        </div>
+      );
+    }
     // INCOTERM + PORT + DELIVERY — 3 lines
     if (key === "incotermPort") {
       const ports = Array.isArray(c.port) ? c.port : (c.port ? [c.port] : []);
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap" }}>{c.incoterm || <span style={{ color: COLORS.textMuted }}>—</span>}</span>
-          <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>{ports.length > 0 ? ports.join(" · ") : "—"}</span>
-          {c.deliveryConditions && <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>{c.deliveryConditions}</span>}
+          <span style={{ fontSize: 11, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>{ports.length > 0 ? ports.join(" · ") : "—"}</span>
+          {c.deliveryConditions && <span style={{ fontSize: 11, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>{c.deliveryConditions}</span>}
         </div>
       );
     }
@@ -14560,14 +14563,14 @@ const Contracts = ({ companies = [] }) => {
     if (key === "loadDisport") return (
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }}>{c.loadport || <span style={{ color: COLORS.textMuted }}>—</span>}</span>
-        <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }}>{c.disport || "—"}</span>
+        <span style={{ fontSize: 11, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }}>{c.disport || "—"}</span>
       </div>
     );
     if (key === "contractType") {
       if (!c.contractType) return (
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <span style={{ color: COLORS.textMuted }}>—</span>
-          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{c.conclusionDate}</span>}
+          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{c.conclusionDate}</span>}
         </div>
       );
       const t = (config.contractTypes || []).find(x => x.label === c.contractType);
@@ -14575,7 +14578,7 @@ const Contracts = ({ companies = [] }) => {
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}20`, color: col, border: `1px solid ${col}40`, whiteSpace: "nowrap", alignSelf: "flex-start" }}>{c.contractType}</span>
-          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{c.conclusionDate}</span>}
+          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{c.conclusionDate}</span>}
         </div>
       );
     }
@@ -14601,10 +14604,7 @@ const Contracts = ({ companies = [] }) => {
         {c.transformation ? "YES" : "NO"}
       </span>
     );
-    if (key === "brokerId") {
-      const name = c.brokerId ? (companies.find(co => String(co.id) === String(c.brokerId))?.name || c.brokerId) : null;
-      return <span style={{ fontSize: 12, color: name ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name || "—"}</span>;
-    }
+
     if (key === "originCountry") return <FlagCell countryVal={c.originCountry} />;
     if (key === "destinationCountry") return <FlagCell countryVal={c.destinationCountry} />;
     if (key === "priceType") {
@@ -14631,7 +14631,7 @@ const Contracts = ({ companies = [] }) => {
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {from && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.text, whiteSpace: "nowrap" }}>{from}</span>}
-          {to   && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap" }}>{to}</span>}
+          {to   && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.text, whiteSpace: "nowrap" }}>{to}</span>}
           {periodLabel && (
             <span style={{ fontSize: 10, fontWeight: 700, color: labelColor, background: `${labelColor}18`, padding: "1px 6px", borderRadius: 3, border: `1px solid ${labelColor}40`, whiteSpace: "nowrap", alignSelf: "flex-start", marginTop: 1 }}>{periodLabel}{c.withoutExtension ? " · W/O" : ""}</span>
           )}

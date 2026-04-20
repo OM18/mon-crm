@@ -14496,19 +14496,18 @@ const Contracts = ({ companies = [] }) => {
 
   // ── Table columns ──
   const COLS = [
-    { key: "contractRef",         label: "Contract #",   w: 140 },
-    { key: "contractType",        label: "Type",         w: 110 },
-    { key: "commodity",           label: "Commodity",    w: 100 },
-    { key: "buyerSeller",         label: "Buyer / Seller", w: 180 },
-    { key: "brokerId",            label: "Broker",       w: 130 },
-    { key: "incotermPort",        label: "Port",         w: 150 },
-    { key: "loadDisport",         label: "Loadport / Disport", w: 180 },
-    { key: "originCountry",       label: "Origin",       w: 130 },
-    { key: "destinationCountry",  label: "Destination",  w: 140 },
-    { key: "paymentTerms",        label: "Pmt Terms",    w: 110 },
-    { key: "priceType",           label: "Price",        w: 130 },
-    { key: "transformation",      label: "Transform.",   w: 85  },
-    { key: "executionPeriod",     label: "Exec. Period", w: 180 },
+    { key: "contractRef",         label: "Contract #",        w: 150 },
+    { key: "contractType",        label: "Type",              w: 120 },
+    { key: "buyerSeller",         label: "Buyer / Seller",    w: 190 },
+    { key: "brokerId",            label: "Broker",            w: 140 },
+    { key: "commodity",           label: "Commodity",         w: 120 },
+    { key: "incotermPort",        label: "Port",              w: 150 },
+    { key: "executionPeriod",     label: "Exec. Period",      w: 200 },
+    { key: "priceType",           label: "Price",             w: 140 },
+    { key: "paymentTerms",        label: "Pmt Terms",         w: 120 },
+    { key: "originCountry",       label: "Origin",            w: 140 },
+    { key: "destinationCountry",  label: "Destination",       w: 140 },
+    { key: "transformation",      label: "Transform.",        w: 85  },
   ];
 
   const gridTpl = COLS.map(c => `${c.w}px`).join(" ") + " 56px";
@@ -14518,15 +14517,15 @@ const Contracts = ({ companies = [] }) => {
     const code = getCountryCode(countryVal);
     const label = (config.country || []).find(x => x.value === countryVal)?.label || countryVal;
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
         {code && (
-          <img src={`https://flagcdn.com/20x15/${code.toLowerCase()}.png`}
+          <img src={`https://flagcdn.com/40x30/${code.toLowerCase()}.png`}
             alt={label}
-            style={{ width: 20, height: 15, objectFit: "cover", borderRadius: 2, flexShrink: 0, border: `1px solid ${COLORS.border}` }}
+            style={{ width: 40, height: 30, objectFit: "cover", borderRadius: 3, flexShrink: 0, border: `1px solid ${COLORS.border}` }}
             onError={e => { e.target.style.display = "none"; }}
           />
         )}
-        <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap" }}>{label}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.textSub, whiteSpace: "nowrap", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
       </div>
     );
   };
@@ -14534,16 +14533,16 @@ const Contracts = ({ companies = [] }) => {
   const cellContent = (c, key) => {
     // CONTRACT REF — ID + Contract # on 2 lines
     if (key === "contractRef") return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>{c.contractNumber || `#${c.id}`}</span>
-        <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textMuted, fontSize: 10 }}>ID {c.id}</span>
+        <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textMuted, fontSize: 10, marginTop: 2 }}>ID {c.id}</span>
       </div>
     );
     // BUYER / SELLER — 2 lines
     if (key === "buyerSeller") return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }}>{c.buyerId || <span style={{ color: COLORS.textMuted }}>—</span>}</span>
-        <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }}>{c.sellerId || "—"}</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170 }}>{c.buyerId || <span style={{ color: COLORS.textMuted }}>—</span>}</span>
+        <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170, marginTop: 2 }}>{c.sellerId || "—"}</span>
       </div>
     );
     // INCOTERM + PORT + DELIVERY — 3 lines
@@ -14602,6 +14601,10 @@ const Contracts = ({ companies = [] }) => {
         {c.transformation ? "YES" : "NO"}
       </span>
     );
+    if (key === "brokerId") {
+      const name = c.brokerId ? (companies.find(co => String(co.id) === String(c.brokerId))?.name || c.brokerId) : null;
+      return <span style={{ fontSize: 12, color: name ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name || "—"}</span>;
+    }
     if (key === "originCountry") return <FlagCell countryVal={c.originCountry} />;
     if (key === "destinationCountry") return <FlagCell countryVal={c.destinationCountry} />;
     if (key === "priceType") {
@@ -14623,11 +14626,16 @@ const Contracts = ({ companies = [] }) => {
       const from = c.executionDateFrom || "";
       const to = c.executionDateTo || "";
       if (!from && !to) return <span style={{ color: COLORS.textMuted }}>—</span>;
+      const periodLabel = c.executionPeriodType ? c.executionPeriodType.toUpperCase() : "";
       return (
-        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "nowrap" }}>
-          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.text }}>{from || "…"} → {to || "…"}</span>
-          {c.executionPeriodType && <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, background: COLORS.bg, padding: "1px 5px", borderRadius: 3, border: `1px solid ${COLORS.border}`, whiteSpace: "nowrap" }}>{c.executionPeriodType}</span>}
-          {c.withoutExtension && <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.orange, whiteSpace: "nowrap" }}>W/O</span>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.text, whiteSpace: "nowrap" }}>{from || "…"} → {to || "…"}</span>
+            {c.withoutExtension && <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.orange, whiteSpace: "nowrap" }}>W/O</span>}
+          </div>
+          {periodLabel && (
+            <span style={{ fontSize: 10, fontWeight: 700, color: periodLabel === "LOADING" ? COLORS.blue : COLORS.purple, background: periodLabel === "LOADING" ? `${COLORS.blue}18` : `${COLORS.purple}18`, padding: "1px 6px", borderRadius: 3, border: `1px solid ${periodLabel === "LOADING" ? COLORS.blue : COLORS.purple}40`, whiteSpace: "nowrap", alignSelf: "flex-start" }}>{periodLabel}</span>
+          )}
         </div>
       );
     }
@@ -14757,7 +14765,7 @@ const Contracts = ({ companies = [] }) => {
           {/* Header row */}
           <div style={{ display: "grid", gridTemplateColumns: gridTpl, background: COLORS.tableHeader, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content", position: "sticky", top: 0, zIndex: 2 }}>
             {COLS.map(col => (
-              <div key={col.key} style={{ padding: "10px 12px", fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textTransform: "uppercase", whiteSpace: "nowrap" }}>{col.label}</div>
+              <div key={col.key} style={{ padding: "10px 12px", fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textTransform: "uppercase", whiteSpace: "nowrap", textAlign: "center" }}>{col.label}</div>
             ))}
             <div style={{ position: "sticky", right: 0, background: COLORS.tableHeader, borderLeft: `1px solid ${COLORS.border}`, width: 56 }} />
           </div>
@@ -14779,7 +14787,7 @@ const Contracts = ({ companies = [] }) => {
                   onMouseOver={e => { if (!isSel) e.currentTarget.style.background = COLORS.hover; }}
                   onMouseOut={e => { if (!isSel) e.currentTarget.style.background = i % 2 === 0 ? "transparent" : `${COLORS.surface}60`; }}>
                   {COLS.map(col => (
-                    <div key={col.key} style={{ padding: "10px 12px", fontSize: 12, display: "flex", alignItems: "center", overflow: "hidden" }}>
+                    <div key={col.key} style={{ padding: "10px 12px", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                       {cellContent(c, col.key)}
                     </div>
                   ))}

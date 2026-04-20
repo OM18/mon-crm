@@ -4070,7 +4070,7 @@ while (true) {
           }
           if (lastError) saveErrors.push({ ref: op.ref || op.id, error: lastError.message });
         } else {
-          saveErrors.push({ ref: op.ref || op.id, error: "Row Supabase introuvable — op non modifiée (aucune donnée perdue)" });
+          saveErrors.push({ ref: op.ref || op.id, error: `Row Supabase introuvable — cherché id="${String(op.id)}" ref="${op.ref}" (aucune donnée perdue)` });
         }
         if (i % 20 === 0) setBatchProgress({ phase: "Mise à jour en base…", done: i, total: updatedList.length });
       }
@@ -11082,7 +11082,7 @@ const setOps = async (val) => {
     if (editOp) { setOpsRaw(ops.map(o => o.id === editOp.id ? data : o)); await saveOneDerivative(data); }
     else        { setOpsRaw([...ops, data]); await saveOneDerivative(data); }
     setShowForm(false);
-    setSelected(data.id);
+    setSelected(data.ref);
   };
 
   const filtered = useMemo(() => {
@@ -11159,7 +11159,7 @@ const setOps = async (val) => {
       activeFilters.underlying, activeFilters.financingBank, activeFilters.transmission,
       customFilters, filterMode, derivAccounts, products, config]);
 
-  const sel = ops.find(o => o.id === selected);
+  const sel = ops.find(o => o.ref === selected);
 
   // ── Format price for display based on instrument decimals config ──
   const formatPrice = (price, instrument) => {
@@ -11578,9 +11578,9 @@ const setOps = async (val) => {
             {visibleRows.map((o, vi) => {
               const i = startIdx + vi;
               const sc = getStatusCfg(o.status);
-              const isSelected = selected === o.id;
+              const isSelected = selected === o.ref;
               return (
-                <div key={o.id} onClick={() => setSelected(o.id === selected ? null : o.id)}
+                <div key={o.id} onClick={() => setSelected(o.ref === selected ? null : o.ref)}
                   style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}
                   onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
                   onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`; }}>

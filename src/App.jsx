@@ -14496,17 +14496,17 @@ const Contracts = ({ companies = [] }) => {
 
   // ── Table columns ──
   const COLS = [
-    { key: "contractRef",         label: "Contract #",        w: 150 },
-    { key: "contractType",        label: "Type",              w: 120 },
+    { key: "contractRef",         label: "Contract #",        w: 100 },
+    { key: "contractType",        label: "Type",              w: 90  },
     { key: "buyerSeller",         label: "Buyer / Seller",    w: 190 },
     { key: "brokerId",            label: "Broker",            w: 140 },
     { key: "commodity",           label: "Commodity",         w: 120 },
     { key: "incotermPort",        label: "Port",              w: 150 },
-    { key: "executionPeriod",     label: "Exec. Period",      w: 200 },
+    { key: "executionPeriod",     label: "Exec. Period",      w: 120 },
     { key: "priceType",           label: "Price",             w: 140 },
     { key: "paymentTerms",        label: "Pmt Terms",         w: 120 },
-    { key: "originCountry",       label: "Origin",            w: 140 },
-    { key: "destinationCountry",  label: "Destination",       w: 140 },
+    { key: "originCountry",       label: "Origin",            w: 110 },
+    { key: "destinationCountry",  label: "Destination",       w: 110 },
     { key: "transformation",      label: "Transform.",        w: 85  },
   ];
 
@@ -14514,17 +14514,10 @@ const Contracts = ({ companies = [] }) => {
 
   const FlagCell = ({ countryVal }) => {
     if (!countryVal) return <span style={{ color: COLORS.textMuted }}>—</span>;
-    const code = getCountryCode(countryVal);
     const label = (config.country || []).find(x => x.value === countryVal)?.label || countryVal;
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-        {code && (
-          <img src={`https://flagcdn.com/40x30/${code.toLowerCase()}.png`}
-            alt={label}
-            style={{ width: 40, height: 30, objectFit: "cover", borderRadius: 3, flexShrink: 0, border: `1px solid ${COLORS.border}` }}
-            onError={e => { e.target.style.display = "none"; }}
-          />
-        )}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+        <CountryFlag country={countryVal} size={28} />
         <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.textSub, whiteSpace: "nowrap", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
       </div>
     );
@@ -14627,14 +14620,13 @@ const Contracts = ({ companies = [] }) => {
       const to = c.executionDateTo || "";
       if (!from && !to) return <span style={{ color: COLORS.textMuted }}>—</span>;
       const periodLabel = c.executionPeriodType ? c.executionPeriodType.toUpperCase() : "";
+      const labelColor = periodLabel === "LOADING" ? COLORS.blue : COLORS.purple;
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.text, whiteSpace: "nowrap" }}>{from || "…"} → {to || "…"}</span>
-            {c.withoutExtension && <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.orange, whiteSpace: "nowrap" }}>W/O</span>}
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {from && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.text, whiteSpace: "nowrap" }}>{from}</span>}
+          {to   && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap" }}>{to}</span>}
           {periodLabel && (
-            <span style={{ fontSize: 10, fontWeight: 700, color: periodLabel === "LOADING" ? COLORS.blue : COLORS.purple, background: periodLabel === "LOADING" ? `${COLORS.blue}18` : `${COLORS.purple}18`, padding: "1px 6px", borderRadius: 3, border: `1px solid ${periodLabel === "LOADING" ? COLORS.blue : COLORS.purple}40`, whiteSpace: "nowrap", alignSelf: "flex-start" }}>{periodLabel}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: labelColor, background: `${labelColor}18`, padding: "1px 6px", borderRadius: 3, border: `1px solid ${labelColor}40`, whiteSpace: "nowrap", alignSelf: "flex-start", marginTop: 1 }}>{periodLabel}{c.withoutExtension ? " · W/O" : ""}</span>
           )}
         </div>
       );

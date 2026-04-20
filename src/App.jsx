@@ -3982,12 +3982,14 @@ while (true) {
 }
       const supabaseRowByOpId = {};
       const supabaseRowByRef = {};
+      const currentDataBySupabaseId = {};
       if (indexRows) {
         for (const r of indexRows) {
           const opId = String(r.data?.id ?? "");
           if (opId && !supabaseRowByOpId[opId]) supabaseRowByOpId[opId] = r.id;
           const ref = r.data?.ref || "";
           if (ref && !supabaseRowByRef[ref]) supabaseRowByRef[ref] = r.id;
+          currentDataBySupabaseId[r.id] = r.data;
         }
       }
 
@@ -4017,16 +4019,20 @@ while (true) {
                 if (!empty && currentEmpty) merged[k] = v;
               });
             }
-            // Update keeper with merged data
-            await supabase.from("derivatives").update({ data: merged }).eq("id", keeper.id);
-            // Delete duplicate rows and reroute index entries to keeper
+            // DELETE duplicates FIRST — before updating keeper — so the unique constraint
+            // on data->>'ref' is satisfied before the UPDATE is validated by PostgreSQL
             for (let di = 1; di < rows.length; di++) {
               await supabase.from("derivatives").delete().eq("id", rows[di].id);
               const dupOpId = String(rows[di].data?.id ?? "");
               if (dupOpId && supabaseRowByOpId[dupOpId] === rows[di].id) supabaseRowByOpId[dupOpId] = keeper.id;
               const dupRef = rows[di].data?.ref || "";
               if (dupRef && supabaseRowByRef[dupRef] === rows[di].id) supabaseRowByRef[dupRef] = keeper.id;
+              // Also update currentDataBySupabaseId to avoid stale refs in the fees patch loop
+              delete currentDataBySupabaseId[rows[di].id];
             }
+            // NOW update keeper with merged data — no duplicate ref in DB anymore
+            await supabase.from("derivatives").update({ data: merged }).eq("id", keeper.id);
+            currentDataBySupabaseId[keeper.id] = merged;
             const keeperOpId = String(keeper.data?.id ?? "");
             if (keeperOpId) supabaseRowByOpId[keeperOpId] = keeper.id;
           }
@@ -4034,14 +4040,6 @@ while (true) {
       }
 
       const saveErrors = [];
-      // Build a map of supabase row id → current data, so we can patch only fees
-      // without overwriting ref or other fields (avoids triggering the unique constraint)
-      const currentDataBySupabaseId = {};
-      for (const r of indexRows) {
-        currentDataBySupabaseId[r.id] = r.data;
-      }
-      // Also apply merged data from dedup step to the keeper rows
-      // (already done in DB, just keep the map consistent)
 
       setBatchProgress({ phase: "Mise à jour en base…", done: 0, total: updatedList.length });
       for (let i = 0; i < updatedList.length; i++) {

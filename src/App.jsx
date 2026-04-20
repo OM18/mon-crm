@@ -3981,13 +3981,13 @@ while (true) {
   indexFrom += 1000;
 }
       const supabaseRowByOpId = {};
-      const supabaseRowByRef = {};
+      const supabaseRowByRef = {};   // keyed by ref.toLowerCase().trim()
       const currentDataBySupabaseId = {};
       if (indexRows) {
         for (const r of indexRows) {
           const opId = String(r.data?.id ?? "");
           if (opId && !supabaseRowByOpId[opId]) supabaseRowByOpId[opId] = r.id;
-          const ref = r.data?.ref || "";
+          const ref = (r.data?.ref || "").toLowerCase().trim();
           if (ref && !supabaseRowByRef[ref]) supabaseRowByRef[ref] = r.id;
           currentDataBySupabaseId[r.id] = r.data;
         }
@@ -4025,7 +4025,7 @@ while (true) {
               await supabase.from("derivatives").delete().eq("id", rows[di].id);
               const dupOpId = String(rows[di].data?.id ?? "");
               if (dupOpId && supabaseRowByOpId[dupOpId] === rows[di].id) supabaseRowByOpId[dupOpId] = keeper.id;
-              const dupRef = rows[di].data?.ref || "";
+              const dupRef = (rows[di].data?.ref || "").toLowerCase().trim();
               if (dupRef && supabaseRowByRef[dupRef] === rows[di].id) supabaseRowByRef[dupRef] = keeper.id;
               // Also update currentDataBySupabaseId to avoid stale refs in the fees patch loop
               delete currentDataBySupabaseId[rows[di].id];
@@ -4044,7 +4044,17 @@ while (true) {
       setBatchProgress({ phase: "Mise à jour en base…", done: 0, total: updatedList.length });
       for (let i = 0; i < updatedList.length; i++) {
         const { op } = updatedList[i];
-        const supabaseId = supabaseRowByOpId[String(op.id)] || supabaseRowByRef[String(op.ref || "")];
+        let supabaseId = supabaseRowByOpId[String(op.id)]
+          || supabaseRowByRef[(op.ref || "").toLowerCase().trim()];
+        // Fallback: direct DB lookup by ref if index missed (handles edge cases)
+        if (!supabaseId && op.ref) {
+          const { data: found } = await supabase.from("derivatives").select("id, data")
+            .eq("data->>ref", String(op.ref)).limit(1);
+          if (found && found.length > 0) {
+            supabaseId = found[0].id;
+            currentDataBySupabaseId[supabaseId] = found[0].data;
+          }
+        }
         if (supabaseId) {
           // Patch only the fees field on the existing row data — never overwrite ref or other fields
           // This avoids triggering the unique constraint on data->>'ref'

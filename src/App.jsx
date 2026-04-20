@@ -1559,10 +1559,11 @@ const DerivProductImportModal = ({ onClose, onImport, config }) => {
     setImporting(true);
     const errors = [];
     const valid = [];
+    const importBaseTs = Date.now();
 
     rawRows.forEach((row, i) => {
-      const obj = { id: Date.now() + i };
-      Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[ci]?.toString().trim() || ""; });
+      const obj = { id: importBaseTs * 10000 + i };
+      Object.entries(mapping).forEach(([ci, f]) => { if (f && f !== "id") obj[f] = row[ci]?.toString().trim() || ""; });
 
       if (obj.stoxxExchange) obj.stoxxExchange = resolveConfigValue("derivExchanges", obj.stoxxExchange);
       if (obj.underlyingCategory) obj.underlyingCategory = obj.underlyingCategory.toLowerCase().trim();
@@ -2585,10 +2586,11 @@ const DerivAccountImportModal = ({ onClose, onImport, config }) => {
     setImporting(true);
     const errors = [];
     const valid  = [];
+    const importBaseTs = Date.now();
 
     rawRows.forEach((row, i) => {
-      const obj = { id: Date.now() + i };
-      Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[ci]?.toString().trim() || ""; });
+      const obj = { id: importBaseTs * 10000 + i };
+      Object.entries(mapping).forEach(([ci, f]) => { if (f && f !== "id") obj[f] = row[ci]?.toString().trim() || ""; });
 
       // Normalize businessUnit against config
       if (obj.businessUnit) {
@@ -7293,9 +7295,10 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
   const doImport = () => {
     setImporting(true);
     const unknowns = {};
+    const importBaseTs = Date.now();
     const items = rawRows.map((row, i) => {
-      const obj = { id: Date.now() + i };
-      Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[ci]?.toString() || ""; });
+      const obj = { id: importBaseTs * 10000 + i };
+      Object.entries(mapping).forEach(([ci, f]) => { if (f && f !== "id") obj[f] = row[ci]?.toString() || ""; });
       if (type === "companies") {
         obj.avatar = (obj.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
         obj.tags = []; obj.revenue = Number(obj.revenue) || 0;

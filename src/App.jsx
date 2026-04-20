@@ -14504,11 +14504,11 @@ const Contracts = ({ companies = [] }) => {
   // ── Table columns ──
   const COLS = [
     { key: "contractRef",         label: "Contract #",        w: 100 },
-    { key: "contractType",        label: "Type",              w: 90  },
+    { key: "contractType",        label: "Type",              w: 70  },
     { key: "buyerSeller",         label: "Buyer / Seller",    w: 210 },
     { key: "commodity",           label: "Commodity",         w: 120 },
     { key: "incotermPort",        label: "Port",              w: 150 },
-    { key: "executionPeriod",     label: "Exec. Period",      w: 120 },
+    { key: "executionPeriod",     label: "Exec. Period",      w: 95  },
     { key: "priceType",           label: "Price",             w: 140 },
     { key: "paymentTerms",        label: "Pmt Terms",         w: 120 },
     { key: "originCountry",       label: "Origin",            w: 110 },

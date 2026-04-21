@@ -14542,11 +14542,11 @@ const Contracts = ({ companies = [] }) => {
       const brokerName = c.brokerId ? (companies.find(co => String(co.id) === String(c.brokerId))?.name || c.brokerId) : null;
       const isPurchase = /purchase|buy|achat|acqui/i.test((c.contractType || "").toLowerCase());
       const isSale     = /sale|sell|vente/i.test((c.contractType || "").toLowerCase());
-      // For purchase: buyer is primary → seller dimmed. For sale: seller is primary → buyer dimmed.
-      const buyerPrimary  = isPurchase || (!isPurchase && !isSale);
+      // Purchase → buyer is the star, seller dimmed. Sale → seller is the star, buyer dimmed. Neutral → both normal.
+      const buyerPrimary  = isPurchase;
       const sellerPrimary = isSale;
-      const buyerStyle  = { fontSize: buyerPrimary ? 12 : 11, fontWeight: buyerPrimary ? 600 : 400, color: buyerPrimary ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 };
-      const sellerStyle = { fontSize: sellerPrimary ? 12 : 11, fontWeight: sellerPrimary ? 600 : 400, color: sellerPrimary ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 };
+      const buyerStyle  = { fontSize: sellerPrimary ? 11 : 12, fontWeight: buyerPrimary ? 700 : 400, color: sellerPrimary ? COLORS.textMuted : COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 };
+      const sellerStyle = { fontSize: buyerPrimary ? 11 : 12, fontWeight: sellerPrimary ? 700 : 400, color: buyerPrimary ? COLORS.textMuted : COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 };
       // Broker: dim if a primary party exists
       const brokerDimmed = isPurchase || isSale;
       return (
@@ -14579,7 +14579,7 @@ const Contracts = ({ companies = [] }) => {
       if (!c.contractType) return (
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <span style={{ color: COLORS.textMuted }}>—</span>
-          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.text, fontFamily: "'DM Mono', monospace", paddingLeft: 2 }}>{c.conclusionDate}</span>}
+          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.text, fontFamily: "'DM Mono', monospace", paddingLeft: 8 }}>{c.conclusionDate}</span>}
         </div>
       );
       const t = (config.contractTypes || []).find(x => x.label === c.contractType);
@@ -14587,7 +14587,7 @@ const Contracts = ({ companies = [] }) => {
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}20`, color: col, border: `1px solid ${col}40`, whiteSpace: "nowrap", alignSelf: "flex-start" }}>{c.contractType}</span>
-          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.text, fontFamily: "'DM Mono', monospace", paddingLeft: 2 }}>{c.conclusionDate}</span>}
+          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.text, fontFamily: "'DM Mono', monospace", paddingLeft: 8 }}>{c.conclusionDate}</span>}
         </div>
       );
     }
@@ -14627,13 +14627,14 @@ const Contracts = ({ companies = [] }) => {
       if (c.priceType === "prime") {
         const instrument = c.derivativeId ? instruments.find(p => String(p.id) === String(c.derivativeId)) : null;
         const instrumentLabel = instrument?.label || instrument?.name || null;
+        const instrumentShort = instrumentLabel ? instrumentLabel.split(" ").slice(1).join(" ") || instrumentLabel : null;
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <span style={{ fontSize: 12, color: COLORS.text }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.purple, background: `${COLORS.purple}15`, padding: "1px 6px", borderRadius: 4, marginRight: 4 }}>PRIME</span>
               {c.premium ? `+${c.premium}` : "—"}
             </span>
-            {instrumentLabel && <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130 }}>{instrumentLabel}</span>}
+            {instrumentShort && <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130 }}>{instrumentShort}</span>}
           </div>
         );
       }

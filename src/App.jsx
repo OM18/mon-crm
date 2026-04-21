@@ -14976,7 +14976,7 @@ const Contracts = ({ companies = [] }) => {
       {/* ── Create / Edit Modal ── */}
       {showModal && (
         <div style={{ position: "fixed", inset: 0, background: "#00000088", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 28, width: "100%", maxWidth: 800, maxHeight: "92vh", overflowY: "auto" }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "24px 28px", width: "100%", maxWidth: 1240 }}>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
               <div>
@@ -14987,7 +14987,7 @@ const Contracts = ({ companies = [] }) => {
               <button onClick={closeModal} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
 
               <CFSec label="Identification" />
               <div>
@@ -15101,7 +15101,7 @@ const Contracts = ({ companies = [] }) => {
 
               <CFSec label="Prix" />
               {/* Price type toggle */}
-              <div style={{ gridColumn: "1 / -1" }}>
+              <div style={{ gridColumn: "1 / 3" }}>
                 <CFL req>Type de prix</CFL>
                 <div style={{ display: "flex", gap: 8, marginTop: 2, maxWidth: 280 }}>
                   {[{ v: "flat", l: "FLAT" }, { v: "prime", l: "PRIME" }].map(({ v, l }) => (

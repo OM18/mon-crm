@@ -4095,6 +4095,9 @@ const BatchEuronextFees = () => {
             tradeDate: op.tradeDate || "—",
             reason: `Ambiguïté — plusieurs tarifs du même type matchent cette trade date. Tarifs en conflit : ${matched.map(t => `${t.tarifType || "—"} [${t.validFrom || "∞"} → ${t.validTo || "∞"}] (${t.isActive ? "actif" : "inactif"})`).join(" | ")}`,
           });
+          // Still clear the manual fee so it shows white "—" instead of stale yellow
+          const clearedOp = { ...op, fees: "" };
+          updatedList.push({ op: clearedOp, oldFees: op.fees, newFees: null, wasManual: op.fees !== undefined && op.fees !== "" });
           continue;
         }
 
@@ -4104,6 +4107,9 @@ const BatchEuronextFees = () => {
             tradeDate: op.tradeDate || "—",
             reason: `Aucun tarif trouvé — broker: "${op.broker || "—"}", exchange: "${op.exchange || "—"}", opType: "${op.opType || "—"}", transmission: "${op.orderTransmissionType || "—"}", tradeDate: "${op.tradeDate || "—"}"`,
           });
+          // Still clear the manual fee so it shows white "—" instead of stale yellow
+          const clearedOp = { ...op, fees: "" };
+          updatedList.push({ op: clearedOp, oldFees: op.fees, newFees: null, wasManual: op.fees !== undefined && op.fees !== "" });
           continue;
         }
 
@@ -4311,7 +4317,7 @@ while (true) {
                     <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: COLORS.accent, minWidth: 100 }}>{op.ref || op.id}</span>
                     <span style={{ color: COLORS.textMuted, minWidth: 80 }}>{op.tradeDate || "—"}</span>
                     {wasManual && <span style={{ fontSize: 10, background: `${COLORS.orange}20`, color: COLORS.orange, borderRadius: 4, padding: "1px 6px", fontWeight: 700 }}>manuel: {oldFees}</span>}
-                    <span style={{ marginLeft: "auto", fontFamily: "'DM Mono', monospace", color: COLORS.green, fontWeight: 700 }}>→ {newFees}</span>
+                    <span style={{ marginLeft: "auto", fontFamily: "'DM Mono', monospace", color: newFees !== null ? COLORS.green : COLORS.textMuted, fontWeight: 700 }}>{newFees !== null ? `→ ${newFees}` : "→ — (vidé)"}</span>
                   </div>
                 ))}
               </div>

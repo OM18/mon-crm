@@ -11004,7 +11004,20 @@ const [exchangeTarifs, setExchangeTarifs] = useState([]);
     };
   };
 
-  const [ops, setOpsRaw] = useState(() => initialOps || []);
+  const [ops, setOpsRaw_] = useState(() => {
+    const initial = initialOps || [];
+    // Deduplicate by ref on init
+    const seen = new Set(); 
+    return initial.filter(o => { const k = String(o.ref ?? o.id); if (seen.has(k)) return false; seen.add(k); return true; });
+  });
+  // Wrap setOpsRaw to always deduplicate by ref
+  const setOpsRaw = (val) => {
+    setOpsRaw_(prev => {
+      const next = typeof val === "function" ? val(prev) : val;
+      const seen = new Set();
+      return next.filter(o => { const k = String(o.ref ?? o.id); if (seen.has(k)) return false; seen.add(k); return true; });
+    });
+  };
   const [derivTab, setDerivTab] = useState('operations'); // 'operations' | 'fixings'
 
 useEffect(() => {
@@ -11082,7 +11095,9 @@ const deleteOneDerivative = async (id) => {
   await supabase.from('derivatives').delete().eq('data->>id', String(id));
 };
 
-const reloadOps = async () => {
+  const [isReloading, setIsReloading] = useState(false);
+
+const reloadOps = useCallback(async () => {
   setIsReloading(true);
   const PAGE = 1000;
   let all = [];
@@ -11096,7 +11111,7 @@ const reloadOps = async () => {
   }
   if (all.length) setOpsRaw(all);
   setIsReloading(false);
-};
+}, []);
 
 const setOps = async (val) => {
   const next = typeof val === "function" ? val(ops) : val;
@@ -11105,7 +11120,6 @@ const setOps = async (val) => {
   const [showForm, setShowForm]   = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
-  const [isReloading, setIsReloading] = useState(false);
   const [editOp, setEditOp]       = useState(null);
   const [form, setForm]         = useState(makeEmpty());
   const [selected, setSelected] = useState(null);
@@ -11357,7 +11371,7 @@ const setOps = async (val) => {
     const handler = () => reloadOps();
     window.addEventListener("derivatives:reload", handler);
     return () => window.removeEventListener("derivatives:reload", handler);
-  }, []);
+  }, [reloadOps]);
 
   useEffect(() => {
     const handleKey = (e) => {

@@ -14975,10 +14975,10 @@ const Contracts = ({ companies = [] }) => {
 
       {/* ── Create / Edit Modal ── */}
       {showModal && (
-        <div style={{ position: "fixed", inset: 0, background: "#00000088", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "24px 28px", width: "100%", maxWidth: 1240 }}>
+        <div style={{ position: "fixed", inset: 0, background: "#00000088", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "16px" }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, width: "100%", maxWidth: 1360, maxHeight: "96vh", display: "flex", flexDirection: "column" }}>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 26px 16px", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 20, color: COLORS.text }}>
                   {editId !== null ? `Modifier le contrat #${editId}` : "Nouveau contrat"}
@@ -14987,6 +14987,7 @@ const Contracts = ({ companies = [] }) => {
               <button onClick={closeModal} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
             </div>
 
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 26px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
 
               <CFSec label="Identification" />
@@ -15346,7 +15347,8 @@ const Contracts = ({ companies = [] }) => {
 
             </div>
 
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", padding: "14px 26px 20px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
               <Btn variant="secondary" onClick={closeModal}>Annuler</Btn>
               <Btn onClick={submit}>{editId !== null ? "✓ Enregistrer" : "✓ Créer le contrat"}</Btn>
             </div>

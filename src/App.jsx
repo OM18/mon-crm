@@ -4195,36 +4195,36 @@ while (true) {
 
       const saveErrors = [];
 
+      // Build a map: ref → current supabase row data (for patching fees only)
+      const dataByRef = {};
+      for (const r of indexRows) {
+        const ref = String(r.data?.ref ?? "").trim();
+        if (ref) dataByRef[ref] = { supabaseId: r.id, data: r.data };
+      }
+
       setBatchProgress({ phase: "Mise à jour en base…", done: 0, total: updatedList.length });
       for (let i = 0; i < updatedList.length; i++) {
         const { op } = updatedList[i];
-        let supabaseId = supabaseRowByOpId[String(op.id)]
-          || supabaseRowByRef[(op.ref || "").toLowerCase().trim()];
-        // Fallback: direct DB lookup by ref if index missed (handles edge cases)
-        if (!supabaseId && op.ref) {
+        const refKey = String(op.ref ?? "").trim();
+        let entry = dataByRef[refKey];
+
+        // Fallback: direct DB query by ref if not in index
+        if (!entry && refKey) {
           const { data: found } = await supabase.from("derivatives").select("id, data")
-            .eq("data->>ref", String(op.ref)).limit(1);
+            .eq("data->>ref", refKey).limit(1);
           if (found && found.length > 0) {
-            supabaseId = found[0].id;
-            currentDataBySupabaseId[supabaseId] = found[0].data;
+            entry = { supabaseId: found[0].id, data: found[0].data };
           }
         }
-        if (supabaseId) {
-          // Patch only the fees field on the existing row data — never overwrite ref or other fields
-          // This avoids triggering the unique constraint on data->>'ref'
-          const existingData = currentDataBySupabaseId[supabaseId] || op;
-          const patched = { ...existingData, fees: op.fees };
-          let lastError = null;
-          for (let attempt = 0; attempt < 3; attempt++) {
-            if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt));
-            const { error } = await supabase.from("derivatives").update({ data: patched }).eq("id", supabaseId);
-            if (!error) { lastError = null; break; }
-            lastError = error;
-            if (!error.message?.includes("fetch")) break;
-          }
-          if (lastError) saveErrors.push({ ref: op.ref || op.id, error: lastError.message });
+
+        if (entry) {
+          const patched = { ...entry.data, fees: op.fees };
+          const { error } = await supabase.from("derivatives")
+            .update({ data: patched })
+            .eq("id", entry.supabaseId);
+          if (error) saveErrors.push({ ref: refKey, error: error.message });
         } else {
-          saveErrors.push({ ref: op.ref || op.id, error: `Row Supabase introuvable — cherché id="${String(op.id)}" ref="${op.ref}" (aucune donnée perdue)` });
+          saveErrors.push({ ref: refKey, error: `Row introuvable pour ref="${refKey}"` });
         }
         if (i % 20 === 0) setBatchProgress({ phase: "Mise à jour en base…", done: i, total: updatedList.length });
       }

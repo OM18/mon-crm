@@ -54,15 +54,32 @@ const saveProducts = async (items, setStateFn, prevItems) => {
     const { data: existing } = await supabase.from('deriv_products').select('id, data');
     const supabaseIdByJsonId = {};
     (existing || []).forEach(row => { if (row.data?.id) supabaseIdByJsonId[String(row.data.id)] = row.id; });
-    const CHUNK = 50;
-    for (let i = 0; i < items.length; i += CHUNK) {
-      const chunk = items.slice(i, i + CHUNK).map(item => {
-        const sid = supabaseIdByJsonId[String(item.id)];
-        return sid ? { id: sid, data: item, updated_at: new Date().toISOString() } : { data: item, updated_at: new Date().toISOString() };
-      });
-      const { error } = await supabase.from('deriv_products').upsert(chunk, { onConflict: 'id' });
-      if (error) console.error('[saveProducts] upsert error:', error);
+
+    const toUpdate = []; // existing rows → UPDATE by supabase row id
+    const toInsert = []; // new rows → INSERT without id (GENERATED ALWAYS)
+    items.forEach(item => {
+      const sid = supabaseIdByJsonId[String(item.id)];
+      if (sid) toUpdate.push({ sid, item });
+      else toInsert.push(item);
+    });
+
+    // UPDATE existing one by one (cannot bulk-upsert GENERATED ALWAYS id columns)
+    for (const { sid, item } of toUpdate) {
+      const { error } = await supabase.from('deriv_products')
+        .update({ data: item, updated_at: new Date().toISOString() })
+        .eq('id', sid);
+      if (error) console.error('[saveProducts] update error:', error);
     }
+
+    // INSERT new products in chunks (no id column — let Supabase generate it)
+    const CHUNK = 50;
+    for (let i = 0; i < toInsert.length; i += CHUNK) {
+      const chunk = toInsert.slice(i, i + CHUNK).map(item => ({ data: item, updated_at: new Date().toISOString() }));
+      const { error } = await supabase.from('deriv_products').insert(chunk);
+      if (error) console.error('[saveProducts] insert error:', error);
+    }
+
+    // DELETE products removed from the list
     const currentIds = new Set(items.map(p => String(p.id)));
     const toDelete = (existing || []).filter(r => r.data?.id && !currentIds.has(String(r.data.id))).map(r => r.id);
     if (toDelete.length > 0) await supabase.from('deriv_products').delete().in('id', toDelete);
@@ -3951,16 +3968,21 @@ const BatchEuronextFees = () => {
         if (partialMatch?.stoxxExchange) return norm(partialMatch.stoxxExchange);
         return norm(op.exchange || "");
       };
-      // Debug: log exactly what ref=6360 looks like before the filter
-      const op6360 = allOps.find(op => String(op.ref) === "6360");
+      // Debug: find ref 6360 (try multiple formats)
+      const op6360 = allOps.find(op => String(op.ref).trim() === "6360" || String(op.id).trim() === "6360");
       if (op6360) {
         const ex = resolveExchange(op6360);
-        console.log(`[DEBUG-6360] instrument="${op6360.instrument}" exchange="${op6360.exchange}" resolved="${ex}" → ${ex.includes("euronext") ? "INCLUSE" : "EXCLUE du filtre Euronext"}`);
+        console.log(`[DEBUG-6360] TROUVÉE — instrument="${op6360.instrument}" exchange="${op6360.exchange}" resolved="${ex}" → ${ex.includes("euronext") ? "INCLUSE" : "EXCLUE du filtre Euronext"}`);
         const prodMatch = allProducts.find(p => norm(p.label) === norm(op6360.instrument));
-        console.log(`[DEBUG-6360] product exact match:`, prodMatch ? prodMatch.label : "AUCUN");
-        console.log(`[DEBUG-6360] broker="${op6360.broker}" opType="${op6360.opType}" trans="${op6360.orderTransmissionType}" tradeDate="${op6360.tradeDate}"`);
+        console.log(`[DEBUG-6360] product exact match:`, prodMatch ? prodMatch.label : "AUCUN — instrument stocké: " + JSON.stringify(op6360.instrument));
+        console.log(`[DEBUG-6360] broker="${op6360.broker}" opType="${op6360.opType}" trans="${op6360.orderTransmissionType}" tradeDate="${op6360.tradeDate}" fees="${op6360.fees}"`);
       } else {
-        console.log("[DEBUG-6360] ref 6360 introuvable dans les ops chargées");
+        // Show a sample of refs to understand the format
+        const sample = allOps.slice(0, 5).map(op => `ref=${JSON.stringify(op.ref)} id=${JSON.stringify(op.id)}`).join(" | ");
+        console.log("[DEBUG-6360] INTROUVABLE. Total ops chargées:", allOps.length, "| Exemples:", sample);
+        // Try to find anything close to 6360
+        const close = allOps.find(op => String(op.ref).includes("6360") || String(op.id).includes("6360"));
+        if (close) console.log("[DEBUG-6360] Proche trouvé:", JSON.stringify({ref: close.ref, id: close.id, instrument: close.instrument}));
       }
       const euronextOps = allOps.filter(op => resolveExchange(op).includes("euronext"));
 

@@ -14914,9 +14914,10 @@ const Contracts = ({ companies = [] }) => {
     if (key === "destinationCountry") return <FlagCell countryVal={c.destinationCountry} />;
     if (key === "quantity") {
       const hasQty = form => form.qtyValue || form.qtyMin || form.qtyMax;
+      const fmtQty = v => v ? Number(v).toLocaleString('fr-FR') : '…';
       const qtyStr = c.qtyType === "range"
-        ? (c.qtyMin || c.qtyMax ? `${c.qtyMin||"…"} – ${c.qtyMax||"…"}` : null)
-        : (c.qtyValue || null);
+        ? (c.qtyMin || c.qtyMax ? `${fmtQty(c.qtyMin)} – ${fmtQty(c.qtyMax)}` : null)
+        : (c.qtyValue ? fmtQty(c.qtyValue) : null);
       if (!qtyStr) return <span style={{ color: COLORS.textMuted }}>—</span>;
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}>
@@ -15044,7 +15045,7 @@ const Contracts = ({ companies = [] }) => {
           <DRow label="Quantity">
             {(c.qtyValue || c.qtyMin || c.qtyMax) ? (
               <span style={{ fontFamily: "'DM Mono', monospace" }}>
-                {c.qtyType === "range" ? `${c.qtyMin||"…"} – ${c.qtyMax||"…"}` : c.qtyValue}
+                {(() => { const fq = v => v ? Number(v).toLocaleString('fr-FR') : '…'; return c.qtyType === "range" ? `${fq(c.qtyMin)} – ${fq(c.qtyMax)}` : fq(c.qtyValue); })()}
                 {c.qtyUnit ? ` ${c.qtyUnit}` : ""}
               </span>
             ) : null}

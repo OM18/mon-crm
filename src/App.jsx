@@ -3862,7 +3862,10 @@ const BatchEuronextFees = () => {
         const opExchange = norm(resolvedExchange);
         const opTrans = norm(op.orderTransmissionType);
         const opOpType = norm(op.opType);
-        const tradeDate = op.tradeDate || "";
+        const rawTradeDate = op.tradeDate || "";
+        // Normalize tradeDate to yyyy-mm-dd for ISO comparison with validFrom/validTo
+        const toISO = d => { if (!d) return ""; if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d; const p = d.split(/[./]/); if (p.length === 3 && p[2].length === 4) return `${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`; return d; };
+        const tradeDate = toISO(rawTradeDate);
         const isDebug = DEBUG_REFS.has(String(op.ref));
 
         const matching = tarifs.filter(t => {
@@ -10884,7 +10887,10 @@ const [exchangeTarifs, setExchangeTarifs] = useState([]);
       const opExchange = norm(resolvedExchange);
       const opTrans = norm(op.orderTransmissionType);
       const opOpType = norm(op.opType);
-      const tradeDate = op.tradeDate || "";
+      const rawTradeDate = op.tradeDate || "";
+      // Normalize dd/mm/yyyy → yyyy-mm-dd for ISO comparison with validFrom/validTo
+      const toISO = d => { if (!d) return ""; if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d; const p = d.split(/[./]/); if (p.length === 3 && p[2].length === 4) return `${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`; return d; };
+      const tradeDate = toISO(rawTradeDate);
 
       // Use active-only tarifs when no tradeDate (live/new ops), use all tarifs with date filter for historical ops
       const candidates = tarifs.filter(t => {

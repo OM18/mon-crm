@@ -3837,6 +3837,119 @@ const BatchFixingsNewToOld = () => {
 };
 
 
+
+// ─── DERIVATIVES DEDUPLICATION TOOL ─────────────────────────
+const DerivativesDedupTool = () => {
+  const [state, setState] = useState("idle"); // idle | running | done | error
+  const [report, setReport] = useState(null);
+
+  const run = async () => {
+    setState("running");
+    setReport(null);
+    try {
+      // Load all rows with supabase id + ref
+      const PAGE = 1000;
+      let all = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase.from("derivatives").select("id, data").range(from, from + PAGE - 1);
+        if (error || !data || data.length === 0) break;
+        all = [...all, ...data];
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+
+      // Group by ref
+      const byRef = {};
+      for (const r of all) {
+        const ref = r.data?.ref || "";
+        if (!ref) continue;
+        if (!byRef[ref]) byRef[ref] = [];
+        byRef[ref].push(r);
+      }
+      const dupGroups = Object.values(byRef).filter(rows => rows.length > 1);
+
+      if (dupGroups.length === 0) {
+        setReport({ deduplicated: 0, deleted: 0, message: "Aucun doublon trouvé — base propre ✓" });
+        setState("done");
+        return;
+      }
+
+      let totalDeleted = 0;
+      for (const rows of dupGroups) {
+        // Keep the row with most complete data (most non-empty fields)
+        const scored = rows.map(r => ({
+          r,
+          score: Object.values(r.data || {}).filter(v => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0)).length
+        }));
+        scored.sort((a, b) => b.score - a.score);
+        const keeper = scored[0].r;
+        // Merge all data into keeper
+        let merged = { ...keeper.data };
+        for (let di = 1; di < scored.length; di++) {
+          const dupData = scored[di].r.data || {};
+          Object.entries(dupData).forEach(([k, v]) => {
+            const empty = v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+            const currentEmpty = merged[k] === undefined || merged[k] === null || merged[k] === "" || (Array.isArray(merged[k]) && merged[k].length === 0);
+            if (!empty && currentEmpty) merged[k] = v;
+          });
+        }
+        // Delete extras first
+        for (let di = 1; di < scored.length; di++) {
+          await supabase.from("derivatives").delete().eq("id", scored[di].r.id);
+          totalDeleted++;
+        }
+        // Update keeper with merged data
+        await supabase.from("derivatives").update({ data: merged }).eq("id", keeper.id);
+      }
+
+      // Notify Derivatives to reload
+      window.__derivativesNeedsReload = true;
+      window.dispatchEvent(new CustomEvent("derivatives:reload"));
+
+      setReport({ deduplicated: dupGroups.length, deleted: totalDeleted });
+      setState("done");
+    } catch (err) {
+      setReport({ fatalError: String(err) });
+      setState("error");
+    }
+  };
+
+  return (
+    <div style={{ background: COLORS.card, border: `2px dashed ${COLORS.orange}60`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ padding: "16px 24px", background: `${COLORS.orange}08`, display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: `${COLORS.orange}20`, border: `1px solid ${COLORS.orange}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🧹</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>Dédupliquer les opérations</div>
+          <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>
+            Fusionne les lignes Supabase ayant le même ref — conserve la donnée la plus complète
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {state === "done" && <Btn variant="secondary" onClick={() => { setState("idle"); setReport(null); }}>Fermer</Btn>}
+          {state !== "running" && (
+            <Btn onClick={run} style={{ background: `${COLORS.orange}20`, color: COLORS.orange, border: `1px solid ${COLORS.orange}40` }}>
+              {state === "idle" ? "🧹 Lancer" : "🔁 Relancer"}
+            </Btn>
+          )}
+          {state === "running" && <span style={{ fontSize: 13, color: COLORS.orange, fontWeight: 600, padding: "8px 16px" }}>En cours…</span>}
+        </div>
+      </div>
+      {report && (
+        <div style={{ padding: "14px 24px", borderTop: `1px solid ${COLORS.border}` }}>
+          {report.fatalError
+            ? <div style={{ color: COLORS.red, fontSize: 13 }}>Erreur : {report.fatalError}</div>
+            : report.message
+              ? <div style={{ color: COLORS.green, fontSize: 13, fontWeight: 600 }}>✓ {report.message}</div>
+              : <div style={{ color: COLORS.green, fontSize: 13, fontWeight: 600 }}>
+                  ✓ {report.deduplicated} groupe{report.deduplicated !== 1 ? "s" : ""} de doublons fusionné{report.deduplicated !== 1 ? "s" : ""} — {report.deleted} ligne{report.deleted !== 1 ? "s" : ""} supprimée{report.deleted !== 1 ? "s" : ""} — Derivatives rechargé
+                </div>}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const BatchEuronextFees = () => {
   const [batchState, setBatchState] = useState("idle"); // idle | confirm | running | done | error
   const [batchReport, setBatchReport] = useState(null);
@@ -6744,6 +6857,9 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
           {/* ── EXCHANGE MANAGER ── */}
           <ExchangeManagerBlock />
+
+          {/* ── DEDUPLICATE DERIVATIVES ── */}
+          <DerivativesDedupTool />
 
           {/* ── BATCH EURONEXT FEES RECALC ── */}
           <BatchEuronextFees />
@@ -11738,7 +11854,7 @@ const setOps = async (val) => {
               const sc = getStatusCfg(o.status);
               const isSelected = selected === o.ref;
               return (
-                <div key={o.id} onClick={() => setSelected(o.ref === selected ? null : o.ref)}
+                <div key={`${o.ref}-${startIdx + vi}`} onClick={() => setSelected(o.ref === selected ? null : o.ref)}
                   style={{ display: "grid", gridTemplateColumns: COLS, gap: 0, padding: "11px 16px", cursor: "pointer", transition: "background 0.12s", borderBottom: `1px solid ${COLORS.border}`, background: isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`, alignItems: "center" }}
                   onMouseOver={e => { if (!isSelected) e.currentTarget.style.background = COLORS.hover; }}
                   onMouseOut={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? COLORS.rowSelected : i % 2 === 0 ? COLORS.card : `${COLORS.card}BB`; }}>

@@ -4981,7 +4981,7 @@ const ContractVolumeUnitsEditor = ({ config, updateField }) => {
                 <input value={item.name} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
                   style={{ background: 'transparent', border: 'none', color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', outline: 'none' }} />
                 <input value={item.display} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, display: e.target.value } : x))}
-                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: COLORS.accent, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', outline: 'none', padding: '3px 8px', textAlign: 'center' }} />
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: COLORS.text, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', outline: 'none', padding: '3px 8px', textAlign: 'center' }} />
                 <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
                   style={{ background: 'none', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: 16, lineHeight: 1 }}
                   onMouseOver={e => e.currentTarget.style.color = COLORS.red}

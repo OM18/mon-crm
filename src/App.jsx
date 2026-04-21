@@ -14922,7 +14922,7 @@ const Contracts = ({ companies = [] }) => {
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}>
           <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap" }}>
-            {qtyStr} <span style={{ fontSize: 11, color: COLORS.accent }}>{c.qtyUnit || ""}</span>
+            {qtyStr} <span style={{ fontSize: 11, color: COLORS.textMuted }}>{c.qtyUnit || ""}</span>
           </span>
           {c.qtyTolerance !== undefined && c.qtyTolerance !== "" && (
             <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.orange, background: `${COLORS.orange}12`, padding: "1px 6px", borderRadius: 3, border: `1px solid ${COLORS.orange}40`, whiteSpace: "nowrap" }}>
@@ -15405,9 +15405,9 @@ const Contracts = ({ companies = [] }) => {
                     <div style={{ display: "flex", alignItems: "center", gap: 8, background: `${COLORS.accent}10`, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, padding: "7px 12px", flex: 1, flexWrap: "wrap" }}>
                       <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: COLORS.accent, fontWeight: 700 }}>
                         {form.qtyType === "range"
-                          ? `${form.qtyMin || "…"} – ${form.qtyMax || "…"} ${form.qtyUnit || ""}`
-                          : `${form.qtyValue || "…"} ${form.qtyUnit || ""}`}
-                      </span>
+                          ? `${form.qtyMin || "…"} – ${form.qtyMax || "…"}`
+                          : `${form.qtyValue || "…"}`}
+                      </span>{form.qtyUnit && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: COLORS.textSub, fontWeight: 700, marginLeft: 4 }}>{form.qtyUnit}</span>}
                       {form.qtyTolerance !== undefined && (
                         <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.orange, background: `${COLORS.orange}12`, padding: "1px 7px", borderRadius: 4, border: `1px solid ${COLORS.orange}40` }}>
                           ±{form.qtyTolerance}%
@@ -15598,7 +15598,7 @@ const Contracts = ({ companies = [] }) => {
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <input type="number" step="1" min="0" value={form.qtyValue || ""} onChange={e => f("qtyValue", e.target.value)} placeholder="ex : 5000"
                     style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 15, fontWeight: 700, fontFamily: "'DM Mono', monospace", outline: "none", boxSizing: "border-box" }} />
-                  {form.qtyUnit && <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.accent, minWidth: 30 }}>{form.qtyUnit}</span>}
+                  {form.qtyUnit && <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.textSub, minWidth: 30 }}>{form.qtyUnit}</span>}
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -15607,7 +15607,7 @@ const Contracts = ({ companies = [] }) => {
                   <span style={{ color: COLORS.textMuted, fontWeight: 700, fontSize: 16 }}>–</span>
                   <input type="number" step="1" min="0" value={form.qtyMax || ""} onChange={e => f("qtyMax", e.target.value)} placeholder="Max"
                     style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 15, fontWeight: 700, fontFamily: "'DM Mono', monospace", outline: "none", boxSizing: "border-box" }} />
-                  {form.qtyUnit && <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.accent, minWidth: 30 }}>{form.qtyUnit}</span>}
+                  {form.qtyUnit && <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.textSub, minWidth: 30 }}>{form.qtyUnit}</span>}
                 </div>
               )}
             </div>

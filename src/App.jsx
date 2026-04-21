@@ -4216,10 +4216,10 @@ while (true) {
 
       // Bulk upsert by supabase row id — much faster than individual UPDATEs
       // Supabase upsert on 'id' (the serial PK) patches existing rows without insert
-      const CHUNK = 50;
+      const SAVE_CHUNK = 50;
       setBatchProgress({ phase: "Mise à jour en base…", done: 0, total: rowsToUpdate.length });
-      for (let i = 0; i < rowsToUpdate.length; i += CHUNK) {
-        const chunk = rowsToUpdate.slice(i, i + CHUNK);
+      for (let i = 0; i < rowsToUpdate.length; i += SAVE_CHUNK) {
+        const chunk = rowsToUpdate.slice(i, i + SAVE_CHUNK);
         let lastError = null;
         for (let attempt = 0; attempt < 3; attempt++) {
           if (attempt > 0) await new Promise(r => setTimeout(r, 800 * attempt));
@@ -4236,8 +4236,8 @@ while (true) {
             if (e2) saveErrors.push({ ref: row.data?.ref || row.id, error: e2.message });
           }
         }
-        setBatchProgress({ phase: "Mise à jour en base…", done: Math.min(i + CHUNK, rowsToUpdate.length), total: rowsToUpdate.length });
-        if (i + CHUNK < rowsToUpdate.length) await new Promise(r => setTimeout(r, 200));
+        setBatchProgress({ phase: "Mise à jour en base…", done: Math.min(i + SAVE_CHUNK, rowsToUpdate.length), total: rowsToUpdate.length });
+        if (i + SAVE_CHUNK < rowsToUpdate.length) await new Promise(r => setTimeout(r, 200));
       }
 
       setBatchReport({ total: euronextOps.length, updated: updatedList.length, errors: [...errors, ...saveErrors], updatedList });

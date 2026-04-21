@@ -14542,9 +14542,9 @@ const Contracts = ({ companies = [] }) => {
       const brokerName = c.brokerId ? (companies.find(co => String(co.id) === String(c.brokerId))?.name || c.brokerId) : null;
       const isPurchase = /purchase|buy|achat|acqui/i.test((c.contractType || "").toLowerCase());
       const isSale     = /sale|sell|vente/i.test((c.contractType || "").toLowerCase());
-      // Purchase → buyer is the star, seller dimmed. Sale → seller is the star, buyer dimmed. Neutral → both normal.
-      const buyerPrimary  = isPurchase;
-      const sellerPrimary = isSale;
+      // Purchase → seller is the counterparty to highlight. Sale → buyer is the counterparty to highlight.
+      const buyerPrimary  = isSale;
+      const sellerPrimary = isPurchase;
       const buyerStyle  = { fontSize: sellerPrimary ? 11 : 12, fontWeight: buyerPrimary ? 700 : 400, color: sellerPrimary ? COLORS.textMuted : COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 };
       const sellerStyle = { fontSize: buyerPrimary ? 11 : 12, fontWeight: sellerPrimary ? 700 : 400, color: buyerPrimary ? COLORS.textMuted : COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 };
       // Broker: dim if a primary party exists

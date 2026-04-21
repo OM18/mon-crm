@@ -14949,7 +14949,7 @@ const Contracts = ({ companies = [] }) => {
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <span style={{ fontSize: 12, color: COLORS.text }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.purple, background: `${COLORS.purple}15`, padding: "1px 6px", borderRadius: 4, marginRight: 4 }}>PRIME</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.purple, background: `${COLORS.purple}15`, padding: "1px 6px", borderRadius: 4, marginRight: 4 }}>PREMIUM</span>
               {c.premium ? `+${c.premium}` : "—"}
             </span>
             {instrumentShort && <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130 }}>{instrumentShort}</span>}
@@ -15301,7 +15301,7 @@ const Contracts = ({ companies = [] }) => {
               <div style={{ gridColumn: "1 / 3" }}>
                 <CFL req>Type de prix</CFL>
                 <div style={{ display: "flex", gap: 8, marginTop: 2, maxWidth: 280 }}>
-                  {[{ v: "flat", l: "FLAT" }, { v: "prime", l: "PRIME" }].map(({ v, l }) => (
+                  {[{ v: "flat", l: "FLAT" }, { v: "prime", l: "PREMIUM" }].map(({ v, l }) => (
                     <div key={v} onClick={() => { f("priceType", form.priceType === v ? "" : v); setFormErrors(p => ({...p, priceType: false})); }}
                       style={{ flex: 1, padding: "9px 0", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: 700, letterSpacing: 0.5, transition: "all 0.15s",
                         border: `1px solid ${formErrors.priceType ? COLORS.red+"80" : form.priceType === v ? COLORS.accent + "80" : COLORS.border}`,
@@ -15311,7 +15311,7 @@ const Contracts = ({ companies = [] }) => {
                     </div>
                   ))}
                 </div>
-                {formErrors.priceType && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Sélectionner FLAT ou PRIME</div>}
+                {formErrors.priceType && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Sélectionner FLAT ou PREMIUM</div>}
               </div>
 
               {/* FLAT fields */}

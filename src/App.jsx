@@ -3951,6 +3951,17 @@ const BatchEuronextFees = () => {
         if (partialMatch?.stoxxExchange) return norm(partialMatch.stoxxExchange);
         return norm(op.exchange || "");
       };
+      // Debug: log exactly what ref=6360 looks like before the filter
+      const op6360 = allOps.find(op => String(op.ref) === "6360");
+      if (op6360) {
+        const ex = resolveExchange(op6360);
+        console.log(`[DEBUG-6360] instrument="${op6360.instrument}" exchange="${op6360.exchange}" resolved="${ex}" → ${ex.includes("euronext") ? "INCLUSE" : "EXCLUE du filtre Euronext"}`);
+        const prodMatch = allProducts.find(p => norm(p.label) === norm(op6360.instrument));
+        console.log(`[DEBUG-6360] product exact match:`, prodMatch ? prodMatch.label : "AUCUN");
+        console.log(`[DEBUG-6360] broker="${op6360.broker}" opType="${op6360.opType}" trans="${op6360.orderTransmissionType}" tradeDate="${op6360.tradeDate}"`);
+      } else {
+        console.log("[DEBUG-6360] ref 6360 introuvable dans les ops chargées");
+      }
       const euronextOps = allOps.filter(op => resolveExchange(op).includes("euronext"));
 
       if (euronextOps.length === 0) {

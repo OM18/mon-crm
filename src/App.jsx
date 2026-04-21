@@ -14610,6 +14610,406 @@ const CFSec = ({ label }) => (
 );
 
 // ─── CONTRACTS ───────────────────────────────────────────────
+
+// ─── CONTRACT IMPORT MODAL ───────────────────────────────────
+const CONTRACT_FIELD_MAP = {
+  "contractNumber":    ["contract number", "contract #", "contract no", "numero contrat", "ref contrat", "ref", "no contrat"],
+  "contractType":      ["contract type", "type", "type contrat"],
+  "status":            ["status", "statut"],
+  "conclusionDate":    ["conclusion date", "date conclusion", "date contrat", "contract date"],
+  "executionDateFrom": ["execution date from", "exec from", "date exec from", "exec debut", "delivery from", "livraison from"],
+  "executionDateTo":   ["execution date to", "exec to", "date exec to", "exec fin", "delivery to", "livraison to"],
+  "executionPeriodType": ["period type", "execution type", "loading/arrival", "exec type"],
+  "buyerId":           ["buyer", "acheteur", "buyer id"],
+  "sellerId":          ["seller", "vendeur", "seller id"],
+  "brokerId":          ["broker", "courtier", "broker id"],
+  "commodity":         ["commodity", "produit", "marchandise", "product"],
+  "priceType":         ["price type", "type prix", "flat/premium", "pricing"],
+  "flatPrice":         ["flat price", "prix fixe", "price", "prix"],
+  "flatCurrency":      ["currency", "devise", "flat currency"],
+  "premium":           ["premium", "prime", "basis"],
+  "incoterm":          ["incoterm", "inco"],
+  "port":              ["port", "ports"],
+  "loadport":          ["loadport", "load port", "port chargement"],
+  "disport":           ["disport", "dis port", "port dechargement", "port déchargement"],
+  "originCountry":     ["origin", "origin country", "pays origine", "pays d origine"],
+  "destinationCountry":["destination", "destination country", "pays destination"],
+  "paymentTerms":      ["payment terms", "paiement", "payment conditions"],
+  "qtyValue":          ["quantity", "qty", "quantite", "quantité"],
+  "qtyMin":            ["qty min", "quantity min", "min qty"],
+  "qtyMax":            ["qty max", "quantity max", "max qty"],
+  "qtyUnit":           ["unit", "units", "unité", "qty unit", "volume unit"],
+  "qtyTolerance":      ["tolerance", "tolerence", "tolérance"],
+  "transformation":    ["transformation", "transform"],
+  "warehouse":         ["warehouse", "entrepot", "entrepôt"],
+};
+
+const CONTRACT_REQUIRED_FIELDS = ["contractNumber", "contractType", "conclusionDate", "buyerId", "sellerId", "commodity"];
+
+const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
+  const { config } = useConfig();
+  const [step, setStep] = useState("upload");
+  const [rawRows, setRawRows] = useState([]);
+  const [headers, setHeaders] = useState([]);
+  const [mapping, setMapping] = useState({});
+  const [error, setError] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [unknownQueue, setUnknownQueue] = useState([]);
+  const [currentQueueIdx, setCurrentQueueIdx] = useState(0);
+  const [decisions, setDecisions] = useState({});
+  const [parsedItems, setParsedItems] = useState([]);
+  const [fileLoading, setFileLoading] = useState(false);
+  const fileRef = useRef();
+
+  const allFields = Object.keys(CONTRACT_FIELD_MAP);
+  const currentItem = unknownQueue[currentQueueIdx];
+
+  const normH = h => h?.toString().toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ");
+
+  const guessField = (header) => {
+    const n = normH(header);
+    for (const [field, aliases] of Object.entries(CONTRACT_FIELD_MAP)) {
+      if (aliases.some(a => normH(a) === n)) return field;
+    }
+    return null;
+  };
+
+  const parseDate = (val) => {
+    if (!val && val !== 0) return "";
+    const s = val.toString().trim();
+    if (/^\d{4,5}$/.test(s)) { const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000)); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; }
+    const m1 = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    if (m1) return `${m1[1].padStart(2,"0")}/${m1[2].padStart(2,"0")}/${m1[3]}`;
+    const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m2) return `${m2[3]}/${m2[2]}/${m2[1]}`;
+    return s;
+  };
+
+  const handleFile = async (file) => {
+    setError(""); setFileLoading(true);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      if (!json.length) { setError("Le fichier est vide."); setFileLoading(false); return; }
+      const hdrs = json[0].map(h => h?.toString() || "");
+      const rows = json.slice(1).filter(r => r.some(c => c !== ""));
+      setHeaders(hdrs); setRawRows(rows);
+      const autoMap = {};
+      hdrs.forEach((h, i) => { const g = guessField(h); if (g && !Object.values(autoMap).includes(g)) autoMap[i] = g; });
+      setMapping(autoMap);
+      setStep("mapping");
+    } catch { setError("Erreur de lecture du fichier."); }
+    setFileLoading(false);
+  };
+
+  const doImport = () => {
+    setImporting(true);
+    const unknowns = {};
+    const items = rawRows.map((row, i) => {
+      const obj = { id: Date.now() + i + Math.random() };
+      Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[ci]?.toString().trim() || ""; });
+
+      // Normalize dates
+      if (obj.conclusionDate) obj.conclusionDate = parseDate(obj.conclusionDate);
+      if (obj.executionDateFrom) obj.executionDateFrom = parseDate(obj.executionDateFrom);
+      if (obj.executionDateTo) obj.executionDateTo = parseDate(obj.executionDateTo);
+
+      // Normalize transformation
+      if (obj.transformation !== undefined) obj.transformation = ["true","yes","oui","1"].includes(String(obj.transformation).toLowerCase().trim());
+
+      // Normalize priceType
+      if (obj.priceType) {
+        const pt = obj.priceType.toLowerCase().trim();
+        if (pt === "flat" || pt === "fixe" || pt === "fixed") obj.priceType = "flat";
+        else if (pt === "prime" || pt === "premium" || pt === "basis") obj.priceType = "prime";
+        else { unknowns[`priceType:${obj.priceType}`] = { fieldKey: "priceType", fieldLabel: "Price Type", value: obj.priceType, allowed: ["flat", "premium"] }; }
+      }
+
+      // Validate contractType against config
+      if (obj.contractType) {
+        const types = config.contractTypes || [];
+        const found = types.find(t => t.label?.toLowerCase() === obj.contractType.toLowerCase() || t.value?.toLowerCase() === obj.contractType.toLowerCase());
+        if (found) obj.contractType = found.label;
+        else unknowns[`contractType:${obj.contractType}`] = { fieldKey: "contractType", fieldLabel: "Contract Type", value: obj.contractType, allowed: types.map(t => t.label) };
+      }
+
+      // Validate status
+      if (obj.status) {
+        const statuses = config.contractStatuses || [];
+        const found = statuses.find(s => (s.label || s.value)?.toLowerCase() === obj.status.toLowerCase());
+        if (found) obj.status = found.label || found.value;
+        else unknowns[`status:${obj.status}`] = { fieldKey: "status", fieldLabel: "Status", value: obj.status, allowed: statuses.map(s => s.label || s.value) };
+      }
+
+      // Validate commodity
+      if (obj.commodity) {
+        const comms = config.contractCommodities || [];
+        const found = comms.find(c => c.label?.toLowerCase() === obj.commodity.toLowerCase() || c.value?.toLowerCase() === obj.commodity.toLowerCase());
+        if (found) obj.commodity = found.label;
+        else unknowns[`commodity:${obj.commodity}`] = { fieldKey: "commodity", fieldLabel: "Commodity", value: obj.commodity, allowed: comms.map(c => c.label) };
+      }
+
+      // Validate incoterm
+      if (obj.incoterm) {
+        const incos = config.contractIncoterms || [];
+        const found = incos.find(i => i.label?.toLowerCase() === obj.incoterm.toLowerCase());
+        if (found) obj.incoterm = found.label;
+        else unknowns[`incoterm:${obj.incoterm}`] = { fieldKey: "incoterm", fieldLabel: "Incoterm", value: obj.incoterm, allowed: incos.map(i => i.label) };
+      }
+
+      // Validate paymentTerms
+      if (obj.paymentTerms) {
+        const terms = config.contractPaymentTerms || [];
+        const found = terms.find(t => t.label?.toLowerCase() === obj.paymentTerms.toLowerCase());
+        if (found) obj.paymentTerms = found.label;
+        else unknowns[`paymentTerms:${obj.paymentTerms}`] = { fieldKey: "paymentTerms", fieldLabel: "Payment Terms", value: obj.paymentTerms, allowed: terms.map(t => t.label) };
+      }
+
+      // Validate originCountry / destinationCountry
+      ["originCountry", "destinationCountry"].forEach(field => {
+        if (obj[field]) {
+          const countries = config.country || [];
+          const found = countries.find(c => c.label?.toLowerCase() === obj[field].toLowerCase() || c.value?.toLowerCase() === obj[field].toLowerCase());
+          if (found) obj[field] = found.value;
+          else unknowns[`${field}:${obj[field]}`] = { fieldKey: field, fieldLabel: field === "originCountry" ? "Origin Country" : "Destination Country", value: obj[field], allowed: countries.map(c => c.label) };
+        }
+      });
+
+      // Validate qtyUnit
+      if (obj.qtyUnit) {
+        const units = config.contractVolumeUnits || [];
+        const found = units.find(u => u.display?.toLowerCase() === obj.qtyUnit.toLowerCase() || u.name?.toLowerCase() === obj.qtyUnit.toLowerCase());
+        if (found) obj.qtyUnit = found.display;
+        else unknowns[`qtyUnit:${obj.qtyUnit}`] = { fieldKey: "qtyUnit", fieldLabel: "Qty Unit", value: obj.qtyUnit, allowed: units.map(u => `${u.display} (${u.name})`) };
+      }
+
+      // Validate qtyTolerance
+      if (obj.qtyTolerance !== undefined && obj.qtyTolerance !== "") {
+        const t = String(obj.qtyTolerance).replace(/[%±]/g,"").trim();
+        if (!["0","5","10"].includes(t)) unknowns[`qtyTolerance:${obj.qtyTolerance}`] = { fieldKey: "qtyTolerance", fieldLabel: "Tolérance", value: obj.qtyTolerance, allowed: ["0%", "5%", "10%"] };
+        else obj.qtyTolerance = t;
+      }
+
+      // Validate required fields
+      CONTRACT_REQUIRED_FIELDS.forEach(key => {
+        if (!obj[key] || String(obj[key]).trim() === "") {
+          const labels = { contractNumber: "Contract Number", contractType: "Contract Type", conclusionDate: "Conclusion Date", buyerId: "Buyer", sellerId: "Seller", commodity: "Commodity" };
+          const uKey = `missing_${key}`;
+          if (!unknowns[uKey]) unknowns[uKey] = { fieldKey: key, fieldLabel: labels[key] || key, value: "(vide)", missingRequired: true };
+        }
+      });
+
+      return obj;
+    });
+
+    const allUnknowns = Object.values(unknowns);
+    if (allUnknowns.length > 0) {
+      setUnknownQueue(allUnknowns); setCurrentQueueIdx(0); setDecisions({}); setParsedItems(items); setStep("validate");
+    } else {
+      onImport(items); setImporting(false); onClose();
+    }
+    setImporting(false);
+  };
+
+  const handleDecision = (decision) => {
+    const key = `${currentItem.configKey || currentItem.fieldKey}:${currentItem.value}`;
+    const newDecisions = { ...decisions, [key]: decision };
+    setDecisions(newDecisions);
+    if (currentQueueIdx + 1 < unknownQueue.length) {
+      setCurrentQueueIdx(i => i + 1);
+    } else {
+      // Apply decisions and import
+      const resolved = parsedItems.map(obj => {
+        const out = { ...obj };
+        unknownQueue.forEach(u => {
+          if (u.missingRequired) return;
+          const k = `${u.configKey || u.fieldKey}:${u.value}`;
+          const dec = newDecisions[k];
+          if (dec === "skip" && out[u.fieldKey] === u.value) out[u.fieldKey] = "";
+          // "add" keeps value as-is
+        });
+        // Remove rows with missing required fields if decision was skip
+        return out;
+      }).filter(obj => {
+        return CONTRACT_REQUIRED_FIELDS.every(key => {
+          const uKey = `missing_${key}`;
+          const hasMissing = !obj[key] || String(obj[key]).trim() === "";
+          return !hasMissing; // rows with missing required fields are dropped
+        });
+      });
+      onImport(resolved);
+      onClose();
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#00000099", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 680, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <img src="/logoxl.png" style={{ width: 28, height: 28, objectFit: "contain" }} />
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>Import Contracts</div>
+              <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>Import depuis Excel / CSV</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
+        </div>
+
+        {/* Step: Upload */}
+        {step === "upload" && (
+          <div>
+            {fileLoading ? (
+              <div style={{ border: `2px dashed ${COLORS.border}`, borderRadius: 14, padding: "48px 24px", textAlign: "center" }}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>⟳</div>
+                <div style={{ color: COLORS.text, fontSize: 15, fontWeight: 600 }}>Lecture du fichier…</div>
+              </div>
+            ) : (
+              <div onClick={() => fileRef.current.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); }}
+                style={{ border: `2px dashed ${COLORS.border}`, borderRadius: 14, padding: "48px 24px", textAlign: "center", cursor: "pointer" }}
+                onMouseOver={e => e.currentTarget.style.borderColor = COLORS.accent} onMouseOut={e => e.currentTarget.style.borderColor = COLORS.border}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>📂</div>
+                <div style={{ color: COLORS.text, fontSize: 15, fontWeight: 600 }}>Glissez votre fichier ici</div>
+                <div style={{ color: COLORS.textSub, fontSize: 13, marginTop: 6 }}>ou cliquez pour parcourir (.xlsx, .xls, .csv)</div>
+              </div>
+            )}
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); }} />
+            {error && <div style={{ marginTop: 14, padding: "10px 14px", background: `${COLORS.red}15`, borderRadius: 8, color: COLORS.red, fontSize: 13 }}>{error}</div>}
+
+            {/* Field guide */}
+            <div style={{ marginTop: 24, background: COLORS.bg, borderRadius: 12, padding: "14px 18px", border: `1px solid ${COLORS.border}` }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.5, marginBottom: 10 }}>COLONNES RECONNUES AUTOMATIQUEMENT</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {[
+                  { f: "contractNumber", l: "Contract Number", req: true },
+                  { f: "contractType", l: "Contract Type", req: true },
+                  { f: "conclusionDate", l: "Conclusion Date", req: true },
+                  { f: "buyerId", l: "Buyer", req: true },
+                  { f: "sellerId", l: "Seller", req: true },
+                  { f: "commodity", l: "Commodity", req: true },
+                  { f: "status", l: "Status" },
+                  { f: "executionDateFrom", l: "Exec From" },
+                  { f: "executionDateTo", l: "Exec To" },
+                  { f: "brokerId", l: "Broker" },
+                  { f: "priceType", l: "Price Type" },
+                  { f: "flatPrice", l: "Flat Price" },
+                  { f: "premium", l: "Premium" },
+                  { f: "incoterm", l: "Incoterm" },
+                  { f: "paymentTerms", l: "Payment Terms" },
+                  { f: "originCountry", l: "Origin" },
+                  { f: "destinationCountry", l: "Destination" },
+                  { f: "qtyValue", l: "Quantity" },
+                  { f: "qtyUnit", l: "Qty Unit" },
+                  { f: "qtyTolerance", l: "Tolerance" },
+                  { f: "transformation", l: "Transformation" },
+                ].map(({ l, req }) => (
+                  <span key={l} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5,
+                    background: req ? `${COLORS.red}15` : `${COLORS.accent}10`,
+                    color: req ? COLORS.red : COLORS.textMuted,
+                    border: `1px solid ${req ? COLORS.red+"30" : COLORS.border}` }}>
+                    {l}{req ? " *" : ""}
+                  </span>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 8 }}>* Champs obligatoires</div>
+            </div>
+          </div>
+        )}
+
+        {/* Step: Mapping */}
+        {step === "mapping" && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, padding: "10px 16px", borderRadius: 10,
+              background: `${COLORS.accent}10`, border: `1px solid ${COLORS.accent}30` }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.accent }}>{rawRows.length} lignes détectées — associez les colonnes</span>
+              <span style={{ fontSize: 12, color: COLORS.textSub }}>{Object.values(mapping).filter(Boolean).length} / {headers.length} mappées</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxHeight: 400, overflowY: "auto" }}>
+              {headers.map((h, i) => {
+                const isMapped = !!mapping[i];
+                return (
+                  <div key={i} style={{ background: COLORS.bg, borderRadius: 10, padding: "10px 14px", border: `1px solid ${isMapped ? COLORS.green+"50" : COLORS.border}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, background: isMapped ? COLORS.green : COLORS.textMuted }} />
+                      <div style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600 }}>{h || `Colonne ${i + 1}`}</div>
+                    </div>
+                    <select value={mapping[i] || ""} onChange={e => { const m = { ...mapping }; if (e.target.value) { Object.keys(m).forEach(k => { if (m[k] === e.target.value) delete m[k]; }); m[i] = e.target.value; } else delete m[i]; setMapping(m); }}
+                      style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 10px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
+                      <option value="">— Ignorer —</option>
+                      {allFields.map(f => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>Ex: {rawRows[0]?.[i]?.toString().slice(0, 30) || "—"}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end" }}>
+              <Btn variant="secondary" onClick={() => setStep("upload")}>← Retour</Btn>
+              <Btn onClick={doImport} style={{ background: COLORS.green }}>{importing ? "Analyse…" : `✓ Analyser ${rawRows.length} lignes`}</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* Step: Validate unknowns */}
+        {step === "validate" && currentItem && (
+          <div>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>Validation des valeurs inconnues</span>
+                <span style={{ fontSize: 12, color: COLORS.textSub }}>{currentQueueIdx + 1} / {unknownQueue.length}</span>
+              </div>
+              <div style={{ height: 6, background: COLORS.border, borderRadius: 4 }}>
+                <div style={{ height: 6, background: COLORS.accent, borderRadius: 4, width: `${((currentQueueIdx + 1) / unknownQueue.length) * 100}%`, transition: "width 0.3s" }} />
+              </div>
+            </div>
+            <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.gold}40`, borderRadius: 16, padding: 28, textAlign: "center" }}>
+              <div style={{ fontSize: 13, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, marginBottom: 10 }}>CHAMP : {currentItem.fieldLabel?.toUpperCase()}</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: COLORS.gold, marginBottom: 10, fontFamily: "'Inter', sans-serif" }}>"{currentItem.value}"</div>
+
+              {currentItem.missingRequired ? (
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 20, lineHeight: 1.8 }}>
+                    <span style={{ color: COLORS.orange, fontWeight: 600 }}>⚠ Des lignes n'ont pas de valeur pour le champ obligatoire <strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong>.</span><br />
+                    <span style={{ color: COLORS.textMuted, fontSize: 12 }}>Ces lignes seront ignorées à l'import.</span>
+                  </div>
+                  <button onClick={() => handleDecision("skip")} style={{ padding: "12px 32px", borderRadius: 10, background: `${COLORS.orange}15`, border: `1.5px solid ${COLORS.orange}40`, color: COLORS.orange, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                    OK — Continuer sans ces lignes
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 16, lineHeight: 1.8 }}>
+                    Cette valeur n'existe pas dans <strong style={{ color: COLORS.text }}>Admin Panel → Contracts</strong> pour le champ <strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong>.
+                  </div>
+                  {currentItem.allowed?.length > 0 && (
+                    <div style={{ marginBottom: 20, display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
+                      <div style={{ width: "100%", fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>Valeurs admises :</div>
+                      {currentItem.allowed.map(v => (
+                        <span key={v} style={{ fontSize: 11, padding: "2px 10px", borderRadius: 6, background: `${COLORS.green}15`, color: COLORS.green, border: `1px solid ${COLORS.green}30` }}>{v}</span>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                    <button onClick={() => handleDecision("skip")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                      ✗ Vider ce champ
+                    </button>
+                    <button onClick={() => handleDecision("add")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.green}20`, border: `1.5px solid ${COLORS.green}60`, color: COLORS.green, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                      ✓ Importer tel quel
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const EMPTY_CONTRACT = () => ({
   id: null,
   contractNumber: "",
@@ -14660,6 +15060,7 @@ const Contracts = ({ companies = [] }) => {
   const [instruments, setInstruments] = useState([]);
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [form, setForm] = useState(EMPTY_CONTRACT());
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
@@ -15109,6 +15510,10 @@ const Contracts = ({ companies = [] }) => {
         </div>
         <input placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ width: 220, background: COLORS.card, border: `1px solid ${search ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+        <button onClick={() => setShowImport(true)} title="Importer depuis Excel"
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: COLORS.card, cursor: "pointer" }}>
+          <img src="/logoxl.png" style={{ width: 22, height: 22, objectFit: "contain" }} />
+        </button>
         <Btn onClick={openNew}>+ NEW CONTRACT</Btn>
       </div>
 
@@ -15167,6 +15572,20 @@ const Contracts = ({ companies = [] }) => {
         <div style={{ overflowY: "auto", flex: 1 }}>
           <DetailPanel c={selected} />
         </div>
+      )}
+
+      {/* ── Import Modal ── */}
+      {showImport && (
+        <ContractImportModal
+          onClose={() => setShowImport(false)}
+          companies={companies}
+          onImport={(items) => {
+            const nextId = contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;
+            const enriched = items.map((item, i) => ({ ...EMPTY_CONTRACT(), ...item, id: nextId + i, createdAt: new Date().toISOString() }));
+            persist([...contracts, ...enriched]);
+            setShowImport(false);
+          }}
+        />
       )}
 
       {/* ── Create / Edit Modal ── */}

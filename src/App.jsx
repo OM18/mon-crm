@@ -4233,6 +4233,8 @@ while (true) {
       // Notify Derivatives component to reload from Supabase so its in-memory state
       // matches what the batch just wrote — fixes the wrong-op-in-detail-panel bug
       window.__derivativesNeedsReload = true;
+      // Small delay to ensure Supabase has committed all updates before reloading
+      await new Promise(r => setTimeout(r, 800));
       window.dispatchEvent(new CustomEvent("derivatives:reload"));
       setBatchState("done");
     } catch (err) {
@@ -11886,7 +11888,7 @@ const setOps = async (val) => {
                     const currency = (product?.currency || "").toUpperCase();
                     const sym = CURRENCY_SYMBOLS[currency] || currency;
                     const autoFees = computeFees(o, exchangeTarifs);
-                    const hasManual = o.fees !== undefined && o.fees !== "";
+                    const hasManual = o.fees !== undefined && o.fees !== null && o.fees !== "" && o.fees !== 0 && o.fees !== false;
                     const displayVal = hasManual ? o.fees : autoFees;
                     const editingFees = o.id && editingFeesId === o.id;
                     return (
@@ -11977,7 +11979,7 @@ const setOps = async (val) => {
             const currency = (product?.currency || "").toUpperCase();
             const sym = CURRENCY_SYMBOLS[currency] || currency;
             const autoFees = computeFees(sel, exchangeTarifs);
-            const hasManual = sel.fees !== undefined && sel.fees !== "";
+            const hasManual = sel.fees !== undefined && sel.fees !== null && sel.fees !== "" && sel.fees !== 0 && sel.fees !== false;
             const displayVal = hasManual ? sel.fees : autoFees;
             return (
               <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: "8px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>

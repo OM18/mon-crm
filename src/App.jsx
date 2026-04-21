@@ -14649,6 +14649,8 @@ const EMPTY_CONTRACT = () => ({
   qtyUnit: "",
   qtyTolerance: "10",
   qtyToleranceOption: "BUYER OPTION",
+  qtyEstimated: "",
+  qtyFinal: "",
   createdAt: "",
 });
 
@@ -15055,6 +15057,10 @@ const Contracts = ({ companies = [] }) => {
               ? <span>{c.qtyTolerance === "0" ? "=0%" : `±${c.qtyTolerance}%`}{c.qtyTolerance !== "0" && c.qtyToleranceOption ? ` · ${c.qtyToleranceOption}` : ""}</span>
               : null}
           </DRow>
+          {(c.qtyEstimated || c.qtyFinal) && <>
+            <DRow label="Estimated Qty">{c.qtyEstimated ? `${parseFloat(c.qtyEstimated).toFixed(2)}${c.qtyUnit ? " " + c.qtyUnit : ""}` : "—"}</DRow>
+            <DRow label="Final Qty">{c.qtyFinal ? `${parseFloat(c.qtyFinal).toFixed(2)}${c.qtyUnit ? " " + c.qtyUnit : ""}` : "—"}</DRow>
+          </>}
 
           <Sec label="Exécution" />
           <div style={{ gridColumn: "1 / 3" }}>
@@ -15645,6 +15651,26 @@ const Contracts = ({ companies = [] }) => {
                 </div>
               </div>
             )}
+
+            {/* Estimated Quantity */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Estimated Quantity</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="number" step="0.01" min="0" value={form.qtyEstimated || ""} onChange={e => f("qtyEstimated", e.target.value)} placeholder="ex : 5000.00"
+                  style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, fontFamily: "'DM Mono', monospace", outline: "none", boxSizing: "border-box" }} />
+                {form.qtyUnit && <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.textSub, minWidth: 30 }}>{form.qtyUnit}</span>}
+              </div>
+            </div>
+
+            {/* Final Quantity */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Final Quantity</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="number" step="0.01" min="0" value={form.qtyFinal || ""} onChange={e => f("qtyFinal", e.target.value)} placeholder="ex : 5000.00"
+                  style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 14, fontFamily: "'DM Mono', monospace", outline: "none", boxSizing: "border-box" }} />
+                {form.qtyUnit && <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.textSub, minWidth: 30 }}>{form.qtyUnit}</span>}
+              </div>
+            </div>
 
             {/* Confirm */}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>

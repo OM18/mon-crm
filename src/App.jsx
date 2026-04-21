@@ -4103,6 +4103,13 @@ while (true) {
         const { op } = updatedList[i];
         let supabaseId = supabaseRowByOpId[String(op.id)]
           || supabaseRowByRef[(op.ref || "").toLowerCase().trim()];
+        // Debug ref 6360 persist step
+        if (String(op.ref) === "6360") {
+          console.log(`[DEBUG-6360-PERSIST] op.id="${op.id}" op.ref="${op.ref}" supabaseId="${supabaseId}"`);
+          console.log(`[DEBUG-6360-PERSIST] supabaseRowByOpId lookup: key="${String(op.id)}" → ${supabaseRowByOpId[String(op.id)]}`);
+          console.log(`[DEBUG-6360-PERSIST] supabaseRowByRef lookup: key="${(op.ref||"").toLowerCase().trim()}" → ${supabaseRowByRef[(op.ref||"").toLowerCase().trim()]}`);
+          console.log(`[DEBUG-6360-PERSIST] existingData:`, currentDataBySupabaseId[supabaseId] ? "trouvé" : "ABSENT");
+        }
         // Fallback: direct DB lookup by ref if index missed (handles edge cases)
         if (!supabaseId && op.ref) {
           const { data: found } = await supabase.from("derivatives").select("id, data")
@@ -4112,6 +4119,8 @@ while (true) {
             currentDataBySupabaseId[supabaseId] = found[0].data;
           }
         }
+        const isDebugOp = String(op.ref) === "6360";
+        if (isDebugOp) console.log(`[DEBUG-6360-SAVE] supabaseId=${supabaseId} op.id=${op.id} op.ref=${op.ref} op.fees="${op.fees}"`);
         if (supabaseId) {
           // Patch only the fees field on the existing row data — never overwrite ref or other fields
           // This avoids triggering the unique constraint on data->>'ref'
@@ -4121,12 +4130,14 @@ while (true) {
           for (let attempt = 0; attempt < 3; attempt++) {
             if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt));
             const { error } = await supabase.from("derivatives").update({ data: patched }).eq("id", supabaseId);
+            if (isDebugOp) console.log(`[DEBUG-6360-SAVE] attempt ${attempt+1} error=`, error);
             if (!error) { lastError = null; break; }
             lastError = error;
             if (!error.message?.includes("fetch")) break;
           }
           if (lastError) saveErrors.push({ ref: op.ref || op.id, error: lastError.message });
         } else {
+          if (isDebugOp) console.log(`[DEBUG-6360-SAVE] supabaseId NOT FOUND — byOpId key="${String(op.id)}" byRef key="${(op.ref||"").toLowerCase().trim()}"`);
           saveErrors.push({ ref: op.ref || op.id, error: `Row Supabase introuvable — cherché id="${String(op.id)}" ref="${op.ref}" (aucune donnée perdue)` });
         }
         if (i % 20 === 0) setBatchProgress({ phase: "Mise à jour en base…", done: i, total: updatedList.length });

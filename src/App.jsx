@@ -4202,31 +4202,42 @@ while (true) {
         if (ref) dataByRef[ref] = { supabaseId: r.id, data: r.data };
       }
 
-      setBatchProgress({ phase: "Mise à jour en base…", done: 0, total: updatedList.length });
-      for (let i = 0; i < updatedList.length; i++) {
-        const { op } = updatedList[i];
+      // Prepare all rows to update: { id (supabase row id), data (patched) }
+      const rowsToUpdate = [];
+      for (const { op } of updatedList) {
         const refKey = String(op.ref ?? "").trim();
-        let entry = dataByRef[refKey];
-
-        // Fallback: direct DB query by ref if not in index
-        if (!entry && refKey) {
-          const { data: found } = await supabase.from("derivatives").select("id, data")
-            .eq("data->>ref", refKey).limit(1);
-          if (found && found.length > 0) {
-            entry = { supabaseId: found[0].id, data: found[0].data };
-          }
-        }
-
+        const entry = dataByRef[refKey];
         if (entry) {
-          const patched = { ...entry.data, fees: op.fees };
-          const { error } = await supabase.from("derivatives")
-            .update({ data: patched })
-            .eq("id", entry.supabaseId);
-          if (error) saveErrors.push({ ref: refKey, error: error.message });
+          rowsToUpdate.push({ id: entry.supabaseId, data: { ...entry.data, fees: op.fees } });
         } else {
           saveErrors.push({ ref: refKey, error: `Row introuvable pour ref="${refKey}"` });
         }
-        if (i % 20 === 0) setBatchProgress({ phase: "Mise à jour en base…", done: i, total: updatedList.length });
+      }
+
+      // Bulk upsert by supabase row id — much faster than individual UPDATEs
+      // Supabase upsert on 'id' (the serial PK) patches existing rows without insert
+      const CHUNK = 50;
+      setBatchProgress({ phase: "Mise à jour en base…", done: 0, total: rowsToUpdate.length });
+      for (let i = 0; i < rowsToUpdate.length; i += CHUNK) {
+        const chunk = rowsToUpdate.slice(i, i + CHUNK);
+        let lastError = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (attempt > 0) await new Promise(r => setTimeout(r, 800 * attempt));
+          const { error } = await supabase.from("derivatives")
+            .upsert(chunk, { onConflict: "id", ignoreDuplicates: false });
+          if (!error) { lastError = null; break; }
+          lastError = error;
+        }
+        if (lastError) {
+          // Fallback: update individually for this chunk
+          for (const row of chunk) {
+            const { error: e2 } = await supabase.from("derivatives")
+              .update({ data: row.data }).eq("id", row.id);
+            if (e2) saveErrors.push({ ref: row.data?.ref || row.id, error: e2.message });
+          }
+        }
+        setBatchProgress({ phase: "Mise à jour en base…", done: Math.min(i + CHUNK, rowsToUpdate.length), total: rowsToUpdate.length });
+        if (i + CHUNK < rowsToUpdate.length) await new Promise(r => setTimeout(r, 200));
       }
 
       setBatchReport({ total: euronextOps.length, updated: updatedList.length, errors: [...errors, ...saveErrors], updatedList });

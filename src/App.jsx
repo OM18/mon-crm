@@ -14537,14 +14537,23 @@ const Contracts = ({ companies = [] }) => {
         <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textMuted, fontSize: 10, marginTop: 2 }}>ID {c.id}</span>
       </div>
     );
-    // BUYER / SELLER — 2 lines
+    // BUYER / SELLER — 2 lines, dim secondary party based on contract type
     if (key === "buyerSeller") {
       const brokerName = c.brokerId ? (companies.find(co => String(co.id) === String(c.brokerId))?.name || c.brokerId) : null;
+      const isPurchase = /purchase|buy|achat|acqui/i.test((c.contractType || "").toLowerCase());
+      const isSale     = /sale|sell|vente/i.test((c.contractType || "").toLowerCase());
+      // For purchase: buyer is primary → seller dimmed. For sale: seller is primary → buyer dimmed.
+      const buyerPrimary  = isPurchase || (!isPurchase && !isSale);
+      const sellerPrimary = isSale;
+      const buyerStyle  = { fontSize: buyerPrimary ? 12 : 11, fontWeight: buyerPrimary ? 600 : 400, color: buyerPrimary ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 };
+      const sellerStyle = { fontSize: sellerPrimary ? 12 : 11, fontWeight: sellerPrimary ? 600 : 400, color: sellerPrimary ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 };
+      // Broker: dim if a primary party exists
+      const brokerDimmed = isPurchase || isSale;
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 }}>{c.buyerId || "—"}</span>
-          <span style={{ fontSize: 12, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 }}>{c.sellerId || "—"}</span>
-          {brokerName && <span style={{ fontSize: 11, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 }}><span style={{ color: COLORS.accent, fontWeight: 700, marginRight: 4 }}>(B)</span>{brokerName}</span>}
+          <span style={buyerStyle}>{c.buyerId || "—"}</span>
+          <span style={sellerStyle}>{c.sellerId || "—"}</span>
+          {brokerName && <span style={{ fontSize: 10, color: brokerDimmed ? COLORS.textMuted : COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 195 }}><span style={{ color: COLORS.accent, fontWeight: 700, marginRight: 4 }}>(B)</span>{brokerName}</span>}
         </div>
       );
     }
@@ -14570,7 +14579,7 @@ const Contracts = ({ companies = [] }) => {
       if (!c.contractType) return (
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <span style={{ color: COLORS.textMuted }}>—</span>
-          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{c.conclusionDate}</span>}
+          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.text, fontFamily: "'DM Mono', monospace", paddingLeft: 2 }}>{c.conclusionDate}</span>}
         </div>
       );
       const t = (config.contractTypes || []).find(x => x.label === c.contractType);
@@ -14578,7 +14587,7 @@ const Contracts = ({ companies = [] }) => {
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}20`, color: col, border: `1px solid ${col}40`, whiteSpace: "nowrap", alignSelf: "flex-start" }}>{c.contractType}</span>
-          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{c.conclusionDate}</span>}
+          {c.conclusionDate && <span style={{ fontSize: 10, color: COLORS.text, fontFamily: "'DM Mono', monospace", paddingLeft: 2 }}>{c.conclusionDate}</span>}
         </div>
       );
     }
@@ -14615,12 +14624,19 @@ const Contracts = ({ companies = [] }) => {
           {c.flatPrice ? `${c.flatPrice}${c.flatCurrency ? " " + c.flatCurrency : ""}` : "—"}
         </span>
       );
-      if (c.priceType === "prime") return (
-        <span style={{ fontSize: 12, color: COLORS.text }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.purple, background: `${COLORS.purple}15`, padding: "1px 6px", borderRadius: 4, marginRight: 4 }}>PRIME</span>
-          {c.premium ? `+${c.premium}` : "—"}
-        </span>
-      );
+      if (c.priceType === "prime") {
+        const instrument = c.derivativeId ? instruments.find(p => String(p.id) === String(c.derivativeId)) : null;
+        const instrumentLabel = instrument?.label || instrument?.name || null;
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 12, color: COLORS.text }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.purple, background: `${COLORS.purple}15`, padding: "1px 6px", borderRadius: 4, marginRight: 4 }}>PRIME</span>
+              {c.premium ? `+${c.premium}` : "—"}
+            </span>
+            {instrumentLabel && <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130 }}>{instrumentLabel}</span>}
+          </div>
+        );
+      }
     }
     if (key === "executionPeriod") {
       const from = c.executionDateFrom || "";
@@ -14630,8 +14646,8 @@ const Contracts = ({ companies = [] }) => {
       const labelColor = periodLabel === "LOADING" ? COLORS.blue : COLORS.purple;
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {from && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.text, whiteSpace: "nowrap" }}>{from}</span>}
-          {to   && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: COLORS.text, whiteSpace: "nowrap" }}>{to}</span>}
+          {from && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: COLORS.text, whiteSpace: "nowrap" }}>{from}</span>}
+          {to   && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: COLORS.text, whiteSpace: "nowrap" }}>{to}</span>}
           {periodLabel && (
             <span style={{ fontSize: 10, fontWeight: 700, color: labelColor, background: `${labelColor}18`, padding: "1px 6px", borderRadius: 3, border: `1px solid ${labelColor}40`, whiteSpace: "nowrap", alignSelf: "flex-start", marginTop: 1 }}>{periodLabel}{c.withoutExtension ? " · W/O" : ""}</span>
           )}

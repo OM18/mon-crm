@@ -3871,7 +3871,6 @@ const BatchEuronextFees = () => {
 
       const norm = v => (v || "").toString().toLowerCase().trim();
 
-      const DEBUG_REFS = new Set(["2199", "6360"]);
 
       const computeFeesForOp = (op, tarifs, prods) => {
         const opBroker = norm(op.broker);
@@ -3887,7 +3886,6 @@ const BatchEuronextFees = () => {
         // Normalize tradeDate to yyyy-mm-dd for ISO comparison with validFrom/validTo
         const toISO = d => { if (!d) return ""; if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d; const p = d.split(/[./]/); if (p.length === 3 && p[2].length === 4) return `${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`; return d; };
         const tradeDate = toISO(rawTradeDate);
-        const isDebug = DEBUG_REFS.has(String(op.ref));
 
         const matching = tarifs.filter(t => {
           const brokers = Array.isArray(t.financialBroker) ? t.financialBroker : [t.financialBroker];
@@ -3901,10 +3899,6 @@ const BatchEuronextFees = () => {
           const dateTo = t.validTo || "";
           const dateMatch = (!dateFrom || tradeDate >= dateFrom) && (!dateTo || tradeDate <= dateTo);
           const allMatch = brokerMatch && exchangeMatch && transMatch && opTypeMatch && dateMatch;
-          if (isDebug) {
-            const status = allMatch ? "✅ MATCH" : `❌ FAIL(broker=${brokerMatch},exch=${exchangeMatch},trans=${transMatch},opType=${opTypeMatch},date=${dateMatch})`;
-            console.log(`[DEBUG] ref=${op.ref} ${status} | ${t.tarifType} ${t.tarif}€ | broker=${brokers.join(",")} | exch=${t.exchange} | from=${dateFrom} to=${dateTo}`);
-          }
           return allMatch;
         });
 
@@ -3968,22 +3962,6 @@ const BatchEuronextFees = () => {
         if (partialMatch?.stoxxExchange) return norm(partialMatch.stoxxExchange);
         return norm(op.exchange || "");
       };
-      // Debug: find ref 6360 (try multiple formats)
-      const op6360 = allOps.find(op => String(op.ref).trim() === "6360" || String(op.id).trim() === "6360");
-      if (op6360) {
-        const ex = resolveExchange(op6360);
-        console.log(`[DEBUG-6360] TROUVÉE — instrument="${op6360.instrument}" exchange="${op6360.exchange}" resolved="${ex}" → ${ex.includes("euronext") ? "INCLUSE" : "EXCLUE du filtre Euronext"}`);
-        const prodMatch = allProducts.find(p => norm(p.label) === norm(op6360.instrument));
-        console.log(`[DEBUG-6360] product exact match:`, prodMatch ? prodMatch.label : "AUCUN — instrument stocké: " + JSON.stringify(op6360.instrument));
-        console.log(`[DEBUG-6360] broker="${op6360.broker}" opType="${op6360.opType}" trans="${op6360.orderTransmissionType}" tradeDate="${op6360.tradeDate}" fees="${op6360.fees}"`);
-      } else {
-        // Show a sample of refs to understand the format
-        const sample = allOps.slice(0, 5).map(op => `ref=${JSON.stringify(op.ref)} id=${JSON.stringify(op.id)}`).join(" | ");
-        console.log("[DEBUG-6360] INTROUVABLE. Total ops chargées:", allOps.length, "| Exemples:", sample);
-        // Try to find anything close to 6360
-        const close = allOps.find(op => String(op.ref).includes("6360") || String(op.id).includes("6360"));
-        if (close) console.log("[DEBUG-6360] Proche trouvé:", JSON.stringify({ref: close.ref, id: close.id, instrument: close.instrument}));
-      }
       const euronextOps = allOps.filter(op => resolveExchange(op).includes("euronext"));
 
       if (euronextOps.length === 0) {
@@ -4103,13 +4081,6 @@ while (true) {
         const { op } = updatedList[i];
         let supabaseId = supabaseRowByOpId[String(op.id)]
           || supabaseRowByRef[(op.ref || "").toLowerCase().trim()];
-        // Debug ref 6360 persist step
-        if (String(op.ref) === "6360") {
-          console.log(`[DEBUG-6360-PERSIST] op.id="${op.id}" op.ref="${op.ref}" supabaseId="${supabaseId}"`);
-          console.log(`[DEBUG-6360-PERSIST] supabaseRowByOpId lookup: key="${String(op.id)}" → ${supabaseRowByOpId[String(op.id)]}`);
-          console.log(`[DEBUG-6360-PERSIST] supabaseRowByRef lookup: key="${(op.ref||"").toLowerCase().trim()}" → ${supabaseRowByRef[(op.ref||"").toLowerCase().trim()]}`);
-          console.log(`[DEBUG-6360-PERSIST] existingData:`, currentDataBySupabaseId[supabaseId] ? "trouvé" : "ABSENT");
-        }
         // Fallback: direct DB lookup by ref if index missed (handles edge cases)
         if (!supabaseId && op.ref) {
           const { data: found } = await supabase.from("derivatives").select("id, data")
@@ -4119,8 +4090,6 @@ while (true) {
             currentDataBySupabaseId[supabaseId] = found[0].data;
           }
         }
-        const isDebugOp = String(op.ref) === "6360";
-        if (isDebugOp) console.log(`[DEBUG-6360-SAVE] supabaseId=${supabaseId} op.id=${op.id} op.ref=${op.ref} op.fees="${op.fees}"`);
         if (supabaseId) {
           // Patch only the fees field on the existing row data — never overwrite ref or other fields
           // This avoids triggering the unique constraint on data->>'ref'
@@ -4130,14 +4099,12 @@ while (true) {
           for (let attempt = 0; attempt < 3; attempt++) {
             if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt));
             const { error } = await supabase.from("derivatives").update({ data: patched }).eq("id", supabaseId);
-            if (isDebugOp) console.log(`[DEBUG-6360-SAVE] attempt ${attempt+1} error=`, error);
             if (!error) { lastError = null; break; }
             lastError = error;
             if (!error.message?.includes("fetch")) break;
           }
           if (lastError) saveErrors.push({ ref: op.ref || op.id, error: lastError.message });
         } else {
-          if (isDebugOp) console.log(`[DEBUG-6360-SAVE] supabaseId NOT FOUND — byOpId key="${String(op.id)}" byRef key="${(op.ref||"").toLowerCase().trim()}"`);
           saveErrors.push({ ref: op.ref || op.id, error: `Row Supabase introuvable — cherché id="${String(op.id)}" ref="${op.ref}" (aucune donnée perdue)` });
         }
         if (i % 20 === 0) setBatchProgress({ phase: "Mise à jour en base…", done: i, total: updatedList.length });
@@ -4146,6 +4113,7 @@ while (true) {
       setBatchReport({ total: euronextOps.length, updated: updatedList.length, errors: [...errors, ...saveErrors], updatedList });
       // Notify Derivatives component to reload from Supabase so its in-memory state
       // matches what the batch just wrote — fixes the wrong-op-in-detail-panel bug
+      window.__derivativesNeedsReload = true;
       window.dispatchEvent(new CustomEvent("derivatives:reload"));
       setBatchState("done");
     } catch (err) {
@@ -11381,6 +11349,11 @@ const setOps = async (val) => {
   const totalNominal = ops.filter(o => o.quantity && o.price).reduce((s, o) => s + Number(o.quantity) * Number(o.price), 0);
 
   useEffect(() => {
+    // If batch ran while this component was unmounted, reload immediately on mount
+    if (window.__derivativesNeedsReload) {
+      window.__derivativesNeedsReload = false;
+      reloadOps();
+    }
     const handler = () => reloadOps();
     window.addEventListener("derivatives:reload", handler);
     return () => window.removeEventListener("derivatives:reload", handler);

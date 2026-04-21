@@ -3854,11 +3854,15 @@ const BatchEuronextFees = () => {
 
       const norm = v => (v || "").toString().toLowerCase().trim();
 
-      const DEBUG_REFS = new Set(["2199"]);
+      const DEBUG_REFS = new Set(["2199", "6360"]);
 
       const computeFeesForOp = (op, tarifs, prods) => {
         const opBroker = norm(op.broker);
-        const resolvedExchange = prods.find(p => norm(p.label) === norm(op.instrument))?.stoxxExchange || op.exchange || "";
+        // Use partial label match so expired/renamed instruments still resolve their exchange
+        const instrNorm = norm(op.instrument);
+        const exactProd = prods.find(p => norm(p.label) === instrNorm);
+        const partialProd = !exactProd ? prods.find(p => { const pl = norm(p.label); return pl && instrNorm && (pl.includes(instrNorm) || instrNorm.includes(pl)); }) : null;
+        const resolvedExchange = (exactProd || partialProd)?.stoxxExchange || op.exchange || "";
         const opExchange = norm(resolvedExchange);
         const opTrans = norm(op.orderTransmissionType);
         const opOpType = norm(op.opType);
@@ -3934,10 +3938,20 @@ const BatchEuronextFees = () => {
       };
 
       // 4. Filter Euronext ops
-      const euronextOps = allOps.filter(op => {
-        const resolvedEx = allProducts.find(p => norm(p.label) === norm(op.instrument))?.stoxxExchange || op.exchange || "";
-        return norm(resolvedEx).includes("euronext");
-      });
+      // Use partial label match (same logic as computeFeesForOp) so ops whose instrument
+      // label doesn't exactly match a product (e.g. expired contracts) aren't silently skipped.
+      const resolveExchange = (op) => {
+        const instrNorm = norm(op.instrument);
+        const exactMatch = allProducts.find(p => norm(p.label) === instrNorm);
+        if (exactMatch?.stoxxExchange) return norm(exactMatch.stoxxExchange);
+        const partialMatch = allProducts.find(p => {
+          const pl = norm(p.label);
+          return pl && instrNorm && (pl.includes(instrNorm) || instrNorm.includes(pl));
+        });
+        if (partialMatch?.stoxxExchange) return norm(partialMatch.stoxxExchange);
+        return norm(op.exchange || "");
+      };
+      const euronextOps = allOps.filter(op => resolveExchange(op).includes("euronext"));
 
       if (euronextOps.length === 0) {
         setBatchReport({ updated: 0, errors: [], total: 0, message: "Aucune opération Euronext trouvée." });
@@ -10883,7 +10897,10 @@ const [exchangeTarifs, setExchangeTarifs] = useState([]);
       if (!tarifs || tarifs.length === 0 || !op) return "";
       const norm = v => (v || "").toString().toLowerCase().trim();
       const opBroker = norm(op.broker);
-      const resolvedExchange = products.find(p => norm(p.label) === norm(op.instrument))?.stoxxExchange || op.exchange || "";
+      const instrNorm = norm(op.instrument);
+      const exactProd = products.find(p => norm(p.label) === instrNorm);
+      const partialProd = !exactProd ? products.find(p => { const pl = norm(p.label); return pl && instrNorm && (pl.includes(instrNorm) || instrNorm.includes(pl)); }) : null;
+      const resolvedExchange = (exactProd || partialProd)?.stoxxExchange || op.exchange || "";
       const opExchange = norm(resolvedExchange);
       const opTrans = norm(op.orderTransmissionType);
       const opOpType = norm(op.opType);

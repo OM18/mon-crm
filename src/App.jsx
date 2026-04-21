@@ -11160,17 +11160,17 @@ useEffect(() => {
       return all;
     }
 
-    // ✅ Toutes les requêtes en parallèle — 1 aller-retour au lieu de 5 séquentiels
-    // Si les ops sont déjà chargées via le cache global, on les skippe
-    const fetchOps = !initialOps || initialOps.length === 0;
+    // ✅ Toutes les requêtes en parallèle
+    // On utilise initialOps comme affichage immédiat, mais on recharge toujours depuis Supabase
+    // pour avoir les données fraîches (fees recalculées par batch, etc.)
+    if (initialOps && initialOps.length > 0) setOpsRaw(initialOps); // affichage immédiat
+
     const [prods, accounts, lots, tarifs, opsData] = await Promise.all([
       supabase.from('deriv_products').select('data').then(r => r.data || []),
       supabase.from('deriv_accounts').select('*').then(r => r.data || []),
       supabase.from('deriv_lot_sizes').select('data').then(r => r.data || []),
       supabase.from('deriv_exchange_tarifs').select('data').then(r => r.data || []),
-      fetchOps
-        ? loadAllPages(supabase.from('derivatives').select('data').order('id', { ascending: true }))
-        : Promise.resolve([]),
+      loadAllPages(supabase.from('derivatives').select('data').order('id', { ascending: true })),
     ]);
 
     if (prods.length) setProducts(prods.map(r => r.data ?? r));
@@ -11183,7 +11183,7 @@ useEffect(() => {
     }));
     if (lots.length) setLotSizes(lots.map(r => r.data ?? r));
     if (tarifs.length) setExchangeTarifs(tarifs.map(r => r.data ?? r));
-    if (opsData.length) setOpsRaw(opsData);
+    if (opsData.length) setOpsRaw(opsData); // override avec données fraîches
   }
   loadAllDerivativesData();
 }, []);

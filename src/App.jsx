@@ -4759,6 +4759,102 @@ const ContractIncotermsEditor = ({ config, updateField }) => {
   );
 };
 
+
+// ─── CONTRACT VOLUME UNITS EDITOR ────────────────────────────
+const ContractVolumeUnitsEditor = ({ config, updateField }) => {
+  const items = Array.isArray(config.contractVolumeUnits) ? config.contractVolumeUnits : [];
+  const [localItems, setLocalItems] = useState(items);
+  const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDisplay, setNewDisplay] = useState('');
+
+  useEffect(() => {
+    setLocalItems(Array.isArray(config.contractVolumeUnits) ? config.contractVolumeUnits : []);
+    setDirty(false);
+  }, [config.contractVolumeUnits]);
+
+  const mark = (next) => { setLocalItems(next); setDirty(true); };
+  const add = () => {
+    if (!newName.trim() || !newDisplay.trim()) return;
+    if (localItems.find(i => i.name === newName.trim())) return;
+    mark([...localItems, { id: Date.now(), name: newName.trim(), display: newDisplay.trim() }]);
+    setNewName(''); setNewDisplay('');
+  };
+  const save = (e) => { e.stopPropagation(); updateField('contractVolumeUnits', localItems); setDirty(false); };
+
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + '60' : COLORS.border}`, borderRadius: 14, overflow: 'hidden', transition: 'border-color 0.2s' }}>
+      <div onClick={() => setExpanded(e => !e)}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', cursor: 'pointer', userSelect: 'none' }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
+        onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>⚖</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Contract Volume Units</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Unités de volume pour les quantités (ex : TON / T, MT / MT…)</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: '3px 10px', borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+            {localItems.length > 0 ? `${localItems.length} unité${localItems.length !== 1 ? 's' : ''}` : 'Aucune unité'}
+          </span>
+          {dirty && (
+            <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>✓ Sauvegarder</div>
+          )}
+          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: 'transform 0.2s', display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+        </div>
+      </div>
+      {expanded && (
+        <div style={{ padding: '14px 18px', borderTop: `1px solid ${COLORS.border}` }}>
+          {/* Header */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 36px', gap: 8, marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Nom complet</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Affichage</div>
+            <div />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+            {localItems.map((item, idx) => (
+              <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 36px', gap: 8, alignItems: 'center', background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: '8px 12px' }}>
+                <input value={item.name} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
+                  style={{ background: 'transparent', border: 'none', color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', outline: 'none' }} />
+                <input value={item.display} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, display: e.target.value } : x))}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: COLORS.accent, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', outline: 'none', padding: '3px 8px', textAlign: 'center' }} />
+                <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
+                  style={{ background: 'none', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: 16, lineHeight: 1 }}
+                  onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                  onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+              </div>
+            ))}
+            {localItems.length === 0 && (
+              <div style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: 'italic', padding: '8px 0' }}>Aucune unité définie</div>
+            )}
+          </div>
+          {/* Add row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px auto', gap: 8, alignItems: 'center' }}>
+            <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()}
+              placeholder='Nom (ex : TON, METRIC TON)' maxLength={40}
+              style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: '8px 12px', color: COLORS.text, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+            <input value={newDisplay} onChange={e => setNewDisplay(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()}
+              placeholder='T, MT…' maxLength={10}
+              style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: '8px 12px', color: COLORS.text, fontSize: 13, fontFamily: 'inherit', outline: 'none', textAlign: 'center' }} />
+            <button onClick={add} disabled={!newName.trim() || !newDisplay.trim()}
+              style={{ background: `${COLORS.accent}20`, border: `1px solid ${COLORS.accent}40`, color: COLORS.accent, borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: newName.trim() && newDisplay.trim() ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: newName.trim() && newDisplay.trim() ? 1 : 0.5 }}>
+              + Ajouter
+            </button>
+          </div>
+          {dirty && (
+            <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={save} style={{ background: `${COLORS.green}20`, border: `1px solid ${COLORS.green}40`, color: COLORS.green, borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>✓ Sauvegarder les modifications</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── CONTRACT PAYMENT TERMS EDITOR ───────────────────────────
 const ContractPaymentTermsEditor = ({ config, updateField }) => {
   const items = Array.isArray(config.contractPaymentTerms) ? config.contractPaymentTerms : [];
@@ -6668,6 +6764,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             hasColor={false}
           />
           <ContractPortsEditor config={config} updateField={updateField} />
+          <ContractVolumeUnitsEditor config={config} updateField={updateField} />
           <ContractPaymentTermsEditor config={config} updateField={updateField} />
           <ContractCountryEditor
             configKey="contractOrigins"
@@ -14355,6 +14452,14 @@ const EMPTY_CONTRACT = () => ({
   executionDateTo: "",
   executionPeriodType: "LOADING", // "LOADING" | "ARRIVAL"
   withoutExtension: false,
+  // Quantity
+  qtyType: "single",
+  qtyValue: "",
+  qtyMin: "",
+  qtyMax: "",
+  qtyUnit: "",
+  qtyTolerance: "10",
+  qtyToleranceOption: "BUYER OPTION",
   createdAt: "",
 });
 
@@ -14443,6 +14548,7 @@ const Contracts = ({ companies = [] }) => {
   const [showPeriodPicker, setShowPeriodPicker] = useState(false);
   const [showIncotermPicker, setShowIncotermPicker] = useState(false);
   const [showPaymentTermsPicker, setShowPaymentTermsPicker] = useState(false);
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
 
   const validate = () => {
     const errs = {};
@@ -14509,6 +14615,7 @@ const Contracts = ({ companies = [] }) => {
     { key: "commodity",           label: "Commodity",         w: 120 },
     { key: "incotermPort",        label: "Port",              w: 150 },
     { key: "executionPeriod",     label: "Exec. Period",      w: 95  },
+    { key: "quantity",            label: "Qty",               w: 110 },
     { key: "priceType",           label: "Price",             w: 140 },
     { key: "paymentTerms",        label: "Pmt Terms",         w: 120 },
     { key: "originCountry",       label: "Origin",            w: 110 },
@@ -14616,6 +14723,25 @@ const Contracts = ({ companies = [] }) => {
 
     if (key === "originCountry") return <FlagCell countryVal={c.originCountry} />;
     if (key === "destinationCountry") return <FlagCell countryVal={c.destinationCountry} />;
+    if (key === "quantity") {
+      const hasQty = form => form.qtyValue || form.qtyMin || form.qtyMax;
+      const qtyStr = c.qtyType === "range"
+        ? (c.qtyMin || c.qtyMax ? `${c.qtyMin||"…"} – ${c.qtyMax||"…"}` : null)
+        : (c.qtyValue || null);
+      if (!qtyStr) return <span style={{ color: COLORS.textMuted }}>—</span>;
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}>
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap" }}>
+            {qtyStr} <span style={{ fontSize: 11, color: COLORS.accent }}>{c.qtyUnit || ""}</span>
+          </span>
+          {c.qtyTolerance !== undefined && c.qtyTolerance !== "" && (
+            <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.orange, background: `${COLORS.orange}12`, padding: "1px 6px", borderRadius: 3, border: `1px solid ${COLORS.orange}40`, whiteSpace: "nowrap" }}>
+              {c.qtyTolerance === "0" ? "=0%" : `±${c.qtyTolerance}%`}{c.qtyTolerance !== "0" && c.qtyToleranceOption ? ` · ${c.qtyToleranceOption === "BUYER OPTION" ? "B.O." : "S.O."}` : ""}
+            </span>
+          )}
+        </div>
+      );
+    }
     if (key === "priceType") {
       if (!c.priceType) return <span style={{ color: COLORS.textMuted }}>—</span>;
       if (c.priceType === "flat") return (
@@ -14724,6 +14850,21 @@ const Contracts = ({ companies = [] }) => {
             <DRow label="Instrument">{instrument?.label || c.derivativeId || "—"}</DRow>
           </>}
           <DRow label="Payment Terms">{c.paymentTerms}</DRow>
+
+          <Sec label="Quantité" />
+          <DRow label="Quantity">
+            {(c.qtyValue || c.qtyMin || c.qtyMax) ? (
+              <span style={{ fontFamily: "'DM Mono', monospace" }}>
+                {c.qtyType === "range" ? `${c.qtyMin||"…"} – ${c.qtyMax||"…"}` : c.qtyValue}
+                {c.qtyUnit ? ` ${c.qtyUnit}` : ""}
+              </span>
+            ) : null}
+          </DRow>
+          <DRow label="Tolérance">
+            {c.qtyTolerance !== undefined && c.qtyTolerance !== ""
+              ? <span>{c.qtyTolerance === "0" ? "=0%" : `±${c.qtyTolerance}%`}{c.qtyTolerance !== "0" && c.qtyToleranceOption ? ` · ${c.qtyToleranceOption}` : ""}</span>
+              : null}
+          </DRow>
 
           <Sec label="Exécution" />
           <div style={{ gridColumn: "1 / 3" }}>
@@ -15064,6 +15205,40 @@ const Contracts = ({ companies = [] }) => {
                 )}
               </div>
 
+              <CFSec label="Quantité" />
+              {/* Quantity sub-modal trigger */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <CFL>Quantity</CFL>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
+                  {(form.qtyValue || form.qtyMin || form.qtyMax) ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, background: `${COLORS.accent}10`, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, padding: "7px 12px", flex: 1, flexWrap: "wrap" }}>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: COLORS.accent, fontWeight: 700 }}>
+                        {form.qtyType === "range"
+                          ? `${form.qtyMin || "…"} – ${form.qtyMax || "…"} ${form.qtyUnit || ""}`
+                          : `${form.qtyValue || "…"} ${form.qtyUnit || ""}`}
+                      </span>
+                      {form.qtyTolerance !== undefined && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.orange, background: `${COLORS.orange}12`, padding: "1px 7px", borderRadius: 4, border: `1px solid ${COLORS.orange}40` }}>
+                          ±{form.qtyTolerance}%
+                        </span>
+                      )}
+                      {form.qtyToleranceOption && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, background: COLORS.bg, padding: "1px 7px", borderRadius: 4, border: `1px solid ${COLORS.border}` }}>
+                          {form.qtyToleranceOption}
+                        </span>
+                      )}
+                      <button onClick={() => { f("qtyValue",""); f("qtyMin",""); f("qtyMax",""); }} style={{ marginLeft: "auto", background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16 }}>×</button>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>Aucune quantité définie</div>
+                  )}
+                  <Btn variant="secondary" onClick={() => setShowQuantityModal(true)} style={{ padding: "8px 14px", fontSize: 12 }}>
+                    ⚖ Définir
+                  </Btn>
+                </div>
+              </div>
+
+
               <CFSec label="Logistique" />
               <div>
                 <CFL req>Incoterm</CFL>
@@ -15174,6 +15349,115 @@ const Contracts = ({ companies = [] }) => {
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
               <Btn variant="secondary" onClick={closeModal}>Annuler</Btn>
               <Btn onClick={submit}>{editId !== null ? "✓ Enregistrer" : "✓ Créer le contrat"}</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Quantity Sub-Modal ── */}
+      {showQuantityModal && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000099", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 20 }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 28, width: "100%", maxWidth: 480 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: COLORS.text }}>⚖ Quantity</div>
+              <button onClick={() => setShowQuantityModal(false)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
+            </div>
+
+            {/* Single vs Range toggle */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Type</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[{ v: "single", l: "Valeur unique" }, { v: "range", l: "Fourchette (min / max)" }].map(({ v, l }) => (
+                  <div key={v} onClick={() => f("qtyType", v)}
+                    style={{ flex: 1, padding: "9px 12px", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
+                      border: `1px solid ${form.qtyType === v ? COLORS.accent + "80" : COLORS.border}`,
+                      background: form.qtyType === v ? `${COLORS.accent}18` : COLORS.bg,
+                      color: form.qtyType === v ? COLORS.accent : COLORS.textMuted }}>
+                    {l}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Unit selector */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Unité</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {(config.contractVolumeUnits || []).map(u => (
+                  <div key={u.id} onClick={() => f("qtyUnit", u.display)}
+                    style={{ padding: "7px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
+                      border: `1px solid ${form.qtyUnit === u.display ? COLORS.accent + "80" : COLORS.border}`,
+                      background: form.qtyUnit === u.display ? `${COLORS.accent}20` : COLORS.bg,
+                      color: form.qtyUnit === u.display ? COLORS.accent : COLORS.textMuted }}>
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>{u.display}</span>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 5 }}>({u.name})</span>
+                  </div>
+                ))}
+                {(config.contractVolumeUnits || []).length === 0 && (
+                  <div style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>Aucune unité — configurez-les dans l'Admin Panel</div>
+                )}
+              </div>
+            </div>
+
+            {/* Value fields */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Quantité</div>
+              {form.qtyType === "single" ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input type="number" step="1" min="0" value={form.qtyValue || ""} onChange={e => f("qtyValue", e.target.value)} placeholder="ex : 5000"
+                    style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 15, fontWeight: 700, fontFamily: "'DM Mono', monospace", outline: "none", boxSizing: "border-box" }} />
+                  {form.qtyUnit && <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.accent, minWidth: 30 }}>{form.qtyUnit}</span>}
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input type="number" step="1" min="0" value={form.qtyMin || ""} onChange={e => f("qtyMin", e.target.value)} placeholder="Min"
+                    style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 15, fontWeight: 700, fontFamily: "'DM Mono', monospace", outline: "none", boxSizing: "border-box" }} />
+                  <span style={{ color: COLORS.textMuted, fontWeight: 700, fontSize: 16 }}>–</span>
+                  <input type="number" step="1" min="0" value={form.qtyMax || ""} onChange={e => f("qtyMax", e.target.value)} placeholder="Max"
+                    style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 15, fontWeight: 700, fontFamily: "'DM Mono', monospace", outline: "none", boxSizing: "border-box" }} />
+                  {form.qtyUnit && <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.accent, minWidth: 30 }}>{form.qtyUnit}</span>}
+                </div>
+              )}
+            </div>
+
+            {/* Tolerance */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Tolérance</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {["0", "5", "10"].map(pct => (
+                  <div key={pct} onClick={() => f("qtyTolerance", pct)}
+                    style={{ flex: 1, padding: "9px 0", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
+                      border: `1px solid ${form.qtyTolerance === pct ? COLORS.orange + "80" : COLORS.border}`,
+                      background: form.qtyTolerance === pct ? `${COLORS.orange}18` : COLORS.bg,
+                      color: form.qtyTolerance === pct ? COLORS.orange : COLORS.textMuted }}>
+                    {pct === "0" ? "=0%" : `±${pct}%`}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Tolerance option — only shown if tolerance > 0 */}
+            {form.qtyTolerance !== "0" && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Option de tolérance</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {["BUYER OPTION", "SELLER OPTION"].map(opt => (
+                    <div key={opt} onClick={() => f("qtyToleranceOption", opt)}
+                      style={{ flex: 1, padding: "9px 12px", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
+                        border: `1px solid ${form.qtyToleranceOption === opt ? COLORS.blue + "80" : COLORS.border}`,
+                        background: form.qtyToleranceOption === opt ? `${COLORS.blue}18` : COLORS.bg,
+                        color: form.qtyToleranceOption === opt ? COLORS.blue : COLORS.textMuted }}>
+                      {opt}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Confirm */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <Btn variant="secondary" onClick={() => setShowQuantityModal(false)} style={{ fontSize: 13 }}>Annuler</Btn>
+              <Btn onClick={() => setShowQuantityModal(false)} style={{ fontSize: 13 }}>✓ Confirmer</Btn>
             </div>
           </div>
         </div>

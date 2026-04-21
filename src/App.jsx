@@ -15741,6 +15741,15 @@ export default function CRM() {
       dataLoaded.current = true;
     }
     loadData();
+
+    // When batch updates derivatives in Supabase, reload the cache in the parent too
+    // so re-mounting Derivatives always gets fresh data
+    const reloadDerivCache = async () => {
+      const fresh = await loadAllPages('derivatives');
+      if (fresh.length) setDerivativesCache(fresh);
+    };
+    window.addEventListener('derivatives:reload', reloadDerivCache);
+    return () => window.removeEventListener('derivatives:reload', reloadDerivCache);
   }, []);
 
   // Companies and contacts are saved explicitly on each action (no auto-save to avoid overwrite issues with large datasets)

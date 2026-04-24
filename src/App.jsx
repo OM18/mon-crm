@@ -287,6 +287,8 @@ const DEFAULT_CONFIG = {
   contractDeliveryTerms: [],
   contractCountryAreas: [],
   contractIncoterms: [],
+  contractDefaultTolerance: "10",
+  contractDefaultToleranceOption: "BUYER OPTION",
   derivInstrumentTypeDefault: "",
   derivCommodities: [
     { value: "corn", label: "Corn", underlyingCategory: "commodity" },
@@ -4832,6 +4834,112 @@ const ContractPortsEditor = ({ config, updateField }) => {
   );
 };
 
+// ─── CONTRACT TOLERANCE DEFAULT EDITOR ──────────────────────
+const ContractToleranceDefaultEditor = ({ config, updateField }) => {
+  const defaultTolerance = config.contractDefaultTolerance ?? "10";
+  const defaultOption    = config.contractDefaultToleranceOption ?? "BUYER OPTION";
+  const [expanded, setExpanded] = useState(false);
+  const [localTol, setLocalTol]    = useState(defaultTolerance);
+  const [localOpt, setLocalOpt]    = useState(defaultOption);
+  const [dirty, setDirty]          = useState(false);
+
+  useEffect(() => {
+    setLocalTol(config.contractDefaultTolerance ?? "10");
+    setLocalOpt(config.contractDefaultToleranceOption ?? "BUYER OPTION");
+    setDirty(false);
+  }, [config.contractDefaultTolerance, config.contractDefaultToleranceOption]);
+
+  const setTol = (v) => { setLocalTol(v); setDirty(true); };
+  const setOpt = (v) => { setLocalOpt(v); setDirty(true); };
+  const save = (e) => {
+    e.stopPropagation();
+    updateField("contractDefaultTolerance", localTol);
+    updateField("contractDefaultToleranceOption", localOpt);
+    setDirty(false);
+  };
+
+  const TOL_OPTIONS = ["0", "5", "10"];
+  const OPT_OPTIONS = ["BUYER OPTION", "SELLER OPTION"];
+
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
+      <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`}
+        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>⚖️</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Quantity Tolerance — Defaults</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Tolérance et option par défaut appliquées aux nouveaux contrats</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 11, color: COLORS.orange, background: `${COLORS.orange}15`, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.orange}40`, fontWeight: 700 }}>
+            ±{localTol}% · {localOpt === "BUYER OPTION" ? "B.O." : "S.O."}
+          </span>
+          {dirty && (
+            <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              ✓ Sauvegarder
+            </div>
+          )}
+          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: "18px 20px", borderTop: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", gap: 20 }}>
+
+          {/* Tolérance % */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Tolérance par défaut</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {TOL_OPTIONS.map(pct => (
+                <div key={pct} onClick={() => setTol(pct)} style={{
+                  flex: 1, padding: "10px 0", textAlign: "center", borderRadius: 10, cursor: "pointer",
+                  border: `1px solid ${localTol === pct ? COLORS.orange + "80" : COLORS.border}`,
+                  background: localTol === pct ? `${COLORS.orange}18` : COLORS.card,
+                  color: localTol === pct ? COLORS.orange : COLORS.textMuted,
+                  fontWeight: 700, fontSize: 14, transition: "all 0.15s"
+                }}>
+                  {pct === "0" ? "= 0%" : `± ${pct}%`}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Option Buyer / Seller */}
+          {localTol !== "0" && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Option par défaut</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {OPT_OPTIONS.map(opt => {
+                  const isActive = localOpt === opt;
+                  const col = opt === "BUYER OPTION" ? COLORS.blue : COLORS.purple;
+                  return (
+                    <div key={opt} onClick={() => setOpt(opt)} style={{
+                      flex: 1, padding: "10px 0", textAlign: "center", borderRadius: 10, cursor: "pointer",
+                      border: `1px solid ${isActive ? col + "80" : COLORS.border}`,
+                      background: isActive ? `${col}18` : COLORS.card,
+                      color: isActive ? col : COLORS.textMuted,
+                      fontWeight: 700, fontSize: 13, transition: "all 0.15s"
+                    }}>
+                      {opt === "BUYER OPTION" ? "🧑 Buyer Option" : "🏭 Seller Option"}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div style={{ fontSize: 11, color: COLORS.textMuted, background: `${COLORS.gold}08`, border: `1px solid ${COLORS.gold}20`, borderRadius: 8, padding: "8px 12px", lineHeight: 1.6 }}>
+            💡 Ces valeurs seront pré-remplies à la création d'un nouveau contrat. Elles restent modifiables contrat par contrat.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── CONTRACT INCOTERMS EDITOR ───────────────────────────────
 const ContractIncotermsEditor = ({ config, updateField }) => {
   const raw = config.contractIncoterms || [];
@@ -7056,6 +7164,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             hasColor={false}
           />
           <ContractIncotermsEditor config={config} updateField={updateField} />
+          <ContractToleranceDefaultEditor config={config} updateField={updateField} />
         </div>
       )}
 
@@ -15164,7 +15273,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
   );
 };
 
-const EMPTY_CONTRACT = () => ({
+const EMPTY_CONTRACT = (cfg = {}) => ({
   id: null,
   contractNumber: "",
   contractType: "",
@@ -15201,8 +15310,8 @@ const EMPTY_CONTRACT = () => ({
   qtyMin: "",
   qtyMax: "",
   qtyUnit: "",
-  qtyTolerance: "10",
-  qtyToleranceOption: "BUYER OPTION",
+  qtyTolerance: cfg.contractDefaultTolerance ?? "10",
+  qtyToleranceOption: cfg.contractDefaultToleranceOption ?? "BUYER OPTION",
   qtyEstimated: "",
   qtyFinal: "",
   createdAt: "",
@@ -15285,9 +15394,9 @@ const Contracts = ({ companies = [] }) => {
     }));
     setFormErrors(p => ({...p, contractType: false}));
   };
-  const openNew  = () => { setForm({ ...EMPTY_CONTRACT(), conclusionDate: todayDDMMYYYY() }); setEditId(null); setShowModal(true); };
+  const openNew  = () => { setForm({ ...EMPTY_CONTRACT(config), conclusionDate: todayDDMMYYYY() }); setEditId(null); setShowModal(true); };
   const openEdit = (c) => { setForm({ ...c }); setEditId(c.id); setShowModal(true); };
-  const closeModal = () => { setShowModal(false); setForm(EMPTY_CONTRACT()); setEditId(null); setFormErrors({}); };
+  const closeModal = () => { setShowModal(false); setForm(EMPTY_CONTRACT(config)); setEditId(null); setFormErrors({}); };
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const [formErrors, setFormErrors] = useState({});
@@ -15735,7 +15844,7 @@ const Contracts = ({ companies = [] }) => {
           companies={companies}
           onImport={(items) => {
             const nextId = contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;
-            const enriched = items.map((item, i) => ({ ...EMPTY_CONTRACT(), ...item, id: nextId + i, createdAt: new Date().toISOString() }));
+            const enriched = items.map((item, i) => ({ ...EMPTY_CONTRACT(config), ...item, id: nextId + i, createdAt: new Date().toISOString() }));
             persist([...contracts, ...enriched]);
             setShowImport(false);
           }}

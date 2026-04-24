@@ -16039,32 +16039,24 @@ const Contracts = ({ companies = [] }) => {
                   );
                 })()}
               </div>
-              {/* Contract Ports — multi-value pills from config */}
+              {/* Contract Ports — multi-value combo input */}
               <div style={{ gridColumn: "1 / -1" }}>
                 <CFL>Contract Port(s)</CFL>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-                  {(config.contractPorts || []).map(p => {
-                    const ports = Array.isArray(form.port) ? form.port : (form.port ? [form.port] : []);
-                    const isActive = ports.includes(p.label);
-                    return (
-                      <div key={p.label} onClick={() => {
-                        const cur = Array.isArray(form.port) ? form.port : (form.port ? [form.port] : []);
-                        f("port", isActive ? cur.filter(x => x !== p.label) : [...cur, p.label]);
-                      }} style={{ padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, transition: "all 0.15s", userSelect: "none",
-                        border: `1px solid ${isActive ? COLORS.accent+"80" : COLORS.border}`,
-                        background: isActive ? `${COLORS.accent}18` : COLORS.bg,
-                        color: isActive ? COLORS.accent : COLORS.textSub }}>
-                        {p.label}
-                      </div>
-                    );
-                  })}
-                  {(config.contractPorts || []).length === 0 && (
-                    <div style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>Aucun port — configurez-les dans l'Admin Panel</div>
-                  )}
-                  {Array.isArray(form.port) && form.port.length > 0 && (
-                    <div onClick={() => f("port", [])} style={{ padding: "6px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, background: COLORS.bg }}>✕ Tout effacer</div>
-                  )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4, marginBottom: 4 }}>
+                  {(Array.isArray(form.port) ? form.port : (form.port ? [form.port] : [])).map(p => (
+                    <span key={p} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 6,
+                      background: `${COLORS.accent}18`, color: COLORS.accent, border: `1px solid ${COLORS.accent}40` }}>
+                      {p}
+                      <span onClick={() => { const cur = Array.isArray(form.port) ? form.port : [form.port]; f("port", cur.filter(x => x !== p)); }}
+                        style={{ cursor: "pointer", fontSize: 13, lineHeight: 1, marginLeft: 2 }}>×</span>
+                    </span>
+                  ))}
                 </div>
+                <CFCombo label="" value="" onChange={v => {
+                  if (!v) return;
+                  const cur = Array.isArray(form.port) ? form.port : (form.port ? [form.port] : []);
+                  if (!cur.includes(v)) f("port", [...cur, v]);
+                }} suggestions={(config.contractPorts || []).map(p => p.label)} placeholder="Saisir ou choisir un port…" />
               </div>
 
               {/* Port — multi-value */}

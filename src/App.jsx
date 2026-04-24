@@ -14734,15 +14734,13 @@ const CONTRACT_FIELD_MAP = {
   "destinationCountry":["destination", "destination country", "pays destination"],
   "paymentTerms":      ["payment terms", "paiement", "payment conditions"],
   "qtyValue":          ["quantity", "qty", "quantite", "quantité"],
-  "qtyMin":            ["qty min", "quantity min", "min qty"],
-  "qtyMax":            ["qty max", "quantity max", "max qty"],
+  "qtyMin":            ["qty min", "quantity min", "min qty", "quantite min", "quantité min", "qte min", "vol min", "volume min"],
+  "qtyMax":            ["qty max", "quantity max", "max qty", "quantite max", "quantité max", "qte max", "vol max", "volume max"],
   "qtyUnit":           ["unit", "units", "unité", "qty unit", "volume unit"],
   "qtyTolerance":      ["tolerance", "tolerence", "tolérance"],
-  "qtyMin":            ["qty min", "quantity min", "min qty", "quantite min", "quantité min"],
-  "qtyMax":            ["qty max", "quantity max", "max qty", "quantite max", "quantité max"],
   "qtyToleranceOption":["tolerance option", "option tolerance", "buyer option", "seller option", "option tolérance"],
-  "qtyEstimated":      ["estimated quantity", "qty estimated", "estimated qty", "quantite estimee", "quantité estimée"],
-  "qtyFinal":          ["final quantity", "qty final", "final qty", "quantite finale", "quantité finale"],
+  "qtyEstimated":      ["estimated quantity", "qty estimated", "estimated qty", "quantite estimee", "quantité estimée", "qte estimee", "quantite est", "vol estime"],
+  "qtyFinal":          ["final quantity", "qty final", "final qty", "quantite finale", "quantité finale", "qte finale", "vol final"],
   "transformation":    ["transformation", "transform"],
   "warehouse":         ["warehouse", "entrepot", "entrepôt"],
 };
@@ -14919,6 +14917,25 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
         const t = String(obj.qtyTolerance).replace(/[%±]/g,"").trim();
         if (!["0","5","10"].includes(t)) unknowns[`qtyTolerance:${obj.qtyTolerance}`] = { fieldKey: "qtyTolerance", fieldLabel: "Tolérance", value: obj.qtyTolerance, allowed: ["0%", "5%", "10%"] };
         else obj.qtyTolerance = t;
+      }
+
+      // Normalize quantity fields — strip spaces/commas and cast to string number
+      const parseQtyNum = (v) => {
+        if (v === undefined || v === null || v === "") return "";
+        const n = parseFloat(String(v).replace(/\s/g, "").replace(/,/g, "."));
+        return isNaN(n) ? "" : String(n);
+      };
+      if (obj.qtyValue     !== undefined) obj.qtyValue     = parseQtyNum(obj.qtyValue);
+      if (obj.qtyMin       !== undefined) obj.qtyMin       = parseQtyNum(obj.qtyMin);
+      if (obj.qtyMax       !== undefined) obj.qtyMax       = parseQtyNum(obj.qtyMax);
+      if (obj.qtyEstimated !== undefined) obj.qtyEstimated = parseQtyNum(obj.qtyEstimated);
+      if (obj.qtyFinal     !== undefined) obj.qtyFinal     = parseQtyNum(obj.qtyFinal);
+
+      // Auto-detect qtyType: if qtyMin or qtyMax provided → range, else → fixed
+      if ((obj.qtyMin && obj.qtyMin !== "") || (obj.qtyMax && obj.qtyMax !== "")) {
+        obj.qtyType = "range";
+      } else if (obj.qtyValue && obj.qtyValue !== "") {
+        obj.qtyType = "fixed";
       }
 
       // Validate required fields

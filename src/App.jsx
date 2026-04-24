@@ -4921,6 +4921,90 @@ const ContractIncotermsEditor = ({ config, updateField }) => {
 };
 
 
+
+// ─── CONTRACT PRICE TYPES EDITOR ─────────────────────────────
+const ContractPriceTypesEditor = ({ config, updateField }) => {
+  const DEFAULT_TYPES = [{ id: "flat", value: "flat", label: "FLAT" }, { id: "prime", value: "prime", label: "PREMIUM" }];
+  const items = Array.isArray(config.contractPriceTypes) && config.contractPriceTypes.length > 0 ? config.contractPriceTypes : DEFAULT_TYPES;
+  const [localItems, setLocalItems] = useState(items);
+  const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newValue, setNewValue] = useState("");
+
+  useEffect(() => {
+    const src = Array.isArray(config.contractPriceTypes) && config.contractPriceTypes.length > 0 ? config.contractPriceTypes : DEFAULT_TYPES;
+    setLocalItems(src); setDirty(false);
+  }, [config.contractPriceTypes]);
+
+  const mark = (next) => { setLocalItems(next); setDirty(true); };
+  const add = () => {
+    if (!newLabel.trim() || !newValue.trim()) return;
+    if (localItems.find(i => i.value === newValue.trim())) return;
+    mark([...localItems, { id: newValue.trim(), value: newValue.trim(), label: newLabel.trim().toUpperCase() }]);
+    setNewLabel(""); setNewValue("");
+  };
+  const save = (e) => { e.stopPropagation(); updateField("contractPriceTypes", localItems); setDirty(false); };
+
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${dirty ? COLORS.accent + "60" : COLORS.border}`, borderRadius: 14, overflow: "hidden" }}>
+      <div onClick={() => setExpanded(e => !e)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", userSelect: "none" }}
+        onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}08`} onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>💲</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>Contract Price Types</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>Types de prix disponibles (ex: FLAT, PREMIUM…)</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+            {localItems.length} type{localItems.length !== 1 ? "s" : ""}
+          </span>
+          {dirty && <div onClick={save} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✓ Sauvegarder</div>}
+          <span style={{ color: COLORS.textMuted, fontSize: 14, display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>▾</span>
+        </div>
+      </div>
+      {expanded && (
+        <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 36px", gap: 8, marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>Label affiché</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>Valeur interne</div>
+            <div />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+            {localItems.map((item, idx) => (
+              <div key={item.id} style={{ display: "grid", gridTemplateColumns: "1fr 120px 36px", gap: 8, alignItems: "center", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 12px" }}>
+                <input value={item.label} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, label: e.target.value.toUpperCase() } : x))}
+                  style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 700, fontFamily: "inherit", outline: "none", letterSpacing: 0.5 }} />
+                <input value={item.value} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, value: e.target.value } : x))}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: COLORS.textMuted, fontSize: 12, fontFamily: "'DM Mono', monospace", outline: "none", padding: "3px 8px" }} />
+                <button onClick={() => mark(localItems.filter((_, i) => i !== idx))} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16 }}
+                  onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 120px auto", gap: 8, alignItems: "center" }}>
+            <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} placeholder="Label (ex: FIXÉ, À TERME…)" maxLength={40}
+              style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+            <input value={newValue} onChange={e => setNewValue(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} placeholder="valeur" maxLength={20}
+              style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+            <button onClick={add} disabled={!newLabel.trim() || !newValue.trim()}
+              style={{ background: `${COLORS.accent}20`, border: `1px solid ${COLORS.accent}40`, color: COLORS.accent, borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: newLabel.trim() && newValue.trim() ? "pointer" : "not-allowed", fontFamily: "inherit", opacity: newLabel.trim() && newValue.trim() ? 1 : 0.5 }}>
+              + Ajouter
+            </button>
+          </div>
+          {dirty && (
+            <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
+              <button onClick={save} style={{ background: `${COLORS.green}20`, border: `1px solid ${COLORS.green}40`, color: COLORS.green, borderRadius: 8, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>✓ Sauvegarder</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── CONTRACT VOLUME UNITS EDITOR ────────────────────────────
 const ContractVolumeUnitsEditor = ({ config, updateField }) => {
   const items = Array.isArray(config.contractVolumeUnits) ? config.contractVolumeUnits : [];
@@ -6928,6 +7012,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             hasColor={false}
           />
           <ContractPortsEditor config={config} updateField={updateField} />
+          <ContractPriceTypesEditor config={config} updateField={updateField} />
           <ContractVolumeUnitsEditor config={config} updateField={updateField} />
           <ContractPaymentTermsEditor config={config} updateField={updateField} />
           <ContractCountryEditor
@@ -14624,7 +14709,7 @@ const CONTRACT_FIELD_MAP = {
   "sellerId":          ["seller", "vendeur", "seller id"],
   "brokerId":          ["broker", "courtier", "broker id"],
   "commodity":         ["commodity", "produit", "marchandise", "product"],
-  "priceType":         ["price type", "type prix", "flat/premium", "pricing"],
+  "contractPriceType": ["price type", "type prix", "flat/premium", "pricing", "contract price type"],
   "flatPrice":         ["flat price", "prix fixe", "price", "prix"],
   "flatCurrency":      ["currency", "devise", "flat currency"],
   "premium":           ["premium", "prime", "basis"],
@@ -14721,11 +14806,11 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
       if (obj.transformation !== undefined) obj.transformation = ["true","yes","oui","1"].includes(String(obj.transformation).toLowerCase().trim());
 
       // Normalize priceType
-      if (obj.priceType) {
-        const pt = obj.priceType.toLowerCase().trim();
-        if (pt === "flat" || pt === "fixe" || pt === "fixed") obj.priceType = "flat";
-        else if (pt === "prime" || pt === "premium" || pt === "basis") obj.priceType = "prime";
-        else { unknowns[`priceType:${obj.priceType}`] = { fieldKey: "priceType", fieldLabel: "Price Type", value: obj.priceType, allowed: ["flat", "premium"] }; }
+      if (obj.contractPriceType) {
+        const priceTypes = config.contractPriceTypes || [];
+        const found = priceTypes.find(t => (t.value || t.label)?.toLowerCase() === obj.contractPriceType.toLowerCase());
+        if (found) obj.contractPriceType = found.value || found.label;
+        else unknowns[`contractPriceType:${obj.contractPriceType}`] = { fieldKey: "contractPriceType", fieldLabel: "Contract Price Type", value: obj.contractPriceType, allowed: priceTypes.map(t => t.label || t.value) };
       }
 
       // Validate contractType against config
@@ -15031,7 +15116,7 @@ const EMPTY_CONTRACT = () => ({
   deliveryConditions: "",
   warehouse: "",
   shipmentTerminal: "",
-  priceType: "",       // "flat" | "prime"
+  contractPriceType: "",  // value from config.contractPriceTypes
   flatPrice: "",       // number, 2 decimals
   flatCurrency: "",    // from contractCurrencies
   premium: "",         // integer
@@ -15151,7 +15236,7 @@ const Contracts = ({ companies = [] }) => {
     if (!form.buyerId?.trim())          errs.buyerId          = true;
     if (!form.sellerId?.trim())         errs.sellerId         = true;
     if (!form.commodity?.trim())        errs.commodity        = true;
-    if (!form.priceType)                errs.priceType        = true;
+    if (!form.contractPriceType)          errs.contractPriceType = true;
     if (!form.incoterm?.trim())         errs.incoterm         = true;
     if (!form.paymentTerms?.trim())     errs.paymentTerms     = true;
     return errs;
@@ -15208,7 +15293,7 @@ const Contracts = ({ companies = [] }) => {
     { key: "incotermPort",        label: "Port",              w: 150 },
     { key: "executionPeriod",     label: "Exec. Period",      w: 95  },
     { key: "quantity",            label: "Qty",               w: 110 },
-    { key: "priceType",           label: "Price",             w: 140 },
+    { key: "contractPriceType",  label: "Price",             w: 140 },
     { key: "paymentTerms",        label: "Pmt Terms",         w: 120 },
     { key: "originCountry",       label: "Origin",            w: 110 },
     { key: "destinationCountry",  label: "Destination",       w: 110 },
@@ -15335,15 +15420,15 @@ const Contracts = ({ companies = [] }) => {
         </div>
       );
     }
-    if (key === "priceType") {
-      if (!c.priceType) return <span style={{ color: COLORS.textMuted }}>—</span>;
-      if (c.priceType === "flat") return (
+    if (key === "contractPriceType") {
+      if (!c.contractPriceType) return <span style={{ color: COLORS.textMuted }}>—</span>;
+      if (c.contractPriceType === "flat") return (
         <span style={{ fontSize: 12, color: COLORS.text }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.green, background: `${COLORS.green}15`, padding: "1px 6px", borderRadius: 4, marginRight: 4 }}>FLAT</span>
           {c.flatPrice ? `${c.flatPrice}${c.flatCurrency ? " " + c.flatCurrency : ""}` : "—"}
         </span>
       );
-      if (c.priceType === "prime") {
+      if (c.contractPriceType === "prime") {
         const instrument = c.derivativeId ? instruments.find(p => String(p.id) === String(c.derivativeId)) : null;
         const instrumentLabel = instrument?.label || instrument?.name || null;
         const instrumentShort = instrumentLabel ? instrumentLabel.split(" ").slice(1).join(" ") || instrumentLabel : null;
@@ -15435,10 +15520,10 @@ const Contracts = ({ companies = [] }) => {
 
           <Sec label="Prix" />
           <DRow label="Price Type">{c.priceType?.toUpperCase() || "—"}</DRow>
-          {c.priceType === "flat" && <>
+          {c.contractPriceType === "flat" && <>
             <DRow label="Flat Price">{c.flatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>
           </>}
-          {c.priceType === "prime" && <>
+          {c.contractPriceType === "prime" && <>
             <DRow label="Premium">{c.premium ? `+${c.premium}` : "—"}</DRow>
             <DRow label="Instrument">{instrument?.label || c.derivativeId || "—"}</DRow>
           </>}
@@ -15720,21 +15805,21 @@ const Contracts = ({ companies = [] }) => {
               <div style={{ gridColumn: "1 / 3" }}>
                 <CFL req>Type de prix</CFL>
                 <div style={{ display: "flex", gap: 8, marginTop: 2, maxWidth: 280 }}>
-                  {[{ v: "flat", l: "FLAT" }, { v: "prime", l: "PREMIUM" }].map(({ v, l }) => (
-                    <div key={v} onClick={() => { f("priceType", form.priceType === v ? "" : v); setFormErrors(p => ({...p, priceType: false})); }}
+                  {(config.contractPriceTypes || [{ value: "flat", label: "FLAT" }, { value: "prime", label: "PREMIUM" }]).map(({ value: v, label: l }) => (
+                    <div key={v} onClick={() => { f("contractPriceType", form.contractPriceType === v ? "" : v); setFormErrors(p => ({...p, contractPriceType: false})); }}
                       style={{ flex: 1, padding: "9px 0", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: 700, letterSpacing: 0.5, transition: "all 0.15s",
-                        border: `1px solid ${formErrors.priceType ? COLORS.red+"80" : form.priceType === v ? COLORS.accent + "80" : COLORS.border}`,
-                        background: form.priceType === v ? `${COLORS.accent}18` : COLORS.bg,
-                        color: form.priceType === v ? COLORS.accent : COLORS.textMuted }}>
+                        border: `1px solid ${formErrors.contractPriceType ? COLORS.red+"80" : form.contractPriceType === v ? COLORS.accent + "80" : COLORS.border}`,
+                        background: form.contractPriceType === v ? `${COLORS.accent}18` : COLORS.bg,
+                        color: form.contractPriceType === v ? COLORS.accent : COLORS.textMuted }}>
                       {l}
                     </div>
                   ))}
                 </div>
-                {formErrors.priceType && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Sélectionner FLAT ou PREMIUM</div>}
+                {formErrors.contractPriceType && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Sélectionner un type de prix</div>}
               </div>
 
               {/* FLAT fields */}
-              {form.priceType === "flat" && <>
+              {form.contractPriceType === "flat" && <>
                 <div>
                   <CFL>Flat Price</CFL>
                   <input type="number" step="0.01" min="0" value={form.flatPrice || ""} onChange={e => f("flatPrice", e.target.value)} placeholder="0.00"
@@ -15745,7 +15830,7 @@ const Contracts = ({ companies = [] }) => {
               </>}
 
               {/* PRIME fields */}
-              {form.priceType === "prime" && <>
+              {form.contractPriceType === "prime" && <>
                 <div>
                   <CFL>Premium</CFL>
                   <input type="number" step="1" value={form.premium || ""} onChange={e => f("premium", e.target.value)} placeholder="ex : 25"

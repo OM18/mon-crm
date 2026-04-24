@@ -14806,6 +14806,11 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
         obj.id = tempId;
       }
 
+      // Normalize port — convert comma-separated string to array
+      if (obj.port && typeof obj.port === "string") {
+        obj.port = obj.port.split(/[,;]/).map(p => p.trim()).filter(Boolean);
+      }
+
       // Normalize dates
       if (obj.conclusionDate) obj.conclusionDate = parseDate(obj.conclusionDate);
       if (obj.executionDateFrom) obj.executionDateFrom = parseDate(obj.executionDateFrom);
@@ -14871,6 +14876,18 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
           else unknowns[`${field}:${obj[field]}`] = { fieldKey: field, fieldLabel: field === "originCountry" ? "Origin Country" : "Destination Country", value: obj[field], allowed: countries.map(c => c.label) };
         }
       });
+
+      // Validate port values against config
+      if (Array.isArray(obj.port) && obj.port.length > 0) {
+        const configPorts = config.contractPorts || [];
+        const resolved = [];
+        obj.port.forEach(pv => {
+          const found = configPorts.find(p => p.label?.toLowerCase() === pv.toLowerCase());
+          if (found) resolved.push(found.label);
+          else unknowns[`port:${pv}`] = { fieldKey: "port", fieldLabel: "Contract Port", value: pv, allowed: configPorts.map(p => p.label) };
+        });
+        obj.port = resolved;
+      }
 
       // Validate qtyUnit
       if (obj.qtyUnit) {
@@ -14989,10 +15006,13 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
                   { f: "executionDateFrom", l: "Exec From" },
                   { f: "executionDateTo", l: "Exec To" },
                   { f: "brokerId", l: "Broker" },
-                  { f: "priceType", l: "Price Type" },
+                  { f: "contractPriceType", l: "Price Type" },
                   { f: "flatPrice", l: "Flat Price" },
                   { f: "premium", l: "Premium" },
+                  { f: "port", l: "Contract Port(s)" },
                   { f: "incoterm", l: "Incoterm" },
+                  { f: "loadport", l: "Loadport" },
+                  { f: "disport", l: "Disport" },
                   { f: "paymentTerms", l: "Payment Terms" },
                   { f: "originCountry", l: "Origin" },
                   { f: "destinationCountry", l: "Destination" },
@@ -16019,6 +16039,34 @@ const Contracts = ({ companies = [] }) => {
                   );
                 })()}
               </div>
+              {/* Contract Ports — multi-value pills from config */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <CFL>Contract Port(s)</CFL>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                  {(config.contractPorts || []).map(p => {
+                    const ports = Array.isArray(form.port) ? form.port : (form.port ? [form.port] : []);
+                    const isActive = ports.includes(p.label);
+                    return (
+                      <div key={p.label} onClick={() => {
+                        const cur = Array.isArray(form.port) ? form.port : (form.port ? [form.port] : []);
+                        f("port", isActive ? cur.filter(x => x !== p.label) : [...cur, p.label]);
+                      }} style={{ padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, transition: "all 0.15s", userSelect: "none",
+                        border: `1px solid ${isActive ? COLORS.accent+"80" : COLORS.border}`,
+                        background: isActive ? `${COLORS.accent}18` : COLORS.bg,
+                        color: isActive ? COLORS.accent : COLORS.textSub }}>
+                        {p.label}
+                      </div>
+                    );
+                  })}
+                  {(config.contractPorts || []).length === 0 && (
+                    <div style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>Aucun port — configurez-les dans l'Admin Panel</div>
+                  )}
+                  {Array.isArray(form.port) && form.port.length > 0 && (
+                    <div onClick={() => f("port", [])} style={{ padding: "6px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, background: COLORS.bg }}>✕ Tout effacer</div>
+                  )}
+                </div>
+              </div>
+
               {/* Port — multi-value */}
               <CFCombo label="Execution Loadport" value={form.loadport} onChange={v => f("loadport", v)}
                 suggestions={(config.contractPorts || []).map(p => p.label)} placeholder="Saisir ou choisir un port…" />

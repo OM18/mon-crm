@@ -2646,6 +2646,18 @@ const DerivAccountImportModal = ({ onClose, onImport, config }) => {
         obj.isActive = true;
       }
 
+      // Validate qtyToleranceOption
+      if (obj.qtyToleranceOption !== undefined && obj.qtyToleranceOption !== "") {
+        const val = obj.qtyToleranceOption.toUpperCase().trim();
+        if (val.includes("BUYER") || val === "B.O." || val === "BO") obj.qtyToleranceOption = "BUYER OPTION";
+        else if (val.includes("SELLER") || val === "S.O." || val === "SO") obj.qtyToleranceOption = "SELLER OPTION";
+        else unknowns[`qtyToleranceOption:${obj.qtyToleranceOption}`] = { fieldKey: "qtyToleranceOption", fieldLabel: "Tolerance Option", value: obj.qtyToleranceOption, allowed: ["BUYER OPTION", "SELLER OPTION"] };
+      }
+
+      // Normalize qtyEstimated and qtyFinal to 2 decimal places
+      if (obj.qtyEstimated) { const n = parseFloat(obj.qtyEstimated); obj.qtyEstimated = isNaN(n) ? "" : String(n); }
+      if (obj.qtyFinal)     { const n = parseFloat(obj.qtyFinal);     obj.qtyFinal     = isNaN(n) ? "" : String(n); }
+
       // Validate required fields
       const missing = [];
       if (!obj.accountNumber) missing.push("accountNumber");
@@ -14726,6 +14738,11 @@ const CONTRACT_FIELD_MAP = {
   "qtyMax":            ["qty max", "quantity max", "max qty"],
   "qtyUnit":           ["unit", "units", "unité", "qty unit", "volume unit"],
   "qtyTolerance":      ["tolerance", "tolerence", "tolérance"],
+  "qtyMin":            ["qty min", "quantity min", "min qty", "quantite min", "quantité min"],
+  "qtyMax":            ["qty max", "quantity max", "max qty", "quantite max", "quantité max"],
+  "qtyToleranceOption":["tolerance option", "option tolerance", "buyer option", "seller option", "option tolérance"],
+  "qtyEstimated":      ["estimated quantity", "qty estimated", "estimated qty", "quantite estimee", "quantité estimée"],
+  "qtyFinal":          ["final quantity", "qty final", "final qty", "quantite finale", "quantité finale"],
   "transformation":    ["transformation", "transform"],
   "warehouse":         ["warehouse", "entrepot", "entrepôt"],
 };
@@ -15018,7 +15035,12 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
                   { f: "destinationCountry", l: "Destination" },
                   { f: "qtyValue", l: "Quantity" },
                   { f: "qtyUnit", l: "Qty Unit" },
+                  { f: "qtyMin", l: "Qty Min" },
+                  { f: "qtyMax", l: "Qty Max" },
                   { f: "qtyTolerance", l: "Tolerance" },
+                  { f: "qtyToleranceOption", l: "Tolerance Option" },
+                  { f: "qtyEstimated", l: "Estimated Qty" },
+                  { f: "qtyFinal", l: "Final Qty" },
                   { f: "transformation", l: "Transformation" },
                 ].map(({ l, req }) => (
                   <span key={l} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5,

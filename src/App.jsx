@@ -14833,7 +14833,8 @@ const CONTRACT_FIELD_MAP = {
   "commodity":         ["commodity", "produit", "marchandise", "product"],
   "contractPriceType": ["price type", "type prix", "flat/premium", "pricing", "contract price type"],
   "flatPrice":         ["flat price", "prix fixe", "price", "prix"],
-  "flatCurrency":      ["currency", "devise", "flat currency"],
+  "flatCurrency":      ["currency", "devise", "flat currency", "price currency", "currency price", "devise prix", "flat currency", "cur"],
+  "derivativeId":      ["derivative", "derivatives", "instrument", "derivative instrument", "deriv", "deriv instrument", "hedge instrument", "instrument deriv"],
   "premium":           ["premium", "prime", "basis"],
   "incoterm":          ["incoterm", "inco"],
   "port":              ["port", "ports"],
@@ -14856,7 +14857,44 @@ const CONTRACT_FIELD_MAP = {
 
 const CONTRACT_REQUIRED_FIELDS = ["contractNumber", "contractType", "conclusionDate", "buyerId", "sellerId", "commodity"];
 
-const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
+const CONTRACT_FIELD_LABELS = {
+  "id":                    "ID",
+  "contractNumber":        "Contract Number *",
+  "contractType":          "Contract Type *",
+  "status":                "Status",
+  "conclusionDate":        "Conclusion Date *",
+  "executionDateFrom":     "Exec Date From",
+  "executionDateTo":       "Exec Date To",
+  "executionPeriodType":   "Period Type",
+  "buyerId":               "Buyer *",
+  "sellerId":              "Seller *",
+  "brokerId":              "Broker",
+  "commodity":             "Commodity *",
+  "contractPriceType":     "Price Type",
+  "flatPrice":             "Flat Price",
+  "flatCurrency":          "Price Currency",
+  "premium":               "Premium",
+  "derivativeId":          "Derivative Instrument",
+  "incoterm":              "Incoterm",
+  "port":                  "Port(s)",
+  "loadport":              "Loadport",
+  "disport":               "Disport",
+  "originCountry":         "Origin Country",
+  "destinationCountry":    "Destination Country",
+  "paymentTerms":          "Payment Terms",
+  "qtyValue":              "Quantity",
+  "qtyMin":                "Qty Min",
+  "qtyMax":                "Qty Max",
+  "qtyUnit":               "Qty Unit",
+  "qtyTolerance":          "Tolerance",
+  "qtyToleranceOption":    "Tolerance Option",
+  "qtyEstimated":          "Estimated Qty",
+  "qtyFinal":              "Final Qty",
+  "transformation":        "Transformation",
+  "warehouse":             "Warehouse",
+};
+
+const ContractImportModal = ({ onClose, onImport, companies = [], instruments = [] }) => {
   const { config } = useConfig();
   const [step, setStep] = useState("upload");
   const [rawRows, setRawRows] = useState([]);
@@ -14949,6 +14987,42 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
         const found = priceTypes.find(t => (t.value || t.label)?.toLowerCase() === obj.contractPriceType.toLowerCase());
         if (found) obj.contractPriceType = found.value || found.label;
         else unknowns[`contractPriceType:${obj.contractPriceType}`] = { fieldKey: "contractPriceType", fieldLabel: "Contract Price Type", value: obj.contractPriceType, allowed: priceTypes.map(t => t.label || t.value) };
+      }
+
+      // Validate flatCurrency against config.contractCurrencies
+      if (obj.flatCurrency && obj.flatCurrency !== "") {
+        const currencies = config.contractCurrencies || [];
+        const norm = v => v.toUpperCase().trim();
+        const found = currencies.find(c => norm(c.label) === norm(obj.flatCurrency) || norm(c.value || "") === norm(obj.flatCurrency));
+        if (found) obj.flatCurrency = found.label;
+        else unknowns[`flatCurrency:${obj.flatCurrency}`] = { fieldKey: "flatCurrency", fieldLabel: "Price Currency", value: obj.flatCurrency, allowed: currencies.map(c => c.label) };
+      }
+
+      // Resolve derivativeId — match by instrument label or id
+      if (obj.derivativeId && obj.derivativeId !== "") {
+        const raw = String(obj.derivativeId).trim();
+        // Try numeric id first
+        const byId = instruments.find(p => String(p.id) === raw);
+        if (byId) {
+          obj.derivativeId = byId.id;
+        } else {
+          // Try label / name match (case-insensitive)
+          const byLabel = instruments.find(p =>
+            (p.label || "").toLowerCase() === raw.toLowerCase() ||
+            (p.name  || "").toLowerCase() === raw.toLowerCase()
+          );
+          if (byLabel) {
+            obj.derivativeId = byLabel.id;
+          } else {
+            // Unknown instrument — queue for manual decision
+            unknowns[`derivativeId:${raw}`] = {
+              fieldKey: "derivativeId",
+              fieldLabel: "Derivative Instrument",
+              value: raw,
+              allowed: instruments.map(p => p.label || p.name || String(p.id)),
+            };
+          }
+        }
       }
 
       // Validate contractType against config
@@ -15151,7 +15225,9 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
                   { f: "brokerId", l: "Broker" },
                   { f: "contractPriceType", l: "Price Type" },
                   { f: "flatPrice", l: "Flat Price" },
+                  { f: "flatCurrency", l: "Price Currency" },
                   { f: "premium", l: "Premium" },
+                  { f: "derivativeId", l: "Derivative Instrument" },
                   { f: "port", l: "Contract Port(s)" },
                   { f: "incoterm", l: "Incoterm" },
                   { f: "loadport", l: "Loadport" },
@@ -15202,7 +15278,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
                     <select value={mapping[i] || ""} onChange={e => { const m = { ...mapping }; if (e.target.value) { Object.keys(m).forEach(k => { if (m[k] === e.target.value) delete m[k]; }); m[i] = e.target.value; } else delete m[i]; setMapping(m); }}
                       style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 10px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }}>
                       <option value="">— Ignorer —</option>
-                      {allFields.map(f => <option key={f} value={f}>{f}</option>)}
+                      {allFields.map(f => <option key={f} value={f}>{CONTRACT_FIELD_LABELS[f] || f}</option>)}
                     </select>
                     <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>Ex: {rawRows[0]?.[i]?.toString().slice(0, 30) || "—"}</div>
                   </div>
@@ -15245,7 +15321,10 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
               ) : (
                 <>
                   <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 16, lineHeight: 1.8 }}>
-                    Cette valeur n'existe pas dans <strong style={{ color: COLORS.text }}>Admin Panel → Contracts</strong> pour le champ <strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong>.
+                    {currentItem.fieldKey === "derivativeId"
+                      ? <>Cette valeur ne correspond à aucun instrument dans <strong style={{ color: COLORS.text }}>Derivatives</strong>. Vous pouvez l'importer tel quel (l'ID sera conservé) ou vider le champ.</>
+                      : <>Cette valeur n'existe pas dans <strong style={{ color: COLORS.text }}>Admin Panel → Contracts</strong> pour le champ <strong style={{ color: COLORS.text }}>{currentItem.fieldLabel}</strong>.</>
+                    }
                   </div>
                   {currentItem.allowed?.length > 0 && (
                     <div style={{ marginBottom: 20, display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
@@ -15842,6 +15921,7 @@ const Contracts = ({ companies = [] }) => {
         <ContractImportModal
           onClose={() => setShowImport(false)}
           companies={companies}
+          instruments={instruments}
           onImport={(items) => {
             const nextId = contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;
             const enriched = items.map((item, i) => ({ ...EMPTY_CONTRACT(config), ...item, id: nextId + i, createdAt: new Date().toISOString() }));

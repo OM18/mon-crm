@@ -14698,6 +14698,7 @@ const CFSec = ({ label }) => (
 
 // ─── CONTRACT IMPORT MODAL ───────────────────────────────────
 const CONTRACT_FIELD_MAP = {
+  "id":                ["id", "contract id", "identifiant"],
   "contractNumber":    ["contract number", "contract #", "contract no", "numero contrat", "ref contrat", "ref", "no contrat"],
   "contractType":      ["contract type", "type", "type contrat"],
   "status":            ["status", "statut"],
@@ -14794,8 +14795,16 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
     setImporting(true);
     const unknowns = {};
     const items = rawRows.map((row, i) => {
-      const obj = { id: Date.now() + i + Math.random() };
+      const tempId = Date.now() + i + Math.random();
+      const obj = { id: tempId };
       Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[ci]?.toString().trim() || ""; });
+      // If id was provided in Excel, use it (as number if numeric); otherwise keep temp
+      if (obj.id && obj.id !== String(tempId)) {
+        const parsed = Number(obj.id);
+        obj.id = !isNaN(parsed) && parsed > 0 ? parsed : obj.id;
+      } else {
+        obj.id = tempId;
+      }
 
       // Normalize dates
       if (obj.conclusionDate) obj.conclusionDate = parseDate(obj.conclusionDate);
@@ -14969,6 +14978,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [] }) => {
               <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.5, marginBottom: 10 }}>COLONNES RECONNUES AUTOMATIQUEMENT</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {[
+                  { f: "id", l: "ID" },
                   { f: "contractNumber", l: "Contract Number", req: true },
                   { f: "contractType", l: "Contract Type", req: true },
                   { f: "conclusionDate", l: "Conclusion Date", req: true },

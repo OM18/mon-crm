@@ -14853,6 +14853,7 @@ const CONTRACT_FIELD_MAP = {
   "qtyFinal":          ["final quantity", "qty final", "final qty", "quantite finale", "quantité finale", "qte finale", "vol final"],
   "transformation":    ["transformation", "transform"],
   "warehouse":         ["warehouse", "entrepot", "entrepôt"],
+  "businessUnit":      ["business unit", "bu", "businessunit", "unité commerciale", "unite commerciale"],
 };
 
 const CONTRACT_REQUIRED_FIELDS = ["contractNumber", "contractType", "conclusionDate", "buyerId", "sellerId", "commodity"];
@@ -14892,6 +14893,7 @@ const CONTRACT_FIELD_LABELS = {
   "qtyFinal":              "Final Qty",
   "transformation":        "Transformation",
   "warehouse":             "Warehouse",
+  "businessUnit":          "Business Unit",
 };
 
 const ContractImportModal = ({ onClose, onImport, companies = [], instruments = [] }) => {
@@ -15121,6 +15123,16 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         obj.qtyType = "fixed";
       }
 
+      // Validate businessUnit against contractBusinessUnits config
+      if (obj.businessUnit && obj.businessUnit !== "") {
+        const activeBUs = config.contractBusinessUnits || [];
+        const allBUs = config.businessUnit || [];
+        const allowed = allBUs.filter(b => activeBUs.includes(b.value));
+        const found = allowed.find(b => b.value?.toLowerCase() === obj.businessUnit.toLowerCase() || b.label?.toLowerCase() === obj.businessUnit.toLowerCase());
+        if (found) obj.businessUnit = found.value;
+        else unknowns[`businessUnit:${obj.businessUnit}`] = { fieldKey: "businessUnit", fieldLabel: "Business Unit", value: obj.businessUnit, allowed: allowed.map(b => b.label) };
+      }
+
       // Validate required fields
       CONTRACT_REQUIRED_FIELDS.forEach(key => {
         if (!obj[key] || String(obj[key]).trim() === "") {
@@ -15244,6 +15256,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
                   { f: "qtyEstimated", l: "Estimated Qty" },
                   { f: "qtyFinal", l: "Final Qty" },
                   { f: "transformation", l: "Transformation" },
+                  { f: "businessUnit", l: "Business Unit" },
                 ].map(({ l, req }) => (
                   <span key={l} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5,
                     background: req ? `${COLORS.red}15` : `${COLORS.accent}10`,
@@ -15393,6 +15406,7 @@ const EMPTY_CONTRACT = (cfg = {}) => ({
   qtyToleranceOption: cfg.contractDefaultToleranceOption ?? "BUYER OPTION",
   qtyEstimated: "",
   qtyFinal: "",
+  businessUnit: "",
   createdAt: "",
 });
 
@@ -15571,13 +15585,23 @@ const Contracts = ({ companies = [] }) => {
   };
 
   const cellContent = (c, key) => {
-    // CONTRACT REF — ID + Contract # on 2 lines
-    if (key === "contractRef") return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>{c.contractNumber || `#${c.id}`}</span>
-        <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textMuted, fontSize: 10, marginTop: 2 }}>ID {c.id}</span>
-      </div>
-    );
+    // CONTRACT REF — ID + Contract # on 2 lines + BU badge
+    if (key === "contractRef") {
+      const buVal = c.businessUnit;
+      const buDef = buVal ? (config.businessUnit || []).find(b => b.value === buVal) : null;
+      const buColor = buDef?.color || COLORS.accent;
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>{c.contractNumber || `#${c.id}`}</span>
+          <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textMuted, fontSize: 10, marginTop: 2 }}>ID {c.id}</span>
+          {buDef && (
+            <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: `${buColor}20`, color: buColor, border: `1px solid ${buColor}40`, alignSelf: "flex-start", textTransform: "uppercase", letterSpacing: 0.3, whiteSpace: "nowrap" }}>
+              {buDef.label}
+            </span>
+          )}
+        </div>
+      );
+    }
     // BUYER / SELLER — 2 lines, dim secondary party based on contract type
     if (key === "buyerSeller") {
       const brokerName = c.brokerId ? (companies.find(co => String(co.id) === String(c.brokerId))?.name || c.brokerId) : null;
@@ -15750,6 +15774,7 @@ const Contracts = ({ companies = [] }) => {
             <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
               {c.contractType && (() => { const t = (config.contractTypes || []).find(x => x.label === c.contractType); const tc = t?.color || COLORS.accent; return <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${tc}20`, color: tc, border: `1px solid ${tc}40` }}>{c.contractType}</span>; })()}
               {c.status && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}22`, color: col, border: `1px solid ${col}40` }}>{c.status}</span>}
+              {c.businessUnit && (() => { const bu = (config.businessUnit || []).find(b => b.value === c.businessUnit); const bc = bu?.color || COLORS.accent; return <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${bc}20`, color: bc, border: `1px solid ${bc}40` }}>◈ {bu?.label || c.businessUnit}</span>; })()}
               {c.transformation && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${COLORS.blue}20`, color: COLORS.blue, border: `1px solid ${COLORS.blue}40` }}>TRANSFORMATION</span>}
             </div>
           </div>
@@ -15765,6 +15790,17 @@ const Contracts = ({ companies = [] }) => {
           <DRow label="Conclusion Date">{c.conclusionDate}</DRow>
           <DRow label="Contract Type">{c.contractType}</DRow>
           <DRow label="Status">{c.status}</DRow>
+          {c.businessUnit && (() => {
+            const buDef = (config.businessUnit || []).find(b => b.value === c.businessUnit);
+            const buColor = buDef?.color || COLORS.accent;
+            return (
+              <DRow label="Business Unit">
+                <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${buColor}20`, color: buColor, border: `1px solid ${buColor}40` }}>
+                  {buDef?.label || c.businessUnit}
+                </span>
+              </DRow>
+            );
+          })()}
 
           <Sec label="Parties" />
           <DRow label="Buyer">{c.buyerId}</DRow>
@@ -16322,6 +16358,32 @@ const Contracts = ({ companies = [] }) => {
               <CFSec label="À définir ultérieurement" />
               <CFInput label="Warehouse" value={form.warehouse} onChange={v => f("warehouse", v)} placeholder="À définir" />
               <CFInput label="Shipment Terminal" value={form.shipmentTerminal} onChange={v => f("shipmentTerminal", v)} placeholder="À définir" />
+
+              <CFSec label="Business Unit" />
+              <div style={{ gridColumn: "1 / -1" }}>
+                <CFL>Business Unit</CFL>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
+                  {(config.businessUnit || []).filter(bu => (config.contractBusinessUnits || []).includes(bu.value)).map(bu => {
+                    const isActive = form.businessUnit === bu.value;
+                    const col = bu.color || COLORS.accent;
+                    return (
+                      <div key={bu.value} onClick={() => f("businessUnit", isActive ? "" : bu.value)}
+                        style={{ padding: "9px 18px", borderRadius: 8, textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.15s", userSelect: "none",
+                          border: `1px solid ${isActive ? col + "80" : COLORS.border}`,
+                          background: isActive ? `${col}20` : COLORS.bg,
+                          color: isActive ? col : COLORS.textMuted }}>
+                        <div style={{ width: 28, height: 28, borderRadius: 6, background: `${col}20`, border: `1px solid ${col}40`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: col, marginRight: 8, verticalAlign: "middle" }}>
+                          {bu.label.slice(0, 2).toUpperCase()}
+                        </div>
+                        {bu.label}
+                      </div>
+                    );
+                  })}
+                  {(config.businessUnit || []).filter(bu => (config.contractBusinessUnits || []).includes(bu.value)).length === 0 && (
+                    <div style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic", padding: "8px 0" }}>Aucune BU active — configurez-les dans l'Admin Panel → Contracts</div>
+                  )}
+                </div>
+              </div>
 
             </div>
 

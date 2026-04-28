@@ -5954,8 +5954,14 @@ const BatchContractsOldToNew = () => {
         // Info
         out["Info"] = String(row["additional_info"] || "").trim();
 
-        // Delivery Conditions
-        out["Delivery Conditions"] = String(row["delivery_condition"] || "").trim();
+        // Delivery Conditions — normalize spacing variants
+        const dcRaw = String(row["delivery_condition"] || "").trim();
+        const DC_MAP = {
+          "1 SP 1 SB":   "1 SP / 1 SB",
+          "1 SP 2 SB":   "1 SP / 2 SB",
+          "1 SP 1-2 SB": "1 SP / 1-2 SB",
+        };
+        out["Delivery Conditions"] = DC_MAP[dcRaw] || dcRaw;
 
         // VAT — "FAUX"/"FALSE" → "FALSE", "VRAI"/"TRUE" → "TRUE"
         const vatRaw = String(row["VAT_option"] || "").trim().toUpperCase();

@@ -15199,6 +15199,12 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
   const [fileLoading, setFileLoading] = useState(false);
   const fileRef = useRef();
 
+  useEffect(() => {
+    const handleKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
   const allFields = Object.keys(CONTRACT_FIELD_MAP);
   const currentItem = unknownQueue[currentQueueIdx];
 

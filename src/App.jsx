@@ -5931,11 +5931,11 @@ const BatchContractsOldToNew = () => {
         out["Quantity"] = row["Volume"] || row["volume"] || "";
         out["Qty Unit"] = "TON";
 
-        // Tolerance — divide by 100 and format as %
+        // Tolerance — format as % (value kept as-is, just append %)
         const tolRaw = row["volume_options"];
         if (tolRaw !== undefined && tolRaw !== "") {
           const n = parseFloat(String(tolRaw).replace(/[%,\s]/g, "").replace(",", "."));
-          out["Tolerance"] = isNaN(n) ? String(tolRaw).trim() : `${(n / 100).toFixed(4).replace(/\.?0+$/, "")}%`;
+          out["Tolerance"] = isNaN(n) ? String(tolRaw).trim() : `${n}%`;
         } else {
           out["Tolerance"] = "";
         }

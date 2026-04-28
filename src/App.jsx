@@ -15769,6 +15769,13 @@ const Contracts = ({ companies = [] }) => {
   const [search, setSearch] = useState("");
   const dataLoaded = useRef(false);
 
+  // ── Escape key — close detail panel ──
+  useEffect(() => {
+    const handleKey = (e) => { if (e.key === "Escape" && !showModal && !showImport) setSelected(null); };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [showModal, showImport]);
+
   // ── Load instruments (active only) ──
   useEffect(() => {
     async function loadInstruments() {

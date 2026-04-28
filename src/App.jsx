@@ -14854,6 +14854,13 @@ const CONTRACT_FIELD_MAP = {
   "transformation":    ["transformation", "transform"],
   "warehouse":         ["warehouse", "entrepot", "entrepôt"],
   "businessUnit":      ["business unit", "bu", "businessunit", "unité commerciale", "unite commerciale"],
+  "analyticalFlatPrice":              ["analytical flat price", "analytical price", "prix analytique", "prix flat analytique"],
+  "flatPriceVatIncluded":             ["flat price vat included", "flat price ttc", "prix ttc", "prix flat ttc"],
+  "analyticalFlatPriceVatIncluded":   ["analytical flat price vat included", "analytical price ttc", "prix analytique ttc"],
+  "vat":                              ["vat", "tva", "tax"],
+  "vatRate":                          ["vat rate", "taux tva", "taux de tva", "tax rate"],
+  "analyticalPremium":                ["analytical premium", "premium analytique", "prime analytique"],
+  "info":                             ["info", "note", "information", "notes", "remarks", "commentaire"],
 };
 
 const CONTRACT_REQUIRED_FIELDS = ["contractNumber", "contractType", "conclusionDate", "buyerId", "sellerId", "commodity"];
@@ -14894,6 +14901,13 @@ const CONTRACT_FIELD_LABELS = {
   "transformation":        "Transformation",
   "warehouse":             "Warehouse",
   "businessUnit":          "Business Unit",
+  "analyticalFlatPrice":              "Contract Analytical Flat Price",
+  "flatPriceVatIncluded":             "Contract Flat Price (VAT Incl.)",
+  "analyticalFlatPriceVatIncluded":   "Contract Analytical Flat Price (VAT Incl.)",
+  "vat":                              "VAT",
+  "vatRate":                          "VAT Rate (%)",
+  "analyticalPremium":                "Analytical Premium",
+  "info":                             "Info",
 };
 
 const ContractImportModal = ({ onClose, onImport, companies = [], instruments = [] }) => {
@@ -15123,6 +15137,22 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         obj.qtyType = "fixed";
       }
 
+      // Normalize vat — boolean
+      if (obj.vat !== undefined) obj.vat = ["true","yes","oui","1"].includes(String(obj.vat).toLowerCase().trim());
+
+      // Normalize vatRate — strip % sign
+      if (obj.vatRate !== undefined && obj.vatRate !== "") {
+        obj.vatRate = String(obj.vatRate).replace(/[%\s]/g, "").trim();
+      }
+
+      // Normalize number fields
+      ["analyticalFlatPrice","flatPriceVatIncluded","analyticalFlatPriceVatIncluded","analyticalPremium"].forEach(field => {
+        if (obj[field] !== undefined && obj[field] !== "") {
+          const n = parseFloat(String(obj[field]).replace(/\s/g, "").replace(/,/g, "."));
+          obj[field] = isNaN(n) ? "" : String(n);
+        }
+      });
+
       // Validate businessUnit against contractBusinessUnits config
       if (obj.businessUnit && obj.businessUnit !== "") {
         const activeBUs = config.contractBusinessUnits || [];
@@ -15236,9 +15266,15 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
                   { f: "executionDateTo", l: "Exec To" },
                   { f: "brokerId", l: "Broker" },
                   { f: "contractPriceType", l: "Price Type" },
-                  { f: "flatPrice", l: "Flat Price" },
+                  { f: "flatPrice", l: "Contract Flat Price" },
+                  { f: "analyticalFlatPrice", l: "Contract Analytical Flat Price" },
                   { f: "flatCurrency", l: "Price Currency" },
+                  { f: "vat", l: "VAT" },
+                  { f: "vatRate", l: "VAT Rate (%)" },
+                  { f: "flatPriceVatIncluded", l: "Flat Price (VAT Incl.)" },
+                  { f: "analyticalFlatPriceVatIncluded", l: "Analytical Flat Price (VAT Incl.)" },
                   { f: "premium", l: "Premium" },
+                  { f: "analyticalPremium", l: "Analytical Premium" },
                   { f: "derivativeId", l: "Derivative Instrument" },
                   { f: "port", l: "Contract Port(s)" },
                   { f: "incoterm", l: "Incoterm" },
@@ -15257,6 +15293,13 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
                   { f: "qtyFinal", l: "Final Qty" },
                   { f: "transformation", l: "Transformation" },
                   { f: "businessUnit", l: "Business Unit" },
+                  { f: "info", l: "Info" },
+                  { f: "vat", l: "VAT" },
+                  { f: "vatRate", l: "VAT Rate (%)" },
+                  { f: "analyticalFlatPrice", l: "Contract Analytical Flat Price" },
+                  { f: "flatPriceVatIncluded", l: "Contract Flat Price (VAT Incl.)" },
+                  { f: "analyticalFlatPriceVatIncluded", l: "Contract Analytical Flat Price (VAT Incl.)" },
+                  { f: "analyticalPremium", l: "Analytical Premium" },
                 ].map(({ l, req }) => (
                   <span key={l} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5,
                     background: req ? `${COLORS.red}15` : `${COLORS.accent}10`,
@@ -15387,10 +15430,17 @@ const EMPTY_CONTRACT = (cfg = {}) => ({
   warehouse: "",
   shipmentTerminal: "",
   contractPriceType: "",  // value from config.contractPriceTypes
-  flatPrice: "",       // number, 2 decimals
-  flatCurrency: "",    // from contractCurrencies
-  premium: "",         // integer
-  derivativeId: "",    // instrument id from deriv_products
+  flatPrice: "",                     // number, 2 decimals
+  analyticalFlatPrice: "",           // number, 2 decimals
+  flatPriceVatIncluded: "",          // number, 2 decimals (active if vat=true)
+  analyticalFlatPriceVatIncluded: "",// number, 2 decimals (active if vat=true)
+  flatCurrency: "",                  // from contractCurrencies
+  vat: false,                        // boolean checkbox
+  vatRate: "",                       // percentage
+  premium: "",                       // integer
+  analyticalPremium: "",             // integer
+  derivativeId: "",                  // instrument id from deriv_products
+  info: "",                          // free text note
   conclusionDate: new Date().toLocaleDateString("fr-FR").split("/").join("/"), // dd/mm/yyyy
   executionDateFrom: "",
   executionDateTo: "",
@@ -15704,10 +15754,17 @@ const Contracts = ({ companies = [] }) => {
     if (key === "contractPriceType") {
       if (!c.contractPriceType) return <span style={{ color: COLORS.textMuted }}>—</span>;
       if (c.contractPriceType === "flat") return (
-        <span style={{ fontSize: 12, color: COLORS.text }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.green, background: `${COLORS.green}15`, padding: "1px 6px", borderRadius: 4, marginRight: 4 }}>FLAT</span>
-          {c.flatPrice ? `${c.flatPrice}${c.flatCurrency ? " " + c.flatCurrency : ""}` : "—"}
-        </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: 12, color: COLORS.text }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.green, background: `${COLORS.green}15`, padding: "1px 6px", borderRadius: 4, marginRight: 4 }}>FLAT</span>
+            {c.flatPrice ? `${c.flatPrice}${c.flatCurrency ? " " + c.flatCurrency : ""}` : "—"}
+          </span>
+          {c.vat && c.flatPriceVatIncluded && (
+            <span style={{ fontSize: 10, color: COLORS.gold, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>
+              <span style={{ fontWeight: 700, marginRight: 3 }}>TTC</span>{c.flatPriceVatIncluded}{c.flatCurrency ? " " + c.flatCurrency : ""}
+            </span>
+          )}
+        </div>
       );
       if (c.contractPriceType === "prime") {
         const instrument = c.derivativeId ? instruments.find(p => String(p.id) === String(c.derivativeId)) : null;
@@ -15719,6 +15776,7 @@ const Contracts = ({ companies = [] }) => {
               <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.purple, background: `${COLORS.purple}15`, padding: "1px 6px", borderRadius: 4, marginRight: 4 }}>PREMIUM</span>
               {c.premium ? `+${c.premium}` : "—"}
             </span>
+            {c.analyticalPremium && <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Anal. +{c.analyticalPremium}</span>}
             {instrumentShort && <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130 }}>{instrumentShort}</span>}
           </div>
         );
@@ -15790,6 +15848,7 @@ const Contracts = ({ companies = [] }) => {
           <DRow label="Conclusion Date">{c.conclusionDate}</DRow>
           <DRow label="Contract Type">{c.contractType}</DRow>
           <DRow label="Status">{c.status}</DRow>
+          {c.info && <div style={{ gridColumn: "1 / -1" }}><DRow label="Info"><span style={{ fontStyle: "italic", color: COLORS.textSub }}>{c.info}</span></DRow></div>}
           {c.businessUnit && (() => {
             const buDef = (config.businessUnit || []).find(b => b.value === c.businessUnit);
             const buColor = buDef?.color || COLORS.accent;
@@ -15814,11 +15873,19 @@ const Contracts = ({ companies = [] }) => {
           <Sec label="Prix" />
           <DRow label="Price Type">{c.priceType?.toUpperCase() || "—"}</DRow>
           {c.contractPriceType === "flat" && <>
-            <DRow label="Flat Price">{c.flatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>
+            <DRow label="Contract Flat Price">{c.flatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>
+            {c.analyticalFlatPrice && <DRow label="Analytical Flat Price">{c.analyticalFlatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
+            {c.vat && <>
+              <DRow label="VAT">{c.vatRate ? `${c.vatRate}%` : "Oui"}</DRow>
+              {c.flatPriceVatIncluded && <DRow label="Flat Price (VAT Incl.)">{c.flatPriceVatIncluded}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
+              {c.analyticalFlatPriceVatIncluded && <DRow label="Analytical Flat Price (VAT Incl.)">{c.analyticalFlatPriceVatIncluded}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
+            </>}
           </>}
           {c.contractPriceType === "prime" && <>
             <DRow label="Premium">{c.premium ? `+${c.premium}` : "—"}</DRow>
+            {c.analyticalPremium && <DRow label="Analytical Premium">{`+${c.analyticalPremium}`}</DRow>}
             <DRow label="Instrument">{instrument?.label || c.derivativeId || "—"}</DRow>
+            {c.vat && <DRow label="VAT">{c.vatRate ? `${c.vatRate}%` : "Oui"}</DRow>}
           </>}
           <DRow label="Payment Terms">{c.paymentTerms}</DRow>
 
@@ -16015,6 +16082,11 @@ const Contracts = ({ companies = [] }) => {
               </div>
               <CFSelect label="Status" value={form.status} onChange={v => f("status", v)}
                 opts={(config.contractStatuses || []).map(s => ({ value: s.label || s.value, label: s.label || s.value }))} />
+              <div style={{ gridColumn: "1 / -1" }}>
+                <CFL>Info</CFL>
+                <textarea value={form.info || ""} onChange={e => f("info", e.target.value)} placeholder="Notes, informations complémentaires…" rows={2}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", resize: "vertical" }} />
+              </div>
 
               <CFSec label="Dates" />
               {/* Conclusion Date */}
@@ -16112,15 +16184,55 @@ const Contracts = ({ companies = [] }) => {
                 {formErrors.contractPriceType && <div style={{ fontSize: 11, color: COLORS.red, marginTop: 3 }}>Sélectionner un type de prix</div>}
               </div>
 
+              {/* VAT checkbox + rate — shown for both flat and prime */}
+              {form.contractPriceType && (
+                <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 24, padding: "10px 14px", background: form.vat ? `${COLORS.gold}10` : COLORS.bg, border: `1px solid ${form.vat ? COLORS.gold+"50" : COLORS.border}`, borderRadius: 8, transition: "all 0.15s" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => f("vat", !form.vat)}>
+                    <div style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${form.vat ? COLORS.gold : COLORS.border}`, background: form.vat ? COLORS.gold : "transparent", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0 }}>
+                      {form.vat && <span style={{ color: COLORS.textOnAccent, fontSize: 13, fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: form.vat ? COLORS.gold : COLORS.textMuted, letterSpacing: 0.5 }}>VAT</span>
+                  </div>
+                  {form.vat && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <CFL>VAT Rate</CFL>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <input type="number" step="0.1" min="0" max="100" value={form.vatRate || ""} onChange={e => f("vatRate", e.target.value)} placeholder="ex : 20"
+                          style={{ width: 80, background: COLORS.card, border: `1px solid ${COLORS.gold}50`, borderRadius: 6, padding: "6px 10px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", textAlign: "right" }} />
+                        <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.gold }}>%</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* FLAT fields */}
               {form.contractPriceType === "flat" && <>
                 <div>
-                  <CFL>Flat Price</CFL>
+                  <CFL>Contract Flat Price</CFL>
                   <input type="number" step="0.01" min="0" value={form.flatPrice || ""} onChange={e => f("flatPrice", e.target.value)} placeholder="0.00"
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <CFL>Contract Analytical Flat Price</CFL>
+                  <input type="number" step="0.01" min="0" value={form.analyticalFlatPrice || ""} onChange={e => f("analyticalFlatPrice", e.target.value)} placeholder="0.00"
                     style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
                 </div>
                 <CFSelect label="Price Currency" value={form.flatCurrency} onChange={v => f("flatCurrency", v)}
                   opts={(config.contractCurrencies || []).map(c => ({ value: c.label, label: c.label }))} />
+                {form.vat && <>
+                  <div style={{ gridColumn: "1 / 3", height: 1, background: `${COLORS.gold}30`, margin: "2px 0" }} />
+                  <div>
+                    <CFL>Contract Flat Price (VAT Included)</CFL>
+                    <input type="number" step="0.01" min="0" value={form.flatPriceVatIncluded || ""} onChange={e => f("flatPriceVatIncluded", e.target.value)} placeholder="0.00"
+                      style={{ width: "100%", background: `${COLORS.gold}08`, border: `1px solid ${COLORS.gold}40`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <CFL>Contract Analytical Flat Price (VAT Included)</CFL>
+                    <input type="number" step="0.01" min="0" value={form.analyticalFlatPriceVatIncluded || ""} onChange={e => f("analyticalFlatPriceVatIncluded", e.target.value)} placeholder="0.00"
+                      style={{ width: "100%", background: `${COLORS.gold}08`, border: `1px solid ${COLORS.gold}40`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                  </div>
+                </>}
               </>}
 
               {/* PRIME fields */}
@@ -16128,6 +16240,11 @@ const Contracts = ({ companies = [] }) => {
                 <div>
                   <CFL>Premium</CFL>
                   <input type="number" step="1" value={form.premium || ""} onChange={e => f("premium", e.target.value)} placeholder="ex : 25"
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <CFL>Analytical Premium</CFL>
+                  <input type="number" step="1" value={form.analyticalPremium || ""} onChange={e => f("analyticalPremium", e.target.value)} placeholder="ex : 25"
                     style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
                 </div>
                 <div>

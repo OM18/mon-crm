@@ -15267,9 +15267,15 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
 
       // Normalize priceType
       if (obj.contractPriceType) {
-        const priceTypes = config.contractPriceTypes || [];
-        const found = priceTypes.find(t => (t.value || t.label)?.toLowerCase() === obj.contractPriceType.toLowerCase());
-        if (found) obj.contractPriceType = found.value || found.label;
+        const priceTypes = (config.contractPriceTypes && config.contractPriceTypes.length > 0)
+          ? config.contractPriceTypes
+          : [{ value: "flat", label: "FLAT" }, { value: "prime", label: "PREMIUM" }];
+        const needle = obj.contractPriceType.toLowerCase().trim();
+        const found = priceTypes.find(t =>
+          t.value?.toLowerCase() === needle ||
+          t.label?.toLowerCase() === needle
+        );
+        if (found) obj.contractPriceType = found.value;
         else unknowns[`contractPriceType:${obj.contractPriceType}`] = { fieldKey: "contractPriceType", fieldLabel: "Contract Price Type", value: obj.contractPriceType, allowed: priceTypes.map(t => t.label || t.value) };
       }
 

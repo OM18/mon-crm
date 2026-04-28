@@ -5878,6 +5878,9 @@ const BatchContractsOldToNew = () => {
       const converted = rows.map(row => {
         const out = {};
 
+        // Id — preserved as-is from source
+        out["Id"] = String(row["id"] || row["Id"] || row["ID"] || "").trim();
+
         // Contract Number
         out["Contract Number"] = String(row["contract_number"] || "").trim();
 
@@ -6002,6 +6005,7 @@ const BatchContractsOldToNew = () => {
   };
 
   const MAPPING = [
+    "id → Id  (conservé tel quel)",
     "contract_number → Contract Number",
     "contract_type → Contract Type  (sale → SALE)",
     "conclusion_date → Conclusion Date  (yyyy-mm-dd → dd/mm/yyyy)",

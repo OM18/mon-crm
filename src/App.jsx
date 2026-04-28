@@ -15925,7 +15925,15 @@ const Contracts = ({ companies = [] }) => {
     companyName(c.sellerId).toLowerCase().includes(q) ||
     (c.commodity || "").toLowerCase().includes(q) ||
     (c.status || "").toLowerCase().includes(q)
-  ).sort((a, b) => (b.id || 0) - (a.id || 0));
+  ).sort((a, b) => {
+    // Parse dd/mm/yyyy → comparable string yyyymmdd
+    const toYMD = d => { if (!d) return ""; const p = d.split("/"); return p.length === 3 ? p[2]+p[1]+p[0] : ""; };
+    const da = toYMD(a.conclusionDate), db = toYMD(b.conclusionDate);
+    if (db && da) return db.localeCompare(da);
+    if (db) return 1;
+    if (da) return -1;
+    return (b.id || 0) - (a.id || 0); // fallback by id
+  });
 
   // ── Table columns ──
   const COLS = [

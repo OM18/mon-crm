@@ -17014,7 +17014,8 @@ export default function CRM() {
   const [tasks, setTasks] = useState(initialTasks);
   const [derivativesCache, setDerivativesCache] = useState(null);
   const [fixingsCache, setFixingsCache] = useState(null);
-  const [page, setPage] = useState("dashboard");
+  const [page, setPage] = useState(() => localStorage.getItem("crm_page") || "dashboard");
+  useEffect(() => { localStorage.setItem("crm_page", page); }, [page]);
   const dataLoaded = useRef(false);
 
   useEffect(() => {

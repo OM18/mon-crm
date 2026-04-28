@@ -5842,6 +5842,16 @@ const BatchContractsOldToNew = () => {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
 
+      // Case-insensitive column lookup
+      const col = (row, ...keys) => {
+        for (const k of keys) {
+          if (row[k] !== undefined && row[k] !== "") return String(row[k]).trim();
+          const found = Object.keys(row).find(rk => rk.toLowerCase().replace(/[^a-z0-9]/g,"") === k.toLowerCase().replace(/[^a-z0-9]/g,""));
+          if (found && row[found] !== undefined && row[found] !== "") return String(row[found]).trim();
+        }
+        return "";
+      };
+
       // yyyy-mm-dd → dd/mm/yyyy
       const parseISODate = (val) => {
         if (!val) return "";
@@ -5892,12 +5902,12 @@ const BatchContractsOldToNew = () => {
         out["Conclusion Date"] = parseISODate(row["conclusion_date"]);
 
         // Buyer / Seller / Broker
-        out["Buyer"]  = String(row["buyer__name"]    || "").trim();
-        out["Seller"] = String(row["supplier__name"] || "").trim();
-        out["Broker"] = String(row["broker_name"]    || "").trim();
+        out["Buyer"]  = col(row, "buyer__name", "buyer_name", "buyername", "buyer");
+        out["Seller"] = col(row, "supplier__name", "supplier_name", "suppliername", "seller");
+        out["Broker"] = col(row, "broker_name", "broker__name", "brokername", "broker");
 
         // Commodity
-        out["Commodity"] = String(row["cargo__title"] || "").trim();
+        out["Commodity"] = col(row, "cargo__title", "cargo_title", "cargotitle", "cargo");
 
         // Status
         const stRaw = String(row["status"] || "").trim().toLowerCase();
@@ -5918,14 +5928,14 @@ const BatchContractsOldToNew = () => {
         out["Contract Port(s)"] = String(row["ports"] || "").trim();
 
         // Incoterm
-        out["Incoterm"] = String(row["basis_name"] || "").trim();
+        out["Incoterm"] = col(row, "basis_name", "basis__name", "basisname");
 
         // Payment Terms
-        out["Payment Terms"] = String(row["payment_conditions_option"] || "").trim();
+        out["Payment Terms"] = col(row, "payment_conditions_option", "payment_conditions", "paymentconditions", "payment_terms");
 
         // Origin / Destination
-        out["Origin"]      = String(row["origin_of_crop__title"]      || "").trim();
-        out["Destination"] = String(row["destination_of_crop__title"] || "").trim();
+        out["Origin"]      = col(row, "origin_of_crop__title", "origin_of_crop_title", "origincrop", "origin");
+        out["Destination"] = col(row, "destination_of_crop__title", "destination_of_crop_title", "destinationcrop", "destination");
 
         // Quantity + Qty Unit
         out["Quantity"] = row["Volume"] || row["volume"] || "";
@@ -5945,7 +5955,7 @@ const BatchContractsOldToNew = () => {
         out["Tolerance Option"] = tolOpt === "buyer" ? "BUYER OPTION" : tolOpt === "seller" ? "SELLER OPTION" : String(row["volume_options_company"] || "").trim();
 
         // Final Qty
-        out["Final Qty"] = row["final_volume"] || "";
+        out["Final Qty"] = col(row, "final_volume", "finalvolume");
 
         // Business Unit — map "MOROCCO BU" → "MOROCCO" etc.
         const buRaw = String(row["business_unit__title"] || row["business_unit"] || "").trim().toUpperCase();

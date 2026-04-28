@@ -14852,6 +14852,7 @@ const CONTRACT_FIELD_MAP = {
   "qtyEstimated":      ["estimated quantity", "qty estimated", "estimated qty", "quantite estimee", "quantité estimée", "qte estimee", "quantite est", "vol estime"],
   "qtyFinal":          ["final quantity", "qty final", "final qty", "quantite finale", "quantité finale", "qte finale", "vol final"],
   "transformation":    ["transformation", "transform"],
+  "deliveryConditions":["delivery conditions", "delivery terms", "conditions de livraison", "conditions livraison", "delivery cond"],
   "warehouse":         ["warehouse", "entrepot", "entrepôt"],
   "businessUnit":      ["business unit", "bu", "businessunit", "unité commerciale", "unite commerciale"],
   "analyticalFlatPrice":              ["analytical flat price", "analytical price", "prix analytique", "prix flat analytique"],
@@ -14899,6 +14900,7 @@ const CONTRACT_FIELD_LABELS = {
   "qtyEstimated":          "Estimated Qty",
   "qtyFinal":              "Final Qty",
   "transformation":        "Transformation",
+  "deliveryConditions":        "Delivery Conditions",
   "warehouse":             "Warehouse",
   "businessUnit":          "Business Unit",
   "analyticalFlatPrice":              "Contract Analytical Flat Price",
@@ -15079,6 +15081,14 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         const found = terms.find(t => t.label?.toLowerCase() === obj.paymentTerms.toLowerCase());
         if (found) obj.paymentTerms = found.label;
         else unknowns[`paymentTerms:${obj.paymentTerms}`] = { fieldKey: "paymentTerms", fieldLabel: "Payment Terms", value: obj.paymentTerms, allowed: terms.map(t => t.label) };
+      }
+
+      // Validate deliveryConditions against config
+      if (obj.deliveryConditions) {
+        const terms = config.contractDeliveryTerms || [];
+        const found = terms.find(t => t.label?.toLowerCase() === obj.deliveryConditions.toLowerCase());
+        if (found) obj.deliveryConditions = found.label;
+        else unknowns[`deliveryConditions:${obj.deliveryConditions}`] = { fieldKey: "deliveryConditions", fieldLabel: "Delivery Conditions", value: obj.deliveryConditions, allowed: terms.map(t => t.label) };
       }
 
       // Validate originCountry / destinationCountry
@@ -15280,6 +15290,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
                   { f: "incoterm", l: "Incoterm" },
                   { f: "loadport", l: "Loadport" },
                   { f: "disport", l: "Disport" },
+                  { f: "deliveryConditions", l: "Delivery Conditions" },
                   { f: "paymentTerms", l: "Payment Terms" },
                   { f: "originCountry", l: "Origin" },
                   { f: "destinationCountry", l: "Destination" },

@@ -15774,6 +15774,7 @@ const Contracts = ({ companies = [] }) => {
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [form, setForm] = useState(EMPTY_CONTRACT());
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
@@ -15851,6 +15852,13 @@ const Contracts = ({ companies = [] }) => {
     }));
     setFormErrors(p => ({...p, contractType: false}));
   };
+  const handleDeleteAll = async () => {
+    await supabase.from('contracts').delete().neq('id', '');
+    setContractsRaw([]);
+    setSelected(null);
+    setShowDeleteAll(false);
+  };
+
   const openNew  = () => { setForm({ ...EMPTY_CONTRACT(config), conclusionDate: todayDDMMYYYY() }); setEditId(null); setShowModal(true); };
   const openEdit = (c) => { setForm({ ...c }); setEditId(c.id); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setForm(EMPTY_CONTRACT(config)); setEditId(null); setFormErrors({}); };
@@ -16274,6 +16282,10 @@ const Contracts = ({ companies = [] }) => {
           <img src="/logoxl.png" style={{ width: 22, height: 22, objectFit: "contain" }} />
         </button>
         <Btn onClick={openNew}>+ NEW CONTRACT</Btn>
+        <button onClick={() => setShowDeleteAll(true)} title="Supprimer tous les contrats"
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 10, border: `1px solid ${COLORS.red}40`, background: `${COLORS.red}10`, cursor: "pointer", color: COLORS.red, fontSize: 16 }}>
+          🗑
+        </button>
       </div>
 
       {/* Blotter table */}
@@ -16334,6 +16346,23 @@ const Contracts = ({ companies = [] }) => {
       )}
 
       {/* ── Import Modal ── */}
+      {showDeleteAll && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000080", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={e => { if (e.target === e.currentTarget) setShowDeleteAll(false); }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "32px 36px", maxWidth: 420, width: "90%", textAlign: "center" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🗑</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: COLORS.text, marginBottom: 8 }}>Supprimer tous les contrats ?</div>
+            <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 24 }}>
+              Cette action est <strong style={{ color: COLORS.red }}>irréversible</strong>. Les {contracts.length} contrat{contracts.length !== 1 ? "s" : ""} seront définitivement supprimés.
+            </div>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+              <Btn variant="secondary" onClick={() => setShowDeleteAll(false)}>Annuler</Btn>
+              <Btn variant="danger" onClick={handleDeleteAll}>Supprimer tous</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showImport && (
         <ContractImportModal
           onClose={() => setShowImport(false)}

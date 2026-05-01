@@ -6141,11 +6141,11 @@ const BatchCompaniesOldToNew = () => {
       };
 
       const COMPLIANCE_MAP = {
-        "AUTHORISED UPON REQUEST": "AUTHORISED",
-        "BLACK LIST":              "BLACK LISTED",
-        "NOT AUTHORIZED INACTIVE": "NOT AUTHORIZED - INACTIVE",
-        "NOT AUTHORIZED REQ":      "NOT AUTHORIZED REQUESTED",
-        "NOT AUTHORIZED TV":       "AUTHORISED",
+        "AUTHORISED UPON REQUEST":  "AUTHORISED",
+        "BLACK LIST":               "BLACK LISTED",
+        "NOT AUTHORISED INACTIVE":  "NOT AUTHORISED - INACTIVE",
+        "NOT AUTHORISED REQ":       "NOT AUTHORISED REQUESTED",
+        "NOT AUTHORISED TV":        "AUTHORISED",
       };
 
       const COLUMN_MAP = {
@@ -6259,7 +6259,7 @@ const BatchCompaniesOldToNew = () => {
     "role_names → gtRole  (supprime la valeur 'other' et les virgules superflues)",
     "custom_field__Role → roles",
     "business_unit_titles → businessUnit  (supprime le préfixe 'BU ')",
-    "custom_field__Custom_compliance_status → complianceStatus  (AUTHORISED UPON REQUEST→AUTHORISED · BLACK LIST→BLACK LISTED · NOT AUTHORIZED INACTIVE→NOT AUTHORIZED - INACTIVE · NOT AUTHORIZED REQ→NOT AUTHORIZED REQUESTED · NOT AUTHORIZED TV→AUTHORISED)",
+    "custom_field__Custom_compliance_status → complianceStatus  (AUTHORISED UPON REQUEST→AUTHORISED · BLACK LIST→BLACK LISTED · NOT AUTHORISED INACTIVE→NOT AUTHORISED - INACTIVE · NOT AUTHORISED REQ→NOT AUTHORISED REQUESTED · NOT AUTHORISED TV→AUTHORISED)",
     "create_time → complianceCreationDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",
     "update_time → complianceLastUpdateDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",
     "date_request → complianceRequestDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",

@@ -6104,6 +6104,202 @@ const BatchContractsOldToNew = () => {
   );
 };
 
+// ─── BATCH COMPANIES — OLD TO NEW ────────────────────────────
+const BatchCompaniesOldToNew = () => {
+  const [state, setState] = useState("idle"); // idle | processing | done | error
+  const [result, setResult] = useState(null);
+  const fileRef = useRef(null);
+
+  const processFile = async (file) => {
+    setState("processing");
+    setResult(null);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      // yyyy-mm-dd hh:mm:ss → dd/mm/yyyy
+      const parseDateTime = (val) => {
+        if (!val) return "";
+        const s = String(val).trim();
+        // yyyy-mm-dd hh:mm:ss or yyyy-mm-dd hh:mm
+        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[\s\u00a0T]/);
+        if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+        // yyyy-mm-dd only
+        const d = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (d) return `${d[3]}/${d[2]}/${d[1]}`;
+        // already dd/mm/yyyy
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+        // Excel serial number
+        if (/^\d{4,5}$/.test(s)) {
+          const dt = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+          return `${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}/${dt.getFullYear()}`;
+        }
+        return s;
+      };
+
+      const COMPLIANCE_MAP = {
+        "AUTHORISED UPON REQUEST": "AUTHORISED",
+        "BLACK LIST":              "BLACK LISTED",
+        "NOT AUTHORIZED INACTIVE": "NOT AUTHORIZED - INACTIVE",
+        "NOT AUTHORIZED REQ":      "NOT AUTHORIZED REQUESTED",
+        "NOT AUTHORIZED TV":       "AUTHORISED",
+      };
+
+      const COLUMN_MAP = {
+        "ID":                                     "ref",
+        "full_name":                              "legalname",
+        "custom_field__IS_INDIVIDUAL":            "companyType",
+        "company_group__title":                   "group",
+        "country__title":                         "country",
+        "size":                                   "companySize",
+        "role_names":                             "gtRole",
+        "custom_field__Role":                     "roles",
+        "business_unit_titles":                   "businessUnit",
+        "custom_field__Custom_compliance_status": "complianceStatus",
+        "create_time":                            "complianceCreationDate",
+        "update_time":                            "complianceLastUpdateDate",
+        "date_request":                           "complianceRequestDate",
+        "date_received":                          "complianceLastReceptionDate",
+        "date_confirmation":                      "complianceFinalConfirmationDate",
+        "additional_info":                        "complianceAdditionalInfos",
+        "custom_field__USD/MAD_CLIENT":           "contractsCurrency",
+        "custom_field__Food/Feed":                "foodFeed",
+        "custom_field__WATCH_LIST":               "watchList",
+        "custom_field__Activity_status":          "status",
+      };
+
+      const DATE_COLS = new Set([
+        "complianceCreationDate", "complianceLastUpdateDate", "complianceRequestDate",
+        "complianceLastReceptionDate", "complianceFinalConfirmationDate",
+      ]);
+
+      const converted = rows.map(row => {
+        const out = {};
+        for (const [srcKey, destKey] of Object.entries(COLUMN_MAP)) {
+          // Try exact key first, then case-insensitive fallback
+          let raw = row[srcKey];
+          if (raw === undefined) {
+            const found = Object.keys(row).find(k => k === srcKey);
+            raw = found !== undefined ? row[found] : "";
+          }
+          const val = raw !== undefined && raw !== null ? String(raw).trim() : "";
+
+          // Transformations
+          if (destKey === "companyType") {
+            out[destKey] = val === "" ? "LEGAL ENTITY" : val.toLowerCase() === "true" ? "INDIVIDUAL" : val;
+          } else if (destKey === "companySize") {
+            out[destKey] = val.toUpperCase();
+          } else if (destKey === "gtRole") {
+            const parts = val.split(",").map(p => p.trim()).filter(p => p.toLowerCase() !== "other" && p !== "");
+            out[destKey] = parts.join(", ");
+          } else if (destKey === "businessUnit") {
+            const parts = val.split(",").map(p => {
+              let s = p.trim();
+              if (s.toUpperCase().startsWith("BU ")) s = s.slice(3).trim();
+              return s;
+            }).filter(p => p !== "");
+            out[destKey] = parts.join(", ");
+          } else if (destKey === "complianceStatus") {
+            const upper = val.toUpperCase();
+            out[destKey] = COMPLIANCE_MAP[upper] !== undefined ? COMPLIANCE_MAP[upper] : val;
+          } else if (DATE_COLS.has(destKey)) {
+            out[destKey] = parseDateTime(val);
+          } else {
+            out[destKey] = val;
+          }
+        }
+        // Keep any extra columns not in COLUMN_MAP as-is
+        for (const k of Object.keys(row)) {
+          if (!COLUMN_MAP[k]) out[k] = String(row[k] ?? "").trim();
+        }
+        return out;
+      });
+
+      if (converted.length === 0) {
+        setResult({ error: "Aucune ligne valide dans le fichier." });
+        setState("error");
+        return;
+      }
+
+      // Export
+      const outWs = XLSX.utils.json_to_sheet(converted);
+      outWs["!cols"] = Object.keys(converted[0]).map(k => ({ wch: Math.max(k.length + 2, 18) }));
+      const outWb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(outWb, outWs, "Companies");
+      const date = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(outWb, `companies_converted_${date}.xlsx`);
+
+      setResult({ total: rows.length, converted: converted.length });
+      setState("done");
+    } catch(e) {
+      setResult({ error: String(e) });
+      setState("error");
+    }
+  };
+
+  const MAPPING = [
+    "ID → ref",
+    "full_name → legalname",
+    "custom_field__IS_INDIVIDUAL → companyType  (vide→LEGAL ENTITY · true→INDIVIDUAL)",
+    "company_group__title → group",
+    "country__title → country",
+    "size → companySize  (mise en majuscules)",
+    "role_names → gtRole  (supprime la valeur 'other' et les virgules superflues)",
+    "custom_field__Role → roles",
+    "business_unit_titles → businessUnit  (supprime le préfixe 'BU ')",
+    "custom_field__Custom_compliance_status → complianceStatus  (AUTHORISED UPON REQUEST→AUTHORISED · BLACK LIST→BLACK LISTED · NOT AUTHORIZED INACTIVE→NOT AUTHORIZED - INACTIVE · NOT AUTHORIZED REQ→NOT AUTHORIZED REQUESTED · NOT AUTHORIZED TV→AUTHORISED)",
+    "create_time → complianceCreationDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",
+    "update_time → complianceLastUpdateDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",
+    "date_request → complianceRequestDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",
+    "date_received → complianceLastReceptionDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",
+    "date_confirmation → complianceFinalConfirmationDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",
+    "additional_info → complianceAdditionalInfos",
+    "custom_field__USD/MAD_CLIENT → contractsCurrency",
+    "custom_field__Food/Feed → foodFeed",
+    "custom_field__WATCH_LIST → watchList",
+    "custom_field__Activity_status → status",
+  ];
+
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ padding: "18px 24px", background: `${COLORS.blue}08`, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: `${COLORS.blue}20`, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>◆</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>BATCH COMPANIES — OLD TO NEW</div>
+          <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Convertit un export companies ancien format vers le format d'import de l'app</div>
+        </div>
+      </div>
+      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+        {/* Mapping info */}
+        <div style={{ fontSize: 12, color: COLORS.textMuted, background: COLORS.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
+          <div style={{ fontWeight: 700, marginBottom: 6, color: COLORS.textSub }}>Mapping appliqué :</div>
+          {MAPPING.map(m => <div key={m} style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>• {m}</div>)}
+        </div>
+
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
+          onChange={e => { if (e.target.files[0]) processFile(e.target.files[0]); e.target.value = ""; }} />
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <Btn onClick={() => { setState("idle"); setResult(null); fileRef.current?.click(); }}
+            disabled={state === "processing"} style={{ background: COLORS.blue, borderColor: COLORS.blue }}>
+            {state === "processing" ? "⟳ Traitement…" : "📂 Charger fichier Excel / CSV"}
+          </Btn>
+          {state === "done" && result && (
+            <span style={{ fontSize: 12, color: COLORS.green, fontWeight: 700 }}>
+              ✓ {result.converted} entreprises converties sur {result.total} — fichier téléchargé
+            </span>
+          )}
+          {state === "error" && <span style={{ fontSize: 12, color: COLORS.red }}>❌ {result?.error}</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -7371,6 +7567,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
       {adminTab === "batch" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <BatchCompaniesOldToNew />
           <BatchDerivativesOldToNew />
           <BatchFixingsOldToNew />
           <BatchFixingsNewToOld />
@@ -12542,8 +12739,7 @@ const setOps = async (val) => {
                       title="Regénérer une référence automatique"
                       style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, padding: "0 12px", cursor: "pointer", color: COLORS.accent, fontSize: 16, flexShrink: 0, transition: "all 0.15s" }}
                       onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}30`}
-                      onMouseOut={e => e.currentTarget.style.background = `${COLORS.accent}15`}
-                      title="Regénérer automatiquement">
+                      onMouseOut={e => e.currentTarget.style.background = `${COLORS.accent}15`}>
                       ↺
                     </button>
                   </div>

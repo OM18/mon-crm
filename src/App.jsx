@@ -6211,6 +6211,10 @@ const BatchCompaniesOldToNew = () => {
             out[destKey] = COMPLIANCE_MAP[upper] !== undefined ? COMPLIANCE_MAP[upper] : val;
           } else if (DATE_COLS.has(destKey)) {
             out[destKey] = parseDateTime(val);
+          } else if (destKey === "foodFeed") {
+            // "Food, Feed" ou "Food,Feed" → "FOOD+FEED", sinon mise en majuscules
+            const normalized = val.replace(/\s*,\s*/g, ",").toUpperCase();
+            out[destKey] = normalized === "FOOD,FEED" ? "FOOD+FEED" : val;
           } else {
             out[destKey] = val;
           }

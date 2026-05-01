@@ -6212,9 +6212,10 @@ const BatchCompaniesOldToNew = () => {
             out[destKey] = val;
           }
         }
-        // Keep any extra columns not in COLUMN_MAP as-is
+        // Keep any extra columns not in COLUMN_MAP as-is (case-insensitive exclusion)
+        const mappedSrcKeysLower = new Set(Object.keys(COLUMN_MAP).map(k => k.toLowerCase()));
         for (const k of Object.keys(row)) {
-          if (!COLUMN_MAP[k]) out[k] = String(row[k] ?? "").trim();
+          if (!mappedSrcKeysLower.has(k.toLowerCase())) out[k] = String(row[k] ?? "").trim();
         }
         return out;
       });

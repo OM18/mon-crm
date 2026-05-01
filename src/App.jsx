@@ -6178,12 +6178,13 @@ const BatchCompaniesOldToNew = () => {
 
       const converted = rows.map(row => {
         const out = {};
+        const rowKeysLower = Object.keys(row).reduce((acc, k) => { acc[k.toLowerCase()] = k; return acc; }, {});
         for (const [srcKey, destKey] of Object.entries(COLUMN_MAP)) {
-          // Try exact key first, then case-insensitive fallback
+          // Exact match first, then case-insensitive fallback
           let raw = row[srcKey];
           if (raw === undefined) {
-            const found = Object.keys(row).find(k => k === srcKey);
-            raw = found !== undefined ? row[found] : "";
+            const actualKey = rowKeysLower[srcKey.toLowerCase()];
+            raw = actualKey !== undefined ? row[actualKey] : "";
           }
           const val = raw !== undefined && raw !== null ? String(raw).trim() : "";
 

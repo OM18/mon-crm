@@ -6199,6 +6199,9 @@ const BatchCompaniesOldToNew = () => {
           } else if (destKey === "businessUnit") {
             const parts = val.split(",").map(p => {
               let s = p.trim();
+              // Supprime " BU" en suffixe (ex: "Morocco BU" → "Morocco")
+              if (s.toUpperCase().endsWith(" BU")) s = s.slice(0, -3).trim();
+              // Supprime "BU " en préfixe (ex: "BU Morocco" → "Morocco")
               if (s.toUpperCase().startsWith("BU ")) s = s.slice(3).trim();
               return s;
             }).filter(p => p !== "");

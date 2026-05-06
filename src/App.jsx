@@ -9054,9 +9054,10 @@ const ColoredStatusDropdown = ({ label, value, options, getCfg, onChange }) => {
 };
 
 // ─── COMPANY DETAIL PANEL ────────────────────────────────────
-const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, getComplianceCfg, getFinalAuthCfg, getBUCfg, getRoleCfg, getTypeCfg, onPatchCompany }) => {
+const CompanyDetailPanel = memo(({ sel, selContacts, onEdit, onDelete, getStatusCfg, getComplianceCfg, getFinalAuthCfg, getBUCfg, getRoleCfg, getTypeCfg, onPatchCompany }) => {
   const { config } = useConfig();
   const [activeTab, setActiveTab] = useState("info");
+  if (!sel) return null;
   const TABS = [
     { id: "info", label: "INFO", icon: "ℹ" },
     { id: "contacts", label: "CONTACTS", icon: "◉" },
@@ -9407,7 +9408,7 @@ const CompanyDetailPanel = ({ sel, selContacts, onEdit, onDelete, getStatusCfg, 
       </div>
     </div>
   );
-};
+});
 
 // ─── COMPANIES ────────────────────────────────────────────────
 // ─── AUTO LOGOUT ──────────────────────────────────────────────
@@ -9898,7 +9899,7 @@ const sel = useMemo(() => selected ? companies.find(c => String(c.id) === select
     } catch {}
     return "";
   };
-  const openEdit = (c) => {
+  const openEdit = useCallback((c) => {
     setForm({
       ...c,
       tags: (c.tags || []).join(", "),
@@ -9911,7 +9912,7 @@ const sel = useMemo(() => selected ? companies.find(c => String(c.id) === select
     });
     setEditCompany(c);
     setShowForm(true);
-  };
+  }, []);
   const openNew = () => { setForm(makeEmptyForm()); setEditCompany(null); setShowForm(true); };
   const toggleRole = (role) => { const cur = form.roles || []; setForm({ ...form, roles: cur.includes(role) ? cur.filter(r => r !== role) : [...cur, role] }); };
 
@@ -9943,12 +9944,12 @@ const sel = useMemo(() => selected ? companies.find(c => String(c.id) === select
     setShowForm(false); setSelected(null);
   };
 
-  const del = (id) => {
+  const del = useCallback((id) => {
     const updated = companies.filter(c => c.id !== id);
     setCompanies(updated);
     saveLargeTable('companies', updated);
     setSelected(null);
-  };
+  }, [companies]);
 
   const selContacts = useMemo(() => sel ? contacts.filter(c => c.companyId === sel.id) : [], [sel, contacts]);
 
@@ -10300,17 +10301,19 @@ return (
         </div>
       </div>
 
-      {/* Panel — width 0 quand fermé pour ne pas créer de bande noire */}
+      {/* Panel toujours monté — évite le coût de mount/unmount à chaque changement de sélection */}
       <div style={{ marginLeft: sel ? 20 : 0, width: sel ? 500 : 0, flexShrink: 0, overflow: "hidden", transition: "width 0.15s, margin 0.15s" }}>
-        {sel && <CompanyDetailPanel sel={sel} selContacts={selContacts} onEdit={() => openEdit(sel)} onDelete={() => del(sel.id)}
+        <CompanyDetailPanel sel={sel} selContacts={selContacts}
+          onEdit={() => sel && openEdit(sel)} onDelete={() => sel && del(sel.id)}
           getStatusCfg={getStatusCfg} getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg}
           getBUCfg={getBUCfg} getRoleCfg={getRoleCfg} getTypeCfg={getTypeCfg}
-          onPatchCompany={(patch) => {
+          onPatchCompany={useCallback((patch) => {
+            if (!sel) return;
             const tz = config.companyTimezone || 'Europe/Paris';
             const updated = companies.map(c => c.id === sel.id ? { ...c, ...patch, complianceLastUpdateDate: nowInTz(tz) } : c);
             setCompanies(updated);
             saveLargeTable('companies', updated);
-          }} />}
+          }, [sel, companies, config.companyTimezone])} />
       </div>
 
 

@@ -9546,15 +9546,26 @@ const LoginPage = ({ onLogin }) => {
   );
 };
 
-const VirtualList = ({ items, itemHeight, containerHeight, renderItem, emptyMessage }) => {
+const VirtualList = ({ items, itemHeight, renderItem, emptyMessage }) => {
   const [scrollTop, setScrollTop] = useState(0);
+  const [viewHeight, setViewHeight] = useState(600);
   const containerRef = useRef(null);
   const gap = 6;
   const rowHeight = itemHeight + gap;
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setViewHeight(el.clientHeight);
+    const ro = new ResizeObserver(([entry]) => setViewHeight(entry.contentRect.height));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const totalHeight = items.length * rowHeight;
-  const visibleCount = Math.ceil(containerHeight / rowHeight) + 4;
-  const startIdx = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
-  const endIdx = Math.min(items.length, startIdx + visibleCount);
+  const OVERSCAN = 3;
+  const startIdx = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERSCAN);
+  const endIdx = Math.min(items.length, startIdx + Math.ceil(viewHeight / rowHeight) + OVERSCAN * 2);
   const visibleItems = items.slice(startIdx, endIdx);
   const offsetY = startIdx * rowHeight;
 
@@ -9572,41 +9583,6 @@ const VirtualList = ({ items, itemHeight, containerHeight, renderItem, emptyMess
     </div>
   );
 };
-
-// ─── VIRTUAL LIST ─────────────────────────────────────────────
-// Rend uniquement les rows visibles → élimine le freeze sur les grandes listes
-const VirtualList = memo(({ items, rowHeight, renderRow, containerStyle = {} }) => {
-  const containerRef = useRef(null);
-  const [scrollTop, setScrollTop] = useState(0);
-  const [viewHeight, setViewHeight] = useState(600);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    setViewHeight(el.clientHeight);
-    const onScroll = () => setScrollTop(el.scrollTop);
-    const onResize = () => setViewHeight(el.clientHeight);
-    el.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onResize);
-    return () => { el.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onResize); };
-  }, []);
-
-  const OVERSCAN = 5;
-  const totalHeight = items.length * rowHeight;
-  const startIdx = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERSCAN);
-  const endIdx   = Math.min(items.length - 1, Math.ceil((scrollTop + viewHeight) / rowHeight) + OVERSCAN);
-  const visibleItems = items.slice(startIdx, endIdx + 1);
-
-  return (
-    <div ref={containerRef} style={{ overflowY: 'auto', flex: 1, ...containerStyle }}>
-      <div style={{ height: totalHeight, position: 'relative' }}>
-        <div style={{ position: 'absolute', top: startIdx * rowHeight, left: 0, right: 0 }}>
-          {visibleItems.map((item, i) => renderRow(item, startIdx + i))}
-        </div>
-      </div>
-    </div>
-  );
-});
 
 const CompanyRow = memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, config }) => (
   <div onClick={onSelect} style={{
@@ -10352,20 +10328,15 @@ return (
           ))}
         </div>
 
-        {filtered.length === 0
-          ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>
-          : <VirtualList
-              items={filtered}
-              rowHeight={72}
-              containerStyle={{ flex: 1 }}
-              renderRow={(c) => (
-                <div key={c.id} style={{ padding: "3px 0" }}>
-                  <CompanyRow c={c} isSelected={selected === String(c.id)} onSelect={() => handleSelect(c.id)}
-                    getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} config={config} />
-                </div>
-              )}
-            />
-        }
+        <VirtualList
+          items={filtered}
+          itemHeight={66}
+          emptyMessage="Aucune société trouvée"
+          renderItem={(c) => (
+            <CompanyRow key={c.id} c={c} isSelected={selected === String(c.id)} onSelect={() => handleSelect(c.id)}
+              getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} config={config} />
+          )}
+        />
       </div>
 
       {sel && <div style={{ marginLeft: 20 }}><CompanyDetailPanel sel={sel} selContacts={selContacts} onEdit={() => openEdit(sel)} onDelete={() => del(sel.id)}

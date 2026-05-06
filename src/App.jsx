@@ -9890,7 +9890,7 @@ const passFilters = filterMode === "AND"
   return toNum(b.complianceCreationDate) - toNum(a.complianceCreationDate);
 }), [companies, search, activeFilters, excludeFilters, onlyFilters, customFilters, filterMode]);
 
-const sel = useMemo(() => selected ? filtered.find(c => c.id === selected) : null, [selected, filtered]);
+const sel = useMemo(() => selected ? companies.find(c => c.id === selected) : null, [selected, companies]);
   const normDateTimeLocal = (val) => {
     if (!val) return "";
     const s = val.toString().trim();

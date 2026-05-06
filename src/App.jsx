@@ -359,9 +359,7 @@ const ConfigProvider = ({ children }) => {
     setUserModified(true);
     setConfig(prev => ({ ...prev, [fieldKey]: newValues }));
   }, []);
-
   const contextValue = useMemo(() => ({ config, updateField }), [config, updateField]);
-
   return (
     <ConfigContext.Provider value={contextValue}>
       {children}
@@ -9994,7 +9992,7 @@ const sel = useMemo(() => selected ? companies.find(c => String(c.id) === select
 
   return (
 <div style={{ display: "flex", gap: 0, height: "calc(100vh - 60px)", overflow: "hidden" }}>
-<div style={{ flex: sel ? 1 : "1 1 100%", display: "flex", flexDirection: "column", minWidth: 0 }}>
+<div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
 
         <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
           <input placeholder="Search a company..." value={search} onChange={e => setSearch(e.target.value)}
@@ -10290,7 +10288,7 @@ return (
           ))}
         </div>
 
-        <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 6, contain: "strict" }}>
+        <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
           {filtered.length === 0
             ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>
             : filtered.map(c => (
@@ -10301,15 +10299,18 @@ return (
         </div>
       </div>
 
-      {sel && <div style={{ marginLeft: 20 }}><CompanyDetailPanel sel={sel} selContacts={selContacts} onEdit={() => openEdit(sel)} onDelete={() => del(sel.id)}
-        getStatusCfg={getStatusCfg} getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg}
-        getBUCfg={getBUCfg} getRoleCfg={getRoleCfg} getTypeCfg={getTypeCfg}
-        onPatchCompany={(patch) => {
-          const tz = config.companyTimezone || 'Europe/Paris';
-          const updated = companies.map(c => c.id === sel.id ? { ...c, ...patch, complianceLastUpdateDate: nowInTz(tz) } : c);
-          setCompanies(updated);
-          saveLargeTable('companies', updated);
-        }} /></div>}
+      {/* Panel toujours dans le DOM — visibility:hidden évite le reflow au clic */}
+      <div style={{ marginLeft: 20, visibility: sel ? "visible" : "hidden", width: 500, flexShrink: 0 }}>
+        {sel && <CompanyDetailPanel sel={sel} selContacts={selContacts} onEdit={() => openEdit(sel)} onDelete={() => del(sel.id)}
+          getStatusCfg={getStatusCfg} getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg}
+          getBUCfg={getBUCfg} getRoleCfg={getRoleCfg} getTypeCfg={getTypeCfg}
+          onPatchCompany={(patch) => {
+            const tz = config.companyTimezone || 'Europe/Paris';
+            const updated = companies.map(c => c.id === sel.id ? { ...c, ...patch, complianceLastUpdateDate: nowInTz(tz) } : c);
+            setCompanies(updated);
+            saveLargeTable('companies', updated);
+          }} />}
+      </div>
 
 
       {showForm && (

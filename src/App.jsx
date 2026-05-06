@@ -9545,6 +9545,33 @@ const LoginPage = ({ onLogin }) => {
   );
 };
 
+const VirtualList = ({ items, itemHeight, containerHeight, renderItem, emptyMessage }) => {
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef(null);
+  const gap = 6;
+  const rowHeight = itemHeight + gap;
+  const totalHeight = items.length * rowHeight;
+  const visibleCount = Math.ceil(containerHeight / rowHeight) + 4;
+  const startIdx = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
+  const endIdx = Math.min(items.length, startIdx + visibleCount);
+  const visibleItems = items.slice(startIdx, endIdx);
+  const offsetY = startIdx * rowHeight;
+
+  return (
+    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
+      style={{ overflowY: "auto", flex: 1, position: "relative" }}>
+      {items.length === 0
+        ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>{emptyMessage}</div>
+        : <div style={{ height: totalHeight, position: "relative" }}>
+            <div style={{ position: "absolute", top: offsetY, left: 0, right: 0, display: "flex", flexDirection: "column", gap }}>
+              {visibleItems.map(item => renderItem(item))}
+            </div>
+          </div>
+      }
+    </div>
+  );
+};
+
 const CompanyRow = memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, config }) => (
   <div onClick={onSelect} style={{
     background: isSelected ? `${COLORS.purple}12` : COLORS.card,
@@ -9863,7 +9890,7 @@ const passFilters = filterMode === "AND"
 }).sort((a, b) => {
   const toNum = v => { if (!v) return 0; const n = parseFloat(v.toString()); return isNaN(n) ? 0 : n; };
   return toNum(b.complianceCreationDate) - toNum(a.complianceCreationDate);
-}).filter((c, idx, arr) => arr.findIndex(x => String(x.id) === String(c.id)) === idx), // dédupliquer par id
+}).filter((c, i, arr) => arr.findIndex(x => String(x.id) === String(c.id)) === i),
 [companies, search, activeFilters, excludeFilters, onlyFilters, customFilters, filterMode]);
 
 const sel = useMemo(() => selected ? companies.find(c => String(c.id) === selected) : null, [selected, companies]);
@@ -9899,7 +9926,7 @@ const sel = useMemo(() => selected ? companies.find(c => String(c.id) === select
     } catch {}
     return "";
   };
-  const openEdit = useCallback((c) => {
+  const openEdit = (c) => {
     setForm({
       ...c,
       tags: (c.tags || []).join(", "),
@@ -9912,7 +9939,7 @@ const sel = useMemo(() => selected ? companies.find(c => String(c.id) === select
     });
     setEditCompany(c);
     setShowForm(true);
-  }, []);
+  };
   const openNew = () => { setForm(makeEmptyForm()); setEditCompany(null); setShowForm(true); };
   const toggleRole = (role) => { const cur = form.roles || []; setForm({ ...form, roles: cur.includes(role) ? cur.filter(r => r !== role) : [...cur, role] }); };
 
@@ -9944,12 +9971,12 @@ const sel = useMemo(() => selected ? companies.find(c => String(c.id) === select
     setShowForm(false); setSelected(null);
   };
 
-  const del = useCallback((id) => {
+  const del = (id) => {
     const updated = companies.filter(c => c.id !== id);
     setCompanies(updated);
     saveLargeTable('companies', updated);
     setSelected(null);
-  }, [companies]);
+  };
 
   const selContacts = useMemo(() => sel ? contacts.filter(c => c.companyId === sel.id) : [], [sel, contacts]);
 
@@ -10301,19 +10328,19 @@ return (
         </div>
       </div>
 
-      {/* Panel toujours monté — évite le coût de mount/unmount à chaque changement de sélection */}
+      {/* Panel toujours monté — width 0 quand fermé, évite mount/unmount coûteux */}
       <div style={{ marginLeft: sel ? 20 : 0, width: sel ? 500 : 0, flexShrink: 0, overflow: "hidden", transition: "width 0.15s, margin 0.15s" }}>
         <CompanyDetailPanel sel={sel} selContacts={selContacts}
           onEdit={() => sel && openEdit(sel)} onDelete={() => sel && del(sel.id)}
           getStatusCfg={getStatusCfg} getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg}
           getBUCfg={getBUCfg} getRoleCfg={getRoleCfg} getTypeCfg={getTypeCfg}
-          onPatchCompany={useCallback((patch) => {
+          onPatchCompany={(patch) => {
             if (!sel) return;
             const tz = config.companyTimezone || 'Europe/Paris';
             const updated = companies.map(c => c.id === sel.id ? { ...c, ...patch, complianceLastUpdateDate: nowInTz(tz) } : c);
             setCompanies(updated);
             saveLargeTable('companies', updated);
-          }, [sel, companies, config.companyTimezone])} />
+          }} />
       </div>
 
 
@@ -17255,12 +17282,12 @@ export default function CRM() {
   useEffect(() => {
     async function loadAllPages(table) {
       const PAGE = 1000;
-      let all = [];
+      const all = [];  // push() au lieu de spread — évite les allocations mémoire à chaque page
       let from = 0;
       while (true) {
         const { data, error } = await supabase.from(table).select('data').range(from, from + PAGE - 1);
         if (error || !data || data.length === 0) break;
-        all = [...all, ...data.map(r => r.data ?? r)];
+        for (const r of data) all.push(r.data ?? r);
         if (data.length < PAGE) break;
         from += PAGE;
       }
@@ -17275,6 +17302,7 @@ export default function CRM() {
         loadAllPages('derivatives'),
         loadAllPages('fixings'),
       ]);
+      // Un seul batch de setState — React 18 les regroupe automatiquement en un seul re-render
       if (contacts.length) setContacts(contacts);
       if (companies.length) setCompanies(companies);
       if (tasks.length) setTasks(tasks);
@@ -17296,7 +17324,13 @@ export default function CRM() {
 
   // Companies and contacts are saved explicitly on each action (no auto-save to avoid overwrite issues with large datasets)
 
+  // Ne sauvegarder les tasks que sur les vrais changements utilisateur, pas au chargement initial
+  const tasksInitialized = useRef(false);
   useEffect(() => {
+    if (!tasksInitialized.current) {
+      tasksInitialized.current = true;
+      return; // skip le premier render (données venant de Supabase)
+    }
     async function saveTasks() {
       await supabase.from('tasks').delete().neq('id', 0);
       if (tasks.length > 0) {

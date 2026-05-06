@@ -9862,7 +9862,8 @@ const passFilters = filterMode === "AND"
 }).sort((a, b) => {
   const toNum = v => { if (!v) return 0; const n = parseFloat(v.toString()); return isNaN(n) ? 0 : n; };
   return toNum(b.complianceCreationDate) - toNum(a.complianceCreationDate);
-}), [companies, search, activeFilters, excludeFilters, onlyFilters, customFilters, filterMode]);
+}).filter((c, idx, arr) => arr.findIndex(x => String(x.id) === String(c.id)) === idx), // dédupliquer par id
+[companies, search, activeFilters, excludeFilters, onlyFilters, customFilters, filterMode]);
 
 const sel = useMemo(() => selected ? companies.find(c => String(c.id) === selected) : null, [selected, companies]);
   const normDateTimeLocal = (val) => {
@@ -10299,8 +10300,8 @@ return (
         </div>
       </div>
 
-      {/* Panel toujours dans le DOM — visibility:hidden évite le reflow au clic */}
-      <div style={{ marginLeft: 20, visibility: sel ? "visible" : "hidden", width: 500, flexShrink: 0 }}>
+      {/* Panel — width 0 quand fermé pour ne pas créer de bande noire */}
+      <div style={{ marginLeft: sel ? 20 : 0, width: sel ? 500 : 0, flexShrink: 0, overflow: "hidden", transition: "width 0.15s, margin 0.15s" }}>
         {sel && <CompanyDetailPanel sel={sel} selContacts={selContacts} onEdit={() => openEdit(sel)} onDelete={() => del(sel.id)}
           getStatusCfg={getStatusCfg} getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg}
           getBUCfg={getBUCfg} getRoleCfg={getRoleCfg} getTypeCfg={getTypeCfg}

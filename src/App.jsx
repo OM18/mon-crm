@@ -9571,7 +9571,7 @@ const VirtualList = ({ items, itemHeight, containerHeight, renderItem, emptyMess
   );
 };
 
-const CompanyRow = ({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, config }) => (
+const CompanyRow = memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, config }) => (
   <div onClick={onSelect} style={{
     background: isSelected ? `${COLORS.purple}12` : COLORS.card,
     border: `1px solid ${isSelected ? COLORS.purple : COLORS.border}`,
@@ -9625,7 +9625,7 @@ const CompanyRow = ({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg
         : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
     </div>
   </div>
-);
+));
 
 // ─── COMPANY EXPORT MODAL ────────────────────────────────────
 const COMPANY_EXPORT_HEADERS = [
@@ -9754,6 +9754,7 @@ useEffect(() => {
 }, []);
 
   const [selected, setSelected] = useState(null);
+  const handleSelect = useCallback((id) => setSelected(prev => prev === id ? null : id), []);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [editCompany, setEditCompany] = useState(null);
@@ -9975,7 +9976,7 @@ const sel = useMemo(() => selected ? companies.find(c => c.id === selected) : nu
     setSelected(null);
   };
 
-  const selContacts = sel ? contacts.filter(c => c.companyId === sel.id) : [];
+  const selContacts = useMemo(() => sel ? contacts.filter(c => c.companyId === sel.id) : [], [sel, contacts]);
 
   const getStatusCfg = (v) => config.activityStatus.find(s => s.value === v) || { label: v || "—", color: COLORS.textSub };
   const COMPLIANCE_LEGACY_MAP = {
@@ -9992,7 +9993,7 @@ const sel = useMemo(() => selected ? companies.find(c => c.id === selected) : nu
     "authorized_upon_request": "authorized_upon_request",
     "blacklisted": "blacklisted",
   };
-  const getComplianceCfg = (v) => {
+  const getComplianceCfg = useCallback((v) => {
     if (!v) return { label: "—", color: COLORS.textSub };
     const norm = s => s?.toLowerCase().replace(/[\s_\-]+/g, "");
     const mapped = COMPLIANCE_LEGACY_MAP[v] || COMPLIANCE_LEGACY_MAP[v?.toLowerCase()];
@@ -10001,8 +10002,8 @@ const sel = useMemo(() => selected ? companies.find(c => c.id === selected) : nu
       || config.complianceStatus.find(s => norm(s.label) === norm(v))
       || (mapped && config.complianceStatus.find(s => s.value === mapped))
       || { label: v, color: COLORS.textSub };
-  };
-  const getFinalAuthCfg = (v) => {
+  }, [config.complianceStatus]);
+  const getFinalAuthCfg = useCallback((v) => {
     if (!v) return { label: "—", color: COLORS.textSub };
     const norm = s => s?.toLowerCase().replace(/[\s_\-]+/g, "");
     const mapped = COMPLIANCE_LEGACY_MAP[v] || COMPLIANCE_LEGACY_MAP[v?.toLowerCase()];
@@ -10011,10 +10012,10 @@ const sel = useMemo(() => selected ? companies.find(c => c.id === selected) : nu
       || config.finalAuthStatus.find(s => norm(s.label) === norm(v))
       || (mapped && config.finalAuthStatus.find(s => s.value === mapped))
       || { label: v, color: COLORS.textSub };
-  };
-  const getBUCfg = (v) => config.businessUnit.find(s => s.value === v) || { label: v || "—", color: COLORS.accent };
-  const getRoleCfg = (v) => config.roles.find(r => r.value === v) || { color: COLORS.accent };
-  const getTypeCfg = (v) => config.companyType.find(s => s.value === v) || { label: v || "—", color: COLORS.blue };
+  }, [config.finalAuthStatus]);
+  const getBUCfg = useCallback((v) => config.businessUnit.find(s => s.value === v) || { label: v || "—", color: COLORS.accent }, [config.businessUnit]);
+  const getRoleCfg = useCallback((v) => config.roles.find(r => r.value === v) || { color: COLORS.accent }, [config.roles]);
+  const getTypeCfg = useCallback((v) => config.companyType.find(s => s.value === v) || { label: v || "—", color: COLORS.blue }, [config.companyType]);
 
   return (
 <div style={{ display: "flex", gap: 0, height: "calc(100vh - 60px)", overflow: "hidden" }}>
@@ -10318,7 +10319,7 @@ return (
           {filtered.length === 0
             ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>
             : filtered.map(c => (
-                <CompanyRow key={c.id} c={c} isSelected={selected === c.id} onSelect={() => setSelected(c.id === selected ? null : c.id)}
+                <CompanyRow key={c.id} c={c} isSelected={selected === c.id} onSelect={() => handleSelect(c.id)}
                   getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} config={config} />
               ))
           }

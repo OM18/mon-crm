@@ -9546,43 +9546,8 @@ const LoginPage = ({ onLogin }) => {
   );
 };
 
-const VirtualList = ({ items, itemHeight, renderItem, emptyMessage }) => {
-  const [scrollTop, setScrollTop] = useState(0);
-  const [viewHeight, setViewHeight] = useState(600);
-  const containerRef = useRef(null);
-  const gap = 6;
-  const rowHeight = itemHeight + gap;
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    setViewHeight(el.clientHeight);
-    const ro = new ResizeObserver(([entry]) => setViewHeight(entry.contentRect.height));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const totalHeight = items.length * rowHeight;
-  const OVERSCAN = 3;
-  const startIdx = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERSCAN);
-  const endIdx = Math.min(items.length, startIdx + Math.ceil(viewHeight / rowHeight) + OVERSCAN * 2);
-  const visibleItems = items.slice(startIdx, endIdx);
-  const offsetY = startIdx * rowHeight;
-
-  return (
-    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
-      style={{ overflowY: "auto", flex: 1, position: "relative" }}>
-      {items.length === 0
-        ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>{emptyMessage}</div>
-        : <div style={{ height: totalHeight, position: "relative" }}>
-            <div style={{ position: "absolute", top: offsetY, left: 0, right: 0, display: "flex", flexDirection: "column", gap }}>
-              {visibleItems.map(item => renderItem(item))}
-            </div>
-          </div>
-      }
-    </div>
-  );
-};
+// VirtualList remplacé par scroll simple — la virtualisation avec hauteur variable causait des doublons visuels
+// Les optimisations memo/useCallback sur CompanyRow suffisent pour les performances
 
 const CompanyRow = memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, config }) => (
   <div onClick={onSelect} style={{
@@ -10328,15 +10293,15 @@ return (
           ))}
         </div>
 
-        <VirtualList
-          items={filtered}
-          itemHeight={66}
-          emptyMessage="Aucune société trouvée"
-          renderItem={(c) => (
-            <CompanyRow key={c.id} c={c} isSelected={selected === String(c.id)} onSelect={() => handleSelect(c.id)}
-              getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} config={config} />
-          )}
-        />
+        <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+          {filtered.length === 0
+            ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>
+            : filtered.map(c => (
+                <CompanyRow key={String(c.id)} c={c} isSelected={selected === String(c.id)} onSelect={() => handleSelect(c.id)}
+                  getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} config={config} />
+              ))
+          }
+        </div>
       </div>
 
       {sel && <div style={{ marginLeft: 20 }}><CompanyDetailPanel sel={sel} selContacts={selContacts} onEdit={() => openEdit(sel)} onDelete={() => del(sel.id)}

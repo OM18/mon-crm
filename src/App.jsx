@@ -355,13 +355,15 @@ const ConfigProvider = ({ children }) => {
     }
   }, [config, loaded, userModified]);
 
-  const updateField = (fieldKey, newValues) => {
+  const updateField = useCallback((fieldKey, newValues) => {
     setUserModified(true);
     setConfig(prev => ({ ...prev, [fieldKey]: newValues }));
-  };
+  }, []);
+
+  const contextValue = useMemo(() => ({ config, updateField }), [config, updateField]);
 
   return (
-    <ConfigContext.Provider value={{ config, updateField }}>
+    <ConfigContext.Provider value={contextValue}>
       {children}
     </ConfigContext.Provider>
   );
@@ -9754,7 +9756,8 @@ useEffect(() => {
 }, []);
 
   const [selected, setSelected] = useState(null);
-  const handleSelect = useCallback((id) => setSelected(prev => prev === id ? null : id), []);
+  // IDs normalisés en String pour éviter les faux positifs number vs string (double-sélection)
+  const handleSelect = useCallback((id) => setSelected(prev => prev === String(id) ? null : String(id)), []);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [editCompany, setEditCompany] = useState(null);
@@ -9891,7 +9894,7 @@ const passFilters = filterMode === "AND"
   return toNum(b.complianceCreationDate) - toNum(a.complianceCreationDate);
 }), [companies, search, activeFilters, excludeFilters, onlyFilters, customFilters, filterMode]);
 
-const sel = useMemo(() => selected ? companies.find(c => c.id === selected) : null, [selected, companies]);
+const sel = useMemo(() => selected ? companies.find(c => String(c.id) === selected) : null, [selected, companies]);
   const normDateTimeLocal = (val) => {
     if (!val) return "";
     const s = val.toString().trim();
@@ -10319,7 +10322,7 @@ return (
           {filtered.length === 0
             ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>
             : filtered.map(c => (
-                <CompanyRow key={c.id} c={c} isSelected={selected === c.id} onSelect={() => handleSelect(c.id)}
+                <CompanyRow key={c.id} c={c} isSelected={selected === String(c.id)} onSelect={() => handleSelect(c.id)}
                   getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} config={config} />
               ))
           }
@@ -17319,12 +17322,19 @@ export default function CRM() {
   useEffect(() => {
     async function saveTasks() {
       await supabase.from('tasks').delete().neq('id', 0);
-      for (const t of tasks) await supabase.from('tasks').insert({ data: t });
+      if (tasks.length > 0) {
+        // Batch insert en une seule requête au lieu d'une boucle séquentielle
+        const CHUNK = 100;
+        for (let i = 0; i < tasks.length; i += CHUNK) {
+          const chunk = tasks.slice(i, i + CHUNK).map(t => ({ data: t }));
+          await supabase.from('tasks').insert(chunk);
+        }
+      }
     }
     saveTasks();
   }, [tasks]);
 
-  const NavItem = ({ n, isAdmin = false }) => (
+  const NavItem = useCallback(({ n, isAdmin = false }) => (
     <div onClick={() => setPage(n.id)} style={{
       display: "flex", alignItems: "center", gap: 12, padding: "11px 24px", cursor: "pointer", transition: "all 0.15s",
       background: page === n.id ? (isAdmin ? `${COLORS.gold}18` : `${COLORS.accent}18`) : "transparent",
@@ -17334,7 +17344,7 @@ export default function CRM() {
       <span style={{ fontSize: 14 }}>{n.icon}</span>
       <span style={{ fontSize: 14, fontWeight: page === n.id ? 700 : 500 }}>{n.label.toUpperCase()}</span>
     </div>
-  );
+  ), [page]);
 
     if (!currentUser) return <LoginPage onLogin={handleLogin} />;
 

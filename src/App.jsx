@@ -9573,6 +9573,41 @@ const VirtualList = ({ items, itemHeight, containerHeight, renderItem, emptyMess
   );
 };
 
+// ─── VIRTUAL LIST ─────────────────────────────────────────────
+// Rend uniquement les rows visibles → élimine le freeze sur les grandes listes
+const VirtualList = memo(({ items, rowHeight, renderRow, containerStyle = {} }) => {
+  const containerRef = useRef(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewHeight, setViewHeight] = useState(600);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setViewHeight(el.clientHeight);
+    const onScroll = () => setScrollTop(el.scrollTop);
+    const onResize = () => setViewHeight(el.clientHeight);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize);
+    return () => { el.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onResize); };
+  }, []);
+
+  const OVERSCAN = 5;
+  const totalHeight = items.length * rowHeight;
+  const startIdx = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERSCAN);
+  const endIdx   = Math.min(items.length - 1, Math.ceil((scrollTop + viewHeight) / rowHeight) + OVERSCAN);
+  const visibleItems = items.slice(startIdx, endIdx + 1);
+
+  return (
+    <div ref={containerRef} style={{ overflowY: 'auto', flex: 1, ...containerStyle }}>
+      <div style={{ height: totalHeight, position: 'relative' }}>
+        <div style={{ position: 'absolute', top: startIdx * rowHeight, left: 0, right: 0 }}>
+          {visibleItems.map((item, i) => renderRow(item, startIdx + i))}
+        </div>
+      </div>
+    </div>
+  );
+});
+
 const CompanyRow = memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, config }) => (
   <div onClick={onSelect} style={{
     background: isSelected ? `${COLORS.purple}12` : COLORS.card,
@@ -9756,7 +9791,6 @@ useEffect(() => {
 }, []);
 
   const [selected, setSelected] = useState(null);
-  // IDs normalisés en String pour éviter les faux positifs number vs string (double-sélection)
   const handleSelect = useCallback((id) => setSelected(prev => prev === String(id) ? null : String(id)), []);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -10318,15 +10352,20 @@ return (
           ))}
         </div>
 
-        <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-          {filtered.length === 0
-            ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>
-            : filtered.map(c => (
-                <CompanyRow key={c.id} c={c} isSelected={selected === String(c.id)} onSelect={() => handleSelect(c.id)}
-                  getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} config={config} />
-              ))
-          }
-        </div>
+        {filtered.length === 0
+          ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>
+          : <VirtualList
+              items={filtered}
+              rowHeight={72}
+              containerStyle={{ flex: 1 }}
+              renderRow={(c) => (
+                <div key={c.id} style={{ padding: "3px 0" }}>
+                  <CompanyRow c={c} isSelected={selected === String(c.id)} onSelect={() => handleSelect(c.id)}
+                    getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} config={config} />
+                </div>
+              )}
+            />
+        }
       </div>
 
       {sel && <div style={{ marginLeft: 20 }}><CompanyDetailPanel sel={sel} selContacts={selContacts} onEdit={() => openEdit(sel)} onDelete={() => del(sel.id)}
@@ -17323,7 +17362,6 @@ export default function CRM() {
     async function saveTasks() {
       await supabase.from('tasks').delete().neq('id', 0);
       if (tasks.length > 0) {
-        // Batch insert en une seule requête au lieu d'une boucle séquentielle
         const CHUNK = 100;
         for (let i = 0; i < tasks.length; i += CHUNK) {
           const chunk = tasks.slice(i, i + CHUNK).map(t => ({ data: t }));

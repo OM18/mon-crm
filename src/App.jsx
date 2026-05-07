@@ -9421,6 +9421,7 @@ const useAutoLogout = (currentUser, onLogout) => {
   const timerRef    = useRef(null);
   const warningRef  = useRef(null);
   const countRef    = useRef(null);
+  const showWarningRef = useRef(false); // évite des setState inutiles
 
   const clearAll = () => {
     clearTimeout(timerRef.current);
@@ -9431,18 +9432,25 @@ const useAutoLogout = (currentUser, onLogout) => {
   const logout = useCallback(() => {
     clearAll();
     setShowWarning(false);
+    showWarningRef.current = false;
     onLogout();
   }, [onLogout]);
 
   const resetTimer = useCallback(() => {
     if (!currentUser) return;
     clearAll();
-    setShowWarning(false);
-    setSecondsLeft(60);
+    // Ne pas appeler setShowWarning/setSecondsLeft si le warning n'est pas affiché
+    // → évite 2 setState à chaque clic souris qui re-renderaient tout l'arbre CRM
+    if (showWarningRef.current) {
+      setShowWarning(false);
+      setSecondsLeft(60);
+      showWarningRef.current = false;
+    }
 
     // Show warning 1 min before logout
     warningRef.current = setTimeout(() => {
       setShowWarning(true);
+      showWarningRef.current = true;
       setSecondsLeft(60);
       countRef.current = setInterval(() => {
         setSecondsLeft(s => {
@@ -9697,7 +9705,7 @@ const CompanyExportModal = ({ all, filtered, onClose }) => {
   );
 };
 
-const Companies = ({ companies, setCompanies, contacts }) => {
+const Companies = memo(({ companies, setCompanies, contacts }) => {
   const { config, updateField } = useConfig();
   const [search, setSearch] = useState("");
   const [activeViewId, setActiveViewId] = useState(null);
@@ -10537,7 +10545,7 @@ return (
       {showExport && <CompanyExportModal all={companies} filtered={filtered} onClose={() => setShowExport(false)} />}
     </div>
   );
-};
+});
 
 // ─── CONTACTS ─────────────────────────────────────────────────
 

@@ -8433,10 +8433,21 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
         obj.internalDeal = String(obj.internalDeal || "").toLowerCase() === "true";
         // Normalize status
         if (obj.status) obj.status = obj.status.toString().toUpperCase().trim();
-        // Validate config-linked fields
+        // Validate config-linked fields (skip only if value is truly absent AND field is not required)
+        const DERIV_REQUIRED_KEYS = new Set(["type", "opType", "side", "businessUnit"]);
         Object.entries(DERIV_FIELD_CONFIG_MAP).forEach(([fieldKey, { configKey, label, getValue }]) => {
           const val = obj[fieldKey];
-          if (!val) return;
+          // Always flag missing required config fields; skip optional ones if empty
+          if (!val) {
+            if (DERIV_REQUIRED_KEYS.has(fieldKey)) {
+              const uKey = `missing_${fieldKey}`;
+              if (!unknowns[uKey]) unknowns[uKey] = {
+                fieldKey, configKey: `missing_${fieldKey}`,
+                fieldLabel: label, value: "(vide)", missingRequired: true
+              };
+            }
+            return;
+          }
           const found = getValue(val, config);
           if (!found) {
             const key = `${configKey}:${val}`;
@@ -8486,9 +8497,37 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
           if (!found) {
             const key = `derivProducts:${obj.instrument}`;
             if (!unknowns[key]) unknowns[key] = { fieldKey: "instrument", configKey: "derivProducts", fieldLabel: "Instrument", value: obj.instrument };
-          } else if (!obj.exchange && found.stoxxExchange) {
+          } else {
             // Auto-fill exchange from product if not provided
-            obj.exchange = found.stoxxExchange;
+            if (!obj.exchange && found.stoxxExchange) obj.exchange = found.stoxxExchange;
+            // Validate price against instrument tick size
+            if (obj.price && found.tickSize) {
+              const parseTickSize = (ts) => {
+                const s = String(ts).trim();
+                const frac = s.match(/^(\d+)\s*\/\s*(\d+)$/);
+                if (frac) return parseFloat(frac[1]) / parseFloat(frac[2]);
+                const dec = parseFloat(s.replace(",", "."));
+                return isNaN(dec) ? null : dec;
+              };
+              const tick = parseTickSize(found.tickSize);
+              const priceNum = parseFloat(String(obj.price).replace(",", "."));
+              if (tick && tick > 0 && !isNaN(priceNum)) {
+                const remainder = Math.abs(priceNum % tick);
+                const isMultiple = remainder < tick * 0.0001 || Math.abs(remainder - tick) < tick * 0.0001;
+                if (!isMultiple) {
+                  const uKey = `tickError:${obj.instrument}:${obj.price}`;
+                  if (!unknowns[uKey]) unknowns[uKey] = {
+                    fieldKey: "price",
+                    configKey: "tickError",
+                    fieldLabel: "Prix",
+                    value: obj.price,
+                    tickError: true,
+                    tickSize: found.tickSize,
+                    instrument: obj.instrument,
+                  };
+                }
+              }
+            }
           }
         }
         // Validate broker against companies list
@@ -8908,7 +8947,24 @@ if (Array.isArray(resolved.contractsCurrency)) {
             <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.gold}40`, borderRadius: 16, padding: 28, textAlign: "center" }}>
               <div style={{ fontSize: 13, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, marginBottom: 10 }}>CHAMP : {currentItem.fieldLabel.toUpperCase()}</div>
               <div style={{ fontSize: 28, fontWeight: 800, color: COLORS.gold, marginBottom: 10, fontFamily: "'Inter', sans-serif" }}>"{currentItem.value}"</div>
-              {currentItem.unknownAccount ? (
+ {currentItem.tickError ? (
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 20, lineHeight: 1.8 }}>
+                    <span style={{ color: COLORS.orange, fontWeight: 600 }}>⚠ Prix non conforme au tick minimum.</span><br />
+                    L&#39;instrument <strong style={{ color: COLORS.text }}>{currentItem.instrument}</strong> a un tick de <strong style={{ color: COLORS.accent }}>{currentItem.tickSize}</strong>.<br />
+                    Le prix importé <strong style={{ color: COLORS.red }}>{currentItem.value}</strong> n&#39;est pas un multiple de ce tick.<br />
+                    <span style={{ color: COLORS.textMuted, fontSize: 12 }}>Corrigez votre fichier Excel puis relancez l&#39;import.</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                    <button onClick={() => handleDecision("skip")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.red}15`, border: `1.5px solid ${COLORS.red}40`, color: COLORS.red, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                      ✗ Annuler l&#39;import
+                    </button>
+                    <button onClick={() => handleDecision("add")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.orange}15`, border: `1.5px solid ${COLORS.orange}40`, color: COLORS.orange, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                      ⚠ Importer quand même
+                    </button>
+                  </div>
+                </div>
+              ) :              {currentItem.unknownAccount ? (
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 20, lineHeight: 1.8 }}>
                     <span style={{ color: COLORS.red, fontWeight: 600 }}>⚠ Ce numéro de compte n'existe pas dans l'Admin Panel.</span><br />

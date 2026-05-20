@@ -8964,7 +8964,7 @@ if (Array.isArray(resolved.contractsCurrency)) {
                     </button>
                   </div>
                 </div>
-              ) :              {currentItem.unknownAccount ? (
+              ) : currentItem.unknownAccount ? (
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 20, lineHeight: 1.8 }}>
                     <span style={{ color: COLORS.red, fontWeight: 600 }}>⚠ Ce numéro de compte n'existe pas dans l'Admin Panel.</span><br />

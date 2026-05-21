@@ -7816,11 +7816,12 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                     <div style={{ fontSize: 11, color: COLORS.textSub, marginBottom: 10 }}>Sélectionnez les sociétés pouvant être assignées comme "Client's Owner" :</div>
                     <ClientOwnerCandidatePicker
                       companies={companies}
-                      candidates={candidates}
+                      candidates={config.clientOwnerCandidates || []}
                       onToggle={(id) => {
-                        const next = candidates.includes(String(id))
-                          ? candidates.filter(c => c !== String(id))
-                          : [...candidates, String(id)];
+                        const current = config.clientOwnerCandidates || [];
+                        const next = current.includes(String(id))
+                          ? current.filter(c => c !== String(id))
+                          : [...current, String(id)];
                         updateField("clientOwnerCandidates", next);
                       }}
                     />

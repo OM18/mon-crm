@@ -6189,12 +6189,13 @@ const BatchCompaniesOldToNew = () => {
 
       const converted = rows.map(row => {
         const out = {};
-        const rowKeysLower = Object.keys(row).reduce((acc, k) => { acc[k.toLowerCase()] = k; return acc; }, {});
+        const normKey = k => k.trim().toLowerCase().replace(/[-_]+/g, "_");
+        const rowKeysNorm = Object.keys(row).reduce((acc, k) => { acc[normKey(k)] = k; return acc; }, {});
         for (const [srcKey, destKey] of Object.entries(COLUMN_MAP)) {
-          // Exact match first, then case-insensitive fallback
+          // Exact match first, then normalized fallback (case-insensitive + hyphen=underscore)
           let raw = row[srcKey];
           if (raw === undefined) {
-            const actualKey = rowKeysLower[srcKey.toLowerCase()];
+            const actualKey = rowKeysNorm[normKey(srcKey)];
             raw = actualKey !== undefined ? row[actualKey] : "";
           }
           const val = raw !== undefined && raw !== null ? String(raw).trim() : "";
@@ -6232,10 +6233,12 @@ const BatchCompaniesOldToNew = () => {
             out[destKey] = val;
           }
         }
-        // Keep any extra columns not in COLUMN_MAP as-is (case-insensitive exclusion)
-        const mappedSrcKeysLower = new Set(Object.keys(COLUMN_MAP).map(k => k.toLowerCase()));
+        // Keep any extra columns not in COLUMN_MAP as-is
+        // Normalize: trim + lowercase + collapse all underscores/hyphens to single underscore
+        const normCol = k => k.trim().toLowerCase().replace(/[-_]+/g, "_");
+        const mappedSrcKeysNorm = new Set(Object.keys(COLUMN_MAP).map(normCol));
         for (const k of Object.keys(row)) {
-          if (!mappedSrcKeysLower.has(k.toLowerCase())) out[k] = String(row[k] ?? "").trim();
+          if (!mappedSrcKeysNorm.has(normCol(k))) out[k] = String(row[k] ?? "").trim();
         }
         return out;
       });

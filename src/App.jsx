@@ -9770,6 +9770,40 @@ const CompanyExportModal = ({ all, filtered, onClose }) => {
   );
 };
 
+const ClientOwnerPicker = ({ value, companies, onChange }) => {
+  const [search, setSearch] = useState("");
+  const ownerName = value ? (companies.find(co => String(co.id) === String(value))?.name || value) : "";
+  const suggestions = search.length >= 1
+    ? companies.filter(co => co.name?.toLowerCase().includes(search.toLowerCase()) && String(co.id) !== String(value)).slice(0, 6)
+    : [];
+  return (
+    <div style={{ position: "relative" }}>
+      <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>CLIENT'S OWNER</label>
+      <div style={{ display: "flex", gap: 6 }}>
+        <input value={search || ownerName} onChange={e => setSearch(e.target.value)}
+          placeholder="Rechercher une société…"
+          style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+        {value && <button type="button" onClick={() => { onChange(""); setSearch(""); }}
+          style={{ padding: "0 10px", borderRadius: 8, background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}40`, color: COLORS.red, cursor: "pointer", fontSize: 13 }}>✕</button>}
+      </div>
+      {ownerName && !search && <div style={{ fontSize: 11, color: COLORS.accent, marginTop: 4 }}>✓ {ownerName}</div>}
+      {suggestions.length > 0 && (
+        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", marginTop: 2 }}>
+          {suggestions.map(co => (
+            <div key={co.id} onClick={() => { onChange(co.id); setSearch(""); }}
+              style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, color: COLORS.text }}
+              onMouseEnter={e => e.currentTarget.style.background = COLORS.hover}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              {co.name}
+              {co.country && <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 6 }}>{co.country}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Companies = memo(({ companies, setCompanies, contacts }) => {
   const { config, updateField } = useConfig();
   const [search, setSearch] = useState("");
@@ -10454,39 +10488,11 @@ return (
             <SelectField label="Activity Status" value={form.status} onChange={v => setForm({ ...form, status: v })} options={config.activityStatus.map(s => ({ value: s.value, label: s.label }))} />
             <SelectField label="Company Size" value={form.companySize || ""} onChange={v => setForm({ ...form, companySize: v })} options={[{ value: "", label: "— Select —" }, { value: "Big", label: "Big" }, { value: "Medium", label: "Medium" }, { value: "Small", label: "Small" }]} />
             <Input label="Broker" value={form.broker} onChange={v => setForm({ ...form, broker: v })} placeholder="Ex: BNP Paribas" />
-            {(() => {
-              const [ownerSearch, setOwnerSearch] = React.useState("");
-              const ownerName = form.clientOwner ? (companies.find(co => String(co.id) === String(form.clientOwner))?.name || form.clientOwner) : "";
-              const suggestions = ownerSearch.length >= 1
-                ? companies.filter(co => co.name?.toLowerCase().includes(ownerSearch.toLowerCase()) && String(co.id) !== String(form.clientOwner)).slice(0, 6)
-                : [];
-              return (
-                <div style={{ position: "relative" }}>
-                  <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>CLIENT'S OWNER</label>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <input value={ownerSearch || ownerName} onChange={e => setOwnerSearch(e.target.value)}
-                      placeholder="Rechercher une société…"
-                      style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-                    {form.clientOwner && <button type="button" onClick={() => { setForm({ ...form, clientOwner: "" }); setOwnerSearch(""); }}
-                      style={{ padding: "0 10px", borderRadius: 8, background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}40`, color: COLORS.red, cursor: "pointer", fontSize: 13 }}>✕</button>}
-                  </div>
-                  {ownerName && !ownerSearch && <div style={{ fontSize: 11, color: COLORS.accent, marginTop: 4 }}>✓ {ownerName}</div>}
-                  {suggestions.length > 0 && (
-                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", marginTop: 2 }}>
-                      {suggestions.map(co => (
-                        <div key={co.id} onClick={() => { setForm({ ...form, clientOwner: co.id }); setOwnerSearch(""); }}
-                          style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, color: COLORS.text }}
-                          onMouseEnter={e => e.currentTarget.style.background = COLORS.hover}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                          {co.name}
-                          {co.country && <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 6 }}>{co.country}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            <ClientOwnerPicker
+              value={form.clientOwner}
+              companies={companies}
+              onChange={v => setForm({ ...form, clientOwner: v })}
+            />
             <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 8 }}>
               <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>BUSINESS UNIT — sélection multiple</label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

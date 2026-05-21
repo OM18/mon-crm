@@ -6318,13 +6318,7 @@ const BatchCompaniesOldToNew = () => {
 const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
   const [search, setSearch] = useState("");
   const uniqueCandidates = [...new Set((candidates || []).map(String))];
-  // Auto-clean duplicates already in store on mount
-  const { updateField } = useConfig();
-  useEffect(() => {
-    if (candidates && candidates.length !== uniqueCandidates.length) {
-      updateField("clientOwnerCandidates", uniqueCandidates);
-    }
-  }, []);
+
   const suggestions = search.trim().length >= 1
     ? companies
         .filter(co => co.name?.toLowerCase().includes(search.toLowerCase()) && !uniqueCandidates.includes(String(co.id)))
@@ -6372,6 +6366,45 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
         <div style={{ fontSize: 12, color: COLORS.textMuted }}>Aucune société sélectionnée.</div>
       )}
     </>
+  );
+};
+
+const ClientOwnerAdminBlock = ({ companies }) => {
+  const { config, updateField } = useConfig();
+  // Deduplicate on mount — purges duplicates already persisted in DB
+  useEffect(() => {
+    const raw = config.clientOwnerCandidates || [];
+    const clean = [...new Set(raw.map(String))];
+    if (clean.length !== raw.length) updateField("clientOwnerCandidates", clean);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const candidates = [...new Set((config.clientOwnerCandidates || []).map(String))];
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginTop: 8 }}>
+      <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 16 }}>🏢</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>Client's Owner</div>
+          <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2 }}>
+            Sociétés éligibles comme propriétaire client — {candidates.length} sélectionnée{candidates.length !== 1 ? "s" : ""}
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: "0 18px 18px" }}>
+        <div style={{ fontSize: 11, color: COLORS.textSub, marginBottom: 10 }}>Sélectionnez les sociétés pouvant être assignées comme "Client's Owner" :</div>
+        <ClientOwnerCandidatePicker
+          companies={companies}
+          candidates={candidates}
+          onToggle={(id) => {
+            const current = [...new Set((config.clientOwnerCandidates || []).map(String))];
+            const sid = String(id);
+            const next = current.includes(sid)
+              ? current.filter(c => c !== sid)
+              : [...current, sid];
+            updateField("clientOwnerCandidates", next);
+          }}
+        />
+      </div>
+    </div>
   );
 };
 
@@ -7809,35 +7842,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
               <FieldEditor key={fieldDef.key} fieldDef={fieldDef} values={config[fieldDef.key] || []} onUpdate={updateField} />
             ))}
             {/* ── CLIENT'S OWNER CANDIDATES ── */}
-            {(() => {
-              const candidates = config.clientOwnerCandidates || [];
-              return (
-                <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginTop: 8 }}>
-                  <div onClick={() => {}} style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, cursor: "default" }}>
-                    <span style={{ fontSize: 16 }}>🏢</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>Client's Owner</div>
-                      <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2 }}>Sociétés éligibles comme propriétaire client — {candidates.length} sélectionnée{candidates.length !== 1 ? "s" : ""}</div>
-                    </div>
-                  </div>
-                  <div style={{ padding: "0 18px 18px" }}>
-                    <div style={{ fontSize: 11, color: COLORS.textSub, marginBottom: 10 }}>Sélectionnez les sociétés pouvant être assignées comme "Client's Owner" :</div>
-                    <ClientOwnerCandidatePicker
-                      companies={companies}
-                      candidates={config.clientOwnerCandidates || []}
-                      onToggle={(id) => {
-                        const current = config.clientOwnerCandidates || [];
-                        const sid = String(id);
-                        const next = current.includes(sid)
-                          ? current.filter(c => c !== sid)
-                          : [...new Set([...current, sid])]; // Set prevents duplicates
-                        updateField("clientOwnerCandidates", next);
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })()}
+            <ClientOwnerAdminBlock companies={companies} />
           </div>
         </div>
 

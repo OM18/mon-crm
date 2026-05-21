@@ -340,9 +340,14 @@ const ConfigProvider = ({ children }) => {
         if (!Array.isArray(loaded.derivAccountTypes)) loaded.derivAccountTypes = DEFAULT_CONFIG.derivAccountTypes;
         if (!Array.isArray(loaded.derivFinancingBanks)) loaded.derivFinancingBanks = DEFAULT_CONFIG.derivFinancingBanks;
         if (!Array.isArray(loaded.derivUnderlyingCategories)) loaded.derivUnderlyingCategories = DEFAULT_CONFIG.derivUnderlyingCategories;
-        // Deduplicate clientOwnerCandidates at load time
+        // Deduplicate clientOwnerCandidates at load time and force-save if needed
         if (Array.isArray(loaded.clientOwnerCandidates)) {
-          loaded.clientOwnerCandidates = [...new Set(loaded.clientOwnerCandidates.map(String))];
+          const deduped = [...new Set(loaded.clientOwnerCandidates.map(String))];
+          if (deduped.length !== loaded.clientOwnerCandidates.length) {
+            loaded.clientOwnerCandidates = deduped;
+            // Force-save the cleaned version back to Supabase immediately
+            await supabase.from('config').upsert({ key: 'admin-config', data: { ...loaded, clientOwnerCandidates: deduped } }, { onConflict: 'key' });
+          }
         }
         setConfig(loaded);
       }
@@ -6329,7 +6334,9 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
         .slice(0, 8)
     : [];
-  const selected = companies.filter(co => uniqueCandidates.includes(String(co.id))).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  // Deduplicate companies by id before filtering to avoid showing duplicates if companies list has dupes
+  const uniqueCompanies = companies.filter((co, idx, arr) => arr.findIndex(x => String(x.id) === String(co.id)) === idx);
+  const selected = uniqueCompanies.filter(co => uniqueCandidates.includes(String(co.id))).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   return (
     <>
       <div style={{ position: "relative", marginBottom: 10 }}>

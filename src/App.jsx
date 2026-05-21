@@ -6317,13 +6317,21 @@ const BatchCompaniesOldToNew = () => {
 
 const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
   const [search, setSearch] = useState("");
+  const uniqueCandidates = [...new Set((candidates || []).map(String))];
+  // Auto-clean duplicates already in store on mount
+  const { updateField } = useConfig();
+  useEffect(() => {
+    if (candidates && candidates.length !== uniqueCandidates.length) {
+      updateField("clientOwnerCandidates", uniqueCandidates);
+    }
+  }, []);
   const suggestions = search.trim().length >= 1
     ? companies
-        .filter(co => co.name?.toLowerCase().includes(search.toLowerCase()) && !candidates.includes(String(co.id)))
+        .filter(co => co.name?.toLowerCase().includes(search.toLowerCase()) && !uniqueCandidates.includes(String(co.id)))
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
         .slice(0, 8)
     : [];
-  const selected = companies.filter(co => candidates.includes(String(co.id))).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const selected = companies.filter(co => uniqueCandidates.includes(String(co.id))).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   return (
     <>
       <div style={{ position: "relative", marginBottom: 10 }}>
@@ -7819,9 +7827,10 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
                       candidates={config.clientOwnerCandidates || []}
                       onToggle={(id) => {
                         const current = config.clientOwnerCandidates || [];
-                        const next = current.includes(String(id))
-                          ? current.filter(c => c !== String(id))
-                          : [...current, String(id)];
+                        const sid = String(id);
+                        const next = current.includes(sid)
+                          ? current.filter(c => c !== sid)
+                          : [...new Set([...current, sid])]; // Set prevents duplicates
                         updateField("clientOwnerCandidates", next);
                       }}
                     />

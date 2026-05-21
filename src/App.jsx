@@ -6179,7 +6179,7 @@ const BatchCompaniesOldToNew = () => {
         "custom_field__Food/Feed":                "foodFeed",
         "custom_field__WATCH_LIST":               "watchList",
         "custom_field__Activity_status":          "status",
-        "custom_field__CLIENT-OWNER":             "clientOwner",
+        "custom_field__CLIENT_OWNER":             "clientOwner",
       };
 
       const DATE_COLS = new Set([
@@ -6283,7 +6283,7 @@ const BatchCompaniesOldToNew = () => {
     "custom_field__Food/Feed → foodFeed",
     "custom_field__WATCH_LIST → watchList",
     "custom_field__Activity_status → status",
-    "custom_field__CLIENT-OWNER → clientOwner  (CLIENT's Owner)",
+    "custom_field__CLIENT_OWNER → clientOwner  (CLIENT's Owner)",
     "custom_field__Custom_compliance_status → finalAuthStatus  (NOT AUTHORISED - UNDER REVIEW→vide · sinon valeur reprise telle quelle)",
   ];
 
@@ -7989,7 +7989,7 @@ const COMPANY_FIELD_MAP = {
 "foodFeed": ["food feed", "foodfeed", "food/feed", "food", "feed"],
     "tags": ["tags", "tag"],
   "gtRole": ["gt role", "gt_role", "gtrole", "gt role(s)", "gt roles"],
-  "clientOwner": ["client's owner", "clientowner", "client owner", "client-owner", "custom_field__client-owner"],
+  "clientOwner": ["client's owner", "clientowner", "client owner", "client_owner", "custom_field__client_owner", "custom_field__client-owner"],
 };
 
 const CONTACT_FIELD_MAP = {

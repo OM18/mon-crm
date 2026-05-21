@@ -6272,7 +6272,7 @@ const BatchCompaniesOldToNew = () => {
     "company_group__title → group",
     "country__title → country",
     "size → companySize  (mise en majuscules)",
-    "role_names → gtRole  (supprime la valeur 'other' et les virgules superflues)",
+    "role_names → gtRole",
     "custom_field__Role → roles",
     "business_unit_titles → businessUnit  (supprime le préfixe 'BU ')",
     "custom_field__Custom_compliance_status → complianceStatus  (AUTHORISED UPON REQUEST→AUTHORISED · BLACK LIST→BLACK LISTED · NOT AUTHORISED INACTIVE→NOT AUTHORISED - INACTIVE · NOT AUTHORISED REQ→NOT AUTHORISED - REQUESTED · NOT AUTHORISED TV→AUTHORISED)",

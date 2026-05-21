@@ -319,6 +319,7 @@ const DEFAULT_CONFIG = {
   companyTimezone: "Europe/Paris",
   companyName: "",
   companyViews: [],
+  clientOwnerCandidates: [],
 };
 
 // ─── CONFIG CONTEXT ───────────────────────────────────────────
@@ -6312,6 +6313,35 @@ const BatchCompaniesOldToNew = () => {
   );
 };
 
+const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
+  const [search, setSearch] = useState("");
+  const visible = companies
+    .filter(co => !search || co.name?.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  return (
+    <>
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Filtrer les sociétés…"
+        style={{ width: "100%", boxSizing: "border-box", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 10 }} />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 200, overflowY: "auto" }}>
+        {visible.map(co => {
+          const selected = candidates.includes(String(co.id));
+          return (
+            <div key={co.id} onClick={() => onToggle(co.id)}
+              style={{ padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                background: selected ? `${COLORS.accent}22` : COLORS.card,
+                border: `1.5px solid ${selected ? COLORS.accent : COLORS.border}`,
+                color: selected ? COLORS.accent : COLORS.textSub,
+                transition: "all 0.15s", userSelect: "none" }}>
+              {selected && <span style={{ marginRight: 5, fontSize: 10 }}>✓</span>}{co.name}
+            </div>
+          );
+        })}
+        {visible.length === 0 && <span style={{ fontSize: 12, color: COLORS.textMuted }}>Aucune société trouvée.</span>}
+      </div>
+    </>
+  );
+};
+
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -7745,6 +7775,34 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             {FIELD_DEFINITIONS.map(fieldDef => (
               <FieldEditor key={fieldDef.key} fieldDef={fieldDef} values={config[fieldDef.key] || []} onUpdate={updateField} />
             ))}
+            {/* ── CLIENT'S OWNER CANDIDATES ── */}
+            {(() => {
+              const candidates = config.clientOwnerCandidates || [];
+              return (
+                <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginTop: 8 }}>
+                  <div onClick={() => {}} style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, cursor: "default" }}>
+                    <span style={{ fontSize: 16 }}>🏢</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>Client's Owner</div>
+                      <div style={{ fontSize: 11, color: COLORS.textSub, marginTop: 2 }}>Sociétés éligibles comme propriétaire client — {candidates.length} sélectionnée{candidates.length !== 1 ? "s" : ""}</div>
+                    </div>
+                  </div>
+                  <div style={{ padding: "0 18px 18px" }}>
+                    <div style={{ fontSize: 11, color: COLORS.textSub, marginBottom: 10 }}>Sélectionnez les sociétés pouvant être assignées comme "Client's Owner" :</div>
+                    <ClientOwnerCandidatePicker
+                      companies={companies}
+                      candidates={candidates}
+                      onToggle={(id) => {
+                        const next = candidates.includes(String(id))
+                          ? candidates.filter(c => c !== String(id))
+                          : [...candidates, String(id)];
+                        updateField("clientOwnerCandidates", next);
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -9771,10 +9829,15 @@ const CompanyExportModal = ({ all, filtered, onClose }) => {
 };
 
 const ClientOwnerPicker = ({ value, companies, onChange }) => {
+  const { config } = useConfig();
   const [search, setSearch] = useState("");
+  const candidates = config.clientOwnerCandidates || [];
+  const eligibleCompanies = candidates.length > 0
+    ? companies.filter(co => candidates.includes(String(co.id)))
+    : companies;
   const ownerName = value ? (companies.find(co => String(co.id) === String(value))?.name || value) : "";
   const suggestions = search.length >= 1
-    ? companies.filter(co => co.name?.toLowerCase().includes(search.toLowerCase()) && String(co.id) !== String(value)).slice(0, 6)
+    ? eligibleCompanies.filter(co => co.name?.toLowerCase().includes(search.toLowerCase()) && String(co.id) !== String(value)).slice(0, 6)
     : [];
   return (
     <div style={{ position: "relative" }}>

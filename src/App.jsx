@@ -6170,6 +6170,7 @@ const BatchCompaniesOldToNew = () => {
         "custom_field__Food/Feed":                "foodFeed",
         "custom_field__WATCH_LIST":               "watchList",
         "custom_field__Activity_status":          "status",
+        "custom_field__CLIENT-OWNER":             "clientOwner",
       };
 
       const DATE_COLS = new Set([
@@ -6273,6 +6274,7 @@ const BatchCompaniesOldToNew = () => {
     "custom_field__Food/Feed → foodFeed",
     "custom_field__WATCH_LIST → watchList",
     "custom_field__Activity_status → status",
+    "custom_field__CLIENT-OWNER → clientOwner  (CLIENT's Owner)",
     "custom_field__Custom_compliance_status → finalAuthStatus  (NOT AUTHORISED - UNDER REVIEW→vide · sinon valeur reprise telle quelle)",
   ];
 
@@ -6315,29 +6317,52 @@ const BatchCompaniesOldToNew = () => {
 
 const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
   const [search, setSearch] = useState("");
-  const visible = companies
-    .filter(co => !search || co.name?.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const suggestions = search.trim().length >= 1
+    ? companies
+        .filter(co => co.name?.toLowerCase().includes(search.toLowerCase()) && !candidates.includes(String(co.id)))
+        .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+        .slice(0, 8)
+    : [];
+  const selected = companies.filter(co => candidates.includes(String(co.id))).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   return (
     <>
-      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Filtrer les sociétés…"
-        style={{ width: "100%", boxSizing: "border-box", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 10 }} />
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 200, overflowY: "auto" }}>
-        {visible.map(co => {
-          const selected = candidates.includes(String(co.id));
-          return (
-            <div key={co.id} onClick={() => onToggle(co.id)}
-              style={{ padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600,
-                background: selected ? `${COLORS.accent}22` : COLORS.card,
-                border: `1.5px solid ${selected ? COLORS.accent : COLORS.border}`,
-                color: selected ? COLORS.accent : COLORS.textSub,
-                transition: "all 0.15s", userSelect: "none" }}>
-              {selected && <span style={{ marginRight: 5, fontSize: 10 }}>✓</span>}{co.name}
-            </div>
-          );
-        })}
-        {visible.length === 0 && <span style={{ fontSize: 12, color: COLORS.textMuted }}>Aucune société trouvée.</span>}
+      <div style={{ position: "relative", marginBottom: 10 }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Tapez le nom d'une société…"
+          style={{ width: "100%", boxSizing: "border-box", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+        {suggestions.length > 0 && (
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", marginTop: 2 }}>
+            {suggestions.map(co => (
+              <div key={co.id} onClick={() => { onToggle(co.id); setSearch(""); }}
+                style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, color: COLORS.text }}
+                onMouseEnter={e => e.currentTarget.style.background = COLORS.hover}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                {co.name}
+                {co.country && <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 6 }}>{co.country}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+        {search.trim().length >= 1 && suggestions.length === 0 && (
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px", marginTop: 2 }}>
+            <span style={{ fontSize: 12, color: COLORS.textMuted }}>Aucune société trouvée.</span>
+          </div>
+        )}
       </div>
+      {selected.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {selected.map(co => (
+            <div key={co.id} onClick={() => onToggle(co.id)}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                background: `${COLORS.accent}22`, border: `1.5px solid ${COLORS.accent}`, color: COLORS.accent, userSelect: "none" }}>
+              {co.name}
+              <span style={{ fontSize: 11, opacity: 0.7 }}>✕</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {selected.length === 0 && search.trim().length === 0 && (
+        <div style={{ fontSize: 12, color: COLORS.textMuted }}>Aucune société sélectionnée.</div>
+      )}
     </>
   );
 };
@@ -7938,6 +7963,7 @@ const COMPANY_FIELD_MAP = {
 "foodFeed": ["food feed", "foodfeed", "food/feed", "food", "feed"],
     "tags": ["tags", "tag"],
   "gtRole": ["gt role", "gt_role", "gtrole", "gt role(s)", "gt roles"],
+  "clientOwner": ["client's owner", "clientowner", "client owner", "client-owner", "custom_field__client-owner"],
 };
 
 const CONTACT_FIELD_MAP = {

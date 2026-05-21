@@ -6209,6 +6209,8 @@ const BatchCompaniesOldToNew = () => {
           } else if (destKey === "complianceStatus") {
             const upper = val.toUpperCase();
             out[destKey] = COMPLIANCE_MAP[upper] !== undefined ? COMPLIANCE_MAP[upper] : val;
+            // Derive finalAuthStatus from same source column
+            out["finalAuthStatus"] = upper === "NOT AUTHORISED - UNDER REVIEW" ? "" : val;
           } else if (DATE_COLS.has(destKey)) {
             out[destKey] = parseDateTime(val);
           } else if (destKey === "foodFeed") {
@@ -6270,6 +6272,7 @@ const BatchCompaniesOldToNew = () => {
     "custom_field__Food/Feed → foodFeed",
     "custom_field__WATCH_LIST → watchList",
     "custom_field__Activity_status → status",
+    "custom_field__Custom_compliance_status → finalAuthStatus  (NOT AUTHORISED - UNDER REVIEW→vide · sinon valeur reprise telle quelle)",
   ];
 
   return (
@@ -9228,6 +9231,12 @@ const CompanyDetailPanel = memo(({ sel, selContacts, onEdit, onDelete, getStatus
               <span style={{ fontSize: 12, color: COLORS.textSub, flexShrink: 0 }}>GT Role</span>
               <span style={{ fontSize: 12, color: sel.gtRole ? COLORS.text : COLORS.textMuted, fontWeight: sel.gtRole ? 600 : 400 }}>{sel.gtRole || "—"}</span>
             </div>
+            <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: "9px 0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: COLORS.textSub, flexShrink: 0 }}>Client's Owner</span>
+              {sel.clientOwner
+                ? (() => { const owner = companies.find(co => String(co.id) === String(sel.clientOwner)); return owner ? <span style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600 }}>{owner.name}</span> : <span style={{ fontSize: 12, color: COLORS.textMuted }}>{sel.clientOwner}</span>; })()
+                : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
+            </div>
             <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: "9px 0", display: "flex", justifyContent: "space-between", gap: 8 }}>
   <span style={{ fontSize: 12, color: COLORS.textSub, flexShrink: 0 }}>Tags</span>
   {(sel.tags && sel.tags.length > 0)
@@ -9770,16 +9779,16 @@ const [showFilters, setShowFilters] = useState(false);
 const [filterMode, setFilterMode] = useState("AND");
 const [activeFilters, setActiveFilters] = useState({
   city:[],companyType: [], status: [], country: [], businessUnit: [], roles: [],
-  foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], watchList: []
+  foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], watchList: [], clientOwner: []
 });
 
 const [excludeFilters, setExcludeFilters] = useState({
   city:[], companyType: [], status: [], country: [], businessUnit: [], roles: [],
-  foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], watchList: []
+  foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], watchList: [], clientOwner: []
 });
 const [onlyFilters, setOnlyFilters] = useState({
   city:[], companyType: [], status: [], country: [], businessUnit: [], roles: [],
-  foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], watchList: []
+  foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], watchList: [], clientOwner: []
 });
 const [customFilters, setCustomFilters] = useState([]);
 const [filterSearch, setFilterSearch] = useState("");
@@ -9864,6 +9873,7 @@ useEffect(() => {
     incorporationDate: "", equity: "", turnover: "", netIncome: "", totalFixedAssets: "", totalAssets: "",
     contractsCurrency: [], numberOfContracts: "", foodFeed: "",
     gtRole: "",
+    clientOwner: "",
   });
   const [form, setForm] = useState(makeEmptyForm());
 
@@ -10104,7 +10114,7 @@ const sel = useMemo(() => selected ? companies.find(c => String(c.id) === select
                     {["AND", "OR"].map(m => (
                       <span key={m} onClick={() => setFilterMode(m)} style={{ cursor: "pointer", fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 8, background: filterMode === m ? COLORS.accent : COLORS.bg, color: filterMode === m ? "#fff" : COLORS.textSub, border: `1px solid ${filterMode === m ? COLORS.accent : COLORS.border}` }}>{m}</span>
                     ))}
-<span onClick={() => { setActiveFilters({ companyType: [], status: [], city: [], country: [], businessUnit: [], roles: [], foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], watchList: [] }); setExcludeFilters({ companyType: [], status: [], city: [], country: [], businessUnit: [], roles: [], foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], watchList: [] }); setOnlyFilters({ companyType: [], status: [], city: [], country: [], businessUnit: [], roles: [], foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], watchList: [] }); setExcludeFilters({ companyType: [], status: [], country: [], businessUnit: [], roles: [], foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [] }); }} style={{ cursor: "pointer", fontSize: 11, color: COLORS.textMuted, marginLeft: 6 }}>
+<span onClick={() => { setActiveFilters({ companyType: [], status: [], city: [], country: [], businessUnit: [], roles: [], foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], watchList: [], clientOwner: [] }); setExcludeFilters({ companyType: [], status: [], city: [], country: [], businessUnit: [], roles: [], foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], watchList: [], clientOwner: [] }); setOnlyFilters({ companyType: [], status: [], city: [], country: [], businessUnit: [], roles: [], foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], watchList: [], clientOwner: [] }); setExcludeFilters({ companyType: [], status: [], country: [], businessUnit: [], roles: [], foodFeed: [], companySize: [], complianceStatus: [], finalAuthStatus: [], contractsCurrency: [], clientOwner: [] }); }} style={{ cursor: "pointer", fontSize: 11, color: COLORS.textMuted, marginLeft: 6 }}>
 ✕ Reset</span>
                   </div>
                 </div>
@@ -10121,6 +10131,7 @@ const sel = useMemo(() => selected ? companies.find(c => String(c.id) === select
                   { key: "finalAuthStatus", label: "Final Auth Status", cfg: config.finalAuthStatus },
                   { key: "contractsCurrency", label: "Contracts Currency", cfg: config.contractsCurrency },
                 { key: "watchList", label: "Watch List", cfg: [{ value: true, label: "⚠️ Watch List", color: COLORS.red }] },
+                { key: "clientOwner", label: "Client's Owner", cfg: companies.map(co => ({ value: co.id, label: co.name, color: COLORS.accent })) },
                 ].map(({ key, label, cfg }) => (
                   <div key={key} style={{ marginBottom: 12 }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSub, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
@@ -10300,7 +10311,7 @@ return (
           <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
             {(config.companyViews || []).map(view => {
               const isActive = activeViewId === view.id;
-              const EMPTY = { city:[], companyType:[], status:[], country:[], businessUnit:[], roles:[], foodFeed:[], companySize:[], complianceStatus:[], finalAuthStatus:[], contractsCurrency:[], watchList:[] };
+              const EMPTY = { city:[], companyType:[], status:[], country:[], businessUnit:[], roles:[], foodFeed:[], companySize:[], complianceStatus:[], finalAuthStatus:[], contractsCurrency:[], watchList:[], clientOwner:[] };
               return (
                 <button key={view.id} onClick={() => {
                   if (isActive) {
@@ -10443,6 +10454,39 @@ return (
             <SelectField label="Activity Status" value={form.status} onChange={v => setForm({ ...form, status: v })} options={config.activityStatus.map(s => ({ value: s.value, label: s.label }))} />
             <SelectField label="Company Size" value={form.companySize || ""} onChange={v => setForm({ ...form, companySize: v })} options={[{ value: "", label: "— Select —" }, { value: "Big", label: "Big" }, { value: "Medium", label: "Medium" }, { value: "Small", label: "Small" }]} />
             <Input label="Broker" value={form.broker} onChange={v => setForm({ ...form, broker: v })} placeholder="Ex: BNP Paribas" />
+            {(() => {
+              const [ownerSearch, setOwnerSearch] = React.useState("");
+              const ownerName = form.clientOwner ? (companies.find(co => String(co.id) === String(form.clientOwner))?.name || form.clientOwner) : "";
+              const suggestions = ownerSearch.length >= 1
+                ? companies.filter(co => co.name?.toLowerCase().includes(ownerSearch.toLowerCase()) && String(co.id) !== String(form.clientOwner)).slice(0, 6)
+                : [];
+              return (
+                <div style={{ position: "relative" }}>
+                  <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>CLIENT'S OWNER</label>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input value={ownerSearch || ownerName} onChange={e => setOwnerSearch(e.target.value)}
+                      placeholder="Rechercher une société…"
+                      style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                    {form.clientOwner && <button type="button" onClick={() => { setForm({ ...form, clientOwner: "" }); setOwnerSearch(""); }}
+                      style={{ padding: "0 10px", borderRadius: 8, background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}40`, color: COLORS.red, cursor: "pointer", fontSize: 13 }}>✕</button>}
+                  </div>
+                  {ownerName && !ownerSearch && <div style={{ fontSize: 11, color: COLORS.accent, marginTop: 4 }}>✓ {ownerName}</div>}
+                  {suggestions.length > 0 && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", marginTop: 2 }}>
+                      {suggestions.map(co => (
+                        <div key={co.id} onClick={() => { setForm({ ...form, clientOwner: co.id }); setOwnerSearch(""); }}
+                          style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, color: COLORS.text }}
+                          onMouseEnter={e => e.currentTarget.style.background = COLORS.hover}
+                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                          {co.name}
+                          {co.country && <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 6 }}>{co.country}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 8 }}>
               <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>BUSINESS UNIT — sélection multiple</label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

@@ -340,6 +340,10 @@ const ConfigProvider = ({ children }) => {
         if (!Array.isArray(loaded.derivAccountTypes)) loaded.derivAccountTypes = DEFAULT_CONFIG.derivAccountTypes;
         if (!Array.isArray(loaded.derivFinancingBanks)) loaded.derivFinancingBanks = DEFAULT_CONFIG.derivFinancingBanks;
         if (!Array.isArray(loaded.derivUnderlyingCategories)) loaded.derivUnderlyingCategories = DEFAULT_CONFIG.derivUnderlyingCategories;
+        // Deduplicate clientOwnerCandidates at load time
+        if (Array.isArray(loaded.clientOwnerCandidates)) {
+          loaded.clientOwnerCandidates = [...new Set(loaded.clientOwnerCandidates.map(String))];
+        }
         setConfig(loaded);
       }
       setLoaded(true);
@@ -6371,13 +6375,13 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
 
 const ClientOwnerAdminBlock = ({ companies }) => {
   const { config, updateField } = useConfig();
-  // Deduplicate on mount — purges duplicates already persisted in DB
+  // Deduplicate whenever config.clientOwnerCandidates changes (incl. after Supabase load)
+  const raw = config.clientOwnerCandidates || [];
   useEffect(() => {
-    const raw = config.clientOwnerCandidates || [];
     const clean = [...new Set(raw.map(String))];
     if (clean.length !== raw.length) updateField("clientOwnerCandidates", clean);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const candidates = [...new Set((config.clientOwnerCandidates || []).map(String))];
+  }, [raw.join(",")]); // re-runs whenever the actual list changes
+  const candidates = [...new Set(raw.map(String))];
   return (
     <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginTop: 8 }}>
       <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>

@@ -6329,6 +6329,8 @@ const BatchCompaniesOldToNew = () => {
 
 const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
   const [search, setSearch] = useState("");
+  const [dropPos, setDropPos] = useState(null);
+  const inputRef = useRef(null);
   const uniqueCandidates = [...new Set((candidates || []).map(String))];
 
   const suggestions = search.trim().length >= 1
@@ -6337,33 +6339,51 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
         .slice(0, 8)
     : [];
-  // Deduplicate companies by id before filtering to avoid showing duplicates if companies list has dupes
   const uniqueCompanies = companies.filter((co, idx, arr) => arr.findIndex(x => String(x.id) === String(co.id)) === idx);
   const selected = uniqueCompanies.filter(co => uniqueCandidates.includes(String(co.id))).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  const showDrop = search.trim().length >= 1;
+
+  useEffect(() => {
+    if (showDrop && inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect();
+      setDropPos({ top: rect.bottom + 2, left: rect.left, width: rect.width });
+    } else {
+      setDropPos(null);
+    }
+  }, [showDrop, search]);
+
+  useEffect(() => {
+    if (!showDrop) return;
+    const handler = (e) => { if (inputRef.current && !inputRef.current.contains(e.target)) setSearch(""); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showDrop]);
+
   return (
     <>
-      <div style={{ position: "relative", marginBottom: 10 }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Tapez le nom d'une société…"
+      <div style={{ marginBottom: 10 }}>
+        <input ref={inputRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="Tapez le nom d'une société…"
           style={{ width: "100%", boxSizing: "border-box", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-        {suggestions.length > 0 && (
-          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflowY: "auto", maxHeight: 220, boxShadow: "0 8px 24px #00000060", marginTop: 2 }}>
-            {suggestions.map(co => (
-              <div key={co.id} onClick={() => { onToggle(co.id); setSearch(""); }}
-                style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, color: COLORS.text }}
-                onMouseEnter={e => e.currentTarget.style.background = COLORS.hover}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                {co.name}
-                {co.country && <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 6 }}>{co.country}</span>}
-              </div>
-            ))}
-          </div>
-        )}
-        {search.trim().length >= 1 && suggestions.length === 0 && (
-          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px", marginTop: 2 }}>
-            <span style={{ fontSize: 12, color: COLORS.textMuted }}>Aucune société trouvée.</span>
-          </div>
-        )}
       </div>
+
+      {dropPos && (
+        <div style={{ position: "fixed", top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, boxShadow: "0 8px 24px #00000060", maxHeight: 220, overflowY: "auto" }}>
+          {suggestions.length > 0
+            ? suggestions.map(co => (
+                <div key={co.id} onMouseDown={() => { onToggle(co.id); setSearch(""); }}
+                  style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, color: COLORS.text }}
+                  onMouseEnter={e => e.currentTarget.style.background = COLORS.hover}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  {co.name}
+                  {co.country && <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 6 }}>{co.country}</span>}
+                </div>
+              ))
+            : <div style={{ padding: "10px 14px", fontSize: 12, color: COLORS.textMuted }}>Aucune société trouvée.</div>
+          }
+        </div>
+      )}
+
       {selected.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {selected.map(co => (

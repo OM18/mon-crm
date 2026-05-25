@@ -15671,9 +15671,126 @@ const CONTRACT_FIELD_LABELS = {
   "info":                             "Info",
 };
 
+const CONTRACT_EXPORT_HEADERS = [
+  "contractNumber", "contractType", "status", "conclusionDate",
+  "executionDateFrom", "executionDateTo", "executionPeriodType",
+  "buyerId", "sellerId", "brokerId", "commodity",
+  "contractPriceType", "flatPrice", "flatCurrency", "premium",
+  "analyticalFlatPrice", "flatPriceVatIncluded", "analyticalFlatPriceVatIncluded",
+  "vat", "vatRate", "analyticalPremium",
+  "derivativeId", "incoterm", "port", "loadport", "disport",
+  "deliveryConditions", "warehouse", "shipmentTerminal",
+  "originCountry", "destinationCountry", "paymentTerms",
+  "qtyValue", "qtyUnit", "qtyMin", "qtyMax", "qtyTolerance", "qtyToleranceOption",
+  "qtyEstimated", "qtyFinal", "transformation", "businessUnit", "info",
+];
+
+const CONTRACT_IMPORT_GUIDE = [
+  { field: "contractNumber", format: "Texte", note: "* Obligatoire — ex: CTR-2024-001", configKey: null },
+  { field: "contractType",   format: "Texte", note: "* Obligatoire",                   configKey: "contractTypes" },
+  { field: "status",         format: "Texte", note: "",                                configKey: "contractStatuses" },
+  { field: "conclusionDate", format: "JJ/MM/AAAA", note: "* Obligatoire",             configKey: null },
+  { field: "executionDateFrom", format: "JJ/MM/AAAA", note: "",                        configKey: null },
+  { field: "executionDateTo",   format: "JJ/MM/AAAA", note: "",                        configKey: null },
+  { field: "executionPeriodType", format: "Texte", note: "ex: Loading / Arrival",      configKey: null },
+  { field: "buyerId",        format: "Texte", note: "* Obligatoire — Nom de société",  configKey: null },
+  { field: "sellerId",       format: "Texte", note: "* Obligatoire — Nom de société",  configKey: null },
+  { field: "brokerId",       format: "Texte", note: "Nom de société",                  configKey: null },
+  { field: "commodity",      format: "Texte", note: "* Obligatoire",                   configKey: "contractCommodities" },
+  { field: "contractPriceType", format: "Texte", note: "ex: FLAT / PREMIUM",           configKey: null },
+  { field: "flatPrice",      format: "Nombre", note: "",                               configKey: null },
+  { field: "flatCurrency",   format: "Texte", note: "",                                configKey: "contractCurrencies" },
+  { field: "premium",        format: "Nombre", note: "",                               configKey: null },
+  { field: "analyticalFlatPrice", format: "Nombre", note: "",                          configKey: null },
+  { field: "flatPriceVatIncluded", format: "Nombre", note: "",                         configKey: null },
+  { field: "analyticalFlatPriceVatIncluded", format: "Nombre", note: "",               configKey: null },
+  { field: "vat",            format: "TRUE / FALSE", note: "",                         configKey: null },
+  { field: "vatRate",        format: "Nombre (%)", note: "ex: 20",                     configKey: null },
+  { field: "analyticalPremium", format: "Nombre", note: "",                            configKey: null },
+  { field: "derivativeId",   format: "Texte", note: "Label ou ID de l'instrument",     configKey: null },
+  { field: "incoterm",       format: "Texte", note: "",                                configKey: "contractIncoterms" },
+  { field: "port",           format: "Texte", note: "Séparateurs : , ;",               configKey: "contractPorts" },
+  { field: "loadport",       format: "Texte", note: "",                                configKey: null },
+  { field: "disport",        format: "Texte", note: "",                                configKey: null },
+  { field: "deliveryConditions", format: "Texte", note: "",                            configKey: "contractDeliveryTerms" },
+  { field: "warehouse",      format: "Texte", note: "",                                configKey: null },
+  { field: "shipmentTerminal", format: "Texte", note: "",                              configKey: null },
+  { field: "paymentTerms",   format: "Texte", note: "",                                configKey: "contractPaymentTerms" },
+  { field: "originCountry",  format: "Texte", note: "",                                configKey: "country" },
+  { field: "destinationCountry", format: "Texte", note: "",                            configKey: "country" },
+  { field: "qtyValue",       format: "Nombre", note: "Quantité fixe",                  configKey: null },
+  { field: "qtyMin",         format: "Nombre", note: "Quantité min (fourchette)",      configKey: null },
+  { field: "qtyMax",         format: "Nombre", note: "Quantité max (fourchette)",      configKey: null },
+  { field: "qtyUnit",        format: "Texte", note: "ex: MT, Tonne",                   configKey: null },
+  { field: "qtyTolerance",   format: "0 / 5 / 10", note: "Tolérance en %",            configKey: null },
+  { field: "qtyToleranceOption", format: "Texte", note: "ex: BUYER OPTION",            configKey: null },
+  { field: "qtyEstimated",   format: "Nombre", note: "",                               configKey: null },
+  { field: "qtyFinal",       format: "Nombre", note: "",                               configKey: null },
+  { field: "transformation", format: "TRUE / FALSE", note: "",                         configKey: null },
+  { field: "businessUnit",   format: "Texte", note: "",                                configKey: "businessUnit" },
+  { field: "info",           format: "Texte", note: "Notes libres",                    configKey: null },
+];
+
+const ContractExportModal = ({ all, filtered, onClose }) => {
+  const [scope, setScope] = useState("filtered");
+  const [exporting, setExporting] = useState(false);
+  const { config } = useConfig();
+
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      const XLSX = await import("xlsx");
+      const data = scope === "all" ? all : filtered;
+      const rows = data.map(c => CONTRACT_EXPORT_HEADERS.map(h => {
+        const v = c[h];
+        if (Array.isArray(v)) return v.join(", ");
+        if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+        return v ?? "";
+      }));
+      const ws = XLSX.utils.aoa_to_sheet([CONTRACT_EXPORT_HEADERS, ...rows]);
+      ws["!cols"] = CONTRACT_EXPORT_HEADERS.map(h => ({ wch: Math.max(h.length + 2, 14) }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Contracts");
+      XLSX.writeFile(wb, `contracts_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) { console.error("[export contracts] error:", e); }
+    setExporting(false);
+    onClose();
+  };
+
+  return (
+    <Modal title="Exporter les contrats" onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ fontSize: 13, color: COLORS.textSub }}>Choisissez les contrats à exporter :</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {[
+            { value: "filtered", label: "Contrats filtrés",    sub: `${filtered.length} contrat${filtered.length !== 1 ? "s" : ""} visibles à l'écran` },
+            { value: "all",      label: "Tous les contrats",   sub: `${all.length} contrat${all.length !== 1 ? "s" : ""} au total` },
+          ].map(opt => (
+            <div key={opt.value} onClick={() => setScope(opt.value)}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 10, border: `1px solid ${scope === opt.value ? COLORS.accent : COLORS.border}`, background: scope === opt.value ? `${COLORS.accent}10` : COLORS.card, cursor: "pointer", transition: "all 0.15s" }}>
+              <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${scope === opt.value ? COLORS.accent : COLORS.border}`, background: scope === opt.value ? COLORS.accent : "transparent", flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{opt.label}</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted }}>{opt.sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.card, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
+          📋 {CONTRACT_EXPORT_HEADERS.length} colonnes : {CONTRACT_EXPORT_HEADERS.join(", ")}
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+          <Btn variant="secondary" onClick={onClose}>Annuler</Btn>
+          <Btn onClick={doExport} disabled={exporting}>{exporting ? "Export en cours…" : "⬇ Exporter Excel"}</Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 const ContractImportModal = ({ onClose, onImport, companies = [], instruments = [] }) => {
   const { config } = useConfig();
-  const [step, setStep] = useState("upload");
+  const [step, setStep] = useState("guide");
   const [rawRows, setRawRows] = useState([]);
   const [headers, setHeaders] = useState([]);
   const [mapping, setMapping] = useState({});
@@ -15998,7 +16115,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#00000099", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
-      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 680, maxHeight: "90vh", overflowY: "auto" }}>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 720, maxHeight: "90vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img src="/logoxl.png" style={{ width: 28, height: 28, objectFit: "contain" }} />
@@ -16009,6 +16126,59 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
         </div>
+
+        {step !== "validate" && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 28 }}>
+            {[["guide", "0. Guide"], ["upload", "1. Fichier"], ["mapping", "2. Colonnes"]].map(([s, l]) => (
+              <div key={s} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: step === s ? COLORS.accent : COLORS.bg, color: step === s ? "#fff" : COLORS.textMuted, border: `1px solid ${step === s ? COLORS.accent : COLORS.border}` }}>{l}</div>
+            ))}
+          </div>
+        )}
+
+        {/* Step: Guide */}
+        {step === "guide" && (
+          <div>
+            <div style={{ padding: "10px 14px", background: `${COLORS.gold}10`, border: `1px solid ${COLORS.gold}30`, borderRadius: 10, marginBottom: 16, fontSize: 12, color: COLORS.gold, lineHeight: 1.7 }}>
+              💡 Ce guide liste tous les champs reconnus à l'import. Les colonnes de votre fichier Excel seront mappées automatiquement si leurs noms correspondent aux alias reconnus.
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: COLORS.bg }}>
+                    <th style={{ padding: "8px 12px", textAlign: "left", color: COLORS.textSub, fontWeight: 700, borderBottom: `1px solid ${COLORS.border}`, letterSpacing: 0.5 }}>CHAMP</th>
+                    <th style={{ padding: "8px 12px", textAlign: "left", color: COLORS.textSub, fontWeight: 700, borderBottom: `1px solid ${COLORS.border}`, letterSpacing: 0.5 }}>FORMAT</th>
+                    <th style={{ padding: "8px 12px", textAlign: "left", color: COLORS.textSub, fontWeight: 700, borderBottom: `1px solid ${COLORS.border}`, letterSpacing: 0.5 }}>NOTE</th>
+                    <th style={{ padding: "8px 12px", textAlign: "left", color: COLORS.textSub, fontWeight: 700, borderBottom: `1px solid ${COLORS.border}`, letterSpacing: 0.5 }}>VALEURS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {CONTRACT_IMPORT_GUIDE.map((row, i) => (
+                    <tr key={row.field} style={{ background: i % 2 === 0 ? COLORS.card : COLORS.bg }}>
+                      <td style={{ padding: "7px 12px", color: COLORS.accent, fontFamily: "'DM Mono', monospace", borderBottom: `1px solid ${COLORS.border}`, whiteSpace: "nowrap" }}>{row.field}</td>
+                      <td style={{ padding: "7px 12px", color: COLORS.text, borderBottom: `1px solid ${COLORS.border}`, whiteSpace: "nowrap" }}>{row.format}</td>
+                      <td style={{ padding: "7px 12px", color: COLORS.textSub, borderBottom: `1px solid ${COLORS.border}` }}>{row.note}</td>
+                      <td style={{ padding: "7px 12px", borderBottom: `1px solid ${COLORS.border}` }}>
+                        {row.configKey && config[row.configKey]?.length > 0 ? (
+                          <details>
+                            <summary style={{ cursor: "pointer", fontSize: 11, color: COLORS.accent, fontWeight: 600 }}>{config[row.configKey].length} valeurs</summary>
+                            <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                              {config[row.configKey].map((v, vi) => (
+                                <span key={vi} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 6, background: v.color ? `${v.color}22` : COLORS.bg, color: v.color || COLORS.text, border: `1px solid ${v.color ? v.color + "55" : COLORS.border}`, fontWeight: 600 }}>{v.label || v.value || v}</span>
+                              ))}
+                            </div>
+                          </details>
+                        ) : <span style={{ color: COLORS.textMuted, fontSize: 11 }}>—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+              <Btn onClick={() => setStep("upload")}>Suivant →</Btn>
+            </div>
+          </div>
+        )}
 
         {/* Step: Upload */}
         {step === "upload" && (
@@ -16126,13 +16296,12 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
               })}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end" }}>
-              <Btn variant="secondary" onClick={() => setStep("upload")}>← Retour</Btn>
+              <Btn variant="secondary" onClick={() => setStep("guide")}>← Retour</Btn>
               <Btn onClick={doImport} style={{ background: COLORS.green }}>{importing ? "Analyse…" : `✓ Analyser ${rawRows.length} lignes`}</Btn>
             </div>
           </div>
         )}
 
-        {/* Step: Validate unknowns */}
         {step === "validate" && currentItem && (
           <div>
             <div style={{ marginBottom: 24 }}>
@@ -16251,6 +16420,7 @@ const Contracts = ({ companies = [] }) => {
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [form, setForm] = useState(EMPTY_CONTRACT());
   const [editId, setEditId] = useState(null);
@@ -16762,10 +16932,7 @@ const Contracts = ({ companies = [] }) => {
         </div>
         <input placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ width: 220, background: COLORS.card, border: `1px solid ${search ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
-        <button onClick={() => setShowImport(true)} title="Importer depuis Excel"
-          style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: COLORS.card, cursor: "pointer" }}>
-          <img src="/logoxl.png" style={{ width: 22, height: 22, objectFit: "contain" }} />
-        </button>
+        <XlButton onImport={() => setShowImport(true)} onExport={() => setShowExport(true)} />
         <Btn onClick={openNew}>+ NEW CONTRACT</Btn>
         <button onClick={() => setShowDeleteAll(true)} title="Supprimer tous les contrats"
           style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 10, border: `1px solid ${COLORS.red}40`, background: `${COLORS.red}10`, cursor: "pointer", color: COLORS.red, fontSize: 16 }}>
@@ -16859,6 +17026,14 @@ const Contracts = ({ companies = [] }) => {
             persist([...contracts, ...enriched]);
             setShowImport(false);
           }}
+        />
+      )}
+
+      {showExport && (
+        <ContractExportModal
+          all={contracts}
+          filtered={filtered}
+          onClose={() => setShowExport(false)}
         />
       )}
 

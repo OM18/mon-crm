@@ -6346,7 +6346,7 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Tapez le nom d'une société…"
           style={{ width: "100%", boxSizing: "border-box", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
         {suggestions.length > 0 && (
-          <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 -8px 24px #00000060", marginBottom: 2 }}>
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflowY: "auto", maxHeight: 220, boxShadow: "0 8px 24px #00000060", marginTop: 2 }}>
             {suggestions.map(co => (
               <div key={co.id} onClick={() => { onToggle(co.id); setSearch(""); }}
                 style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, color: COLORS.text }}
@@ -6359,7 +6359,7 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
           </div>
         )}
         {search.trim().length >= 1 && suggestions.length === 0 && (
-          <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px", marginBottom: 2 }}>
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px", marginTop: 2 }}>
             <span style={{ fontSize: 12, color: COLORS.textMuted }}>Aucune société trouvée.</span>
           </div>
         )}
@@ -6393,7 +6393,7 @@ const ClientOwnerAdminBlock = ({ companies }) => {
   }, [raw.join(",")]); // re-runs whenever the actual list changes
   const candidates = [...new Set(raw.map(String))];
   return (
-    <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden", marginTop: 8 }}>
+    <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, marginTop: 8 }}>
       <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ fontSize: 16 }}>🏢</span>
         <div style={{ flex: 1 }}>

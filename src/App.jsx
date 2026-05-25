@@ -8224,7 +8224,7 @@ const FixingExportModal = ({ fixings, filtered, onClose, products = [], config =
 };
 
 
-const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivProducts = [], derivCompanies = [] }) => {
+const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivProducts = [], derivCompanies = [], companies = [] }) => {
   const { config, updateField } = useConfig();
   const [step, setStep] = useState("guide");
   const [guideTab, setGuideTab] = useState(type === "companies" ? "companies" : type === "derivatives" ? "derivatives" : type === "fixings" ? "fixings" : "contacts");
@@ -8295,6 +8295,7 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
     { field: "foodFeed", format: "Texte", note: "" },
    { field: "tags", format: "Texte", note: "Choix multiple — Séparateurs : ," },
     { field: "watchList", format: "TRUE / FALSE", note: "" },
+    { field: "clientOwner", format: "Texte", note: "Nom exact de la société propriétaire" },
       ],
   contacts: [
     { field: "name", format: "Texte", note: "" },
@@ -8531,6 +8532,19 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
         }
         obj.priority = obj.priority || "moyenne";
         obj.lastContact = new Date().toISOString().split("T")[0];
+        // Résolution clientOwner : nom de société → id
+        if (obj.clientOwner && typeof obj.clientOwner === "string" && obj.clientOwner.trim()) {
+          const norm = s => s.toLowerCase().trim();
+          const matched = companies.find(co => norm(co.name || "") === norm(obj.clientOwner));
+          if (matched) {
+            obj.clientOwner = String(matched.id);
+          } else {
+            // Valeur inconnue : on conserve le nom brut (sera affiché en fallback dans l'UI)
+            obj.clientOwner = obj.clientOwner.trim();
+          }
+        } else {
+          obj.clientOwner = obj.clientOwner || "";
+        }
       } else if (type === "derivatives") {
         // Parse dates (handles Excel serial, DD/MM/YYYY, ISO)
         const parseExcelDate = (val) => {
@@ -10748,7 +10762,7 @@ return (
           </div>
         </Modal>
       )}
-      {showImport && <ExcelImportModal type="companies" onClose={() => setShowImport(false)} onImport={(items, mappedFields = []) => {
+      {showImport && <ExcelImportModal type="companies" companies={companies} onClose={() => setShowImport(false)} onImport={(items, mappedFields = []) => {
   setCompanies(prev => {
     const byRef = {};
     prev.forEach(c => { if (c.ref) byRef[c.ref] = c; });

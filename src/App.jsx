@@ -9885,39 +9885,30 @@ const CompanyExportModal = ({ all, filtered, onClose }) => {
 
 const ClientOwnerPicker = ({ value, companies, onChange }) => {
   const { config } = useConfig();
-  const [search, setSearch] = useState("");
   const candidates = config.clientOwnerCandidates || [];
   const eligibleCompanies = candidates.length > 0
     ? companies.filter(co => candidates.includes(String(co.id)))
     : companies;
-  const ownerName = value ? (companies.find(co => String(co.id) === String(value))?.name || value) : "";
-  const suggestions = search.length >= 1
-    ? eligibleCompanies.filter(co => co.name?.toLowerCase().includes(search.toLowerCase()) && String(co.id) !== String(value)).slice(0, 6)
-    : [];
+  const owner = value ? companies.find(co => String(co.id) === String(value)) : null;
   return (
-    <div style={{ position: "relative" }}>
-      <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>CLIENT'S OWNER</label>
-      <div style={{ display: "flex", gap: 6 }}>
-        <input value={search || ownerName} onChange={e => setSearch(e.target.value)}
-          placeholder="Rechercher une société…"
-          style={{ flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 12px", color: COLORS.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-        {value && <button type="button" onClick={() => { onChange(""); setSearch(""); }}
-          style={{ padding: "0 10px", borderRadius: 8, background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}40`, color: COLORS.red, cursor: "pointer", fontSize: 13 }}>✕</button>}
-      </div>
-      {ownerName && !search && <div style={{ fontSize: 11, color: COLORS.accent, marginTop: 4 }}>✓ {ownerName}</div>}
-      {suggestions.length > 0 && (
-        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px #00000060", marginTop: 2 }}>
-          {suggestions.map(co => (
-            <div key={co.id} onClick={() => { onChange(co.id); setSearch(""); }}
-              style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, color: COLORS.text }}
-              onMouseEnter={e => e.currentTarget.style.background = COLORS.hover}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-              {co.name}
-              {co.country && <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 6 }}>{co.country}</span>}
-            </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>CLIENT'S OWNER</label>
+      <select
+        value={value || ""}
+        onChange={e => onChange(e.target.value || "")}
+        style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: value ? COLORS.text : COLORS.textMuted, fontSize: 13, fontFamily: "inherit", outline: "none", cursor: "pointer" }}
+      >
+        <option value="">— Sélectionner —</option>
+        {eligibleCompanies
+          .slice()
+          .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+          .map(co => (
+            <option key={co.id} value={co.id}>
+              {co.name}{co.country ? ` — ${co.country}` : ""}
+            </option>
           ))}
-        </div>
-      )}
+      </select>
+      {owner && <div style={{ fontSize: 11, color: COLORS.accent }}>✓ {owner.name}</div>}
     </div>
   );
 };

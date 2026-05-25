@@ -6333,13 +6333,15 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
   const inputRef = useRef(null);
   const uniqueCandidates = [...new Set((candidates || []).map(String))];
 
+  // Déduplication globale par id — la société peut être stockée en double en base
+  const uniqueCompanies = companies.filter((co, idx, arr) => arr.findIndex(x => String(x.id) === String(co.id)) === idx);
+
   const suggestions = search.trim().length >= 1
-    ? companies
+    ? uniqueCompanies
         .filter(co => co.name?.toLowerCase().includes(search.toLowerCase()) && !uniqueCandidates.includes(String(co.id)))
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
         .slice(0, 8)
     : [];
-  const uniqueCompanies = companies.filter((co, idx, arr) => arr.findIndex(x => String(x.id) === String(co.id)) === idx);
   const selected = uniqueCompanies.filter(co => uniqueCandidates.includes(String(co.id))).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   const showDrop = search.trim().length >= 1;

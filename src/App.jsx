@@ -6223,7 +6223,7 @@ const BatchCompaniesOldToNew = () => {
     "complianceCreationDate","complianceLastUpdateDate","complianceRequestDate",
     "complianceLastReceptionDate","complianceFinalConfirmationDate",
   ]);
-  const BIGCAPS_COLS = new Set(["companySize","roles","gtRole","businessUnit","foodFeed"]);
+  const BIGCAPS_COLS = new Set(["companySize","foodFeed"]);
 
   // ── processFile ──────────────────────────────────────────────
   const processFile = async (file) => {
@@ -6348,9 +6348,6 @@ const BatchCompaniesOldToNew = () => {
 
   const FORMAT_ROWS = [
     ["size","companySize","—","BIG CAPS"],
-    ["custom_field__Role","roles","—","BIG CAPS"],
-    ["role_names","gtRole","—","BIG CAPS"],
-    ["business_unit_titles","businessUnit","—","BIG CAPS"],
     ["custom_field__Food/Feed","foodFeed","—","BIG CAPS"],
     ["create_time","complianceCreationDate","dd.mm.yyyy hh:min:sec","dd.mm.yyyy hh:min"],
     ["update_time","complianceLastUpdateDate","dd.mm.yyyy hh:min:sec","dd.mm.yyyy hh:min"],

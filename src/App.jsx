@@ -6116,13 +6116,118 @@ const BatchContractsOldToNew = () => {
 
 // ─── BATCH COMPANIES — OLD TO NEW ────────────────────────────
 const BatchCompaniesOldToNew = () => {
-  const [state, setState] = useState("idle"); // idle | processing | done | error
+  const [state, setState] = useState("idle");
   const [result, setResult] = useState(null);
   const fileRef = useRef(null);
 
+  // ── Helpers ──────────────────────────────────────────────────
+  const normKey = k => k.trim().toLowerCase().replace(/[-_]+/g, "_");
+
+  // "dd.mm.yyyy hh:min:sec" or "yyyy-mm-dd hh:mm:ss" → "dd/mm/yyyy hh:mm"
+  const parseDateTime = (val) => {
+    if (!val) return "";
+    const s = String(val).trim();
+    // dd.mm.yyyy hh:mm:ss  or  dd.mm.yyyy hh:mm
+    const m1 = s.match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/);
+    if (m1) return `${m1[1]}/${m1[2]}/${m1[3]} ${m1[4]}:${m1[5]}`;
+    // yyyy-mm-dd hh:mm:ss  or  yyyy-mm-dd hh:mm
+    const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})[\s\u00a0T](\d{2}):(\d{2})/);
+    if (m2) return `${m2[3]}/${m2[2]}/${m2[1]} ${m2[4]}:${m2[5]}`;
+    // yyyy-mm-dd only
+    const m3 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m3) return `${m3[3]}/${m3[2]}/${m3[1]}`;
+    // already dd/mm/yyyy hh:mm or dd/mm/yyyy
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) return s;
+    // Excel serial
+    if (/^\d{4,5}$/.test(s)) {
+      const dt = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+      return `${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}/${dt.getFullYear()}`;
+    }
+    return s;
+  };
+
+  // ── Column rename map (OLD LABEL → NEW LABEL) ────────────────
+  // Source: NEW_LABELS.xlsx
+  const COLUMN_MAP = {
+    "id":                                     "ref",
+    "name":                                   "name",
+    "full_name":                              "legalName",
+    "custom_field__IS_INDIVIDUAL":            "companyType",
+    "company_group__title":                   "group",
+    "website":                                "website",
+    "address":                                "address",
+    "city":                                   "city",
+    "country__title":                         "country",
+    "custom_field__Activity_status":          "status",
+    "size":                                   "companySize",
+    "custom_field__Role":                     "roles",
+    "role_names":                             "gtRole",
+    "business_unit_titles":                   "businessUnit",
+    "custom_field__Custom_compliance_status": "complianceStatus", // also → finalAuthStatus (see below)
+    "create_time":                            "complianceCreationDate",
+    "update_time":                            "complianceLastUpdateDate",
+    "date_request":                           "complianceRequestDate",
+    "date_received":                          "complianceLastReceptionDate",
+    "date_confirmation":                      "complianceFinalConfirmationDate",
+    "additional_info":                        "complianceAdditionalInfos",
+    "custom_field__USD/MAD_CLIENT":           "contractsCurrency",
+    "custom_field__Food/Feed":                "foodFeed",
+    "custom_field__WATCH_LIST":               "watchList",
+    "custom_field__CLIENT_OWNER":             "clientOwner",
+  };
+
+  // ── New columns to add (fixed values) ───────────────────────
+  // Source: NEW_COLUMNS.xlsx — just finalAuthStatus (derived from complianceStatus)
+  // (handled in value transform below)
+
+  // ── Value maps  Source: NEW_VALUES.xlsx ─────────────────────
+  const COMPANY_TYPE_MAP = { "true": "INDIVIDUAL", "": "LEGAL ENTITY" };
+
+  const BUSINESS_UNIT_MAP = {
+    "MOROCCO BU": "MOROCCO", "UKRAINE BU": "UKRAINE", "MAXIGRAIN": "MAXIGRAIN",
+    "PRODELA": "PRODELA", "EGYPT BU": "EGYPT", "RUSSIA BU": "RUSSIA",
+    "BUTTER BU": "BUTTER", "GENEVE": "GENEVE", "FINANCE": "FINANCE",
+    "TURKEY BU": "TURKEY", "RISK": "RISK", "COPAG": "COPAG",
+    "JYG": "JYG", "ATM": "ATM",
+  };
+
+  const COMPLIANCE_STATUS_MAP = {
+    "AUTHORISED": "AUTHORISED",
+    "AUTHORISED UPON REQUEST": "AUTHORISED",
+    "BLACK LISTED": "BLACK LISTED",
+    "NOT AUTHORISED": "NOT AUTHORISED",
+    "NOT AUTHORISED - UNDER REVIEW": "NOT AUTHORISED - UNDER REVIEW",
+    "NOT AUTHORISED INACTIVE": "NOT AUTHORISED INACTIVE",
+    "NOT AUTHORISED REQ": "NOT AUTHORISED \u2013 REQUESTED",
+    "NOT AUTHORISED TV": "AUTHORISED",
+  };
+
+  const FINAL_AUTH_STATUS_MAP = {
+    "AUTHORISED": "AUTHORISED",
+    "AUTHORISED UPON REQUEST": "AUTHORISED UPON REQUEST",
+    "BLACK LISTED": "BLACK LISTED",
+    "NOT AUTHORISED": "NOT AUTHORISED",
+    "NOT AUTHORISED - UNDER REVIEW": "", // → vide
+    "NOT AUTHORISED INACTIVE": "NOT AUTHORISED INACTIVE",
+    "NOT AUTHORISED REQ": "NOT AUTHORISED \u2013 REQUESTED",
+    "NOT AUTHORISED TV": "NOT AUTHORISED - UNDER REVIEW",
+  };
+
+  // ── Format rules  Source: NEW_FORMATS.xlsx ──────────────────
+  // companySize → BIG CAPS
+  // roles, gtRole, businessUnit → BIG CAPS  (implied by 2 extra BIG CAPS rows under size)
+  // date fields → dd.mm.yyyy hh:min  (strip seconds) ← handled in parseDateTime
+  // foodFeed → BIG CAPS
+
+  const DATE_COLS = new Set([
+    "complianceCreationDate","complianceLastUpdateDate","complianceRequestDate",
+    "complianceLastReceptionDate","complianceFinalConfirmationDate",
+  ]);
+  const BIGCAPS_COLS = new Set(["companySize","roles","gtRole","businessUnit","foodFeed"]);
+
+  // ── processFile ──────────────────────────────────────────────
   const processFile = async (file) => {
-    setState("processing");
-    setResult(null);
+    setState("processing"); setResult(null);
     try {
       const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
@@ -6130,168 +6235,133 @@ const BatchCompaniesOldToNew = () => {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
 
-      // yyyy-mm-dd hh:mm:ss → dd/mm/yyyy
-      const parseDateTime = (val) => {
-        if (!val) return "";
-        const s = String(val).trim();
-        // yyyy-mm-dd hh:mm:ss or yyyy-mm-dd hh:mm
-        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[\s\u00a0T]/);
-        if (m) return `${m[3]}/${m[2]}/${m[1]}`;
-        // yyyy-mm-dd only
-        const d = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (d) return `${d[3]}/${d[2]}/${d[1]}`;
-        // already dd/mm/yyyy
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
-        // Excel serial number
-        if (/^\d{4,5}$/.test(s)) {
-          const dt = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
-          return `${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}/${dt.getFullYear()}`;
-        }
-        return s;
-      };
-
-      const COMPLIANCE_MAP = {
-        "AUTHORISED UPON REQUEST":  "AUTHORISED",
-        "BLACK LIST":               "BLACK LISTED",
-        "NOT AUTHORISED INACTIVE":  "NOT AUTHORISED - INACTIVE",
-        "NOT AUTHORISED REQ":       "NOT AUTHORISED - REQUESTED",
-        "NOT AUTHORISED TV":        "AUTHORISED",
-      };
-
-      const COLUMN_MAP = {
-        "ID":                                     "ref",
-        "full_name":                              "legalname",
-        "custom_field__IS_INDIVIDUAL":            "companyType",
-        "company_group__title":                   "group",
-        "country__title":                         "country",
-        "size":                                   "companySize",
-        "role_names":                             "gtRole",
-        "custom_field__Role":                     "roles",
-        "business_unit_titles":                   "businessUnit",
-        "custom_field__Custom_compliance_status": "complianceStatus",
-        "create_time":                            "complianceCreationDate",
-        "update_time":                            "complianceLastUpdateDate",
-        "date_request":                           "complianceRequestDate",
-        "date_received":                          "complianceLastReceptionDate",
-        "date_confirmation":                      "complianceFinalConfirmationDate",
-        "additional_info":                        "complianceAdditionalInfos",
-        "custom_field__USD/MAD_CLIENT":           "contractsCurrency",
-        "custom_field__Food/Feed":                "foodFeed",
-        "custom_field__WATCH_LIST":               "watchList",
-        "custom_field__Activity_status":          "status",
-        "custom_field__CLIENT_OWNER":             "clientOwner",
-      };
-
-      const DATE_COLS = new Set([
-        "complianceCreationDate", "complianceLastUpdateDate", "complianceRequestDate",
-        "complianceLastReceptionDate", "complianceFinalConfirmationDate",
-      ]);
-
       const converted = rows.map(row => {
         const out = {};
-        const normKey = k => k.trim().toLowerCase().replace(/[-_]+/g, "_");
-        const rowKeysNorm = Object.keys(row).reduce((acc, k) => { acc[normKey(k)] = k; return acc; }, {});
-        for (const [srcKey, destKey] of Object.entries(COLUMN_MAP)) {
-          // Exact match first, then normalized fallback (case-insensitive + hyphen=underscore)
-          let raw = row[srcKey];
-          if (raw === undefined) {
-            const actualKey = rowKeysNorm[normKey(srcKey)];
-            raw = actualKey !== undefined ? row[actualKey] : "";
-          }
-          const val = raw !== undefined && raw !== null ? String(raw).trim() : "";
+        const rowNorm = Object.keys(row).reduce((acc, k) => { acc[normKey(k)] = k; return acc; }, {});
+        let complianceSrcVal = "";
 
-          // Transformations
+        for (const [srcKey, destKey] of Object.entries(COLUMN_MAP)) {
+          let raw = row[srcKey];
+          if (raw === undefined) { const ak = rowNorm[normKey(srcKey)]; raw = ak !== undefined ? row[ak] : ""; }
+          let val = raw !== undefined && raw !== null ? String(raw).trim() : "";
+
+          // ── Value transforms ──
           if (destKey === "companyType") {
-            out[destKey] = val === "" ? "LEGAL ENTITY" : val.toLowerCase() === "true" ? "INDIVIDUAL" : val;
-          } else if (destKey === "companySize") {
-            out[destKey] = val.toUpperCase();
-          } else if (destKey === "gtRole") {
-            const parts = val.split(",").map(p => p.trim()).filter(p => p.toLowerCase() !== "other" && p !== "");
-            out[destKey] = parts.join(", ");
+            const k = val.toLowerCase() === "true" ? "true" : val === "" ? "" : null;
+            val = k !== null ? (COMPANY_TYPE_MAP[k] ?? val) : val;
+
           } else if (destKey === "businessUnit") {
-            const parts = val.split(",").map(p => {
-              let s = p.trim();
-              // Supprime " BU" en suffixe (ex: "Morocco BU" → "Morocco")
-              if (s.toUpperCase().endsWith(" BU")) s = s.slice(0, -3).trim();
-              // Supprime "BU " en préfixe (ex: "BU Morocco" → "Morocco")
-              if (s.toUpperCase().startsWith("BU ")) s = s.slice(3).trim();
-              return s;
-            }).filter(p => p !== "");
-            out[destKey] = parts.join(", ");
+            val = val.split(",").map(p => {
+              const t = p.trim().toUpperCase();
+              return BUSINESS_UNIT_MAP[t] ?? p.trim();
+            }).filter(Boolean).join(", ");
+
           } else if (destKey === "complianceStatus") {
-            const upper = val.toUpperCase();
-            out[destKey] = COMPLIANCE_MAP[upper] !== undefined ? COMPLIANCE_MAP[upper] : val;
-            // Derive finalAuthStatus from same source column
-            out["finalAuthStatus"] = upper === "NOT AUTHORISED - UNDER REVIEW" ? "" : val;
+            complianceSrcVal = val.toUpperCase();
+            val = COMPLIANCE_STATUS_MAP[complianceSrcVal] ?? val;
+
           } else if (DATE_COLS.has(destKey)) {
-            out[destKey] = parseDateTime(val);
+            val = parseDateTime(val);
+
           } else if (destKey === "foodFeed") {
-            // "Food, Feed" ou "Food,Feed" → "FOOD+FEED", sinon mise en majuscules
-            const normalized = val.replace(/\s*,\s*/g, ",").toUpperCase();
-            out[destKey] = normalized === "FOOD,FEED" ? "FOOD+FEED" : val;
-          } else {
-            out[destKey] = val;
+            // "Food,Feed" / "Food, Feed" → "FOOD+FEED"  else BIG CAPS
+            const up = val.replace(/\s*,\s*/g, ",").toUpperCase();
+            val = up === "FOOD,FEED" ? "FOOD+FEED" : up;
           }
+
+          // ── Format transforms ──
+          if (BIGCAPS_COLS.has(destKey) && destKey !== "foodFeed") val = val.toUpperCase();
+
+          out[destKey] = val;
         }
-        // Keep any extra columns not in COLUMN_MAP as-is
-        // Normalize: trim + lowercase + collapse all underscores/hyphens to single underscore
-        const normCol = k => k.trim().toLowerCase().replace(/[-_]+/g, "_");
-        const mappedSrcKeysNorm = new Set(Object.keys(COLUMN_MAP).map(normCol));
+
+        // ── New column: finalAuthStatus (derived from same source as complianceStatus) ──
+        out["finalAuthStatus"] = FINAL_AUTH_STATUS_MAP[complianceSrcVal] ?? complianceSrcVal;
+
+        // ── Pass through unmapped columns ──
+        const mappedNorm = new Set(Object.keys(COLUMN_MAP).map(normKey));
         for (const k of Object.keys(row)) {
-          if (!mappedSrcKeysNorm.has(normCol(k))) out[k] = String(row[k] ?? "").trim();
+          if (!mappedNorm.has(normKey(k))) out[k] = String(row[k] ?? "").trim();
         }
         return out;
       });
 
-      if (converted.length === 0) {
-        setResult({ error: "Aucune ligne valide dans le fichier." });
-        setState("error");
-        return;
-      }
+      if (converted.length === 0) { setResult({ error: "Aucune ligne valide dans le fichier." }); setState("error"); return; }
 
-      // Export
       const outWs = XLSX.utils.json_to_sheet(converted);
       outWs["!cols"] = Object.keys(converted[0]).map(k => ({ wch: Math.max(k.length + 2, 18) }));
       const outWb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(outWb, outWs, "Companies");
-      const date = new Date().toISOString().slice(0, 10);
-      XLSX.writeFile(outWb, `companies_converted_${date}.xlsx`);
-
+      XLSX.writeFile(outWb, `companies_converted_${new Date().toISOString().slice(0,10)}.xlsx`);
       setResult({ total: rows.length, converted: converted.length });
       setState("done");
-    } catch(e) {
-      setResult({ error: String(e) });
-      setState("error");
-    }
+    } catch(e) { setResult({ error: String(e) }); setState("error"); }
   };
 
-  const MAPPING = [
-    "ID → ref",
-    "full_name → legalname",
-    "custom_field__IS_INDIVIDUAL → companyType  (vide→LEGAL ENTITY · true→INDIVIDUAL)",
-    "company_group__title → group",
-    "country__title → country",
-    "size → companySize  (mise en majuscules)",
-    "role_names → gtRole",
-    "custom_field__Role → roles",
-    "business_unit_titles → businessUnit  (supprime le préfixe 'BU ')",
-    "custom_field__Custom_compliance_status → complianceStatus  (AUTHORISED UPON REQUEST→AUTHORISED · BLACK LIST→BLACK LISTED · NOT AUTHORISED INACTIVE→NOT AUTHORISED - INACTIVE · NOT AUTHORISED REQ→NOT AUTHORISED - REQUESTED · NOT AUTHORISED TV→AUTHORISED)",
-    "create_time → complianceCreationDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",
-    "update_time → complianceLastUpdateDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",
-    "date_request → complianceRequestDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",
-    "date_received → complianceLastReceptionDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",
-    "date_confirmation → complianceFinalConfirmationDate  (yyyy-mm-dd hh:mm:ss → dd/mm/yyyy)",
-    "additional_info → complianceAdditionalInfos",
-    "custom_field__USD/MAD_CLIENT → contractsCurrency",
-    "custom_field__Food/Feed → foodFeed",
-    "custom_field__WATCH_LIST → watchList",
-    "custom_field__Activity_status → status",
-    "custom_field__CLIENT_OWNER → clientOwner  (CLIENT's Owner)",
-    "custom_field__Custom_compliance_status → finalAuthStatus  (NOT AUTHORISED - UNDER REVIEW→vide · sinon valeur reprise telle quelle)",
+  // ── Table styles ─────────────────────────────────────────────
+  const TH = { padding: "5px 10px", textAlign: "left", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bg, whiteSpace: "nowrap" };
+  const TD = { padding: "4px 10px", fontSize: 11, color: COLORS.text, borderBottom: `1px solid ${COLORS.border}40`, whiteSpace: "nowrap" };
+  const TDm = { ...TD, color: COLORS.textMuted, fontStyle: "italic" };
+  const TAG = (c) => ({ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${c}18`, color: c, border: `1px solid ${c}40` });
+
+  // ── Data for tables ──────────────────────────────────────────
+  const RENAME_ROWS = [
+    ["id","ref"],["name","name"],["full_name","legalName"],["custom_field__IS_INDIVIDUAL","companyType"],
+    ["company_group__title","group"],["website","website"],["address","address"],["city","city"],
+    ["country__title","country"],["custom_field__Activity_status","status"],["size","companySize"],
+    ["custom_field__Role","roles"],["role_names","gtRole"],["business_unit_titles","businessUnit"],
+    ["custom_field__Custom_compliance_status","complianceStatus"],["create_time","complianceCreationDate"],
+    ["update_time","complianceLastUpdateDate"],["date_request","complianceRequestDate"],
+    ["date_received","complianceLastReceptionDate"],["date_confirmation","complianceFinalConfirmationDate"],
+    ["additional_info","complianceAdditionalInfos"],["custom_field__USD/MAD_CLIENT","contractsCurrency"],
+    ["custom_field__Food/Feed","foodFeed"],["custom_field__WATCH_LIST","watchList"],
+    ["custom_field__CLIENT_OWNER","clientOwner"],
+  ];
+
+  const NEW_COL_ROWS = [["custom_field__Custom_compliance_status","finalAuthStatus","Dérivé de complianceStatus avec mapping distinct"]];
+
+  const VALUES_ROWS = [
+    ["custom_field__IS_INDIVIDUAL","companyType","true","INDIVIDUAL"],
+    ["","","(vide)","LEGAL ENTITY"],
+    ["business_unit_titles","businessUnit","MOROCCO BU","MOROCCO"],
+    ["","","UKRAINE BU","UKRAINE"],["","","EGYPT BU","EGYPT"],["","","RUSSIA BU","RUSSIA"],
+    ["","","BUTTER BU","BUTTER"],["","","TURKEY BU","TURKEY"],
+    ["","","MAXIGRAIN","MAXIGRAIN"],["","","PRODELA","PRODELA"],
+    ["","","GENEVE","GENEVE"],["","","FINANCE","FINANCE"],
+    ["","","RISK","RISK"],["","","COPAG","COPAG"],["","","JYG","JYG"],["","","ATM","ATM"],
+    ["custom_field__Custom_compliance_status","complianceStatus","AUTHORISED UPON REQUEST","AUTHORISED"],
+    ["","","BLACK LISTED","BLACK LISTED"],["","","NOT AUTHORISED","NOT AUTHORISED"],
+    ["","","NOT AUTHORISED - UNDER REVIEW","NOT AUTHORISED - UNDER REVIEW"],
+    ["","","NOT AUTHORISED INACTIVE","NOT AUTHORISED INACTIVE"],
+    ["","","NOT AUTHORISED REQ","NOT AUTHORISED \u2013 REQUESTED"],
+    ["","","NOT AUTHORISED TV","AUTHORISED"],
+    ["custom_field__Custom_compliance_status","finalAuthStatus","AUTHORISED","AUTHORISED"],
+    ["","","AUTHORISED UPON REQUEST","AUTHORISED UPON REQUEST"],
+    ["","","BLACK LISTED","BLACK LISTED"],["","","NOT AUTHORISED","NOT AUTHORISED"],
+    ["","","NOT AUTHORISED - UNDER REVIEW","(vide)"],
+    ["","","NOT AUTHORISED INACTIVE","NOT AUTHORISED INACTIVE"],
+    ["","","NOT AUTHORISED REQ","NOT AUTHORISED \u2013 REQUESTED"],
+    ["","","NOT AUTHORISED TV","NOT AUTHORISED - UNDER REVIEW"],
+    ["custom_field__Food/Feed","foodFeed","Food,Feed","FOOD+FEED"],
+    ["","","","(BIG CAPS sinon)"],
+  ];
+
+  const FORMAT_ROWS = [
+    ["size","companySize","—","BIG CAPS"],
+    ["custom_field__Role","roles","—","BIG CAPS"],
+    ["role_names","gtRole","—","BIG CAPS"],
+    ["business_unit_titles","businessUnit","—","BIG CAPS"],
+    ["custom_field__Food/Feed","foodFeed","—","BIG CAPS"],
+    ["create_time","complianceCreationDate","dd.mm.yyyy hh:min:sec","dd.mm.yyyy hh:min"],
+    ["update_time","complianceLastUpdateDate","dd.mm.yyyy hh:min:sec","dd.mm.yyyy hh:min"],
+    ["date_request","complianceRequestDate","dd.mm.yyyy hh:min:sec","dd.mm.yyyy hh:min"],
+    ["date_received","complianceLastReceptionDate","dd.mm.yyyy hh:min:sec","dd.mm.yyyy hh:min"],
+    ["date_confirmation","complianceFinalConfirmationDate","dd.mm.yyyy hh:min:sec","dd.mm.yyyy hh:min"],
   ];
 
   return (
     <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      {/* Header */}
       <div style={{ padding: "18px 24px", background: `${COLORS.blue}08`, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{ width: 38, height: 38, borderRadius: 10, background: `${COLORS.blue}20`, border: `1px solid ${COLORS.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>◆</div>
         <div style={{ flex: 1 }}>
@@ -6299,14 +6369,91 @@ const BatchCompaniesOldToNew = () => {
           <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Convertit un export companies ancien format vers le format d'import de l'app</div>
         </div>
       </div>
-      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
 
-        {/* Mapping info */}
-        <div style={{ fontSize: 12, color: COLORS.textMuted, background: COLORS.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
-          <div style={{ fontWeight: 700, marginBottom: 6, color: COLORS.textSub }}>Mapping appliqué :</div>
-          {MAPPING.map(m => <div key={m} style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>• {m}</div>)}
+      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
+
+        {/* ── 4 tables side by side ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.6fr 1fr", gap: 14, alignItems: "start" }}>
+
+          {/* TABLE 1 — Colonnes à renommer */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.blue}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.blue, letterSpacing: 0.8 }}>① COLONNES RENOMMÉES</div>
+            <div style={{ overflowY: "auto", maxHeight: 360 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={TH}>OLD</th><th style={TH}>NEW</th></tr></thead>
+                <tbody>
+                  {RENAME_ROWS.map(([o, n], i) => (
+                    <tr key={i}>
+                      <td style={{ ...TD, color: COLORS.accent, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{o}</td>
+                      <td style={{ ...TD, color: COLORS.green, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{n}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* TABLE 2 — Colonnes à ajouter */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.green}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.green, letterSpacing: 0.8 }}>② COLONNES AJOUTÉES</div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={TH}>SOURCE</th><th style={TH}>NEW COL</th><th style={TH}>NOTE</th></tr></thead>
+              <tbody>
+                {NEW_COL_ROWS.map(([src, col, note], i) => (
+                  <tr key={i}>
+                    <td style={{ ...TD, color: COLORS.accent, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{src}</td>
+                    <td style={{ ...TD, color: COLORS.green, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{col}</td>
+                    <td style={{ ...TDm, fontSize: 10, whiteSpace: "normal" }}>{note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* TABLE 3 — Valeurs à modifier */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.orange}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.orange, letterSpacing: 0.8 }}>③ VALEURS MODIFIÉES</div>
+            <div style={{ overflowY: "auto", maxHeight: 360 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={TH}>SRC COL</th><th style={TH}>NEW COL</th><th style={TH}>OLD VALUE</th><th style={TH}>NEW VALUE</th></tr></thead>
+                <tbody>
+                  {VALUES_ROWS.map(([src, col, ov, nv], i) => {
+                    const isEmpty = !ov && !nv;
+                    return (
+                      <tr key={i} style={{ opacity: isEmpty ? 0.45 : 1 }}>
+                        <td style={{ ...TD, color: src ? COLORS.accent : "transparent", fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{src || "↳"}</td>
+                        <td style={{ ...TD, color: col ? COLORS.green : "transparent", fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{col || "↳"}</td>
+                        <td style={{ ...TD, fontSize: 10 }}>{ov || <span style={{ color: COLORS.textMuted, fontStyle: "italic" }}>—</span>}</td>
+                        <td style={{ ...TD, fontSize: 10, fontWeight: 600 }}>{nv || <span style={{ color: COLORS.textMuted, fontStyle: "italic" }}>= source</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* TABLE 4 — Formats */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.gold}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.gold, letterSpacing: 0.8 }}>④ FORMATS</div>
+            <div style={{ overflowY: "auto", maxHeight: 360 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={TH}>CHAMP</th><th style={TH}>OLD FORMAT</th><th style={TH}>NEW FORMAT</th></tr></thead>
+                <tbody>
+                  {FORMAT_ROWS.map(([, col, of_, nf], i) => (
+                    <tr key={i}>
+                      <td style={{ ...TD, color: COLORS.green, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{col}</td>
+                      <td style={{ ...TDm, fontSize: 10 }}>{of_ === "—" ? <span style={{ color: COLORS.textMuted }}>—</span> : of_}</td>
+                      <td style={{ ...TD, fontSize: 10 }}><span style={TAG(COLORS.gold)}>{nf}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
+        {/* ── Action button ── */}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
           onChange={e => { if (e.target.files[0]) processFile(e.target.files[0]); e.target.value = ""; }} />
 

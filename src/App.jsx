@@ -6523,7 +6523,7 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
         <div style={{ position: "fixed", top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, boxShadow: "0 8px 24px #00000060", maxHeight: 220, overflowY: "auto" }}>
           {suggestions.length > 0
             ? suggestions.map(co => (
-                <div key={co.id} onMouseDown={() => { onToggle(co.id); setSearch(""); }}
+                <div key={co.name} onMouseDown={() => { onToggle(co.name); setSearch(""); }}
                   style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, color: COLORS.text }}
                   onMouseEnter={e => e.currentTarget.style.background = COLORS.hover}
                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
@@ -6539,7 +6539,7 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
       {(selected.length > 0 || unmatchedIds.length > 0) && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {selected.map(co => (
-            <div key={co.id} onClick={() => onToggle(co.id)}
+            <div key={co.name} onClick={() => onToggle(co.name)}
               style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600,
                 background: `${COLORS.accent}22`, border: `1.5px solid ${COLORS.accent}`, color: COLORS.accent, userSelect: "none" }}>
               {co.name}
@@ -6589,10 +6589,8 @@ const ClientOwnerAdminBlock = ({ companies }) => {
         <ClientOwnerCandidatePicker
           companies={companies}
           candidates={candidates}
-          onToggle={(nameOrId) => {
-            // Find company name from id or use directly if already a name
-            const co = companies.find(c => String(c.id) === String(nameOrId) || c.name === nameOrId);
-            const key = co ? (co.name || String(nameOrId)) : String(nameOrId);
+          onToggle={(name) => {
+            const key = String(name);
             const current = [...new Set((config.clientOwnerCandidates || []).map(String))];
             const next = current.includes(key)
               ? current.filter(c => c !== key)

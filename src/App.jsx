@@ -10460,7 +10460,7 @@ const sel = useMemo(() => selected ? companies.find(c => String(c.id) === select
 { key: "status", label: "Activity Status", cfg: config.activityStatus },
 { key: "city", label: "City", cfg: config.city },
 { key: "companyType", label: "Company Type", cfg: config.companyType },
-                  { key: "country", label: "Country", cfg: config.country },
+                  { key: "country", label: "Country", cfg: null, searchable: true },
                   { key: "businessUnit", label: "Business Unit", cfg: config.businessUnit },
                   { key: "roles", label: "Roles", cfg: config.roles },
                   { key: "foodFeed", label: "Food / Feed", cfg: config.foodFeed },
@@ -10469,11 +10469,49 @@ const sel = useMemo(() => selected ? companies.find(c => String(c.id) === select
                   { key: "finalAuthStatus", label: "Final Auth Status", cfg: config.finalAuthStatus },
                   { key: "contractsCurrency", label: "Contracts Currency", cfg: config.contractsCurrency },
                 { key: "watchList", label: "Watch List", cfg: [{ value: true, label: "⚠️ Watch List", color: COLORS.red }] },
-                { key: "clientOwner", label: "Client's Owner", cfg: companies.map(co => ({ value: co.id, label: co.name, color: COLORS.accent })) },
-                ].map(({ key, label, cfg }) => (
+                { key: "clientOwner", label: "Client's Owner", cfg: (config.clientOwnerCandidates || []).map(name => { const co = companies.find(c => c.name === name); return co ? { value: co.id, label: co.name, color: COLORS.accent } : null; }).filter(Boolean) },
+                ].map(({ key, label, cfg, searchable }) => (
                   <div key={key} style={{ marginBottom: 12 }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSub, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {searchable ? (() => {
+                      const countryOptions = (config.country || []);
+                      const [cSearch, setCSearch] = React.useState("");
+                      const filtered = cSearch.trim().length >= 1
+                        ? countryOptions.filter(c => c.label.toLowerCase().includes(cSearch.toLowerCase()))
+                        : [];
+                      const active = activeFilters[key] || [];
+                      return (
+                        <div>
+                          <input value={cSearch} onChange={e => setCSearch(e.target.value)} placeholder="Rechercher un pays…"
+                            style={{ width: "100%", boxSizing: "border-box", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "6px 10px", color: COLORS.text, fontSize: 12, fontFamily: "inherit", outline: "none", marginBottom: 6 }} />
+                          {filtered.length > 0 && (
+                            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, maxHeight: 160, overflowY: "auto", marginBottom: 6 }}>
+                              {filtered.map(c => (
+                                <div key={c.value} onMouseDown={() => { setActiveFilters(f => ({ ...f, [key]: active.includes(c.value) ? f[key].filter(v => v !== c.value) : [...f[key], c.value] })); setCSearch(""); }}
+                                  style={{ padding: "6px 10px", cursor: "pointer", fontSize: 12, color: active.includes(c.value) ? COLORS.accent : COLORS.text, fontWeight: active.includes(c.value) ? 700 : 400 }}
+                                  onMouseEnter={e => e.currentTarget.style.background = COLORS.hover}
+                                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                                  {active.includes(c.value) ? "✓ " : ""}{c.label}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {active.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                              {active.map(val => {
+                                const item = countryOptions.find(c => c.value === val);
+                                return (
+                                  <span key={val} onClick={() => setActiveFilters(f => ({ ...f, [key]: f[key].filter(v => v !== val) }))}
+                                    style={{ cursor: "pointer", fontSize: 11, padding: "3px 10px", borderRadius: 8, fontWeight: 600, background: `${COLORS.accent}22`, color: COLORS.accent, border: `1px solid ${COLORS.accent}55` }}>
+                                    {item?.label || val} ✕
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })() : <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {(cfg || []).map(item => {
                         const selected = activeFilters[key].includes(item.value);
                        const excluded = excludeFilters[key]?.includes(item.value);
@@ -10512,7 +10550,7 @@ return (
   </span>
                         );
                       })}
-                    </div>
+                    </div>}
                   </div>
                 ))}
               <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 12 }}>

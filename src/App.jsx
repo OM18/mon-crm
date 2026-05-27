@@ -6475,25 +6475,24 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
   const [search, setSearch] = useState("");
   const [dropPos, setDropPos] = useState(null);
   const inputRef = useRef(null);
+  // candidates stored as company names (strings) — avoids JS BigInt precision loss on large Supabase ids
   const uniqueCandidates = [...new Set((candidates || []).map(String))];
 
-  // Déduplication globale par id — la société peut être stockée en double en base
-  const uniqueCompanies = companies.filter((co, idx, arr) => arr.findIndex(x => String(x.id) === String(co.id)) === idx);
+  // Déduplication globale par nom
+  const uniqueCompanies = companies.filter((co, idx, arr) => arr.findIndex(x => (x.name || "") === (co.name || "")) === idx);
 
   const suggestions = search.trim().length >= 1
     ? uniqueCompanies
         .filter(co => {
           const nameMatch = co.name?.toLowerCase().includes(search.toLowerCase());
-          const alreadySelected = uniqueCandidates.some(c => c === String(co.id));
+          const alreadySelected = uniqueCandidates.includes(co.name || "");
           return nameMatch && !alreadySelected;
         })
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
         .slice(0, 15)
     : [];
-  const matchedSelected = uniqueCompanies.filter(co => uniqueCandidates.some(c => c === String(co.id))).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-  // Fallback: ids in candidates that don't match any company in the list (timing issue or missing data)
-  const unmatchedIds = uniqueCandidates.filter(cid => !uniqueCompanies.some(co => String(co.id) === cid));
-  const selected = matchedSelected;
+  const selected = uniqueCompanies.filter(co => uniqueCandidates.includes(co.name || "")).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const unmatchedIds = uniqueCandidates.filter(cname => !uniqueCompanies.some(co => co.name === cname));
 
   const showDrop = search.trim().length >= 1;
 
@@ -6590,12 +6589,14 @@ const ClientOwnerAdminBlock = ({ companies }) => {
         <ClientOwnerCandidatePicker
           companies={companies}
           candidates={candidates}
-          onToggle={(id) => {
+          onToggle={(nameOrId) => {
+            // Find company name from id or use directly if already a name
+            const co = companies.find(c => String(c.id) === String(nameOrId) || c.name === nameOrId);
+            const key = co ? (co.name || String(nameOrId)) : String(nameOrId);
             const current = [...new Set((config.clientOwnerCandidates || []).map(String))];
-            const sid = String(id);
-            const next = current.includes(sid)
-              ? current.filter(c => c !== sid)
-              : [...current, sid];
+            const next = current.includes(key)
+              ? current.filter(c => c !== key)
+              : [...current, key];
             updateField("clientOwnerCandidates", next);
           }}
         />
@@ -10083,7 +10084,7 @@ const ClientOwnerPicker = ({ value, companies, onChange }) => {
   const { config } = useConfig();
   const candidates = config.clientOwnerCandidates || [];
   const eligibleCompanies = candidates.length > 0
-    ? companies.filter(co => candidates.includes(String(co.id)))
+    ? companies.filter(co => candidates.map(String).includes(co.name || ""))
     : companies;
   const owner = value ? companies.find(co => String(co.id) === String(value)) : null;
   return (

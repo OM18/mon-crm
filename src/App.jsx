@@ -6490,7 +6490,10 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
         .slice(0, 15)
     : [];
-  const selected = uniqueCompanies.filter(co => uniqueCandidates.includes(String(co.id))).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const matchedSelected = uniqueCompanies.filter(co => uniqueCandidates.some(c => c === String(co.id))).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  // Fallback: ids in candidates that don't match any company in the list (timing issue or missing data)
+  const unmatchedIds = uniqueCandidates.filter(cid => !uniqueCompanies.some(co => String(co.id) === cid));
+  const selected = matchedSelected;
 
   const showDrop = search.trim().length >= 1;
 
@@ -6534,7 +6537,7 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
         </div>
       )}
 
-      {selected.length > 0 && (
+      {(selected.length > 0 || unmatchedIds.length > 0) && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {selected.map(co => (
             <div key={co.id} onClick={() => onToggle(co.id)}
@@ -6544,9 +6547,18 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
               <span style={{ fontSize: 11, opacity: 0.7 }}>✕</span>
             </div>
           ))}
+          {unmatchedIds.map(cid => (
+            <div key={cid} onClick={() => onToggle(cid)}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                background: `${COLORS.textMuted}22`, border: `1.5px solid ${COLORS.textMuted}`, color: COLORS.textMuted, userSelect: "none" }}
+              title={`ID: ${cid} — société introuvable dans la liste chargée`}>
+              #{cid}
+              <span style={{ fontSize: 11, opacity: 0.7 }}>✕</span>
+            </div>
+          ))}
         </div>
       )}
-      {selected.length === 0 && search.trim().length === 0 && (
+      {selected.length === 0 && unmatchedIds.length === 0 && search.trim().length === 0 && (
         <div style={{ fontSize: 12, color: COLORS.textMuted }}>Aucune société sélectionnée.</div>
       )}
     </>

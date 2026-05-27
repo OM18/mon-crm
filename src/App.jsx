@@ -6606,6 +6606,84 @@ const ClientOwnerAdminBlock = ({ companies }) => {
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState(null); // null | {running, done, count}
+
+  // Maps each config field key to which table/column it affects
+  const FIELD_MIGRATION_MAP = {
+    activityStatus:    [{ table: "companies", col: "status",          isArray: false },
+                        { table: "contacts",  col: "status",          isArray: false }],
+    companyType:       [{ table: "companies", col: "companyType",      isArray: false }],
+    city:              [{ table: "companies", col: "city",             isArray: false }],
+    businessUnit:      [{ table: "companies", col: "businessUnit",     isArray: false }],
+    country:           [{ table: "companies", col: "country",          isArray: false }],
+    complianceStatus:  [{ table: "companies", col: "complianceStatus", isArray: false }],
+    finalAuthStatus:   [{ table: "companies", col: "finalAuthStatus",  isArray: false }],
+    roles:             [{ table: "companies", col: "roles",            isArray: true  }],
+    companySize:       [{ table: "companies", col: "companySize",      isArray: false }],
+    foodFeed:          [{ table: "companies", col: "foodFeed",         isArray: true  }],
+    contractsCurrency: [{ table: "companies", col: "contractsCurrency",isArray: true  }],
+    contactPositions:  [{ table: "contacts",  col: "position",         isArray: false }],
+  };
+
+  const migrateAndUpdate = async (fieldKey, newValues) => {
+    const oldValues = config[fieldKey] || [];
+    // Detect renamed values: same index, same label, different value
+    const renames = [];
+    oldValues.forEach(oldItem => {
+      const match = newValues.find(n => n.label === oldItem.label && n.value !== oldItem.value);
+      if (match) renames.push({ from: oldItem.value, to: match.value });
+    });
+
+    if (renames.length === 0) { updateField(fieldKey, newValues); return; }
+
+    const targets = FIELD_MIGRATION_MAP[fieldKey] || [];
+    if (targets.length === 0) { updateField(fieldKey, newValues); return; }
+
+    setMigrationStatus({ running: true, done: 0, total: 0 });
+
+    let totalUpdated = 0;
+    for (const { table, col, isArray } of targets) {
+      // Load all records from the table
+      const PAGE = 1000; let all = []; let from = 0;
+      while (true) {
+        const { data, error } = await supabase.from(table).select('id, data').range(from, from + PAGE - 1);
+        if (error || !data || data.length === 0) break;
+        all = [...all, ...data];
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+
+      // Apply renames
+      const toUpdate = [];
+      for (const row of all) {
+        const d = row.data || {};
+        let changed = false;
+        let updated = { ...d };
+        for (const { from: oldVal, to: newVal } of renames) {
+          if (isArray) {
+            const arr = Array.isArray(updated[col]) ? updated[col] : (updated[col] ? [updated[col]] : []);
+            if (arr.includes(oldVal)) {
+              updated[col] = arr.map(v => v === oldVal ? newVal : v);
+              changed = true;
+            }
+          } else {
+            if (updated[col] === oldVal) { updated[col] = newVal; changed = true; }
+          }
+        }
+        if (changed) toUpdate.push({ id: row.id, data: updated });
+      }
+
+      // Batch update
+      for (const row of toUpdate) {
+        await supabase.from(table).update({ data: row.data }).eq('id', row.id);
+        totalUpdated++;
+      }
+    }
+
+    updateField(fieldKey, newValues);
+    setMigrationStatus({ running: false, done: totalUpdated });
+    setTimeout(() => setMigrationStatus(null), 4000);
+  };
   const [adminTab, setAdminTab] = useState("fields");
   const [employees, setEmployees] = useState([]);
 
@@ -8033,8 +8111,18 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             <div style={{ padding: "10px 14px", background: `${COLORS.gold}10`, border: `1px solid ${COLORS.gold}30`, borderRadius: 10, marginBottom: 20, fontSize: 12, color: COLORS.gold, lineHeight: 1.7 }}>
               💡 Cliquez sur un champ pour le déplier et modifier ses valeurs. N'oubliez pas de cliquer sur <strong>✓ Sauvegarder</strong> après chaque modification.
             </div>
+            {migrationStatus && (
+              <div style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 16, fontSize: 12, fontWeight: 600,
+                background: migrationStatus.running ? `${COLORS.blue}18` : `${COLORS.green}18`,
+                color: migrationStatus.running ? COLORS.blue : COLORS.green,
+                border: `1px solid ${migrationStatus.running ? COLORS.blue : COLORS.green}40` }}>
+                {migrationStatus.running
+                  ? "⏳ Migration en cours — mise à jour des données existantes…"
+                  : `✓ Migration terminée — ${migrationStatus.done} enregistrement${migrationStatus.done !== 1 ? "s" : ""} mis à jour en base`}
+              </div>
+            )}
             {FIELD_DEFINITIONS.map(fieldDef => (
-              <FieldEditor key={fieldDef.key} fieldDef={fieldDef} values={config[fieldDef.key] || []} onUpdate={updateField} />
+              <FieldEditor key={fieldDef.key} fieldDef={fieldDef} values={config[fieldDef.key] || []} onUpdate={migrateAndUpdate} />
             ))}
             {/* ── CLIENT'S OWNER CANDIDATES ── */}
             <ClientOwnerAdminBlock companies={companies} />

@@ -11060,8 +11060,6 @@ return (
           const isEmpty = val === undefined || val === null || val === "" || (Array.isArray(val) && val.length === 0);
           if (!isEmpty) merged[field] = val;
         });
-        // Always update lastUpdateDate on merge
-        merged.complianceLastUpdateDate = nowInTz(config.companyTimezone || 'Europe/Paris');
         updated[existingIdx] = merged;
         updatedIds.add(existingIdx);
       } else {

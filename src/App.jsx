@@ -6214,16 +6214,12 @@ const BatchCompaniesOldToNew = () => {
   };
 
   // ── Format rules  Source: NEW_FORMATS.xlsx ──────────────────
-  // companySize → BIG CAPS
-  // roles, gtRole, businessUnit → BIG CAPS  (implied by 2 extra BIG CAPS rows under size)
-  // date fields → dd.mm.yyyy hh:min  (strip seconds) ← handled in parseDateTime
-  // foodFeed → BIG CAPS
 
   const DATE_COLS = new Set([
     "complianceCreationDate","complianceLastUpdateDate","complianceRequestDate",
     "complianceLastReceptionDate","complianceFinalConfirmationDate",
   ]);
-  const BIGCAPS_COLS = new Set(["companySize","foodFeed"]);
+  const BIGCAPS_COLS = new Set(["companySize"]);
 
   // ── processFile ──────────────────────────────────────────────
   const processFile = async (file) => {
@@ -6263,14 +6259,10 @@ const BatchCompaniesOldToNew = () => {
           } else if (DATE_COLS.has(destKey)) {
             val = parseDateTime(val);
 
-          } else if (destKey === "foodFeed") {
-            // "Food,Feed" / "Food, Feed" → "FOOD+FEED"  else BIG CAPS
-            const up = val.replace(/\s*,\s*/g, ",").toUpperCase();
-            val = up === "FOOD,FEED" ? "FOOD+FEED" : up;
           }
 
           // ── Format transforms ──
-          if (BIGCAPS_COLS.has(destKey) && destKey !== "foodFeed") val = val.toUpperCase();
+          if (BIGCAPS_COLS.has(destKey)) val = val.toUpperCase();
 
           out[destKey] = val;
         }
@@ -6342,13 +6334,11 @@ const BatchCompaniesOldToNew = () => {
     ["","","NOT AUTHORISED INACTIVE","NOT AUTHORISED INACTIVE"],
     ["","","NOT AUTHORISED REQ","NOT AUTHORISED \u2013 REQUESTED"],
     ["","","NOT AUTHORISED TV","NOT AUTHORISED - UNDER REVIEW"],
-    ["custom_field__Food/Feed","foodFeed","Food,Feed","FOOD+FEED"],
-    ["","","","(BIG CAPS sinon)"],
+
   ];
 
   const FORMAT_ROWS = [
     ["size","companySize","—","BIG CAPS"],
-    ["custom_field__Food/Feed","foodFeed","—","BIG CAPS"],
     ["create_time","complianceCreationDate","dd.mm.yyyy hh:min:sec","dd.mm.yyyy hh:min"],
     ["update_time","complianceLastUpdateDate","dd.mm.yyyy hh:min:sec","dd.mm.yyyy hh:min"],
     ["date_request","complianceRequestDate","dd.mm.yyyy hh:min:sec","dd.mm.yyyy hh:min"],

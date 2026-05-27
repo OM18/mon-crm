@@ -6482,9 +6482,13 @@ const ClientOwnerCandidatePicker = ({ companies, candidates, onToggle }) => {
 
   const suggestions = search.trim().length >= 1
     ? uniqueCompanies
-        .filter(co => co.name?.toLowerCase().includes(search.toLowerCase()) && !uniqueCandidates.includes(String(co.id)))
+        .filter(co => {
+          const nameMatch = co.name?.toLowerCase().includes(search.toLowerCase());
+          const alreadySelected = uniqueCandidates.some(c => c === String(co.id));
+          return nameMatch && !alreadySelected;
+        })
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-        .slice(0, 8)
+        .slice(0, 15)
     : [];
   const selected = uniqueCompanies.filter(co => uniqueCandidates.includes(String(co.id))).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 

@@ -10032,7 +10032,7 @@ const VirtualList = ({ items, itemHeight, containerHeight, renderItem, emptyMess
 };
 
 const VirtualCompanyList = ({ filtered, selected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, configCountry }) => {
-  const ROW_H = 74; // 68px content + 6px margin
+  const ROW_H = 92; // extra height for multi-value fields (Business Unit, roles...)
   const OVERSCAN = 5;
   const [scrollTop, setScrollTop] = useState(0);
   const containerRef = useRef(null);

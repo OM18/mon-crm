@@ -8774,7 +8774,7 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
           const norm = s => s.toLowerCase().trim();
           const matched = companies.find(co => norm(co.name || "") === norm(obj.clientOwner));
           if (matched) {
-            obj.clientOwner = String(matched.id);
+            obj.clientOwner = matched.name;
           } else {
             // Valeur inconnue : on conserve le nom brut (sera affiché en fallback dans l'UI)
             obj.clientOwner = obj.clientOwner.trim();
@@ -9620,7 +9620,7 @@ const CompanyDetailPanel = memo(({ sel, selContacts, onEdit, onDelete, getStatus
             <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: "9px 0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 12, color: COLORS.textSub, flexShrink: 0 }}>Client's Owner</span>
               {sel.clientOwner
-                ? (() => { const owner = companies.find(co => String(co.id) === String(sel.clientOwner)); return owner ? <span style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600 }}>{owner.name}</span> : <span style={{ fontSize: 12, color: COLORS.textMuted }}>{sel.clientOwner}</span>; })()
+                ? <span style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600 }}>{sel.clientOwner}</span>
                 : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
             </div>
             <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: "9px 0", display: "flex", justifyContent: "space-between", gap: 8 }}>
@@ -10189,7 +10189,8 @@ const ClientOwnerPicker = ({ value, companies, onChange }) => {
   const eligibleCompanies = candidates.length > 0
     ? companies.filter(co => candidates.map(String).includes(co.name || ""))
     : companies;
-  const owner = value ? companies.find(co => String(co.id) === String(value)) : null;
+  // value is stored as company name (avoids JS BigInt precision loss on large Supabase ids)
+  const owner = value ? eligibleCompanies.find(co => co.name === value) : null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>CLIENT'S OWNER</label>
@@ -10203,7 +10204,7 @@ const ClientOwnerPicker = ({ value, companies, onChange }) => {
           .slice()
           .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
           .map(co => (
-            <option key={co.id} value={co.id}>
+            <option key={co.name} value={co.name}>
               {co.name}{co.country ? ` — ${co.country}` : ""}
             </option>
           ))}
@@ -10612,7 +10613,7 @@ const sel = useMemo(() => selected ? companies.find(c => String(c.id) === select
                   { key: "finalAuthStatus", label: "Final Auth Status", cfg: config.finalAuthStatus },
                   { key: "contractsCurrency", label: "Contracts Currency", cfg: config.contractsCurrency },
                 { key: "watchList", label: "Watch List", cfg: [{ value: true, label: "⚠️ Watch List", color: COLORS.red }] },
-                { key: "clientOwner", label: "Client's Owner", cfg: (config.clientOwnerCandidates || []).map(name => { const co = companies.find(c => c.name === name); return co ? { value: co.id, label: co.name, color: COLORS.accent } : null; }).filter(Boolean) },
+                { key: "clientOwner", label: "Client's Owner", cfg: (config.clientOwnerCandidates || []).map(name => ({ value: name, label: name, color: COLORS.accent })) },
                 ].map(({ key, label, cfg, searchable }) => (
                   <div key={key} style={{ marginBottom: 12 }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSub, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>

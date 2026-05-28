@@ -10032,14 +10032,41 @@ const VirtualList = ({ items, itemHeight, containerHeight, renderItem, emptyMess
 };
 
 const VirtualCompanyList = ({ filtered, selected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, configCountry }) => {
+  const ROW_H = 74; // 68px content + 6px margin
+  const OVERSCAN = 5;
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef(null);
+  const [containerH, setContainerH] = useState(800);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(entries => {
+      setContainerH(entries[0].contentRect.height);
+    });
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const totalH = filtered.length * ROW_H;
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H) - OVERSCAN);
+  const endIdx = Math.min(filtered.length, Math.ceil((scrollTop + containerH) / ROW_H) + OVERSCAN);
+  const visibleItems = filtered.slice(startIdx, endIdx);
+
   return (
-    <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
+      style={{ overflowY: "auto", flex: 1, position: "relative" }}>
       {filtered.length === 0
         ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>
-        : filtered.map(c => (
-            <CompanyRow key={String(c.id)} c={c} isSelected={selected === (c.ref || String(c.id))} onSelect={onSelect}
-              getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} configCountry={configCountry} />
-          ))
+        : <div style={{ height: totalH, position: "relative" }}>
+            <div style={{ position: "absolute", top: startIdx * ROW_H, left: 0, right: 0 }}>
+              {visibleItems.map(c => (
+                <div key={c.ref || String(c.id)} style={{ height: ROW_H, paddingBottom: 6, boxSizing: "border-box" }}>
+                  <CompanyRow c={c} isSelected={selected === (c.ref || String(c.id))} onSelect={onSelect}
+                    getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} configCountry={configCountry} />
+                </div>
+              ))}
+            </div>
+          </div>
       }
     </div>
   );

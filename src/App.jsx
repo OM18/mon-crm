@@ -10121,9 +10121,14 @@ const CompanyRow = memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAu
     </div>
     <div style={{ fontSize: 12, color: COLORS.blue, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.website || "—"}</div>
     <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-      {(Array.isArray(c.businessUnit) ? c.businessUnit : (c.businessUnit ? [c.businessUnit] : [])).length > 0
-        ? (Array.isArray(c.businessUnit) ? c.businessUnit : [c.businessUnit]).map(v => <Badge key={v} label={getBUCfg(v).label.toUpperCase()} color={getBUCfg(v).color} />)
-        : <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>}
+      {(() => {
+        const buArr = Array.isArray(c.businessUnit) ? c.businessUnit : (c.businessUnit ? [c.businessUnit] : []);
+        if (buArr.length === 0) return <span style={{ fontSize: 12, color: COLORS.textMuted }}>—</span>;
+        return <>
+          {buArr.slice(0, 2).map(v => <Badge key={v} label={getBUCfg(v).label.toUpperCase()} color={getBUCfg(v).color} />)}
+          {buArr.length > 2 && <span style={{ fontSize: 11, color: COLORS.textMuted }}>+{buArr.length - 2}</span>}
+        </>;
+      })()}
     </div>
   </div>
 ));

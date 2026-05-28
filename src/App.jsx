@@ -10037,7 +10037,7 @@ const VirtualCompanyList = ({ filtered, selected, onSelect, getComplianceCfg, ge
       {filtered.length === 0
         ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>
         : filtered.map(c => (
-            <CompanyRow key={String(c.id)} c={c} isSelected={selected === String(c.id)} onSelect={onSelect}
+            <CompanyRow key={String(c.id)} c={c} isSelected={selected === (c.ref || String(c.id))} onSelect={onSelect}
               getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} configCountry={configCountry} />
           ))
       }
@@ -10320,7 +10320,11 @@ useEffect(() => {
 }, []);
 
   const [selected, setSelected] = useState(null);
-  const handleSelect = useCallback((id) => setSelected(prev => prev === String(id) ? null : String(id)), []);
+  const handleSelect = useCallback((id) => {
+    const co = companies.find(c => c.id === id || String(c.id) === String(id));
+    const key = co?.ref || String(id);
+    setSelected(prev => prev === key ? null : key);
+  }, [companies]);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [editCompany, setEditCompany] = useState(null);
@@ -10459,7 +10463,7 @@ const passFilters = filterMode === "AND"
 }).filter((c, i, arr) => arr.findIndex(x => String(x.id) === String(c.id)) === i),
 [companies, search, activeFilters, excludeFilters, onlyFilters, customFilters, filterMode]);
 
-const sel = useMemo(() => selected ? companies.find(c => String(c.id) === selected) : null, [selected, companies]);
+const sel = useMemo(() => selected ? (companies.find(c => c.ref === selected) || companies.find(c => String(c.id) === selected)) : null, [selected, companies]);
   const normDateTimeLocal = (val) => {
     if (!val) return "";
     const s = val.toString().trim();

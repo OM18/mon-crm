@@ -11035,7 +11035,34 @@ return (
               </div>
             </div>
             <Input label="Number of Contracts" type="number" value={form.numberOfContracts || ""} onChange={v => setForm({ ...form, numberOfContracts: v })} placeholder="Ex: 12" />
-            <SelectField label="Food/Feed" value={form.foodFeed || ""} onChange={v => setForm({ ...form, foodFeed: v })} options={[{ value: "", label: "— Select —" }, { value: "FOOD", label: "FOOD" }, { value: "FEED", label: "FEED" }, { value: "FOOD + FEED", label: "FOOD + FEED" }]} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 12, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>FOOD/FEED</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {(config.foodFeed || []).map(opt => {
+                  const selected = (Array.isArray(form.foodFeed) ? form.foodFeed : form.foodFeed ? [form.foodFeed] : []).includes(opt.value);
+                  return (
+                    <span key={opt.value} onClick={() => {
+                      const current = Array.isArray(form.foodFeed) ? form.foodFeed : form.foodFeed ? [form.foodFeed] : [];
+                      const next = selected ? current.filter(v => v !== opt.value) : [...current, opt.value];
+                      setForm({ ...form, foodFeed: next });
+                    }} style={{
+                      cursor: "pointer", fontSize: 12, padding: "5px 12px", borderRadius: 8, fontWeight: 600, userSelect: "none", transition: "all 0.15s",
+                      background: selected ? (opt.color || COLORS.accent) : `${(opt.color || COLORS.accent)}18`,
+                      color: selected ? "#fff" : (opt.color || COLORS.accent),
+                      border: `1.5px solid ${selected ? (opt.color || COLORS.accent) : (opt.color || COLORS.accent) + "55"}`
+                    }}>
+                      {opt.label}
+                    </span>
+                  );
+                })}
+                {(Array.isArray(form.foodFeed) ? form.foodFeed : form.foodFeed ? [form.foodFeed] : []).length > 0 && (
+                  <span onClick={() => setForm({ ...form, foodFeed: [] })}
+                    style={{ cursor: "pointer", fontSize: 11, padding: "5px 10px", borderRadius: 8, color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, background: "transparent" }}>
+                    ✕ Effacer
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end" }}>
             <Btn variant="secondary" onClick={() => setShowForm(false)}>Annuler</Btn>

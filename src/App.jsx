@@ -10031,6 +10031,33 @@ const VirtualList = ({ items, itemHeight, containerHeight, renderItem, emptyMess
   );
 };
 
+const VirtualCompanyList = ({ filtered, selected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, configCountry }) => {
+  const ROW_H = 68;
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef(null);
+  const containerH = (containerRef.current?.clientHeight) || (typeof window !== "undefined" ? window.innerHeight - 180 : 800);
+  const totalH = filtered.length * ROW_H;
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H) - 3);
+  const endIdx = Math.min(filtered.length, Math.ceil((scrollTop + containerH) / ROW_H) + 3);
+  const visibleItems = filtered.slice(startIdx, endIdx);
+  return (
+    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
+      style={{ overflowY: "auto", flex: 1, position: "relative" }}>
+      {filtered.length === 0
+        ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>
+        : <div style={{ height: totalH, position: "relative" }}>
+            <div style={{ position: "absolute", top: startIdx * ROW_H, left: 0, right: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+              {visibleItems.map(c => (
+                <CompanyRow key={String(c.id)} c={c} isSelected={selected === String(c.id)} onSelect={onSelect}
+                  getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} configCountry={configCountry} />
+              ))}
+            </div>
+          </div>
+      }
+    </div>
+  );
+};
+
 const CompanyRow = memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, configCountry }) => (
   <div onClick={() => onSelect(c.id)} style={{
     background: isSelected ? `${COLORS.purple}12` : COLORS.card,
@@ -10852,34 +10879,16 @@ return (
           ))}
         </div>
 
-        {(() => {
-          const ROW_H = 68; // px per row incl. gap
-          const listRef = React.useRef(null);
-          const [scrollTop, setScrollTop] = React.useState(0);
-          const containerH = typeof window !== "undefined" ? window.innerHeight - 180 : 800;
-          const totalH = filtered.length * ROW_H;
-          const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H) - 3);
-          const endIdx = Math.min(filtered.length, Math.ceil((scrollTop + containerH) / ROW_H) + 3);
-          const visibleItems = filtered.slice(startIdx, endIdx);
-          return (
-            <div ref={listRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
-              style={{ overflowY: "auto", flex: 1, position: "relative" }}>
-              {filtered.length === 0
-                ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>
-                : <>
-                    <div style={{ height: totalH, position: "relative" }}>
-                      <div style={{ position: "absolute", top: startIdx * ROW_H, left: 0, right: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-                        {visibleItems.map(c => (
-                          <CompanyRow key={String(c.id)} c={c} isSelected={selected === String(c.id)} onSelect={handleSelect}
-                            getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} configCountry={config.country} />
-                        ))}
-                      </div>
-                    </div>
-                  </>
-              }
-            </div>
-          );
-        })()}
+        <VirtualCompanyList
+          filtered={filtered}
+          selected={selected}
+          onSelect={handleSelect}
+          getComplianceCfg={getComplianceCfg}
+          getFinalAuthCfg={getFinalAuthCfg}
+          getRoleCfg={getRoleCfg}
+          getBUCfg={getBUCfg}
+          configCountry={config.country}
+        />
       </div>
 
       {/* Panel toujours monté — width 0 quand fermé, évite mount/unmount coûteux */}

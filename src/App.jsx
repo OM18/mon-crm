@@ -10032,7 +10032,7 @@ const VirtualList = ({ items, itemHeight, containerHeight, renderItem, emptyMess
 };
 
 const VirtualCompanyList = ({ filtered, selected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, configCountry }) => {
-  const ROW_H = 68;
+  const ROW_H = 74; // 68px row + 6px gap, no separate gap needed
   const [scrollTop, setScrollTop] = useState(0);
   const containerRef = useRef(null);
   const containerH = (containerRef.current?.clientHeight) || (typeof window !== "undefined" ? window.innerHeight - 180 : 800);
@@ -10046,10 +10046,12 @@ const VirtualCompanyList = ({ filtered, selected, onSelect, getComplianceCfg, ge
       {filtered.length === 0
         ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: 48 }}>Aucune société trouvée</div>
         : <div style={{ height: totalH, position: "relative" }}>
-            <div style={{ position: "absolute", top: startIdx * ROW_H, left: 0, right: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ position: "absolute", top: startIdx * ROW_H, left: 0, right: 0 }}>
               {visibleItems.map(c => (
-                <CompanyRow key={String(c.id)} c={c} isSelected={selected === String(c.id)} onSelect={onSelect}
-                  getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} configCountry={configCountry} />
+                <div key={String(c.id)} style={{ marginBottom: 6 }}>
+                  <CompanyRow c={c} isSelected={selected === String(c.id)} onSelect={onSelect}
+                    getComplianceCfg={getComplianceCfg} getFinalAuthCfg={getFinalAuthCfg} getRoleCfg={getRoleCfg} getBUCfg={getBUCfg} configCountry={configCountry} />
+                </div>
               ))}
             </div>
           </div>

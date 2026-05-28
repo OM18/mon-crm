@@ -10128,8 +10128,31 @@ const COMPANY_EXPORT_HEADERS = [
 ];
 
 const CompanyExportModal = ({ all, filtered, onClose }) => {
+  const { config } = useConfig();
   const [scope, setScope] = useState("filtered");
   const [exporting, setExporting] = useState(false);
+
+  // Resolve a raw stored value to its admin-panel label
+  const resolveLabel = (fieldKey, rawVal) => {
+    if (rawVal === null || rawVal === undefined || rawVal === "") return "";
+    const FIELD_MAP = {
+      companyType:      config.companyType,
+      status:           config.activityStatus,
+      city:             config.city,
+      country:          config.country,
+      businessUnit:     config.businessUnit,
+      roles:            config.roles,
+      companySize:      config.companySize,
+      complianceStatus: config.complianceStatus,
+      finalAuthStatus:  config.finalAuthStatus,
+      contractsCurrency:config.contractsCurrency,
+      foodFeed:         config.foodFeed,
+    };
+    const cfgList = FIELD_MAP[fieldKey];
+    if (!cfgList) return rawVal; // not a config field — return as-is
+    const match = cfgList.find(item => item.value === rawVal);
+    return match ? match.label : rawVal; // fallback to raw if not found in config
+  };
 
   const doExport = async () => {
     setExporting(true);
@@ -10138,9 +10161,9 @@ const CompanyExportModal = ({ all, filtered, onClose }) => {
       const data = scope === "all" ? all : filtered;
       const rows = data.map(c => COMPANY_EXPORT_HEADERS.map(h => {
         const v = c[h];
-        if (Array.isArray(v)) return v.join(", ");
         if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
-        return v ?? "";
+        if (Array.isArray(v)) return v.map(item => resolveLabel(h, item)).join(", ");
+        return resolveLabel(h, v) ?? "";
       }));
       const ws = XLSX.utils.aoa_to_sheet([COMPANY_EXPORT_HEADERS, ...rows]);
       ws["!cols"] = COMPANY_EXPORT_HEADERS.map(h => ({ wch: Math.max(h.length + 2, 14) }));

@@ -10046,7 +10046,7 @@ const VirtualCompanyList = ({ filtered, selected, onSelect, getComplianceCfg, ge
 };
 
 const CompanyRow = memo(({ c, isSelected, onSelect, getComplianceCfg, getFinalAuthCfg, getRoleCfg, getBUCfg, configCountry }) => (
-  <div onClick={() => onSelect(c.id)} style={{
+  <div onClick={() => onSelect(c.ref || String(c.id))} style={{
     background: isSelected ? `${COLORS.purple}12` : COLORS.card,
     border: `1px solid ${isSelected ? COLORS.purple : COLORS.border}`,
     borderRadius: 12, padding: "12px 18px", cursor: "pointer",
@@ -10320,11 +10320,7 @@ useEffect(() => {
 }, []);
 
   const [selected, setSelected] = useState(null);
-  const handleSelect = useCallback((id) => {
-    const co = companies.find(c => c.id === id || String(c.id) === String(id));
-    const key = co?.ref || String(id);
-    setSelected(prev => prev === key ? null : key);
-  }, [companies]);
+  const handleSelect = useCallback((key) => setSelected(prev => prev === key ? null : key), []);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [editCompany, setEditCompany] = useState(null);
@@ -10463,7 +10459,7 @@ const passFilters = filterMode === "AND"
 }).filter((c, i, arr) => arr.findIndex(x => String(x.id) === String(c.id)) === i),
 [companies, search, activeFilters, excludeFilters, onlyFilters, customFilters, filterMode]);
 
-const sel = useMemo(() => selected ? (companies.find(c => c.ref === selected) || companies.find(c => String(c.id) === selected)) : null, [selected, companies]);
+const sel = useMemo(() => selected ? companies.find(c => (c.ref || String(c.id)) === selected) : null, [selected, companies]);
   const normDateTimeLocal = (val) => {
     if (!val) return "";
     const s = val.toString().trim();

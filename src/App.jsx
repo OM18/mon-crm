@@ -10409,8 +10409,11 @@ const passFilters = filterMode === "AND"
       const val = c[key];
       const valArr = Array.isArray(val) ? val : (val !== undefined && val !== null && val !== "" ? [val] : []);
       if (activeFilters[key].length > 0) {
-        // Always OR within the same filter key
-        const inc = activeFilters[key].some(f => valArr.includes(f));
+        // Multi-value fields in AND mode: all selected values must be present
+        const isMultiField = ["roles","businessUnit","foodFeed","contractsCurrency"].includes(key);
+        const inc = (filterMode === "AND" && isMultiField)
+          ? activeFilters[key].every(f => valArr.includes(f))
+          : activeFilters[key].some(f => valArr.includes(f));
         if (!inc) return false;
         const onlyVals = (onlyFilters[key] || []).filter(v => activeFilters[key].includes(v));
         if (onlyVals.length > 0) {

@@ -6152,7 +6152,8 @@ const BatchCompaniesOldToNew = () => {
     "id":                                     "ref",
     "name":                                   "name",
     "full_name":                              "legalName",
-    "custom_field__IS_INDIVIDUAL":            "companyType",
+    "custom_field__Company_type":             "companyType",
+    "custom_field__Final_authorisation_status": "finalAuthStatus",
     "company_group__title":                   "group",
     "website":                                "website",
     "address":                                "address",
@@ -6181,8 +6182,6 @@ const BatchCompaniesOldToNew = () => {
   // (handled in value transform below)
 
   // ── Value maps  Source: NEW_VALUES.xlsx ─────────────────────
-  const COMPANY_TYPE_MAP = { "true": "INDIVIDUAL", "": "LEGAL ENTITY" };
-
   const BUSINESS_UNIT_MAP = {
     "MOROCCO BU": "MOROCCO", "UKRAINE BU": "UKRAINE", "MAXIGRAIN": "MAXIGRAIN",
     "PRODELA": "PRODELA", "EGYPT BU": "EGYPT", "RUSSIA BU": "RUSSIA",
@@ -6242,11 +6241,7 @@ const BatchCompaniesOldToNew = () => {
           let val = raw !== undefined && raw !== null ? String(raw).trim() : "";
 
           // ── Value transforms ──
-          if (destKey === "companyType") {
-            const k = val.toLowerCase() === "true" ? "true" : val === "" ? "" : null;
-            val = k !== null ? (COMPANY_TYPE_MAP[k] ?? val) : val;
-
-          } else if (destKey === "businessUnit") {
+          if (destKey === "businessUnit") {
             val = val.split(",").map(p => {
               const t = p.trim().toUpperCase();
               return BUSINESS_UNIT_MAP[t] ?? p.trim();
@@ -6255,6 +6250,9 @@ const BatchCompaniesOldToNew = () => {
           } else if (destKey === "complianceStatus") {
             complianceSrcVal = val.toUpperCase();
             val = COMPLIANCE_STATUS_MAP[complianceSrcVal] ?? val;
+
+          } else if (destKey === "finalAuthStatus") {
+            val = FINAL_AUTH_STATUS_MAP[val.toUpperCase()] ?? val;
 
           } else if (DATE_COLS.has(destKey)) {
             val = parseDateTime(val);
@@ -6266,9 +6264,6 @@ const BatchCompaniesOldToNew = () => {
 
           out[destKey] = val;
         }
-
-        // ── New column: finalAuthStatus (derived from same source as complianceStatus) ──
-        out["finalAuthStatus"] = FINAL_AUTH_STATUS_MAP[complianceSrcVal] ?? complianceSrcVal;
 
         // ── Pass through unmapped columns ──
         const mappedNorm = new Set(Object.keys(COLUMN_MAP).map(normKey));
@@ -6298,7 +6293,8 @@ const BatchCompaniesOldToNew = () => {
 
   // ── Data for tables ──────────────────────────────────────────
   const RENAME_ROWS = [
-    ["id","ref"],["name","name"],["full_name","legalName"],["custom_field__IS_INDIVIDUAL","companyType"],
+    ["id","ref"],["name","name"],["full_name","legalName"],["custom_field__Company_type","companyType"],
+    ["custom_field__Final_authorisation_status","finalAuthStatus"],
     ["company_group__title","group"],["website","website"],["address","address"],["city","city"],
     ["country__title","country"],["custom_field__Activity_status","status"],["size","companySize"],
     ["custom_field__Role","roles"],["role_names","gtRole"],["business_unit_titles","businessUnit"],
@@ -6310,11 +6306,9 @@ const BatchCompaniesOldToNew = () => {
     ["custom_field__CLIENT_OWNER","clientOwner"],
   ];
 
-  const NEW_COL_ROWS = [["custom_field__Custom_compliance_status","finalAuthStatus","Dérivé de complianceStatus avec mapping distinct"]];
+  const NEW_COL_ROWS = [];
 
   const VALUES_ROWS = [
-    ["custom_field__IS_INDIVIDUAL","companyType","true","INDIVIDUAL"],
-    ["","","(vide)","LEGAL ENTITY"],
     ["business_unit_titles","businessUnit","MOROCCO BU","MOROCCO"],
     ["","","UKRAINE BU","UKRAINE"],["","","EGYPT BU","EGYPT"],["","","RUSSIA BU","RUSSIA"],
     ["","","BUTTER BU","BUTTER"],["","","TURKEY BU","TURKEY"],
@@ -6360,7 +6354,7 @@ const BatchCompaniesOldToNew = () => {
       <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
 
         {/* ── 4 tables side by side ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.6fr 1fr", gap: 14, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr 1fr", gap: 14, alignItems: "start" }}>
 
           {/* TABLE 1 — Colonnes à renommer */}
           <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
@@ -6380,22 +6374,7 @@ const BatchCompaniesOldToNew = () => {
             </div>
           </div>
 
-          {/* TABLE 2 — Colonnes à ajouter */}
-          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
-            <div style={{ padding: "8px 12px", background: `${COLORS.green}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.green, letterSpacing: 0.8 }}>② COLONNES AJOUTÉES</div>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={TH}>SOURCE</th><th style={TH}>NEW COL</th><th style={TH}>NOTE</th></tr></thead>
-              <tbody>
-                {NEW_COL_ROWS.map(([src, col, note], i) => (
-                  <tr key={i}>
-                    <td style={{ ...TD, color: COLORS.accent, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{src}</td>
-                    <td style={{ ...TD, color: COLORS.green, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{col}</td>
-                    <td style={{ ...TDm, fontSize: 10, whiteSpace: "normal" }}>{note}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+
 
           {/* TABLE 3 — Valeurs à modifier */}
           <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>

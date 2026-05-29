@@ -10143,7 +10143,7 @@ const COMPANY_EXPORT_HEADERS = [
   "complianceRequestDate", "complianceLastReceptionDate", "complianceFinalConfirmationDate",
   "complianceAdditionalInfos",
   "incorporationDate", "equity", "turnover", "netIncome", "totalFixedAssets", "totalAssets",
-  "contractsCurrency", "numberOfContracts", "foodFeed", "tags", "watchList",
+  "contractsCurrency", "numberOfContracts", "foodFeed", "clientOwner", "tags", "watchList",
 ];
 
 const CompanyExportModal = ({ all, filtered, onClose }) => {

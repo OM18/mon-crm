@@ -6285,7 +6285,7 @@ const BatchCompaniesOldToNew = () => {
     ["","","MAXIGRAIN","MAXIGRAIN"],["","","PRODELA","PRODELA"],
     ["","","GENEVE","GENEVE"],["","","FINANCE","FINANCE"],
     ["","","RISK","RISK"],["","","COPAG","COPAG"],["","","JYG","JYG"],["","","ATM","ATM"],
-
+  ];
 
   const FORMAT_ROWS = [
     ["size","companySize","—","BIG CAPS"],

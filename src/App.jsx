@@ -6190,27 +6190,6 @@ const BatchCompaniesOldToNew = () => {
     "JYG": "JYG", "ATM": "ATM",
   };
 
-  const COMPLIANCE_STATUS_MAP = {
-    "AUTHORISED": "AUTHORISED",
-    "AUTHORISED UPON REQUEST": "AUTHORISED",
-    "BLACK LISTED": "BLACK LISTED",
-    "NOT AUTHORISED": "NOT AUTHORISED",
-    "NOT AUTHORISED - UNDER REVIEW": "NOT AUTHORISED - UNDER REVIEW",
-    "NOT AUTHORISED INACTIVE": "NOT AUTHORISED INACTIVE",
-    "NOT AUTHORISED REQ": "NOT AUTHORISED \u2013 REQUESTED",
-    "NOT AUTHORISED TV": "AUTHORISED",
-  };
-
-  const FINAL_AUTH_STATUS_MAP = {
-    "AUTHORISED": "AUTHORISED",
-    "AUTHORISED UPON REQUEST": "AUTHORISED UPON REQUEST",
-    "BLACK LISTED": "BLACK LISTED",
-    "NOT AUTHORISED": "NOT AUTHORISED",
-    "NOT AUTHORISED - UNDER REVIEW": "", // → vide
-    "NOT AUTHORISED INACTIVE": "NOT AUTHORISED INACTIVE",
-    "NOT AUTHORISED REQ": "NOT AUTHORISED \u2013 REQUESTED",
-    "NOT AUTHORISED TV": "NOT AUTHORISED - UNDER REVIEW",
-  };
 
   // ── Format rules  Source: NEW_FORMATS.xlsx ──────────────────
 
@@ -6233,8 +6212,6 @@ const BatchCompaniesOldToNew = () => {
       const converted = rows.map(row => {
         const out = {};
         const rowNorm = Object.keys(row).reduce((acc, k) => { acc[normKey(k)] = k; return acc; }, {});
-        let complianceSrcVal = "";
-
         for (const [srcKey, destKey] of Object.entries(COLUMN_MAP)) {
           let raw = row[srcKey];
           if (raw === undefined) { const ak = rowNorm[normKey(srcKey)]; raw = ak !== undefined ? row[ak] : ""; }
@@ -6246,13 +6223,6 @@ const BatchCompaniesOldToNew = () => {
               const t = p.trim().toUpperCase();
               return BUSINESS_UNIT_MAP[t] ?? p.trim();
             }).filter(Boolean).join(", ");
-
-          } else if (destKey === "complianceStatus") {
-            complianceSrcVal = val.toUpperCase();
-            val = COMPLIANCE_STATUS_MAP[complianceSrcVal] ?? val;
-
-          } else if (destKey === "finalAuthStatus") {
-            val = FINAL_AUTH_STATUS_MAP[val.toUpperCase()] ?? val;
 
           } else if (DATE_COLS.has(destKey)) {
             val = parseDateTime(val);
@@ -6315,21 +6285,7 @@ const BatchCompaniesOldToNew = () => {
     ["","","MAXIGRAIN","MAXIGRAIN"],["","","PRODELA","PRODELA"],
     ["","","GENEVE","GENEVE"],["","","FINANCE","FINANCE"],
     ["","","RISK","RISK"],["","","COPAG","COPAG"],["","","JYG","JYG"],["","","ATM","ATM"],
-    ["custom_field__Custom_compliance_status","complianceStatus","AUTHORISED UPON REQUEST","AUTHORISED"],
-    ["","","BLACK LISTED","BLACK LISTED"],["","","NOT AUTHORISED","NOT AUTHORISED"],
-    ["","","NOT AUTHORISED - UNDER REVIEW","NOT AUTHORISED - UNDER REVIEW"],
-    ["","","NOT AUTHORISED INACTIVE","NOT AUTHORISED INACTIVE"],
-    ["","","NOT AUTHORISED REQ","NOT AUTHORISED \u2013 REQUESTED"],
-    ["","","NOT AUTHORISED TV","AUTHORISED"],
-    ["custom_field__Custom_compliance_status","finalAuthStatus","AUTHORISED","AUTHORISED"],
-    ["","","AUTHORISED UPON REQUEST","AUTHORISED UPON REQUEST"],
-    ["","","BLACK LISTED","BLACK LISTED"],["","","NOT AUTHORISED","NOT AUTHORISED"],
-    ["","","NOT AUTHORISED - UNDER REVIEW","(vide)"],
-    ["","","NOT AUTHORISED INACTIVE","NOT AUTHORISED INACTIVE"],
-    ["","","NOT AUTHORISED REQ","NOT AUTHORISED \u2013 REQUESTED"],
-    ["","","NOT AUTHORISED TV","NOT AUTHORISED - UNDER REVIEW"],
 
-  ];
 
   const FORMAT_ROWS = [
     ["size","companySize","—","BIG CAPS"],

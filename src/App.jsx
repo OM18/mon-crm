@@ -6829,9 +6829,13 @@ const DocumentsAdminTab = ({ config, updateField }) => {
     setNewTypeName("");
   };
 
-  const saveTypes = (e) => {
+  const saveTypes = async (e) => {
     e.stopPropagation();
     updateField("documentTypes", localTypes);
+    await supabase.from('config').upsert(
+      { key: 'admin-config', data: { ...config, documentTypes: localTypes } },
+      { onConflict: 'key' }
+    );
     setDirtyTypes(false);
   };
 
@@ -6842,9 +6846,6 @@ const DocumentsAdminTab = ({ config, updateField }) => {
   const [expandedDocs, setExpandedDocs] = useState(false);
   const [newDocName, setNewDocName] = useState("");
   const [newDocType, setNewDocType] = useState("");
-  const [newDocYear, setNewDocYear] = useState("");
-
-  const isValidYear = (y) => /^\d{4}$/.test(y) && parseInt(y) >= 2000 && parseInt(y) <= 2100;
 
   useEffect(() => {
     setLocalDocs(Array.isArray(config.documents) ? config.documents : []);
@@ -6854,14 +6855,18 @@ const DocumentsAdminTab = ({ config, updateField }) => {
   const markDocs = (next) => { setLocalDocs(next); setDirtyDocs(true); };
 
   const addDoc = () => {
-    if (!newDocName.trim() || !newDocType || !isValidYear(newDocYear)) return;
-    markDocs([...localDocs, { id: Date.now(), name: newDocName.trim(), type: newDocType, year: newDocYear }]);
-    setNewDocName(""); setNewDocType(""); setNewDocYear("");
+    if (!newDocName.trim() || !newDocType) return;
+    markDocs([...localDocs, { id: Date.now(), name: newDocName.trim(), type: newDocType }]);
+    setNewDocName(""); setNewDocType("");
   };
 
-  const saveDocs = (e) => {
+  const saveDocs = async (e) => {
     e.stopPropagation();
     updateField("documents", localDocs);
+    await supabase.from('config').upsert(
+      { key: 'admin-config', data: { ...config, documents: localDocs } },
+      { onConflict: 'key' }
+    );
     setDirtyDocs(false);
   };
 
@@ -6909,13 +6914,6 @@ const DocumentsAdminTab = ({ config, updateField }) => {
                     <option value="">— Select type —</option>
                     {localTypes.map(t => <option key={t.id} value={t.value}>{t.label}</option>)}
                   </select>
-                  <input
-                    value={doc.year || ""}
-                    onChange={e => { const v = e.target.value.replace(/\D/g, "").slice(0, 4); markDocs(localDocs.map((d, i) => i === idx ? { ...d, year: v } : d)); }}
-                    placeholder="YYYY"
-                    maxLength={4}
-                    style={{ width: 72, background: "transparent", border: `1px solid ${doc.year && !/^\d{4}$/.test(doc.year) ? COLORS.red + "80" : COLORS.border}`, borderRadius: 8, padding: "6px 10px", color: COLORS.text, fontSize: 12, fontFamily: "inherit", outline: "none", textAlign: "center" }}
-                  />
                   <button onClick={() => markDocs(localDocs.filter((_, i) => i !== idx))}
                     style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
                     onMouseOver={e => e.currentTarget.style.color = COLORS.red}
@@ -6948,27 +6946,13 @@ const DocumentsAdminTab = ({ config, updateField }) => {
                   {localTypes.map(t => <option key={t.id} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
-              <div style={{ width: 90, display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>YEAR *</label>
-                <input
-                  value={newDocYear}
-                  onChange={e => setNewDocYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                  placeholder="YYYY"
-                  maxLength={4}
-                  onKeyDown={e => e.key === "Enter" && addDoc()}
-                  style={{ background: COLORS.bg, border: `1px solid ${newDocYear && !isValidYear(newDocYear) ? COLORS.red + "80" : newDocYear && isValidYear(newDocYear) ? COLORS.orange : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", textAlign: "center" }}
-                />
-                {newDocYear && !isValidYear(newDocYear) && (
-                  <span style={{ fontSize: 10, color: COLORS.red, marginTop: 2 }}>2000 – 2100</span>
-                )}
-              </div>
               {localTypes.length === 0 && (
                 <div style={{ fontSize: 11, color: COLORS.orange, alignSelf: "center", maxWidth: 160 }}>⚠ Ajoutez d'abord des types ci-dessous</div>
               )}
               <button
                 onClick={addDoc}
-                disabled={!newDocName.trim() || !newDocType || !isValidYear(newDocYear)}
-                style={{ padding: "9px 16px", background: (!newDocName.trim() || !newDocType || !isValidYear(newDocYear)) ? COLORS.border : COLORS.orange, color: (!newDocName.trim() || !newDocType || !isValidYear(newDocYear)) ? COLORS.textMuted : "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: (!newDocName.trim() || !newDocType || !isValidYear(newDocYear)) ? "not-allowed" : "pointer", whiteSpace: "nowrap", transition: "background 0.15s", fontFamily: "inherit" }}
+                disabled={!newDocName.trim() || !newDocType}
+                style={{ padding: "9px 16px", background: (!newDocName.trim() || !newDocType) ? COLORS.border : COLORS.orange, color: (!newDocName.trim() || !newDocType) ? COLORS.textMuted : "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: (!newDocName.trim() || !newDocType) ? "not-allowed" : "pointer", whiteSpace: "nowrap", transition: "background 0.15s", fontFamily: "inherit" }}
               >+ Ajouter</button>
             </div>
           </div>

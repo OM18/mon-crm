@@ -9097,6 +9097,7 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
 
   const doImport = () => {
     setImporting(true);
+    setTimeout(() => {
     const unknowns = {};
     const importBaseTs = Date.now();
     const items = rawRows.map((row, i) => {
@@ -9462,6 +9463,7 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
       onImport(resolved, Object.values(mapping).filter(Boolean)); setImporting(false); onClose();
     }
     setImporting(false);
+    }, 50);
   };
 
   const resolveItems = (items, finalDecisions) => {
@@ -9469,6 +9471,7 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
       const resolved = { ...obj };
       if (type === "companies") {
         Object.entries(FIELD_CONFIG_MAP).forEach(([fieldKey, { configKey }]) => {
+          if (["foodFeed", "businessUnit", "roles", "contractsCurrency"].includes(fieldKey)) return;
           const val = resolved[fieldKey];
           if (!val) return;
           const mapped = mapToConfigValue(configKey, val);
@@ -9504,6 +9507,15 @@ if (Array.isArray(resolved.contractsCurrency)) {
     return finalDecisions[key] === "add" ? v : null;
   }).filter(Boolean);
 }
+        if (Array.isArray(resolved.foodFeed)) {
+          const normFF = s => s.toLowerCase().replace(/_/g, " ");
+          resolved.foodFeed = resolved.foodFeed.map(v => {
+            const matched = config.foodFeed?.find(f => normFF(f.value) === normFF(v) || normFF(f.label) === normFF(v));
+            if (matched) return matched.value;
+            const key = `foodFeed:${v}`;
+            return finalDecisions[key] === "add" ? v : null;
+          }).filter(Boolean);
+        } else { resolved.foodFeed = []; }
       } else if (type === "contacts") {
         const val = resolved.status;
         if (val) {

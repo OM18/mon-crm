@@ -9948,12 +9948,14 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
   const [newDocId, setNewDocId] = useState("");
   const [newDate,  setNewDate]  = useState("");
   const [newDateErr, setNewDateErr] = useState("");
+  const [newYear,  setNewYear]  = useState("");
 
   // Edit state
-  const [editId, setEditId]         = useState(null);
-  const [editDocId, setEditDocId]   = useState("");
-  const [editDate,  setEditDate]    = useState("");
+  const [editId, setEditId]           = useState(null);
+  const [editDocId, setEditDocId]     = useState("");
+  const [editDate,  setEditDate]      = useState("");
   const [editDateErr, setEditDateErr] = useState("");
+  const [editYear,  setEditYear]      = useState("");
 
   useEffect(() => {
     setDocs(Array.isArray(sel.companyDocuments) ? sel.companyDocuments : []);
@@ -9974,6 +9976,14 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
     return adminDoc ? adminDoc.name || adminDoc.label : docRef;
   };
 
+  // Extract 4-digit year from dd/mm/yyyy
+  const yearFromDate = (date) => {
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(date)) return date.slice(6, 10);
+    return "";
+  };
+
+  const isValidYear = (y) => /^\d{4}$/.test(y) && parseInt(y) >= 2000 && parseInt(y) <= 2100;
+
   const validateDate = (val) => {
     if (!val) return "";
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(val)) return "Format dd/mm/yyyy requis";
@@ -9991,14 +10001,23 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
   };
 
   // ── Add ──
-  const canAdd = newDocId && newDate.length === 10 && !newDateErr;
+  const canAdd = newDocId && newDate.length === 10 && !newDateErr && isValidYear(newYear);
 
   const addDoc = () => {
     if (!canAdd) return;
-    const updated = [...docs, { id: Date.now(), docRef: newDocId, receptionDate: newDate }];
+    const updated = [...docs, { id: Date.now(), docRef: newDocId, receptionDate: newDate, year: newYear }];
     setDocs(updated);
     onPatchCompany({ companyDocuments: updated });
-    setNewDocId(""); setNewDate(""); setNewDateErr(""); setShowForm(false);
+    setNewDocId(""); setNewDate(""); setNewDateErr(""); setNewYear(""); setShowForm(false);
+  };
+
+  // When add-date changes: auto-fill year if user hasn't manually overridden it
+  const handleNewDateChange = (raw) => {
+    const v = fmtDate(raw);
+    setNewDate(v);
+    setNewDateErr(validateDate(v));
+    const y = yearFromDate(v);
+    if (y) setNewYear(y); // auto-fill
   };
 
   // ── Edit ──
@@ -10007,19 +10026,29 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
     setEditDocId(doc.docRef);
     setEditDate(doc.receptionDate);
     setEditDateErr("");
-    setShowForm(false); // close add form if open
+    setEditYear(doc.year || yearFromDate(doc.receptionDate) || "");
+    setShowForm(false);
   };
 
-  const cancelEdit = () => { setEditId(null); setEditDocId(""); setEditDate(""); setEditDateErr(""); };
+  const cancelEdit = () => { setEditId(null); setEditDocId(""); setEditDate(""); setEditDateErr(""); setEditYear(""); };
 
-  const canSaveEdit = editDocId && editDate.length === 10 && !editDateErr;
+  const canSaveEdit = editDocId && editDate.length === 10 && !editDateErr && isValidYear(editYear);
 
   const saveEdit = () => {
     if (!canSaveEdit) return;
-    const updated = docs.map(d => d.id === editId ? { ...d, docRef: editDocId, receptionDate: editDate } : d);
+    const updated = docs.map(d => d.id === editId ? { ...d, docRef: editDocId, receptionDate: editDate, year: editYear } : d);
     setDocs(updated);
     onPatchCompany({ companyDocuments: updated });
     cancelEdit();
+  };
+
+  // When edit-date changes: auto-fill year
+  const handleEditDateChange = (raw) => {
+    const v = fmtDate(raw);
+    setEditDate(v);
+    setEditDateErr(validateDate(v));
+    const y = yearFromDate(v);
+    if (y) setEditYear(y);
   };
 
   // ── Delete ──
@@ -10030,8 +10059,29 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
     if (editId === id) cancelEdit();
   };
 
+  // ── Shared Year field ──
+  const YearField = ({ year, setYear, autoLabel }) => {
+    const err = year && !isValidYear(year);
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>YEAR</label>
+          {autoLabel && <span style={{ fontSize: 9, color: COLORS.textMuted, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "1px 5px" }}>auto</span>}
+        </div>
+        <input
+          value={year}
+          onChange={e => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+          placeholder="YYYY"
+          maxLength={4}
+          style={{ background: COLORS.card, border: `1px solid ${err ? COLORS.red + "80" : isValidYear(year) ? COLORS.orange : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", textAlign: "center" }}
+        />
+        {err && <span style={{ fontSize: 11, color: COLORS.red }}>2000 – 2100</span>}
+      </div>
+    );
+  };
+
   // ── Shared form UI ──
-  const DocForm = ({ docId, setDocId, date, setDate, dateErr, setDateErr, onSave, onCancel, canSave, saveLabel }) => (
+  const DocForm = ({ docId, setDocId, date, onDateChange, dateErr, year, setYear, onSave, onCancel, canSave, saveLabel }) => (
     <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.orange}40`, borderRadius: 12, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DOCUMENT *</label>
@@ -10048,12 +10098,17 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
           {docId ? getTypeLabel(docId) : "— automatique —"}
         </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>RECEPTION DATE *</label>
-        <input value={date} placeholder="jj/mm/aaaa" maxLength={10}
-          onChange={e => { const v = fmtDate(e.target.value); setDate(v); setDateErr(validateDate(v)); }}
-          style={{ background: COLORS.card, border: `1px solid ${dateErr ? COLORS.red + "80" : date.length === 10 && !dateErr ? COLORS.orange : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
-        {dateErr && <span style={{ fontSize: 11, color: COLORS.red }}>{dateErr}</span>}
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>RECEPTION DATE *</label>
+          <input value={date} placeholder="jj/mm/aaaa" maxLength={10}
+            onChange={e => onDateChange(e.target.value)}
+            style={{ background: COLORS.card, border: `1px solid ${dateErr ? COLORS.red + "80" : date.length === 10 && !dateErr ? COLORS.orange : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+          {dateErr && <span style={{ fontSize: 11, color: COLORS.red }}>{dateErr}</span>}
+        </div>
+        <div style={{ width: 100 }}>
+          <YearField year={year} setYear={setYear} autoLabel={true} />
+        </div>
       </div>
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
         <button onClick={onCancel}
@@ -10087,9 +10142,10 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
         <div style={{ marginBottom: 16 }}>
           <DocForm
             docId={newDocId} setDocId={setNewDocId}
-            date={newDate} setDate={setNewDate}
-            dateErr={newDateErr} setDateErr={setNewDateErr}
-            onSave={addDoc} onCancel={() => { setShowForm(false); setNewDocId(""); setNewDate(""); setNewDateErr(""); }}
+            date={newDate} onDateChange={handleNewDateChange}
+            dateErr={newDateErr}
+            year={newYear} setYear={setNewYear}
+            onSave={addDoc} onCancel={() => { setShowForm(false); setNewDocId(""); setNewDate(""); setNewDateErr(""); setNewYear(""); }}
             canSave={canAdd} saveLabel="✓ Enregistrer"
           />
         </div>
@@ -10119,6 +10175,7 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
                     {getTypeLabel(doc.docRef)}
                   </span>
                   <span style={{ fontSize: 11, color: COLORS.textMuted }}>📅 {doc.receptionDate}</span>
+                  {doc.year && <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 5, padding: "1px 7px" }}>📆 {doc.year}</span>}
                 </div>
               </div>
               {/* Edit button */}
@@ -10144,8 +10201,9 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
               <div style={{ border: `1px solid ${COLORS.orange}50`, borderTop: "none", borderRadius: "0 0 10px 10px", overflow: "hidden" }}>
                 <DocForm
                   docId={editDocId} setDocId={setEditDocId}
-                  date={editDate} setDate={setEditDate}
-                  dateErr={editDateErr} setDateErr={setEditDateErr}
+                  date={editDate} onDateChange={handleEditDateChange}
+                  dateErr={editDateErr}
+                  year={editYear} setYear={setEditYear}
                   onSave={saveEdit} onCancel={cancelEdit}
                   canSave={canSaveEdit} saveLabel="✓ Sauvegarder"
                 />

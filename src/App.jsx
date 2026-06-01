@@ -16738,8 +16738,8 @@ const CONTRACT_FIELD_MAP = {
   "shipmentTerminal":  ["shipment terminal", "terminal", "shipment_terminal_name", "shipment terminal name"],
   "businessUnit":      ["business unit", "bu", "businessunit", "unité commerciale", "unite commerciale"],
   "analyticalFlatPrice":              ["contract analytical flat price", "analytical flat price", "analytical price", "prix analytique", "prix flat analytique"],
-  "flatPriceVatIncluded":             ["flat price vat included", "flat price ttc", "prix ttc", "prix flat ttc"],
-  "analyticalFlatPriceVatIncluded":   ["analytical flat price vat included", "analytical price ttc", "prix analytique ttc"],
+  "flatPriceVatIncluded":             ["flat price vat excluded", "flat price vat included", "flat price ht", "flat price ttc", "prix ht", "prix ttc", "prix flat ht", "prix flat ttc"],
+  "analyticalFlatPriceVatIncluded":   ["analytical flat price vat excluded", "analytical flat price vat included", "analytical price ht", "analytical price ttc", "prix analytique ht", "prix analytique ttc"],
   "vat":                              ["vat", "tva", "tax"],
   "vatRate":                          ["vat rate (%)", "vat rate", "taux tva", "taux de tva", "tax rate"],
   "analyticalPremium":                ["analytical premium", "premium analytique", "prime analytique"],
@@ -16787,8 +16787,8 @@ const CONTRACT_FIELD_LABELS = {
   "shipmentTerminal":       "Shipment Terminal",
   "businessUnit":          "Business Unit",
   "analyticalFlatPrice":              "Contract Analytical Flat Price",
-  "flatPriceVatIncluded":             "Contract Flat Price (VAT Incl.)",
-  "analyticalFlatPriceVatIncluded":   "Contract Analytical Flat Price (VAT Incl.)",
+  "flatPriceVatIncluded":             "Contract Flat Price (VAT Excl.)",
+  "analyticalFlatPriceVatIncluded":   "Contract Analytical Flat Price (VAT Excl.)",
   "vat":                              "VAT",
   "vatRate":                          "VAT Rate (%)",
   "analyticalPremium":                "Analytical Premium",
@@ -17346,8 +17346,8 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
                   { f: "flatCurrency", l: "Price Currency" },
                   { f: "vat", l: "VAT" },
                   { f: "vatRate", l: "VAT Rate (%)" },
-                  { f: "flatPriceVatIncluded", l: "Flat Price (VAT Incl.)" },
-                  { f: "analyticalFlatPriceVatIncluded", l: "Analytical Flat Price (VAT Incl.)" },
+                  { f: "flatPriceVatIncluded", l: "Flat Price (VAT Excl.)" },
+                  { f: "analyticalFlatPriceVatIncluded", l: "Analytical Flat Price (VAT Excl.)" },
                   { f: "premium", l: "Premium" },
                   { f: "analyticalPremium", l: "Analytical Premium" },
                   { f: "derivativeId", l: "Derivative Instrument" },
@@ -17375,8 +17375,8 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
                   { f: "vat", l: "VAT" },
                   { f: "vatRate", l: "VAT Rate (%)" },
                   { f: "analyticalFlatPrice", l: "Contract Analytical Flat Price" },
-                  { f: "flatPriceVatIncluded", l: "Contract Flat Price (VAT Incl.)" },
-                  { f: "analyticalFlatPriceVatIncluded", l: "Contract Analytical Flat Price (VAT Incl.)" },
+                  { f: "flatPriceVatIncluded", l: "Contract Flat Price (VAT Excl.)" },
+                  { f: "analyticalFlatPriceVatIncluded", l: "Contract Analytical Flat Price (VAT Excl.)" },
                   { f: "analyticalPremium", l: "Analytical Premium" },
                 ].map(({ l, req }) => (
                   <span key={l} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5,
@@ -17660,10 +17660,20 @@ const Contracts = ({ companies = [] }) => {
     const errs = validate();
     if (Object.keys(errs).length > 0) { setFormErrors(errs); return; }
     setFormErrors({});
+    const computeVatExcluded = (price, vatRate) => {
+      const p = parseFloat(price), r = parseFloat(vatRate);
+      if (!isNaN(p) && !isNaN(r) && r > 0) return (p / (1 + r / 100)).toFixed(2);
+      return "";
+    };
+    const enriched = {
+      ...form,
+      flatPriceVatIncluded:           form.vat ? computeVatExcluded(form.flatPrice, form.vatRate)           : "",
+      analyticalFlatPriceVatIncluded: form.vat ? computeVatExcluded(form.analyticalFlatPrice, form.vatRate) : "",
+    };
     if (editId !== null) {
-      persist(contracts.map(c => c.id === editId ? { ...form, id: editId } : c));
+      persist(contracts.map(c => c.id === editId ? { ...enriched, id: editId } : c));
     } else {
-      persist([...contracts, { ...form, id: nextId(), createdAt: new Date().toISOString() }]);
+      persist([...contracts, { ...enriched, id: nextId(), createdAt: new Date().toISOString() }]);
     }
     closeModal();
   };
@@ -17862,7 +17872,7 @@ const Contracts = ({ companies = [] }) => {
           </span>
           {c.vat && c.flatPriceVatIncluded && (
             <span style={{ fontSize: 10, color: COLORS.gold, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>
-              <span style={{ fontWeight: 700, marginRight: 3 }}>TTC</span>{c.flatPriceVatIncluded}{c.flatCurrency ? " " + c.flatCurrency : ""}
+              <span style={{ fontWeight: 700, marginRight: 3 }}>HT</span>{c.flatPriceVatIncluded}{c.flatCurrency ? " " + c.flatCurrency : ""}
             </span>
           )}
         </div>
@@ -17978,8 +17988,8 @@ const Contracts = ({ companies = [] }) => {
             {c.analyticalFlatPrice && <DRow label="Analytical Flat Price">{c.analyticalFlatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
             {c.vat && <>
               <DRow label="VAT">{c.vatRate ? `${c.vatRate}%` : "Oui"}</DRow>
-              {c.flatPriceVatIncluded && <DRow label="Flat Price (VAT Incl.)">{c.flatPriceVatIncluded}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
-              {c.analyticalFlatPriceVatIncluded && <DRow label="Analytical Flat Price (VAT Incl.)">{c.analyticalFlatPriceVatIncluded}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
+              {c.flatPriceVatIncluded && <DRow label="Flat Price (VAT Excl.)">{c.flatPriceVatIncluded}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
+              {c.analyticalFlatPriceVatIncluded && <DRow label="Analytical Flat Price (VAT Excl.)">{c.analyticalFlatPriceVatIncluded}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
             </>}
           </>}
           {c.contractPriceType === "prime" && <>
@@ -18350,14 +18360,24 @@ const Contracts = ({ companies = [] }) => {
                 {form.vat && <>
                   <div style={{ gridColumn: "1 / 3", height: 1, background: `${COLORS.gold}30`, margin: "2px 0" }} />
                   <div>
-                    <CFL>Contract Flat Price (VAT Included)</CFL>
-                    <input type="number" step="0.01" min="0" value={form.flatPriceVatIncluded || ""} onChange={e => f("flatPriceVatIncluded", e.target.value)} placeholder="0.00"
-                      style={{ width: "100%", background: `${COLORS.gold}08`, border: `1px solid ${COLORS.gold}40`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                    <CFL>Contract Flat Price (VAT Excluded)</CFL>
+                    <div style={{ position: "relative" }}>
+                      <input type="number" step="0.01" min="0" readOnly
+                        value={form.flatPrice && form.vatRate ? (parseFloat(form.flatPrice) / (1 + parseFloat(form.vatRate) / 100)).toFixed(2) : ""}
+                        placeholder="— auto —"
+                        style={{ width: "100%", background: `${COLORS.gold}08`, border: `1px solid ${COLORS.gold}40`, borderRadius: 8, padding: "8px 36px 8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", cursor: "default" }} />
+                      <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: COLORS.gold, fontWeight: 700, pointerEvents: "none" }}>AUTO</span>
+                    </div>
                   </div>
                   <div>
-                    <CFL>Contract Analytical Flat Price (VAT Included)</CFL>
-                    <input type="number" step="0.01" min="0" value={form.analyticalFlatPriceVatIncluded || ""} onChange={e => f("analyticalFlatPriceVatIncluded", e.target.value)} placeholder="0.00"
-                      style={{ width: "100%", background: `${COLORS.gold}08`, border: `1px solid ${COLORS.gold}40`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                    <CFL>Contract Analytical Flat Price (VAT Excluded)</CFL>
+                    <div style={{ position: "relative" }}>
+                      <input type="number" step="0.01" min="0" readOnly
+                        value={form.analyticalFlatPrice && form.vatRate ? (parseFloat(form.analyticalFlatPrice) / (1 + parseFloat(form.vatRate) / 100)).toFixed(2) : ""}
+                        placeholder="— auto —"
+                        style={{ width: "100%", background: `${COLORS.gold}08`, border: `1px solid ${COLORS.gold}40`, borderRadius: 8, padding: "8px 36px 8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", cursor: "default" }} />
+                      <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: COLORS.gold, fontWeight: 700, pointerEvents: "none" }}>AUTO</span>
+                    </div>
                   </div>
                 </>}
               </>}

@@ -9940,21 +9940,26 @@ const ColoredStatusDropdown = ({ label, value, options, getCfg, onChange }) => {
 // ─── COMPANY DETAIL PANEL ────────────────────────────────────
 // ─── COMPANY DOCUMENTS TAB ───────────────────────────────────
 const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
-  const adminDocs   = Array.isArray(config.documents)     ? config.documents     : [];
-  const adminTypes  = Array.isArray(config.documentTypes) ? config.documentTypes : [];
+  const adminDocs  = Array.isArray(config.documents)     ? config.documents     : [];
+  const adminTypes = Array.isArray(config.documentTypes) ? config.documentTypes : [];
 
-  const [docs, setDocs]           = useState(Array.isArray(sel.companyDocuments) ? sel.companyDocuments : []);
-  const [showForm, setShowForm]   = useState(false);
-  const [newDocId, setNewDocId]   = useState("");
-  const [newDate,  setNewDate]    = useState("");
-  const [dateError, setDateError] = useState("");
+  const [docs, setDocs]         = useState(Array.isArray(sel.companyDocuments) ? sel.companyDocuments : []);
+  const [showForm, setShowForm] = useState(false);
+  const [newDocId, setNewDocId] = useState("");
+  const [newDate,  setNewDate]  = useState("");
+  const [newDateErr, setNewDateErr] = useState("");
 
-  // Keep in sync if parent company changes
+  // Edit state
+  const [editId, setEditId]         = useState(null);
+  const [editDocId, setEditDocId]   = useState("");
+  const [editDate,  setEditDate]    = useState("");
+  const [editDateErr, setEditDateErr] = useState("");
+
   useEffect(() => {
     setDocs(Array.isArray(sel.companyDocuments) ? sel.companyDocuments : []);
+    setEditId(null);
   }, [sel.id]);
 
-  // Derive doc type label from admin config
   const getTypeLabel = (docValue) => {
     const adminDoc = adminDocs.find(d => d.value === docValue || d.id === docValue || d.label === docValue);
     if (!adminDoc) return "—";
@@ -9970,104 +9975,125 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
   const validateDate = (val) => {
     if (!val) return "";
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(val)) return "Format dd/mm/yyyy requis";
-    const [dd, mm, yyyy] = val.split("/").map(Number);
+    const [dd, mm] = val.split("/").map(Number);
     if (mm < 1 || mm > 12) return "Mois invalide";
     if (dd < 1 || dd > 31) return "Jour invalide";
     return "";
   };
 
-  const handleDateChange = (val) => {
-    // Auto-insert slashes as user types
+  const fmtDate = (val) => {
     let v = val.replace(/[^\d]/g, "");
     if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2);
     if (v.length > 5) v = v.slice(0, 5) + "/" + v.slice(5);
-    v = v.slice(0, 10);
-    setNewDate(v);
-    setDateError(validateDate(v));
+    return v.slice(0, 10);
   };
 
-  const canAdd = newDocId && newDate && !dateError && newDate.length === 10;
+  // ── Add ──
+  const canAdd = newDocId && newDate.length === 10 && !newDateErr;
 
   const addDoc = () => {
     if (!canAdd) return;
-    const entry = { id: Date.now(), docRef: newDocId, receptionDate: newDate };
-    const updated = [...docs, entry];
+    const updated = [...docs, { id: Date.now(), docRef: newDocId, receptionDate: newDate }];
     setDocs(updated);
     onPatchCompany({ companyDocuments: updated });
-    setNewDocId(""); setNewDate(""); setDateError(""); setShowForm(false);
+    setNewDocId(""); setNewDate(""); setNewDateErr(""); setShowForm(false);
   };
 
+  // ── Edit ──
+  const startEdit = (doc) => {
+    setEditId(doc.id);
+    setEditDocId(doc.docRef);
+    setEditDate(doc.receptionDate);
+    setEditDateErr("");
+    setShowForm(false); // close add form if open
+  };
+
+  const cancelEdit = () => { setEditId(null); setEditDocId(""); setEditDate(""); setEditDateErr(""); };
+
+  const canSaveEdit = editDocId && editDate.length === 10 && !editDateErr;
+
+  const saveEdit = () => {
+    if (!canSaveEdit) return;
+    const updated = docs.map(d => d.id === editId ? { ...d, docRef: editDocId, receptionDate: editDate } : d);
+    setDocs(updated);
+    onPatchCompany({ companyDocuments: updated });
+    cancelEdit();
+  };
+
+  // ── Delete ──
   const removeDoc = (id) => {
     const updated = docs.filter(d => d.id !== id);
     setDocs(updated);
     onPatchCompany({ companyDocuments: updated });
+    if (editId === id) cancelEdit();
   };
+
+  // ── Shared form UI ──
+  const DocForm = ({ docId, setDocId, date, setDate, dateErr, setDateErr, onSave, onCancel, canSave, saveLabel }) => (
+    <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.orange}40`, borderRadius: 12, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DOCUMENT *</label>
+        <select value={docId} onChange={e => setDocId(e.target.value)}
+          style={{ background: COLORS.card, border: `1px solid ${docId ? COLORS.orange : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: docId ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit" }}>
+          <option value="">— Sélectionner un document —</option>
+          {adminDocs.map(d => <option key={d.id || d.value} value={d.value || d.id}>{d.name || d.label}</option>)}
+        </select>
+        {adminDocs.length === 0 && <span style={{ fontSize: 11, color: COLORS.orange }}>⚠ Aucun document configuré dans l'Admin Panel</span>}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DOC TYPE</label>
+        <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, color: docId ? COLORS.text : COLORS.textMuted, fontFamily: "inherit" }}>
+          {docId ? getTypeLabel(docId) : "— automatique —"}
+        </div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>RECEPTION DATE *</label>
+        <input value={date} placeholder="jj/mm/aaaa" maxLength={10}
+          onChange={e => { const v = fmtDate(e.target.value); setDate(v); setDateErr(validateDate(v)); }}
+          style={{ background: COLORS.card, border: `1px solid ${dateErr ? COLORS.red + "80" : date.length === 10 && !dateErr ? COLORS.orange : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+        {dateErr && <span style={{ fontSize: 11, color: COLORS.red }}>{dateErr}</span>}
+      </div>
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <button onClick={onCancel}
+          style={{ padding: "7px 14px", background: "transparent", color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          Annuler
+        </button>
+        <button onClick={onSave} disabled={!canSave}
+          style={{ padding: "7px 16px", background: canSave ? COLORS.orange : COLORS.border, color: canSave ? "#fff" : COLORS.textMuted, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: canSave ? "pointer" : "not-allowed", transition: "background 0.15s", fontFamily: "inherit" }}>
+          {saveLabel}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
 
-      {/* Header row */}
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
           {docs.length} DOCUMENT{docs.length !== 1 ? "S" : ""}
         </div>
         <button
-          onClick={() => setShowForm(v => !v)}
+          onClick={() => { setShowForm(v => !v); cancelEdit(); }}
           style={{ background: showForm ? COLORS.border : `${COLORS.orange}20`, color: showForm ? COLORS.textMuted : COLORS.orange, border: `1px solid ${showForm ? COLORS.border : COLORS.orange + "50"}`, borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
         >{showForm ? "✕ Annuler" : "+ Ajouter"}</button>
       </div>
 
       {/* Add form */}
       {showForm && (
-        <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.orange}40`, borderRadius: 12, padding: "14px 16px", marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-          {/* Document name select */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DOCUMENT *</label>
-            <select
-              value={newDocId}
-              onChange={e => setNewDocId(e.target.value)}
-              style={{ background: COLORS.card, border: `1px solid ${newDocId ? COLORS.orange : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: newDocId ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit" }}
-            >
-              <option value="">— Sélectionner un document —</option>
-              {adminDocs.map(d => (
-                <option key={d.id || d.value} value={d.value || d.id}>{d.name || d.label}</option>
-              ))}
-            </select>
-            {adminDocs.length === 0 && (
-              <span style={{ fontSize: 11, color: COLORS.orange }}>⚠ Aucun document configuré dans l'Admin Panel</span>
-            )}
-          </div>
-
-          {/* Doc type — auto-filled, read-only */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DOC TYPE</label>
-            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, color: newDocId ? COLORS.text : COLORS.textMuted, fontFamily: "inherit" }}>
-              {newDocId ? getTypeLabel(newDocId) : "— automatique —"}
-            </div>
-          </div>
-
-          {/* Reception date */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>RECEPTION DATE *</label>
-            <input
-              value={newDate}
-              onChange={e => handleDateChange(e.target.value)}
-              placeholder="jj/mm/aaaa"
-              maxLength={10}
-              style={{ background: COLORS.card, border: `1px solid ${dateError ? COLORS.red + "80" : newDate.length === 10 && !dateError ? COLORS.orange : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }}
-            />
-            {dateError && <span style={{ fontSize: 11, color: COLORS.red }}>{dateError}</span>}
-          </div>
-
-          <button
-            onClick={addDoc}
-            disabled={!canAdd}
-            style={{ alignSelf: "flex-end", padding: "8px 18px", background: canAdd ? COLORS.orange : COLORS.border, color: canAdd ? "#fff" : COLORS.textMuted, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: canAdd ? "pointer" : "not-allowed", transition: "background 0.15s", fontFamily: "inherit" }}
-          >✓ Enregistrer</button>
+        <div style={{ marginBottom: 16 }}>
+          <DocForm
+            docId={newDocId} setDocId={setNewDocId}
+            date={newDate} setDate={setNewDate}
+            dateErr={newDateErr} setDateErr={setNewDateErr}
+            onSave={addDoc} onCancel={() => { setShowForm(false); setNewDocId(""); setNewDate(""); setNewDateErr(""); }}
+            canSave={canAdd} saveLabel="✓ Enregistrer"
+          />
         </div>
       )}
 
-      {/* Document list */}
+      {/* Empty state */}
       {docs.length === 0 && !showForm && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px 0", color: COLORS.textMuted, fontSize: 13 }}>
           <span style={{ fontSize: 32 }}>📄</span>
@@ -10075,28 +10101,54 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
         </div>
       )}
 
+      {/* List */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {docs.map(doc => (
-          <div key={doc.id} style={{ display: "flex", alignItems: "center", gap: 12, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
-            <span style={{ fontSize: 20, flexShrink: 0 }}>📄</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {getDocLabel(doc.docRef)}
+          <div key={doc.id}>
+            {/* Row */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, background: editId === doc.id ? `${COLORS.orange}10` : COLORS.bg, border: `1px solid ${editId === doc.id ? COLORS.orange + "50" : COLORS.border}`, borderRadius: editId === doc.id ? "10px 10px 0 0" : 10, padding: "10px 14px", transition: "background 0.15s, border-color 0.15s" }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>📄</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {getDocLabel(doc.docRef)}
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 3, alignItems: "center" }}>
+                  <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 5, background: `${COLORS.orange}18`, color: COLORS.orange, border: `1px solid ${COLORS.orange}30`, fontWeight: 600 }}>
+                    {getTypeLabel(doc.docRef)}
+                  </span>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted }}>📅 {doc.receptionDate}</span>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 3, alignItems: "center" }}>
-                <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 5, background: `${COLORS.orange}18`, color: COLORS.orange, border: `1px solid ${COLORS.orange}30`, fontWeight: 600 }}>
-                  {getTypeLabel(doc.docRef)}
-                </span>
-                <span style={{ fontSize: 11, color: COLORS.textMuted }}>📅 {doc.receptionDate}</span>
-              </div>
+              {/* Edit button */}
+              <button
+                onClick={() => editId === doc.id ? cancelEdit() : startEdit(doc)}
+                title={editId === doc.id ? "Annuler" : "Modifier"}
+                style={{ background: editId === doc.id ? `${COLORS.orange}20` : "none", border: `1px solid ${editId === doc.id ? COLORS.orange + "50" : "transparent"}`, borderRadius: 6, color: editId === doc.id ? COLORS.orange : COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "3px 7px", flexShrink: 0 }}
+                onMouseOver={e => { if (editId !== doc.id) e.currentTarget.style.color = COLORS.accent; }}
+                onMouseOut={e => { if (editId !== doc.id) e.currentTarget.style.color = COLORS.textMuted; }}
+              >✏️</button>
+              {/* Delete button */}
+              <button
+                onClick={() => removeDoc(doc.id)}
+                title="Supprimer"
+                style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16, lineHeight: 1, flexShrink: 0, padding: 4 }}
+                onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}
+              >×</button>
             </div>
-            <button
-              onClick={() => removeDoc(doc.id)}
-              title="Supprimer"
-              style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16, lineHeight: 1, flexShrink: 0, padding: 4 }}
-              onMouseOver={e => e.currentTarget.style.color = COLORS.red}
-              onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}
-            >×</button>
+
+            {/* Inline edit form */}
+            {editId === doc.id && (
+              <div style={{ border: `1px solid ${COLORS.orange}50`, borderTop: "none", borderRadius: "0 0 10px 10px", overflow: "hidden" }}>
+                <DocForm
+                  docId={editDocId} setDocId={setEditDocId}
+                  date={editDate} setDate={setEditDate}
+                  dateErr={editDateErr} setDateErr={setEditDateErr}
+                  onSave={saveEdit} onCancel={cancelEdit}
+                  canSave={canSaveEdit} saveLabel="✓ Sauvegarder"
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>

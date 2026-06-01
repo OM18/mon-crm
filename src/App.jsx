@@ -10167,15 +10167,17 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
             <div style={{ display: "flex", alignItems: "center", gap: 12, background: editId === doc.id ? `${COLORS.orange}10` : COLORS.bg, border: `1px solid ${editId === doc.id ? COLORS.orange + "50" : COLORS.border}`, borderRadius: editId === doc.id ? "10px 10px 0 0" : 10, padding: "10px 14px", transition: "background 0.15s, border-color 0.15s" }}>
               <span style={{ fontSize: 20, flexShrink: 0 }}>📄</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {getDocLabel(doc.docRef)}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {getDocLabel(doc.docRef)}
+                  </div>
+                  {doc.year && <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.accent, background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}40`, borderRadius: 5, padding: "1px 7px", flexShrink: 0 }}>{doc.year}</span>}
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 3, alignItems: "center" }}>
                   <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 5, background: `${COLORS.orange}18`, color: COLORS.orange, border: `1px solid ${COLORS.orange}30`, fontWeight: 600 }}>
                     {getTypeLabel(doc.docRef)}
                   </span>
                   <span style={{ fontSize: 11, color: COLORS.textMuted }}>📅 {doc.receptionDate}</span>
-                  {doc.year && <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 5, padding: "1px 7px" }}>📆 {doc.year}</span>}
                 </div>
               </div>
               {/* Edit button */}

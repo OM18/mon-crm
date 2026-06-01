@@ -289,6 +289,8 @@ const DEFAULT_CONFIG = {
   contractIncoterms: [],
   contractDefaultTolerance: "10",
   contractDefaultToleranceOption: "BUYER OPTION",
+  documentTypes: [],
+  documents: [],
   derivInstrumentTypeDefault: "",
   derivCommodities: [
     { value: "corn", label: "Corn", underlyingCategory: "commodity" },
@@ -6805,6 +6807,218 @@ const ClientOwnerAdminBlock = ({ companies }) => {
   );
 };
 
+// ─── DOCUMENTS ADMIN TAB ──────────────────────────────────────
+const DocumentsAdminTab = ({ config, updateField }) => {
+  // ── Document Types section ──
+  const rawTypes = Array.isArray(config.documentTypes) ? config.documentTypes : [];
+  const [localTypes, setLocalTypes] = useState(rawTypes);
+  const [dirtyTypes, setDirtyTypes] = useState(false);
+  const [expandedTypes, setExpandedTypes] = useState(false);
+  const [newTypeName, setNewTypeName] = useState("");
+
+  useEffect(() => {
+    setLocalTypes(Array.isArray(config.documentTypes) ? config.documentTypes : []);
+    setDirtyTypes(false);
+  }, [config.documentTypes]);
+
+  const markTypes = (next) => { setLocalTypes(next); setDirtyTypes(true); };
+
+  const addType = () => {
+    if (!newTypeName.trim()) return;
+    markTypes([...localTypes, { id: Date.now(), label: newTypeName.trim(), value: newTypeName.trim().toLowerCase().replace(/\s+/g, "_") }]);
+    setNewTypeName("");
+  };
+
+  const saveTypes = (e) => {
+    e.stopPropagation();
+    updateField("documentTypes", localTypes);
+    setDirtyTypes(false);
+  };
+
+  // ── Documents section ──
+  const rawDocs = Array.isArray(config.documents) ? config.documents : [];
+  const [localDocs, setLocalDocs] = useState(rawDocs);
+  const [dirtyDocs, setDirtyDocs] = useState(false);
+  const [expandedDocs, setExpandedDocs] = useState(false);
+  const [newDocName, setNewDocName] = useState("");
+  const [newDocType, setNewDocType] = useState("");
+
+  useEffect(() => {
+    setLocalDocs(Array.isArray(config.documents) ? config.documents : []);
+    setDirtyDocs(false);
+  }, [config.documents]);
+
+  const markDocs = (next) => { setLocalDocs(next); setDirtyDocs(true); };
+
+  const addDoc = () => {
+    if (!newDocName.trim() || !newDocType) return;
+    markDocs([...localDocs, { id: Date.now(), name: newDocName.trim(), type: newDocType }]);
+    setNewDocName(""); setNewDocType("");
+  };
+
+  const saveDocs = (e) => {
+    e.stopPropagation();
+    updateField("documents", localDocs);
+    setDirtyDocs(false);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* ── DOCUMENTS ── */}
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+        <div
+          onClick={() => setExpandedDocs(e => !e)}
+          style={{ padding: "18px 24px", borderBottom: expandedDocs ? `1px solid ${COLORS.border}` : "none", display: "flex", alignItems: "center", gap: 14, background: `${COLORS.orange}08`, cursor: "pointer", userSelect: "none" }}
+          onMouseOver={e => e.currentTarget.style.background = `${COLORS.orange}14`}
+          onMouseOut={e => e.currentTarget.style.background = `${COLORS.orange}08`}
+        >
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.orange}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📄</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>DOCUMENTS</div>
+            <div style={{ fontSize: 12, color: COLORS.textSub }}>Liste des documents avec leur type associé</div>
+          </div>
+          <span style={{ fontSize: 11, color: COLORS.textMuted, background: COLORS.bg, padding: "3px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, marginRight: 8 }}>{localDocs.length} document{localDocs.length !== 1 ? "s" : ""}</span>
+          {dirtyDocs && (
+            <div onClick={saveDocs} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", marginRight: 8 }}>✓ Sauvegarder</div>
+          )}
+          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expandedDocs ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+        </div>
+
+        {expandedDocs && (
+          <div style={{ padding: "20px 24px" }}>
+            {/* Existing documents list */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+              {localDocs.map((doc, idx) => (
+                <div key={doc.id} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                  <span style={{ fontSize: 16 }}>📄</span>
+                  <input
+                    value={doc.name}
+                    onChange={e => { const v = e.target.value; markDocs(localDocs.map((d, i) => i === idx ? { ...d, name: v } : d)); }}
+                    placeholder="Document name…"
+                    style={{ flex: 2, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }}
+                  />
+                  <select
+                    value={doc.type}
+                    onChange={e => { const v = e.target.value; markDocs(localDocs.map((d, i) => i === idx ? { ...d, type: v } : d)); }}
+                    style={{ flex: 1, background: COLORS.card, border: `1px solid ${COLORS.border}`, color: doc.type ? COLORS.text : COLORS.textMuted, borderRadius: 8, padding: "6px 10px", fontSize: 12, fontFamily: "inherit", outline: "none" }}
+                  >
+                    <option value="">— Select type —</option>
+                    {localTypes.map(t => <option key={t.id} value={t.value}>{t.label}</option>)}
+                  </select>
+                  <button onClick={() => markDocs(localDocs.filter((_, i) => i !== idx))}
+                    style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                    onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                    onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+                </div>
+              ))}
+              {localDocs.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "20px 0", fontSize: 13 }}>Aucun document — ajoutez-en ci-dessous</div>}
+            </div>
+
+            {/* Add new document */}
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-end", background: `${COLORS.orange}08`, border: `1px dashed ${COLORS.orange}40`, borderRadius: 10, padding: "14px 16px" }}>
+              <div style={{ flex: 2, display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DOCUMENT NAME *</label>
+                <input
+                  value={newDocName}
+                  onChange={e => setNewDocName(e.target.value)}
+                  placeholder="Nom du document…"
+                  onKeyDown={e => e.key === "Enter" && addDoc()}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }}
+                />
+              </div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DOCUMENT TYPE *</label>
+                <select
+                  value={newDocType}
+                  onChange={e => setNewDocType(e.target.value)}
+                  style={{ background: COLORS.bg, border: `1px solid ${newDocType ? COLORS.orange : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: newDocType ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit" }}
+                >
+                  <option value="">— Sélectionner —</option>
+                  {localTypes.map(t => <option key={t.id} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              {localTypes.length === 0 && (
+                <div style={{ fontSize: 11, color: COLORS.orange, alignSelf: "center", maxWidth: 160 }}>⚠ Ajoutez d'abord des types ci-dessous</div>
+              )}
+              <button
+                onClick={addDoc}
+                disabled={!newDocName.trim() || !newDocType}
+                style={{ padding: "9px 16px", background: (!newDocName.trim() || !newDocType) ? COLORS.border : COLORS.orange, color: (!newDocName.trim() || !newDocType) ? COLORS.textMuted : "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: (!newDocName.trim() || !newDocType) ? "not-allowed" : "pointer", whiteSpace: "nowrap", transition: "background 0.15s", fontFamily: "inherit" }}
+              >+ Ajouter</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── DOCUMENT TYPES ── */}
+      <div style={{ background: COLORS.card, border: `1px solid ${dirtyTypes ? COLORS.orange + "60" : COLORS.border}`, borderRadius: 16, overflow: "hidden", transition: "border-color 0.2s" }}>
+        <div
+          onClick={() => setExpandedTypes(e => !e)}
+          style={{ padding: "18px 24px", borderBottom: expandedTypes ? `1px solid ${COLORS.border}` : "none", display: "flex", alignItems: "center", gap: 14, background: `${COLORS.orange}06`, cursor: "pointer", userSelect: "none" }}
+          onMouseOver={e => e.currentTarget.style.background = `${COLORS.orange}12`}
+          onMouseOut={e => e.currentTarget.style.background = `${COLORS.orange}06`}
+        >
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: COLORS.hover, border: `1px solid ${COLORS.orange}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏷</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>DOCUMENTS TYPES</div>
+            <div style={{ fontSize: 12, color: COLORS.textSub }}>Types de documents disponibles (utilisés dans le champ "Document Type")</div>
+          </div>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 360 }}>
+            {localTypes.map(t => (
+              <span key={t.id} style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: `${COLORS.orange}18`, color: COLORS.orange, border: `1px solid ${COLORS.orange}40` }}>{t.label}</span>
+            ))}
+          </div>
+          {dirtyTypes && (
+            <div onClick={saveTypes} style={{ background: `${COLORS.green}20`, color: COLORS.green, border: `1px solid ${COLORS.green}40`, padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", marginLeft: 8 }}>✓ Sauvegarder</div>
+          )}
+          <span style={{ color: COLORS.textMuted, fontSize: 14, transition: "transform 0.2s", display: "inline-block", transform: expandedTypes ? "rotate(180deg)" : "rotate(0deg)", marginLeft: 8 }}>▾</span>
+        </div>
+
+        {expandedTypes && (
+          <div style={{ padding: "20px 24px", borderTop: `1px solid ${COLORS.border}` }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+              {localTypes.map((t, idx) => (
+                <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.orange, flexShrink: 0 }} />
+                  <input
+                    value={t.label}
+                    onChange={e => { const v = e.target.value; markTypes(localTypes.map((x, i) => i === idx ? { ...x, label: v, value: v.toLowerCase().replace(/\s+/g, "_") } : x)); }}
+                    style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }}
+                  />
+                  <button onClick={() => markTypes(localTypes.filter((_, i) => i !== idx))}
+                    style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                    onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                    onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+                </div>
+              ))}
+              {localTypes.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "16px 0", fontSize: 13 }}>Aucun type — ajoutez-en ci-dessous</div>}
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: `${COLORS.orange}08`, border: `1px dashed ${COLORS.orange}40`, borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>LABEL *</label>
+                <input
+                  value={newTypeName}
+                  onChange={e => setNewTypeName(e.target.value)}
+                  placeholder="Nouveau type…"
+                  onKeyDown={e => e.key === "Enter" && addType()}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }}
+                />
+              </div>
+              <button
+                onClick={addType}
+                disabled={!newTypeName.trim()}
+                style={{ padding: "9px 16px", background: !newTypeName.trim() ? COLORS.border : COLORS.orange, color: !newTypeName.trim() ? COLORS.textMuted : "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: !newTypeName.trim() ? "not-allowed" : "pointer", transition: "background 0.15s", fontFamily: "inherit" }}
+              >+ Ajouter</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+};
+
 const AdminPanel = ({ companies = [] }) => {
   const { config, updateField } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -7140,8 +7354,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        {[["fields", "📋 Champs CRM"], ["derivatives", "◬ Derivatives"], ["contracts", "📄 Contracts"], ["company", "🏢 Company"], ["batch", "⚙ Batch"]].map(([t, l]) => (
-          <span key={t} onClick={() => setAdminTab(t)} style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, padding: "6px 18px", borderRadius: 10, background: adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : t === "contracts" ? COLORS.green : COLORS.accent) : COLORS.bg, color: adminTab === t ? "#fff" : COLORS.textMuted, border: `1px solid ${adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : t === "contracts" ? COLORS.green : COLORS.accent) : COLORS.border}` }}>{l}</span>
+        {[["fields", "📋 Champs CRM"], ["derivatives", "◬ Derivatives"], ["contracts", "📄 Contracts"], ["documents", "🗂 Documents"], ["company", "🏢 Company"], ["batch", "⚙ Batch"]].map(([t, l]) => (
+          <span key={t} onClick={() => setAdminTab(t)} style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, padding: "6px 18px", borderRadius: 10, background: adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : t === "contracts" ? COLORS.green : t === "documents" ? COLORS.orange : COLORS.accent) : COLORS.bg, color: adminTab === t ? "#fff" : COLORS.textMuted, border: `1px solid ${adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : t === "contracts" ? COLORS.green : t === "documents" ? COLORS.orange : COLORS.accent) : COLORS.border}` }}>{l}</span>
         ))}
       </div>
 
@@ -8293,6 +8507,10 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             </div>
           </div>
         </div>
+      )}
+
+      {adminTab === "documents" && (
+        <DocumentsAdminTab config={config} updateField={updateField} />
       )}
 
       {adminTab === "fields" && (

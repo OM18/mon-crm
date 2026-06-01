@@ -9938,6 +9938,172 @@ const ColoredStatusDropdown = ({ label, value, options, getCfg, onChange }) => {
 };
 
 // ─── COMPANY DETAIL PANEL ────────────────────────────────────
+// ─── COMPANY DOCUMENTS TAB ───────────────────────────────────
+const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
+  const adminDocs   = Array.isArray(config.documents)     ? config.documents     : [];
+  const adminTypes  = Array.isArray(config.documentTypes) ? config.documentTypes : [];
+
+  const [docs, setDocs]           = useState(Array.isArray(sel.companyDocuments) ? sel.companyDocuments : []);
+  const [showForm, setShowForm]   = useState(false);
+  const [newDocId, setNewDocId]   = useState("");
+  const [newDate,  setNewDate]    = useState("");
+  const [dateError, setDateError] = useState("");
+
+  // Keep in sync if parent company changes
+  useEffect(() => {
+    setDocs(Array.isArray(sel.companyDocuments) ? sel.companyDocuments : []);
+  }, [sel.id]);
+
+  // Derive doc type label from admin config
+  const getTypeLabel = (docValue) => {
+    const adminDoc = adminDocs.find(d => d.value === docValue || d.id === docValue || d.label === docValue);
+    if (!adminDoc) return "—";
+    const typeEntry = adminTypes.find(t => t.value === adminDoc.type || t.id === adminDoc.type);
+    return typeEntry ? typeEntry.label : adminDoc.type || "—";
+  };
+
+  const getDocLabel = (docValue) => {
+    const adminDoc = adminDocs.find(d => d.value === docValue || d.id === docValue || d.label === docValue);
+    return adminDoc ? adminDoc.name || adminDoc.label : docValue;
+  };
+
+  const validateDate = (val) => {
+    if (!val) return "";
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(val)) return "Format dd/mm/yyyy requis";
+    const [dd, mm, yyyy] = val.split("/").map(Number);
+    if (mm < 1 || mm > 12) return "Mois invalide";
+    if (dd < 1 || dd > 31) return "Jour invalide";
+    return "";
+  };
+
+  const handleDateChange = (val) => {
+    // Auto-insert slashes as user types
+    let v = val.replace(/[^\d]/g, "");
+    if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2);
+    if (v.length > 5) v = v.slice(0, 5) + "/" + v.slice(5);
+    v = v.slice(0, 10);
+    setNewDate(v);
+    setDateError(validateDate(v));
+  };
+
+  const canAdd = newDocId && newDate && !dateError && newDate.length === 10;
+
+  const addDoc = () => {
+    if (!canAdd) return;
+    const entry = { id: Date.now(), docRef: newDocId, receptionDate: newDate };
+    const updated = [...docs, entry];
+    setDocs(updated);
+    onPatchCompany({ companyDocuments: updated });
+    setNewDocId(""); setNewDate(""); setDateError(""); setShowForm(false);
+  };
+
+  const removeDoc = (id) => {
+    const updated = docs.filter(d => d.id !== id);
+    setDocs(updated);
+    onPatchCompany({ companyDocuments: updated });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>
+          {docs.length} DOCUMENT{docs.length !== 1 ? "S" : ""}
+        </div>
+        <button
+          onClick={() => setShowForm(v => !v)}
+          style={{ background: showForm ? COLORS.border : `${COLORS.orange}20`, color: showForm ? COLORS.textMuted : COLORS.orange, border: `1px solid ${showForm ? COLORS.border : COLORS.orange + "50"}`, borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+        >{showForm ? "✕ Annuler" : "+ Ajouter"}</button>
+      </div>
+
+      {/* Add form */}
+      {showForm && (
+        <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.orange}40`, borderRadius: 12, padding: "14px 16px", marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Document name select */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DOCUMENT *</label>
+            <select
+              value={newDocId}
+              onChange={e => setNewDocId(e.target.value)}
+              style={{ background: COLORS.card, border: `1px solid ${newDocId ? COLORS.orange : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: newDocId ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit" }}
+            >
+              <option value="">— Sélectionner un document —</option>
+              {adminDocs.map(d => (
+                <option key={d.id || d.value} value={d.value || d.id}>{d.name || d.label}</option>
+              ))}
+            </select>
+            {adminDocs.length === 0 && (
+              <span style={{ fontSize: 11, color: COLORS.orange }}>⚠ Aucun document configuré dans l'Admin Panel</span>
+            )}
+          </div>
+
+          {/* Doc type — auto-filled, read-only */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>DOC TYPE</label>
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, color: newDocId ? COLORS.text : COLORS.textMuted, fontFamily: "inherit" }}>
+              {newDocId ? getTypeLabel(newDocId) : "— automatique —"}
+            </div>
+          </div>
+
+          {/* Reception date */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, letterSpacing: 0.5 }}>RECEPTION DATE *</label>
+            <input
+              value={newDate}
+              onChange={e => handleDateChange(e.target.value)}
+              placeholder="jj/mm/aaaa"
+              maxLength={10}
+              style={{ background: COLORS.card, border: `1px solid ${dateError ? COLORS.red + "80" : newDate.length === 10 && !dateError ? COLORS.orange : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit" }}
+            />
+            {dateError && <span style={{ fontSize: 11, color: COLORS.red }}>{dateError}</span>}
+          </div>
+
+          <button
+            onClick={addDoc}
+            disabled={!canAdd}
+            style={{ alignSelf: "flex-end", padding: "8px 18px", background: canAdd ? COLORS.orange : COLORS.border, color: canAdd ? "#fff" : COLORS.textMuted, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: canAdd ? "pointer" : "not-allowed", transition: "background 0.15s", fontFamily: "inherit" }}
+          >✓ Enregistrer</button>
+        </div>
+      )}
+
+      {/* Document list */}
+      {docs.length === 0 && !showForm && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px 0", color: COLORS.textMuted, fontSize: 13 }}>
+          <span style={{ fontSize: 32 }}>📄</span>
+          Aucun document lié à cette société
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {docs.map(doc => (
+          <div key={doc.id} style={{ display: "flex", alignItems: "center", gap: 12, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>📄</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {getDocLabel(doc.docRef)}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 3, alignItems: "center" }}>
+                <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 5, background: `${COLORS.orange}18`, color: COLORS.orange, border: `1px solid ${COLORS.orange}30`, fontWeight: 600 }}>
+                  {getTypeLabel(doc.docRef)}
+                </span>
+                <span style={{ fontSize: 11, color: COLORS.textMuted }}>📅 {doc.receptionDate}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => removeDoc(doc.id)}
+              title="Supprimer"
+              style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16, lineHeight: 1, flexShrink: 0, padding: 4 }}
+              onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+              onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}
+            >×</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const CompanyDetailPanel = memo(({ sel, selContacts, onEdit, onDelete, getStatusCfg, getComplianceCfg, getFinalAuthCfg, getBUCfg, getRoleCfg, getTypeCfg, onPatchCompany }) => {
   const { config } = useConfig();
   const [activeTab, setActiveTab] = useState("info");
@@ -10263,11 +10429,7 @@ const CompanyDetailPanel = memo(({ sel, selContacts, onEdit, onDelete, getStatus
 
         {/* ── DOCUMENTS ── */}
         {activeTab === "documents" && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 200, gap: 12 }}>
-            <div style={{ fontSize: 40 }}>📄</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text }}>Bloc DOCUMENTS</div>
-            <div style={{ fontSize: 13, color: COLORS.textMuted, textAlign: "center", lineHeight: 1.6 }}>Les documents liés à cette société<br />seront disponibles prochainement.</div>
-          </div>
+          <CompanyDocumentsTab sel={sel} config={config} onPatchCompany={onPatchCompany} />
         )}
 
         {/* ── CONTACTS ── */}

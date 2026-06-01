@@ -9114,6 +9114,7 @@ const ExcelImportModal = ({ onClose, onImport, type, derivAccounts = [], derivPr
           obj.ref = generatedRef;
         }
         Object.entries(FIELD_CONFIG_MAP).forEach(([fieldKey, { configKey, label }]) => {
+          if (["foodFeed", "businessUnit", "roles", "contractsCurrency"].includes(fieldKey)) return; // handled as multi-value
           const val = obj[fieldKey];
           if (val && !mapToConfigValue(configKey, val)) {
             const key = `${configKey}:${val}`;
@@ -9180,6 +9181,22 @@ if (obj.contractsCurrency && typeof obj.contractsCurrency === "string") {
     return matched ? matched.value : v;
   });
 } else { obj.contractsCurrency = []; }
+
+        if (obj.foodFeed && typeof obj.foodFeed === "string") {
+          const ffValues = obj.foodFeed.split(/[,;\/|]/).map(v => v.trim()).filter(Boolean);
+          const normFF = s => s.toLowerCase().replace(/_/g, " ");
+          ffValues.forEach(v => {
+            const matched = config.foodFeed?.find(f => normFF(f.value) === normFF(v) || normFF(f.label) === normFF(v));
+            if (!matched) {
+              const key = `foodFeed:${v}`;
+              if (!unknowns[key]) unknowns[key] = { fieldKey: "foodFeed", configKey: "foodFeed", fieldLabel: "Food / Feed", value: v };
+            }
+          });
+          obj.foodFeed = ffValues.map(v => {
+            const matched = config.foodFeed?.find(f => normFF(f.value) === normFF(v) || normFF(f.label) === normFF(v));
+            return matched ? matched.value : v;
+          });
+        } else { obj.foodFeed = []; }
 
         // Parse compliance dates (handles Excel serial, DD/MM/YYYY, ISO)
         const parseCompanyDate = (val) => {

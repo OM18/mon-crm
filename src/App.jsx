@@ -9960,16 +9960,18 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
     setEditId(null);
   }, [sel.id]);
 
-  const getTypeLabel = (docValue) => {
-    const adminDoc = adminDocs.find(d => d.value === docValue || d.id === docValue || d.label === docValue);
+  const findAdminDoc = (docRef) => adminDocs.find(d => String(d.id) === String(docRef));
+
+  const getTypeLabel = (docRef) => {
+    const adminDoc = findAdminDoc(docRef);
     if (!adminDoc) return "—";
-    const typeEntry = adminTypes.find(t => t.value === adminDoc.type || t.id === adminDoc.type);
+    const typeEntry = adminTypes.find(t => t.value === adminDoc.type);
     return typeEntry ? typeEntry.label : adminDoc.type || "—";
   };
 
-  const getDocLabel = (docValue) => {
-    const adminDoc = adminDocs.find(d => d.value === docValue || d.id === docValue || d.label === docValue);
-    return adminDoc ? adminDoc.name || adminDoc.label : docValue;
+  const getDocLabel = (docRef) => {
+    const adminDoc = findAdminDoc(docRef);
+    return adminDoc ? adminDoc.name || adminDoc.label : docRef;
   };
 
   const validateDate = (val) => {
@@ -10036,7 +10038,7 @@ const CompanyDocumentsTab = ({ sel, config, onPatchCompany }) => {
         <select value={docId} onChange={e => setDocId(e.target.value)}
           style={{ background: COLORS.card, border: `1px solid ${docId ? COLORS.orange : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: docId ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit" }}>
           <option value="">— Sélectionner un document —</option>
-          {adminDocs.map(d => <option key={d.id || d.value} value={d.value || d.id}>{d.name || d.label}</option>)}
+          {adminDocs.map(d => <option key={d.id} value={String(d.id)}>{d.name || d.label}</option>)}
         </select>
         {adminDocs.length === 0 && <span style={{ fontSize: 11, color: COLORS.orange }}>⚠ Aucun document configuré dans l'Admin Panel</span>}
       </div>

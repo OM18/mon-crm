@@ -16794,7 +16794,7 @@ const CONTRACT_FIELD_MAP = {
   "contractPriceType": ["price type", "contractpricetype", "pricetype", "type prix", "flat/premium", "pricing", "contract price type"],
   "flatPrice":         ["flat price", "flatprice", "prix fixe", "price", "prix"],
   "flatCurrency":      ["currency", "devise", "flat currency", "flatcurrency", "price currency", "currency price", "devise prix", "cur"],
-  "derivativeId":      ["derivative", "derivativeid", "derivatives", "instrument", "derivative instrument", "deriv", "deriv instrument", "hedge instrument", "instrument deriv"],
+  "derivativeId":      ["derivative", "derivativeid", "derivative id", "derivatives", "instrument", "derivative instrument", "deriv", "deriv instrument", "hedge instrument", "instrument deriv"],
   "premium":           ["premium", "prime", "basis"],
   "analyticalFlatPrice": ["contract analytical flat price", "analyticalflatprice", "analytical flat price", "analytical price", "prix analytique", "prix flat analytique"],
   "analyticalPremium": ["analytical premium", "analyticalpremium", "premium analytique", "prime analytique"],

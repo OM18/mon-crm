@@ -18090,9 +18090,9 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
   );
 };
 
-const Contracts = ({ companies = [] }) => {
+const Contracts = ({ companies = [], contracts = [], setContracts }) => {
   const { config } = useConfig();
-  const [contracts, setContractsRaw] = useState([]);
+  const setContractsRaw = setContracts; // alias for compatibility
   const [instruments, setInstruments] = useState([]);
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -18102,7 +18102,7 @@ const Contracts = ({ companies = [] }) => {
   const [form, setForm] = useState(EMPTY_CONTRACT());
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
-  const dataLoaded = useRef(false);
+  const dataLoaded = useRef(true); // already loaded by parent
 
   // ── Load instruments (active only) ──
   useEffect(() => {
@@ -18115,42 +18115,13 @@ const Contracts = ({ companies = [] }) => {
 
   const supabaseIds = useRef([]);
 
-  // ── Load from Supabase ──
-  useEffect(() => {
-    async function load() {
-      const PAGE = 1000; let all = []; let from = 0;
-      while (true) {
-        const { data, error } = await supabase.from('contracts').select('data').range(from, from + PAGE - 1);
-        if (error || !data || data.length === 0) break;
-        all = [...all, ...data.map(r => r.data ?? r)];
-        if (data.length < PAGE) break;
-        from += PAGE;
-      }
-      if (all.length) setContractsRaw(all);
-      dataLoaded.current = true;
-    }
-    load();
-  }, []);
-
   const persist = async (updated) => {
     setContractsRaw(updated);
     try {
-      // Step 1 — fetch current Supabase row IDs to delete precisely
-      const { data: existing } = await supabase.from('contracts').select('id');
-      if (existing && existing.length > 0) {
-        const ids = existing.map(r => r.id);
-        const CHUNK = 200;
-        for (let i = 0; i < ids.length; i += CHUNK) {
-          await supabase.from('contracts').delete().in('id', ids.slice(i, i + CHUNK));
-        }
-      }
-      // Step 2 — insert updated list
-      if (updated.length === 0) return;
-      const CHUNK = 50;
-      for (let i = 0; i < updated.length; i += CHUNK) {
-        const chunk = updated.slice(i, i + CHUNK).map(c => ({ data: c }));
-        const { error } = await supabase.from('contracts').insert(chunk);
-        if (error) console.error('[Contracts] insert error:', error);
+      if (updated.length === 0) {
+        await supabase.from('contracts').delete().neq('id', 0);
+      } else {
+        await saveLargeTable('contracts', updated);
       }
     } catch (err) { console.error('[Contracts] persist error:', err); }
   };
@@ -19438,6 +19409,7 @@ export default function CRM() {
   const [contacts, setContacts] = useState(initialContacts);
   const [companies, setCompanies] = useState([]);
   const [tasks, setTasks] = useState(initialTasks);
+  const [contracts, setContracts] = useState([]);
   const [derivativesCache, setDerivativesCache] = useState(null);
   const [fixingsCache, setFixingsCache] = useState(null);
   const [page, setPage] = useState(() => localStorage.getItem("crm_page") || "dashboard");
@@ -19495,19 +19467,20 @@ export default function CRM() {
     }
 
     async function loadData() {
-      const [contacts, companies, tasks, derivOps, fixingOps] = await Promise.all([
+      const [contacts, companies, tasks, derivOps, fixingOps, contractsData] = await Promise.all([
         loadAllPages('contacts'),
         loadAllPages('companies'),
         loadAllPages('tasks'),
         loadAllPages('derivatives'),
         loadAllPages('fixings'),
+        loadAllPages('contracts'),
       ]);
-      // Un seul batch de setState — React 18 les regroupe automatiquement en un seul re-render
       if (contacts.length) setContacts(contacts);
       if (companies.length) setCompanies(companies);
       if (tasks.length) setTasks(tasks);
       if (derivOps.length) setDerivativesCache(derivOps);
       if (fixingOps.length) setFixingsCache(fixingOps);
+      if (contractsData.length) setContracts(contractsData);
       dataLoaded.current = true;
     }
     loadData();
@@ -19645,7 +19618,7 @@ export default function CRM() {
           {page === "derivatives" && <Derivatives companies={companies} initialOps={derivativesCache} initialFixings={fixingsCache} />}
           {page === "derivatives-dashboard" && <DerivativesDashboard />}
           {page === "derivatives-statistics" && <DerivStatistics />}
-          {page === "contracts" && <Contracts companies={companies} />}
+          {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} />}
           {page === "admin" && <AdminPanel companies={companies} />}
         </div>
       </div>

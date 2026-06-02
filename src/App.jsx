@@ -18017,18 +18017,6 @@ const Contracts = ({ companies = [] }) => {
   const [search, setSearch] = useState("");
   const dataLoaded = useRef(false);
 
-  // ── Escape key ──
-  useEffect(() => {
-    const handleKey = (e) => {
-      if (e.key !== "Escape") return;
-      if (showMultiPrice) { setShowMultiPrice(false); return; }
-      if (showModal) { closeModal(); return; }
-      if (!showImport) setSelected(null);
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [showModal, showImport, showMultiPrice]);
-
   // ── Load instruments (active only) ──
   useEffect(() => {
     async function loadInstruments() {
@@ -18112,6 +18100,18 @@ const Contracts = ({ companies = [] }) => {
   const [showPaymentTermsPicker, setShowPaymentTermsPicker] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [showMultiPrice, setShowMultiPrice] = useState(false);
+
+  // ── Escape key ──
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (showMultiPrice) { setShowMultiPrice(false); return; }
+      if (showModal) { closeModal(); return; }
+      if (!showImport) setSelected(null);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [showModal, showImport, showMultiPrice]);
 
   const validate = () => {
     const errs = {};

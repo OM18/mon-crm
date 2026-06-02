@@ -18097,13 +18097,13 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
 };
 
 // ─── VIRTUAL CONTRACT LIST ────────────────────────────────────
-const ROW_H_CONTRACT = 46;
+const ROW_H_CONTRACT = 72;
 const OVERSCAN_CONTRACT = 8;
 
 const ContractRow = memo(({ c, idx, isSel, onSelect, onEdit, onRemove, COLS, gridTpl, cellContent }) => (
   <div onClick={() => onSelect(c)}
     style={{ display: "grid", gridTemplateColumns: gridTpl, borderBottom: `1px solid ${COLORS.border}`,
-      minWidth: "max-content", height: ROW_H_CONTRACT, boxSizing: "border-box",
+      minWidth: "max-content", height: ROW_H_CONTRACT, boxSizing: "border-box", overflow: "hidden",
       background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
       cursor: "pointer", transition: "background 0.1s" }}
     onMouseOver={e => { if (!isSel) e.currentTarget.style.background = COLORS.hover; }}

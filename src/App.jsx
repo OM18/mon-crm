@@ -6817,8 +6817,8 @@ const DocumentsAdminTab = ({ config, updateField }) => {
   const [newTypeName, setNewTypeName] = useState("");
 
   useEffect(() => {
+    if (dirtyTypes) return;
     setLocalTypes(Array.isArray(config.documentTypes) ? config.documentTypes : []);
-    setDirtyTypes(false);
   }, [config.documentTypes]);
 
   const markTypes = (next) => { setLocalTypes(next); setDirtyTypes(true); };
@@ -6832,10 +6832,6 @@ const DocumentsAdminTab = ({ config, updateField }) => {
   const saveTypes = async (e) => {
     e.stopPropagation();
     updateField("documentTypes", localTypes);
-    await supabase.from('config').upsert(
-      { key: 'admin-config', data: { ...config, documentTypes: localTypes } },
-      { onConflict: 'key' }
-    );
     setDirtyTypes(false);
   };
 
@@ -6848,8 +6844,8 @@ const DocumentsAdminTab = ({ config, updateField }) => {
   const [newDocType, setNewDocType] = useState("");
 
   useEffect(() => {
+    if (dirtyDocs) return;
     setLocalDocs(Array.isArray(config.documents) ? config.documents : []);
-    setDirtyDocs(false);
   }, [config.documents]);
 
   const markDocs = (next) => { setLocalDocs(next); setDirtyDocs(true); };
@@ -6863,10 +6859,6 @@ const DocumentsAdminTab = ({ config, updateField }) => {
   const saveDocs = async (e) => {
     e.stopPropagation();
     updateField("documents", localDocs);
-    await supabase.from('config').upsert(
-      { key: 'admin-config', data: { ...config, documents: localDocs } },
-      { onConflict: 'key' }
-    );
     setDirtyDocs(false);
   };
 

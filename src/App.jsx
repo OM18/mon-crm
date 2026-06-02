@@ -16780,48 +16780,48 @@ const CFSec = ({ label }) => (
 // ─── CONTRACT IMPORT MODAL ───────────────────────────────────
 const CONTRACT_FIELD_MAP = {
   "id":                ["id", "contract id", "identifiant"],
-  "contractNumber":    ["contract number", "contract #", "contract no", "numero contrat", "ref contrat", "ref", "no contrat"],
-  "contractType":      ["contract type", "type", "type contrat"],
+  "contractNumber":    ["contract number", "contractnumber", "contract #", "contract no", "numero contrat", "ref contrat", "ref", "no contrat"],
+  "contractType":      ["contract type", "contracttype", "type", "type contrat"],
   "status":            ["status", "statut"],
-  "conclusionDate":    ["conclusion date", "date conclusion", "date contrat", "contract date"],
-  "executionDateFrom": ["execution date from", "exec from", "date exec from", "exec debut", "delivery from", "livraison from"],
-  "executionDateTo":   ["execution date to", "exec to", "date exec to", "exec fin", "delivery to", "livraison to"],
-  "executionPeriodType": ["period type", "execution type", "loading/arrival", "exec type"],
-  "buyerId":           ["buyer", "acheteur", "buyer id"],
-  "sellerId":          ["seller", "vendeur", "seller id"],
-  "brokerId":          ["broker", "courtier", "broker id"],
+  "conclusionDate":    ["conclusion date", "conclusiondate", "date conclusion", "date contrat", "contract date"],
+  "executionDateFrom": ["execution date from", "executiondatefrom", "exec from", "execfrom", "date exec from", "exec debut", "delivery from", "livraison from"],
+  "executionDateTo":   ["execution date to", "executiondateto", "exec to", "execto", "date exec to", "exec fin", "delivery to", "livraison to"],
+  "executionPeriodType": ["period type", "executionperiodtype", "periodtype", "execution type", "loading/arrival", "exec type"],
+  "buyerId":           ["buyer", "buyerid", "acheteur", "buyer id"],
+  "sellerId":          ["seller", "sellerid", "vendeur", "seller id"],
+  "brokerId":          ["broker", "brokerid", "courtier", "broker id"],
   "commodity":         ["commodity", "produit", "marchandise", "product"],
-  "contractPriceType": ["price type", "type prix", "flat/premium", "pricing", "contract price type"],
-  "flatPrice":         ["flat price", "prix fixe", "price", "prix"],
-  "flatCurrency":      ["currency", "devise", "flat currency", "price currency", "currency price", "devise prix", "flat currency", "cur"],
-  "derivativeId":      ["derivative", "derivatives", "instrument", "derivative instrument", "deriv", "deriv instrument", "hedge instrument", "instrument deriv"],
+  "contractPriceType": ["price type", "contractpricetype", "pricetype", "type prix", "flat/premium", "pricing", "contract price type"],
+  "flatPrice":         ["flat price", "flatprice", "prix fixe", "price", "prix"],
+  "flatCurrency":      ["currency", "devise", "flat currency", "flatcurrency", "price currency", "currency price", "devise prix", "cur"],
+  "derivativeId":      ["derivative", "derivativeid", "derivatives", "instrument", "derivative instrument", "deriv", "deriv instrument", "hedge instrument", "instrument deriv"],
   "premium":           ["premium", "prime", "basis"],
+  "analyticalFlatPrice": ["contract analytical flat price", "analyticalflatprice", "analytical flat price", "analytical price", "prix analytique", "prix flat analytique"],
+  "analyticalPremium": ["analytical premium", "analyticalpremium", "premium analytique", "prime analytique"],
+  "numberOfLots":      ["number of lots", "numberoflots", "nb lots", "nombre de lots", "lots"],
   "incoterm":          ["incoterm", "inco"],
   "port":              ["contract port(s)", "contract ports", "port", "ports"],
   "loadport":          ["loadport", "load port", "port chargement"],
   "disport":           ["disport", "dis port", "port dechargement", "port déchargement"],
-  "originCountry":     ["origin", "origin country", "pays origine", "pays d origine"],
-  "destinationCountry":["destination", "destination country", "pays destination"],
-  "paymentTerms":      ["payment terms", "paiement", "payment conditions"],
-  "qtyValue":          ["quantity", "qty", "quantite", "quantité"],
-  "qtyMin":            ["qty min", "quantity min", "min qty", "quantite min", "quantité min", "qte min", "vol min", "volume min"],
-  "qtyMax":            ["qty max", "quantity max", "max qty", "quantite max", "quantité max", "qte max", "vol max", "volume max"],
-  "qtyUnit":           ["unit", "units", "unité", "qty unit", "volume unit"],
-  "qtyTolerance":      ["tolerance", "tolerence", "tolérance"],
-  "qtyToleranceOption":["tolerance option", "option tolerance", "buyer option", "seller option", "option tolérance"],
-  "qtyEstimated":      ["estimated quantity", "qty estimated", "estimated qty", "quantite estimee", "quantité estimée", "qte estimee", "quantite est", "vol estime"],
-  "qtyFinal":          ["final quantity", "qty final", "final qty", "quantite finale", "quantité finale", "qte finale", "vol final"],
+  "originCountry":     ["origin", "origincountry", "origin country", "pays origine", "pays d origine"],
+  "destinationCountry":["destination", "destinationcountry", "destination country", "pays destination"],
+  "paymentTerms":      ["payment terms", "paymentterms", "paiement", "payment conditions"],
+  "qtyValue":          ["quantity", "qtyvalue", "qty", "quantite", "quantité", "volume"],
+  "qtyMin":            ["qty min", "qtymin", "quantity min", "min qty", "quantite min", "quantité min", "qte min", "vol min", "volume min"],
+  "qtyMax":            ["qty max", "qtymax", "quantity max", "max qty", "quantite max", "quantité max", "qte max", "vol max", "volume max"],
+  "qtyUnit":           ["unit", "units", "unité", "qty unit", "qtyunit", "volume unit"],
+  "qtyTolerance":      ["tolerance", "qtytolerance", "tolerence", "tolérance"],
+  "qtyToleranceOption":["tolerance option", "qtytoleranceoption", "toleranceoption", "option tolerance", "buyer option", "seller option", "option tolérance"],
+  "qtyEstimated":      ["estimated quantity", "qtyestimated", "qty estimated", "estimated qty", "quantite estimee", "quantité estimée", "qte estimee", "quantite est", "vol estime"],
+  "qtyFinal":          ["final quantity", "qtyfinal", "qty final", "final qty", "quantite finale", "quantité finale", "qte finale", "vol final"],
   "transformation":    ["transformation", "transform"],
-  "deliveryConditions":["delivery conditions", "delivery terms", "conditions de livraison", "conditions livraison", "delivery cond"],
+  "deliveryConditions":["delivery conditions", "deliveryconditions", "delivery terms", "conditions de livraison", "conditions livraison", "delivery cond"],
   "warehouse":         ["warehouse", "entrepot", "entrepôt"],
-  "shipmentTerminal":  ["shipment terminal", "terminal", "shipment_terminal_name", "shipment terminal name"],
-  "businessUnit":      ["business unit", "bu", "businessunit", "unité commerciale", "unite commerciale"],
-  "analyticalFlatPrice":              ["contract analytical flat price", "analytical flat price", "analytical price", "prix analytique", "prix flat analytique"],
-  "numberOfLots":                     ["number of lots", "nb lots", "nombre de lots", "lots"],
-  "vat":                              ["vat", "tva", "tax"],
-  "vatRate":                          ["vat rate (%)", "vat rate", "taux tva", "taux de tva", "tax rate"],
-  "analyticalPremium":                ["analytical premium", "premium analytique", "prime analytique"],
-  "info":                             ["info", "note", "information", "notes", "remarks", "commentaire"],
+  "shipmentTerminal":  ["shipment terminal", "shipmentterminal", "terminal", "shipment_terminal_name", "shipment terminal name"],
+  "businessUnit":      ["business unit", "businessunit", "bu", "unité commerciale", "unite commerciale"],
+  "vat":               ["vat", "tva", "tax"],
+  "vatRate":           ["vat rate (%)", "vatrate", "vat rate", "taux tva", "taux de tva", "tax rate"],
+  "info":              ["info", "note", "information", "notes", "remarks", "commentaire"],
 };
 
 const CONTRACT_REQUIRED_FIELDS = ["contractNumber", "contractType", "conclusionDate", "buyerId", "sellerId", "commodity"];
@@ -17014,7 +17014,13 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
   const allFields = Object.keys(CONTRACT_FIELD_MAP);
   const currentItem = unknownQueue[currentQueueIdx];
 
-  const normH = h => h?.toString().toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ");
+  const normH = h => {
+    if (!h) return "";
+    const s = h.toString().trim();
+    // Split camelCase BEFORE lowercasing: contractNumber → contract Number → contract number
+    const spaced = s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
+    return spaced.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+  };
 
   const guessField = (header) => {
     const n = normH(header);

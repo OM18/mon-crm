@@ -18372,8 +18372,8 @@ const Contracts = ({ companies = [], contracts = [], setContracts }) => {
       const buDef = buVal ? (config.businessUnit || []).find(b => b.value === buVal) : null;
       const buColor = buDef?.color || COLORS.accent;
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>{c.contractNumber || `#${c.id}`}</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, width: "100%" }}>
+          <span title={c.contractNumber || `#${c.id}`} style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.contractNumber || `#${c.id}`}</span>
           <span style={{ fontFamily: "'DM Mono', monospace", color: COLORS.textMuted, fontSize: 10, marginTop: 2 }}>ID {c.id}</span>
           {buDef && (
             <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: `${buColor}20`, color: buColor, border: `1px solid ${buColor}40`, alignSelf: "flex-start", textTransform: "uppercase", letterSpacing: 0.3, whiteSpace: "nowrap" }}>

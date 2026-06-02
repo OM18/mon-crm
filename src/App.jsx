@@ -18096,6 +18096,75 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
   );
 };
 
+// ─── VIRTUAL CONTRACT LIST ────────────────────────────────────
+const ROW_H_CONTRACT = 46;
+const OVERSCAN_CONTRACT = 8;
+
+const ContractRow = memo(({ c, idx, isSel, onSelect, onEdit, onRemove, COLS, gridTpl, cellContent }) => (
+  <div onClick={() => onSelect(c)}
+    style={{ display: "grid", gridTemplateColumns: gridTpl, borderBottom: `1px solid ${COLORS.border}`,
+      minWidth: "max-content", height: ROW_H_CONTRACT, boxSizing: "border-box",
+      background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
+      cursor: "pointer", transition: "background 0.1s" }}
+    onMouseOver={e => { if (!isSel) e.currentTarget.style.background = COLORS.hover; }}
+    onMouseOut={e => { if (!isSel) e.currentTarget.style.background = idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`; }}>
+    {COLS.map(col => (
+      <div key={col.key} style={{ padding: "10px 12px", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        {cellContent(c, col.key)}
+      </div>
+    ))}
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, position: "sticky", right: 0, background: "inherit", borderLeft: `1px solid ${COLORS.border}`, padding: "0 8px" }}
+      onClick={e => e.stopPropagation()}>
+      <button onClick={() => onEdit(c)} title="Modifier"
+        style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+        onMouseOver={e => e.currentTarget.style.color = COLORS.accent}
+        onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>✏</button>
+      <button onClick={() => onRemove(c.id)} title="Supprimer"
+        style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+        onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+        onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>🗑</button>
+    </div>
+  </div>
+));
+
+const VirtualContractList = ({ filtered, selected, onSelect, onEdit, onRemove, COLS, gridTpl, cellContent }) => {
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef(null);
+  const [containerH, setContainerH] = useState(800);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(entries => setContainerH(entries[0].contentRect.height));
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const totalH = filtered.length * ROW_H_CONTRACT;
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H_CONTRACT) - OVERSCAN_CONTRACT);
+  const endIdx = Math.min(filtered.length, Math.ceil((scrollTop + containerH) / ROW_H_CONTRACT) + OVERSCAN_CONTRACT);
+  const visible = filtered.slice(startIdx, endIdx);
+
+  return (
+    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
+      style={{ overflowY: "auto", flex: 1, position: "relative" }}>
+      {filtered.length === 0
+        ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "56px 0", fontSize: 14 }}>Aucun contrat — cliquez sur « + Nouveau contrat »</div>
+        : <div style={{ height: totalH, position: "relative" }}>
+            <div style={{ position: "absolute", top: startIdx * ROW_H_CONTRACT, left: 0, right: 0 }}>
+              {visible.map((c, vi) => (
+                <ContractRow key={c.id}
+                  c={c} idx={startIdx + vi}
+                  isSel={selected?.id === c.id}
+                  onSelect={onSelect} onEdit={onEdit} onRemove={onRemove}
+                  COLS={COLS} gridTpl={gridTpl} cellContent={cellContent} />
+              ))}
+            </div>
+          </div>
+      }
+    </div>
+  );
+};
+
 const Contracts = ({ companies = [], contracts = [], setContracts }) => {
   const { config } = useConfig();
   const setContractsRaw = setContracts; // alias for compatibility
@@ -18645,42 +18714,17 @@ const Contracts = ({ companies = [], contracts = [], setContracts }) => {
             <div style={{ position: "sticky", right: 0, background: COLORS.tableHeader, borderLeft: `1px solid ${COLORS.border}`, width: 56 }} />
           </div>
 
-          {/* Body */}
-          <div style={{ overflowY: "auto", flex: 1 }}>
-            {filtered.length === 0 && (
-              <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "56px 0", fontSize: 14 }}>
-                {search ? "Aucun résultat pour « " + search + " »" : "Aucun contrat — cliquez sur « + Nouveau contrat »"}
-              </div>
-            )}
-            {filtered.map((c, i) => {
-              const isSel = selected?.id === c.id;
-              return (
-                <div key={c.id} onClick={() => setSelected(isSel ? null : c)}
-                  style={{ display: "grid", gridTemplateColumns: gridTpl, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content",
-                    background: isSel ? COLORS.rowSelected : i % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
-                    cursor: "pointer", transition: "background 0.1s" }}
-                  onMouseOver={e => { if (!isSel) e.currentTarget.style.background = COLORS.hover; }}
-                  onMouseOut={e => { if (!isSel) e.currentTarget.style.background = i % 2 === 0 ? "transparent" : `${COLORS.surface}60`; }}>
-                  {COLS.map(col => (
-                    <div key={col.key} style={{ padding: "10px 12px", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                      {cellContent(c, col.key)}
-                    </div>
-                  ))}
-                  {/* Row actions — sticky right */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, position: "sticky", right: 0, background: "inherit", borderLeft: `1px solid ${COLORS.border}`, padding: "0 8px" }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => openEdit(c)} title="Modifier"
-                      style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
-                      onMouseOver={e => e.currentTarget.style.color = COLORS.accent}
-                      onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>✏</button>
-                    <button onClick={() => remove(c.id)} title="Supprimer"
-                      style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
-                      onMouseOver={e => e.currentTarget.style.color = COLORS.red}
-                      onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>🗑</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {/* Body — virtualized */}
+          <VirtualContractList
+            filtered={filtered}
+            selected={selected}
+            onSelect={(c) => setSelected(selected?.id === c.id ? null : c)}
+            onEdit={openEdit}
+            onRemove={remove}
+            COLS={COLS}
+            gridTpl={gridTpl}
+            cellContent={cellContent}
+          />
         </div>
       </div>
 

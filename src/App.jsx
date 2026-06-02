@@ -17529,6 +17529,470 @@ const EMPTY_CONTRACT = (cfg = {}) => ({
   createdAt: "",
 });
 
+// ─── MULTI-PRICE MODAL ───────────────────────────────────────────────────────
+// Handles 4 combinable modes: multi-negotiated, rolling, optional port, optional period
+
+const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
+  const priceType = form.contractPriceType; // "flat" | "prime"
+
+  // ── Local state for multi-price ──
+  const [activeTab, setActiveTab] = useState(() => {
+    if (form.multiPrice?.rolling?.enabled) return "rolling";
+    if (form.multiPrice?.multiNego?.enabled) return "multiNego";
+    if (form.multiPrice?.optPort?.enabled) return "optPort";
+    if (form.multiPrice?.optPeriod?.enabled) return "optPeriod";
+    return "multiNego";
+  });
+
+  // Initialize from form.multiPrice or defaults
+  const initMultiPrice = () => form.multiPrice || {
+    multiNego: { enabled: false, positions: [] },
+    rolling:   { enabled: false, positions: [] },
+    optPort:   { enabled: false, defaultIdx: 0, options: [] },
+    optPeriod: { enabled: false, defaultIdx: 0, options: [] },
+  };
+
+  const [mp, setMp] = useState(initMultiPrice);
+
+  const patchMp = (key, val) => setMp(prev => ({ ...prev, [key]: { ...prev[key], ...val } }));
+
+  // ── Helpers ──
+  const fmtDate = (val) => {
+    let v = val.replace(/[^\d]/g, "");
+    if (v.length > 2) v = v.slice(0,2)+"/"+v.slice(2);
+    if (v.length > 5) v = v.slice(0,5)+"/"+v.slice(5);
+    return v.slice(0,10);
+  };
+
+  const newPos = () => ({
+    id: Date.now() + Math.random(),
+    conclusionDate: "",
+    flatPrice: "", analyticalFlatPrice: "", flatCurrency: form.flatCurrency || "",
+    premium: "", analyticalPremium: "", derivativeId: form.derivativeId || "",
+    qtyValue: "", qtyUnit: form.qtyUnit || "",
+    label: "",
+  });
+
+  const newOptPos = () => ({
+    id: Date.now() + Math.random(),
+    label: "",
+    flatPrice: "", analyticalFlatPrice: "", flatCurrency: form.flatCurrency || "",
+    premium: "", analyticalPremium: "", derivativeId: form.derivativeId || "",
+    port: "", executionDateFrom: "", executionDateTo: "",
+  });
+
+  // ── Computed total qty for multiNego ──
+  const totalQty = mp.multiNego.positions.reduce((s, p) => s + (parseFloat(p.qtyValue) || 0), 0);
+
+  // ── Sub-components ──
+
+  // Shared price fields
+  const PriceFields = ({ pos, onChange, showQty = true, showDate = true, showLabel = false, forcePriceType }) => {
+    const effectivePriceType = forcePriceType || pos.priceType || priceType;
+    return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {showLabel && (
+        <div>
+          <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>LABEL *</div>
+          <input value={pos.label || ""} onChange={e => onChange("label", e.target.value)} placeholder="Nom de l'option…"
+            style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+        </div>
+      )}
+      {showDate && (
+        <div>
+          <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>CONCLUSION DATE</div>
+          <input value={pos.conclusionDate || ""} onChange={e => onChange("conclusionDate", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
+            style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+        </div>
+      )}
+      {(effectivePriceType === "flat" || effectivePriceType === "mixed") && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>FLAT PRICE</div>
+            <input type="number" step="0.01" value={pos.flatPrice || ""} onChange={e => onChange("flatPrice", e.target.value)} placeholder="0.00"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>ANALYTICAL FLAT</div>
+            <input type="number" step="0.01" value={pos.analyticalFlatPrice || ""} onChange={e => onChange("analyticalFlatPrice", e.target.value)} placeholder="0.00"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>CURRENCY</div>
+            <select value={pos.flatCurrency || ""} onChange={e => onChange("flatCurrency", e.target.value)}
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: pos.flatCurrency ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+              <option value="">—</option>
+              {(config.contractCurrencies || []).map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+      {(effectivePriceType === "prime" || effectivePriceType === "mixed") && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>PREMIUM</div>
+            <input type="number" step="1" value={pos.premium || ""} onChange={e => onChange("premium", e.target.value)} placeholder="ex: 25"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>ANALYTICAL PREMIUM</div>
+            <input type="number" step="1" value={pos.analyticalPremium || ""} onChange={e => onChange("analyticalPremium", e.target.value)} placeholder="ex: 25"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>DERIVATIVE INSTRUMENT</div>
+            <select value={pos.derivativeId || ""} onChange={e => onChange("derivativeId", e.target.value)}
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: pos.derivativeId ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+              <option value="">— Instrument —</option>
+              {instruments.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+      {showQty && (
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>QUANTITY</div>
+            <input type="number" step="0.01" value={pos.qtyValue || ""} onChange={e => onChange("qtyValue", e.target.value)} placeholder="0"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>UNIT</div>
+            <select value={pos.qtyUnit || ""} onChange={e => onChange("qtyUnit", e.target.value)}
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: pos.qtyUnit ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+              <option value="">—</option>
+              {(config.contractVolumeUnits || []).map(u => <option key={u.label || u.value} value={u.label || u.value}>{u.label || u.value}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+    </div>
+    );
+  };
+
+  // Position card wrapper
+  const PosCard = ({ idx, total, onMoveUp, onMoveDown, onRemove, isDefault, onSetDefault, children }) => (
+    <div style={{ background: COLORS.bg, border: `1px solid ${isDefault ? COLORS.accent+"60" : COLORS.border}`, borderRadius: 10, padding: "12px 14px", position: "relative" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub }}>#{idx + 1}</span>
+        {isDefault !== undefined && (
+          <button onClick={onSetDefault}
+            style={{ fontSize: 10, padding: "2px 8px", borderRadius: 5, border: `1px solid ${isDefault ? COLORS.accent+"60" : COLORS.border}`, background: isDefault ? `${COLORS.accent}15` : "transparent", color: isDefault ? COLORS.accent : COLORS.textMuted, cursor: "pointer", fontWeight: 700 }}>
+            {isDefault ? "✓ DEFAULT" : "SET DEFAULT"}
+          </button>
+        )}
+        <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+          {idx > 0 && <button onClick={onMoveUp} style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.textMuted, cursor: "pointer", padding: "2px 6px", fontSize: 11 }}>↑</button>}
+          {idx < total - 1 && <button onClick={onMoveDown} style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.textMuted, cursor: "pointer", padding: "2px 6px", fontSize: 11 }}>↓</button>}
+          <button onClick={onRemove} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "2px 4px" }}
+            onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+
+  // ── Tabs ──
+  const TABS = [
+    { key: "multiNego", label: "Multi-négocié",    icon: "📋" },
+    { key: "rolling",   label: "Rolling",           icon: "🔄" },
+    { key: "optPort",   label: "Port optionnel",    icon: "⚓" },
+    { key: "optPeriod", label: "Période optionnelle", icon: "📅" },
+  ];
+
+  const movePos = (arr, idx, dir) => {
+    const a = [...arr];
+    const target = idx + dir;
+    if (target < 0 || target >= a.length) return a;
+    [a[idx], a[target]] = [a[target], a[idx]];
+    return a;
+  };
+
+  const updatePos = (section, idx, field, val) => {
+    const positions = [...mp[section].positions];
+    positions[idx] = { ...positions[idx], [field]: val };
+    patchMp(section, { positions });
+  };
+
+  const removePos = (section, idx) => {
+    const positions = mp[section].positions.filter((_, i) => i !== idx);
+    const extra = section === "optPort" || section === "optPeriod"
+      ? { defaultIdx: Math.min(mp[section].defaultIdx, Math.max(0, positions.length - 1)) }
+      : {};
+    patchMp(section, { positions, ...extra });
+  };
+
+  const addPos = (section) => patchMp(section, { positions: [...mp[section].positions, section === "optPort" || section === "optPeriod" ? newOptPos() : newPos()] });
+
+  const onSave = () => {
+    f("multiPrice", mp);
+    // For multiNego: update main qty to total
+    if (mp.multiNego.enabled && mp.multiNego.positions.length > 0 && totalQty > 0) {
+      f("qtyValue", String(totalQty));
+      if (mp.multiNego.positions[0]?.qtyUnit) f("qtyUnit", mp.multiNego.positions[0].qtyUnit);
+    }
+    onClose();
+  };
+
+  const tabColor = { multiNego: COLORS.blue, rolling: COLORS.purple, optPort: COLORS.green, optPeriod: COLORS.orange };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#00000099", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1300, padding: 20 }}>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 20, width: "100%", maxWidth: 660, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+        {/* Header */}
+        <div style={{ padding: "20px 24px 0", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: COLORS.text }}>💱 Prix multiples</div>
+              <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Activez et configurez les modes applicables</div>
+            </div>
+            <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 22 }}>×</button>
+          </div>
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: 4 }}>
+            {TABS.map(t => {
+              const enabled = mp[t.key]?.enabled;
+              const active = activeTab === t.key;
+              return (
+                <button key={t.key} onClick={() => setActiveTab(t.key)}
+                  style={{ padding: "8px 14px", border: `1px solid ${active ? tabColor[t.key]+"80" : enabled ? tabColor[t.key]+"40" : COLORS.border}`, borderBottom: "none", borderRadius: "8px 8px 0 0", background: active ? `${tabColor[t.key]}18` : "transparent", color: active ? tabColor[t.key] : enabled ? tabColor[t.key] : COLORS.textMuted, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                  {t.icon} {t.label}
+                  {enabled && <span style={{ width: 6, height: 6, borderRadius: "50%", background: tabColor[t.key], display: "inline-block" }} />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+
+          {/* ── MULTI-NEGO ── */}
+          {activeTab === "multiNego" && (() => {
+            const sec = mp.multiNego;
+            return (
+              <div>
+                {/* Toggle */}
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: "12px 14px", background: sec.enabled ? `${COLORS.blue}10` : COLORS.bg, border: `1px solid ${sec.enabled ? COLORS.blue+"40" : COLORS.border}`, borderRadius: 10 }}>
+                  <div onClick={() => patchMp("multiNego", { enabled: !sec.enabled })} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flex: 1 }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${sec.enabled ? COLORS.blue : COLORS.border}`, background: sec.enabled ? COLORS.blue : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {sec.enabled && <span style={{ color: "#fff", fontSize: 11, fontWeight: 900 }}>✓</span>}
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: sec.enabled ? COLORS.blue : COLORS.textMuted }}>Activer les prix multi-négociés</span>
+                  </div>
+                  {sec.enabled && sec.positions.length > 0 && (
+                    <div style={{ fontSize: 11, color: COLORS.blue, background: `${COLORS.blue}15`, border: `1px solid ${COLORS.blue}40`, borderRadius: 6, padding: "3px 9px", fontWeight: 700 }}>
+                      Qté totale : {totalQty > 0 ? `${totalQty} ${sec.positions[0]?.qtyUnit || ""}` : "—"}
+                    </div>
+                  )}
+                </div>
+                {sec.enabled && (
+                  <>
+                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 12, fontStyle: "italic" }}>
+                      Chaque position a sa propre date de conclusion, son prix ({priceType === "flat" ? "flat" : priceType === "prime" ? "premium" : "flat ou premium"}) et sa quantité. La quantité totale du contrat sera mise à jour automatiquement.
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {sec.positions.map((pos, idx) => (
+                        <PosCard key={pos.id} idx={idx} total={sec.positions.length}
+                          onMoveUp={() => patchMp("multiNego", { positions: movePos(sec.positions, idx, -1) })}
+                          onMoveDown={() => patchMp("multiNego", { positions: movePos(sec.positions, idx, 1) })}
+                          onRemove={() => removePos("multiNego", idx)}>
+                          {/* Price type selector per position */}
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 4 }}>TYPE DE PRIX</div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              {[{ v: "flat", l: "FLAT" }, { v: "prime", l: "PREMIUM" }].map(({ v, l }) => (
+                                <div key={v} onClick={() => updatePos("multiNego", idx, "priceType", v)}
+                                  style={{ padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                                    border: `1px solid ${(pos.priceType || priceType) === v ? COLORS.accent+"80" : COLORS.border}`,
+                                    background: (pos.priceType || priceType) === v ? `${COLORS.accent}18` : "transparent",
+                                    color: (pos.priceType || priceType) === v ? COLORS.accent : COLORS.textMuted }}>
+                                  {l}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <PriceFields pos={pos}
+                            onChange={(field, val) => updatePos("multiNego", idx, field, val)}
+                            showQty={true} showDate={true} showLabel={false} />
+                        </PosCard>
+                      ))}
+                    </div>
+                    <button onClick={() => addPos("multiNego")}
+                      style={{ marginTop: 12, width: "100%", padding: "9px 0", background: `${COLORS.blue}12`, border: `1px dashed ${COLORS.blue}60`, borderRadius: 8, color: COLORS.blue, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      + Ajouter une position
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── ROLLING ── */}
+          {activeTab === "rolling" && (() => {
+            const sec = mp.rolling;
+            return (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: "12px 14px", background: sec.enabled ? `${COLORS.purple}10` : COLORS.bg, border: `1px solid ${sec.enabled ? COLORS.purple+"40" : COLORS.border}`, borderRadius: 10 }}>
+                  <div onClick={() => patchMp("rolling", { enabled: !sec.enabled })} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${sec.enabled ? COLORS.purple : COLORS.border}`, background: sec.enabled ? COLORS.purple : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {sec.enabled && <span style={{ color: "#fff", fontSize: 11, fontWeight: 900 }}>✓</span>}
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: sec.enabled ? COLORS.purple : COLORS.textMuted }}>Activer le Rolling</span>
+                  </div>
+                </div>
+                {sec.enabled && (
+                  <>
+                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 12, fontStyle: "italic" }}>
+                      Contrat à prime : pas de nouvelle date de conclusion. Chaque position a son premium et sa quantité propres.
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {sec.positions.map((pos, idx) => (
+                        <PosCard key={pos.id} idx={idx} total={sec.positions.length}
+                          onMoveUp={() => patchMp("rolling", { positions: movePos(sec.positions, idx, -1) })}
+                          onMoveDown={() => patchMp("rolling", { positions: movePos(sec.positions, idx, 1) })}
+                          onRemove={() => removePos("rolling", idx)}>
+                          <PriceFields pos={pos}
+                            onChange={(field, val) => updatePos("rolling", idx, field, val)}
+                            showQty={true} showDate={false} showLabel={false} forcePriceType="prime" />
+                        </PosCard>
+                      ))}
+                    </div>
+                    <button onClick={() => addPos("rolling")}
+                      style={{ marginTop: 12, width: "100%", padding: "9px 0", background: `${COLORS.purple}12`, border: `1px dashed ${COLORS.purple}60`, borderRadius: 8, color: COLORS.purple, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      + Ajouter une position rolling
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── OPT PORT ── */}
+          {activeTab === "optPort" && (() => {
+            const sec = mp.optPort;
+            return (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: "12px 14px", background: sec.enabled ? `${COLORS.green}10` : COLORS.bg, border: `1px solid ${sec.enabled ? COLORS.green+"40" : COLORS.border}`, borderRadius: 10 }}>
+                  <div onClick={() => patchMp("optPort", { enabled: !sec.enabled })} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${sec.enabled ? COLORS.green : COLORS.border}`, background: sec.enabled ? COLORS.green : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {sec.enabled && <span style={{ color: "#fff", fontSize: 11, fontWeight: 900 }}>✓</span>}
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: sec.enabled ? COLORS.green : COLORS.textMuted }}>Activer les ports optionnels</span>
+                  </div>
+                </div>
+                {sec.enabled && (
+                  <>
+                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 12, fontStyle: "italic" }}>
+                      Prix (flat ou premium) différent par port. La quantité du contrat s'applique à toutes les options. Définir une option par défaut (obligatoire).
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {sec.options.map((opt, idx) => (
+                        <PosCard key={opt.id} idx={idx} total={sec.options.length}
+                          isDefault={sec.defaultIdx === idx} onSetDefault={() => patchMp("optPort", { defaultIdx: idx })}
+                          onMoveUp={() => patchMp("optPort", { options: movePos(sec.options, idx, -1) })}
+                          onMoveDown={() => patchMp("optPort", { options: movePos(sec.options, idx, 1) })}
+                          onRemove={() => removePos("optPort", idx)}>
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>PORT *</div>
+                            <input value={opt.port || ""} onChange={e => { const o = [...sec.options]; o[idx] = { ...o[idx], port: e.target.value }; patchMp("optPort", { options: o }); }} placeholder="Nom du port…"
+                              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                          </div>
+                          <PriceFields pos={opt}
+                            onChange={(field, val) => { const o = [...sec.options]; o[idx] = { ...o[idx], [field]: val }; patchMp("optPort", { options: o }); }}
+                            showQty={false} showDate={false} showLabel={false} />
+                        </PosCard>
+                      ))}
+                    </div>
+                    <button onClick={() => patchMp("optPort", { options: [...sec.options, newOptPos()] })}
+                      style={{ marginTop: 12, width: "100%", padding: "9px 0", background: `${COLORS.green}12`, border: `1px dashed ${COLORS.green}60`, borderRadius: 8, color: COLORS.green, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      + Ajouter un port
+                    </button>
+                    {sec.options.length > 0 && !sec.options[sec.defaultIdx] && (
+                      <div style={{ fontSize: 11, color: COLORS.orange, marginTop: 8 }}>⚠ Aucune option par défaut sélectionnée</div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── OPT PERIOD ── */}
+          {activeTab === "optPeriod" && (() => {
+            const sec = mp.optPeriod;
+            return (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: "12px 14px", background: sec.enabled ? `${COLORS.orange}10` : COLORS.bg, border: `1px solid ${sec.enabled ? COLORS.orange+"40" : COLORS.border}`, borderRadius: 10 }}>
+                  <div onClick={() => patchMp("optPeriod", { enabled: !sec.enabled })} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${sec.enabled ? COLORS.orange : COLORS.border}`, background: sec.enabled ? COLORS.orange : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {sec.enabled && <span style={{ color: "#fff", fontSize: 11, fontWeight: 900 }}>✓</span>}
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: sec.enabled ? COLORS.orange : COLORS.textMuted }}>Activer les périodes optionnelles</span>
+                  </div>
+                </div>
+                {sec.enabled && (
+                  <>
+                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 12, fontStyle: "italic" }}>
+                      Prix différent par période d'exécution. La quantité du contrat s'applique à toutes les options. Définir une option par défaut (obligatoire).
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {sec.options.map((opt, idx) => (
+                        <PosCard key={opt.id} idx={idx} total={sec.options.length}
+                          isDefault={sec.defaultIdx === idx} onSetDefault={() => patchMp("optPeriod", { defaultIdx: idx })}
+                          onMoveUp={() => patchMp("optPeriod", { options: movePos(sec.options, idx, -1) })}
+                          onMoveDown={() => patchMp("optPeriod", { options: movePos(sec.options, idx, 1) })}
+                          onRemove={() => removePos("optPeriod", idx)}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                            <div>
+                              <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>PÉRIODE DE →</div>
+                              <input value={opt.executionDateFrom || ""} onChange={e => { const o = [...sec.options]; o[idx] = { ...o[idx], executionDateFrom: fmtDate(e.target.value) }; patchMp("optPeriod", { options: o }); }} placeholder="dd/mm/yyyy" maxLength={10}
+                                style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>PÉRIODE →</div>
+                              <input value={opt.executionDateTo || ""} onChange={e => { const o = [...sec.options]; o[idx] = { ...o[idx], executionDateTo: fmtDate(e.target.value) }; patchMp("optPeriod", { options: o }); }} placeholder="dd/mm/yyyy" maxLength={10}
+                                style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                            </div>
+                          </div>
+                          <PriceFields pos={opt}
+                            onChange={(field, val) => { const o = [...sec.options]; o[idx] = { ...o[idx], [field]: val }; patchMp("optPeriod", { options: o }); }}
+                            showQty={false} showDate={false} showLabel={false} />
+                        </PosCard>
+                      ))}
+                    </div>
+                    <button onClick={() => patchMp("optPeriod", { options: [...sec.options, newOptPos()] })}
+                      style={{ marginTop: 12, width: "100%", padding: "9px 0", background: `${COLORS.orange}12`, border: `1px dashed ${COLORS.orange}60`, borderRadius: 8, color: COLORS.orange, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      + Ajouter une période
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "14px 24px", borderTop: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, background: COLORS.card }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            {TABS.filter(t => mp[t.key]?.enabled).map(t => (
+              <span key={t.key} style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 5, background: `${tabColor[t.key]}18`, color: tabColor[t.key], border: `1px solid ${tabColor[t.key]}40` }}>
+                {t.icon} {t.label}
+              </span>
+            ))}
+            {!TABS.some(t => mp[t.key]?.enabled) && <span style={{ fontSize: 11, color: COLORS.textMuted }}>Aucun mode activé</span>}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onClose} style={{ padding: "8px 16px", background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, color: COLORS.textMuted, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Annuler</button>
+            <button onClick={onSave} style={{ padding: "8px 20px", background: COLORS.accent, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✓ Appliquer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Contracts = ({ companies = [] }) => {
   const { config } = useConfig();
   const [contracts, setContractsRaw] = useState([]);
@@ -17632,6 +18096,7 @@ const Contracts = ({ companies = [] }) => {
   const [showIncotermPicker, setShowIncotermPicker] = useState(false);
   const [showPaymentTermsPicker, setShowPaymentTermsPicker] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [showMultiPrice, setShowMultiPrice] = useState(false);
 
   const validate = () => {
     const errs = {};
@@ -17856,6 +18321,12 @@ const Contracts = ({ companies = [] }) => {
     }
     if (key === "contractPriceType") {
       if (!c.contractPriceType) return <span style={{ color: COLORS.textMuted }}>—</span>;
+      const multiActive = c.multiPrice && Object.values(c.multiPrice).some(v => v?.enabled);
+      const MultiBadge = () => multiActive ? (
+        <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: `${COLORS.accent}18`, color: COLORS.accent, border: `1px solid ${COLORS.accent}40`, whiteSpace: "nowrap" }}>
+          💱 {Object.values(c.multiPrice).filter(v => v?.enabled).length} mode{Object.values(c.multiPrice).filter(v => v?.enabled).length > 1 ? "s" : ""}
+        </span>
+      ) : null;
       if (c.contractPriceType === "flat") return (
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <span style={{ fontSize: 12, color: COLORS.text }}>
@@ -17867,6 +18338,7 @@ const Contracts = ({ companies = [] }) => {
               <span style={{ fontWeight: 700, marginRight: 3 }}>HT</span>{c.flatPriceVatIncluded}{c.flatCurrency ? " " + c.flatCurrency : ""}
             </span>
           )}
+          <MultiBadge />
         </div>
       );
       if (c.contractPriceType === "prime") {
@@ -17881,6 +18353,7 @@ const Contracts = ({ companies = [] }) => {
             </span>
             {c.analyticalPremium && <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Anal. +{c.analyticalPremium}</span>}
             {instrumentShort && <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130 }}>{instrumentShort}</span>}
+            <MultiBadge />
           </div>
         );
       }
@@ -18396,6 +18869,38 @@ const Contracts = ({ companies = [] }) => {
                 </div>
               </>}
 
+              {/* Multi-price button */}
+              {form.contractPriceType && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <button onClick={() => setShowMultiPrice(true)}
+                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", background: form.multiPrice && Object.values(form.multiPrice).some(v => v?.enabled) ? `${COLORS.accent}15` : COLORS.bg, border: `1px solid ${form.multiPrice && Object.values(form.multiPrice).some(v => v?.enabled) ? COLORS.accent+"60" : COLORS.border}`, borderRadius: 8, color: form.multiPrice && Object.values(form.multiPrice).some(v => v?.enabled) ? COLORS.accent : COLORS.textMuted, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                      <span>💱</span>
+                      <span>Prix multiples</span>
+                      {form.multiPrice && Object.values(form.multiPrice).some(v => v?.enabled) && (
+                        <span style={{ background: COLORS.accent, color: "#fff", borderRadius: 10, padding: "1px 7px", fontSize: 11 }}>
+                          {Object.values(form.multiPrice).filter(v => v?.enabled).length} actif{Object.values(form.multiPrice).filter(v => v?.enabled).length > 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </button>
+                    {/* Active mode badges */}
+                    {form.multiPrice && (() => {
+                      const badges = [
+                        { key: "multiNego", label: "Multi-négocié", color: COLORS.blue },
+                        { key: "rolling",   label: "Rolling",       color: COLORS.purple },
+                        { key: "optPort",   label: "Port opt.",     color: COLORS.green },
+                        { key: "optPeriod", label: "Période opt.",  color: COLORS.orange },
+                      ].filter(b => form.multiPrice[b.key]?.enabled);
+                      return badges.map(b => (
+                        <span key={b.key} style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 5, background: `${b.color}18`, color: b.color, border: `1px solid ${b.color}40` }}>
+                          {b.label} {b.key === "multiNego" ? `(${form.multiPrice.multiNego.positions.length} pos.)` : b.key === "rolling" ? `(${form.multiPrice.rolling.positions.length} pos.)` : b.key === "optPort" ? `(${form.multiPrice.optPort.options.length} opt.)` : `(${form.multiPrice.optPeriod.options.length} opt.)`}
+                        </span>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <CFL req>Payment Terms</CFL>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
@@ -18650,6 +19155,15 @@ const Contracts = ({ companies = [] }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Multi-Price Modal ── */}
+      {showMultiPrice && (
+        <MultiPriceModal
+          form={form} f={f}
+          config={config} instruments={instruments}
+          onClose={() => setShowMultiPrice(false)}
+        />
       )}
 
       {/* ── Quantity Sub-Modal ── */}

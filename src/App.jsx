@@ -18131,17 +18131,29 @@ const Contracts = ({ companies = [] }) => {
   }, []);
 
   const persist = async (updated) => {
+    const prev = [...contracts];
     setContractsRaw(updated);
     try {
-      const { error: delError } = await supabase.from('contracts').delete().neq('id', 0);
-      if (delError) { console.error('[Contracts] delete error:', delError); return; }
+      // Guard: don't wipe table if updated is empty but prev had data
+      if (updated.length === 0 && prev.length > 0) {
+        await supabase.from('contracts').delete().neq('id', 0);
+        return;
+      }
+      await supabase.from('contracts').delete().neq('id', 0);
       const CHUNK = 50;
       for (let i = 0; i < updated.length; i += CHUNK) {
         const chunk = updated.slice(i, i + CHUNK).map(c => ({ data: c }));
         const { error: insError } = await supabase.from('contracts').insert(chunk);
-        if (insError) { console.error('[Contracts] insert error:', insError); return; }
+        if (insError) {
+          console.error('[Contracts] insert error:', insError);
+          setContractsRaw(prev); // rollback UI
+          return;
+        }
       }
-    } catch (err) { console.error('[Contracts] save error:', err); }
+    } catch (err) {
+      console.error('[Contracts] save error:', err);
+      setContractsRaw(prev); // rollback UI
+    }
   };
 
   const nextId = () => contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;

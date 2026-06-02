@@ -18113,61 +18113,40 @@ const Contracts = ({ companies = [] }) => {
     loadInstruments();
   }, []);
 
-  const supabaseIds = useRef([]); // tracks real Supabase row IDs
+  const supabaseIds = useRef([]);
 
   // ── Load from Supabase ──
   useEffect(() => {
     async function load() {
-      const PAGE = 1000; let all = []; let allIds = []; let from = 0;
+      const PAGE = 1000; let all = []; let from = 0;
       while (true) {
-        const { data, error } = await supabase.from('contracts').select('id, data').range(from, from + PAGE - 1);
+        const { data, error } = await supabase.from('contracts').select('data').range(from, from + PAGE - 1);
         if (error || !data || data.length === 0) break;
         all = [...all, ...data.map(r => r.data ?? r)];
-        allIds = [...allIds, ...data.map(r => r.id)];
         if (data.length < PAGE) break;
         from += PAGE;
       }
-      if (all.length) {
-        setContractsRaw(all);
-        supabaseIds.current = allIds;
-      }
+      if (all.length) setContractsRaw(all);
       dataLoaded.current = true;
     }
     load();
   }, []);
 
-  const persist = async (updated) => {
-    const prev = [...contracts];
-    const prevIds = [...supabaseIds.current];
+  const persist = (updated) => {
     setContractsRaw(updated);
-    try {
-      // Delete using real Supabase row IDs if available, fallback to neq
-      if (prevIds.length > 0) {
-        const CHUNK = 200;
-        for (let i = 0; i < prevIds.length; i += CHUNK) {
-          const { error } = await supabase.from('contracts').delete().in('id', prevIds.slice(i, i + CHUNK));
-          if (error) { console.error('[Contracts] delete error:', error); setContractsRaw(prev); supabaseIds.current = prevIds; return; }
-        }
-      } else {
-        await supabase.from('contracts').delete().neq('id', 0);
-      }
-      supabaseIds.current = [];
+    // Use neq('id','') — contracts table has text/uuid id (not bigint)
+    supabase.from('contracts').delete().neq('id', '').then(() => {
       if (updated.length === 0) return;
-      // Reinsert and capture new IDs
-      const newIds = [];
       const CHUNK = 50;
-      for (let i = 0; i < updated.length; i += CHUNK) {
+      const insertChunk = async (i) => {
+        if (i >= updated.length) return;
         const chunk = updated.slice(i, i + CHUNK).map(c => ({ data: c }));
-        const { data: inserted, error: insError } = await supabase.from('contracts').insert(chunk).select('id');
-        if (insError) { console.error('[Contracts] insert error:', insError); setContractsRaw(prev); supabaseIds.current = prevIds; return; }
-        if (inserted) newIds.push(...inserted.map(r => r.id));
-      }
-      supabaseIds.current = newIds;
-    } catch (err) {
-      console.error('[Contracts] save error:', err);
-      setContractsRaw(prev);
-      supabaseIds.current = prevIds;
-    }
+        const { error } = await supabase.from('contracts').insert(chunk);
+        if (error) { console.error('[Contracts] insert error:', error); return; }
+        await insertChunk(i + CHUNK);
+      };
+      insertChunk(0);
+    });
   };
 
   const nextId = () => contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;

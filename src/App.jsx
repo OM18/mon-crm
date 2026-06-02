@@ -18017,12 +18017,17 @@ const Contracts = ({ companies = [] }) => {
   const [search, setSearch] = useState("");
   const dataLoaded = useRef(false);
 
-  // ── Escape key — close detail panel ──
+  // ── Escape key ──
   useEffect(() => {
-    const handleKey = (e) => { if (e.key === "Escape" && !showModal && !showImport) setSelected(null); };
+    const handleKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (showMultiPrice) { setShowMultiPrice(false); return; }
+      if (showModal) { closeModal(); return; }
+      if (!showImport) setSelected(null);
+    };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [showModal, showImport]);
+  }, [showModal, showImport, showMultiPrice]);
 
   // ── Load instruments (active only) ──
   useEffect(() => {

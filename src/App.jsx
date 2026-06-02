@@ -18132,21 +18132,27 @@ const Contracts = ({ companies = [] }) => {
     load();
   }, []);
 
-  const persist = (updated) => {
+  const persist = async (updated) => {
     setContractsRaw(updated);
-    // Use neq('id','') — contracts table has text/uuid id (not bigint)
-    supabase.from('contracts').delete().neq('id', '').then(() => {
+    try {
+      // Step 1 — fetch current Supabase row IDs to delete precisely
+      const { data: existing } = await supabase.from('contracts').select('id');
+      if (existing && existing.length > 0) {
+        const ids = existing.map(r => r.id);
+        const CHUNK = 200;
+        for (let i = 0; i < ids.length; i += CHUNK) {
+          await supabase.from('contracts').delete().in('id', ids.slice(i, i + CHUNK));
+        }
+      }
+      // Step 2 — insert updated list
       if (updated.length === 0) return;
       const CHUNK = 50;
-      const insertChunk = async (i) => {
-        if (i >= updated.length) return;
+      for (let i = 0; i < updated.length; i += CHUNK) {
         const chunk = updated.slice(i, i + CHUNK).map(c => ({ data: c }));
         const { error } = await supabase.from('contracts').insert(chunk);
-        if (error) { console.error('[Contracts] insert error:', error); return; }
-        await insertChunk(i + CHUNK);
-      };
-      insertChunk(0);
-    });
+        if (error) console.error('[Contracts] insert error:', error);
+      }
+    } catch (err) { console.error('[Contracts] persist error:', err); }
   };
 
   const nextId = () => contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;

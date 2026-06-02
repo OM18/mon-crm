@@ -18118,16 +18118,14 @@ const Contracts = ({ companies = [], contracts = [], setContracts }) => {
   const persist = async (updated) => {
     setContractsRaw(updated);
     try {
-      console.log('[Contracts] deleting all rows...');
-      const { data: delData, error: delError } = await supabase.from('contracts').delete().neq('id', '').select();
-      console.log('[Contracts] delete result:', { delData, delError });
+      const { error: delError } = await supabase.from('contracts').delete().gt('id', 0);
+      if (delError) { console.error('[Contracts] delete error:', delError); return; }
       const CHUNK = 50;
       for (let i = 0; i < updated.length; i += CHUNK) {
         const chunk = updated.slice(i, i + CHUNK).map(c => ({ data: c }));
-        const { data: insData, error: insError } = await supabase.from('contracts').insert(chunk).select();
-        console.log(`[Contracts] insert chunk ${i}-${i+CHUNK}:`, { count: insData?.length, insError });
+        const { error } = await supabase.from('contracts').insert(chunk);
+        if (error) console.error('[Contracts] insert error:', error);
       }
-      console.log('[Contracts] persist done, final count:', updated.length);
     } catch (err) { console.error('[Contracts] persist error:', err); }
   };
 
@@ -18157,12 +18155,9 @@ const Contracts = ({ companies = [], contracts = [], setContracts }) => {
     setFormErrors(p => ({...p, contractType: false}));
   };
   const handleDeleteAll = async () => {
-    console.log('[Contracts] deleteAll called');
-    const { error } = await supabase.from('contracts').delete().neq('id', '');
-    console.log('[Contracts] deleteAll result:', error);
-    if (!error) {
-      setContractsRaw([]);
-    }
+    const { error } = await supabase.from('contracts').delete().gt('id', 0);
+    if (error) console.error('[Contracts] deleteAll error:', error);
+    setContractsRaw([]);
     setSelected(null);
     setShowDeleteAll(false);
   };

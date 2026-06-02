@@ -18118,10 +18118,12 @@ const Contracts = ({ companies = [], contracts = [], setContracts }) => {
   const persist = async (updated) => {
     setContractsRaw(updated);
     try {
-      if (updated.length === 0) {
-        await supabase.from('contracts').delete().neq('id', 0);
-      } else {
-        await saveLargeTable('contracts', updated);
+      await supabase.from('contracts').delete().neq('id', '');
+      const CHUNK = 50;
+      for (let i = 0; i < updated.length; i += CHUNK) {
+        const chunk = updated.slice(i, i + CHUNK).map(c => ({ data: c }));
+        const { error } = await supabase.from('contracts').insert(chunk);
+        if (error) console.error('[Contracts] insert error:', error);
       }
     } catch (err) { console.error('[Contracts] persist error:', err); }
   };

@@ -5838,15 +5838,111 @@ const CompanyNameBlock = ({ config, updateField, companies = [] }) => {
 };
 
 
-// ─── BATCH CONTRACTS — OLD TO NEW (FLAT PRICE ONLY) ──────────
+// ─── BATCH CONTRACTS — OLD TO NEW ─────────────────────────────
 const BatchContractsOldToNew = () => {
-  const [state, setState] = useState("idle"); // idle | processing | done | error
+  const [state, setState] = useState("idle");
   const [result, setResult] = useState(null);
   const fileRef = useRef(null);
 
+  const normKey = k => k.trim().toLowerCase().replace(/[-_\s]+/g, "_");
+
+  // ── Column rename map (source → new) ─────────────────────────
+  const COLUMN_MAP = {
+    "id":                               "-",            // drop
+    "contract_number":                  "contractNumber",
+    "contract_type":                    "contractType",
+    "status":                           "status",
+    "conclusion_date":                  "conclusionDate",
+    "arrival_period_start":             "executionPeriodType", // used for period type AND date
+    "date_of_execution":                "executionDateFrom",
+    "end_of_execution":                 "executionDateTo",
+    "buyer__name":                      "buyerId",
+    "supplier__name":                   "sellerId",
+    "broker__name":                     "brokerId",
+    "cargo__title":                     "commodity",
+    "derivative":                       "contractPriceType", // also → derivativeId
+    "price":                            "flatPrice",
+    "currency":                         "flatCurrency",
+    "price_premium":                    "premium",
+    "analytical_price":                 "analyticalFlatPrice",
+    "estimated_lots":                   "numberOfLots",
+    "VAT_option":                       "vat",
+    "VAT_value":                        "vatRate",
+    "basis__name":                      "incoterm",
+    "ports":                            "port",
+    "loadport":                         "loadport",
+    "disport":                          "disport",
+    "delivery_condition":               "deliveryConditions",
+    "warehouse":                        "warehouse",
+    "shipment_terminal_name":           "shipmentTerminal",
+    "payment_conditions_option":        "paymentTerms",
+    "origin_of_crop__title":            "originCountry",
+    "destination_of_crop__title":       "destinationCountry",
+    "volume":                           "qtyValue",
+    "volume_min":                       "qtyMin",
+    "volume_max":                       "qtyMax",
+    "volume_options_company":           "qtyToleranceOption",
+    "volume_options":                   "qtyTolerance",
+    "volume_estimated_open":            "qtyEstimated",
+    "final_volume":                     "qtyFinal",
+    "custom_field__Has_transformation": "transformation",
+    "business_unit__title":             "businessUnit",
+    "additional_info":                  "info",
+  };
+
+  // Columns to DROP entirely
+  const DROP_COLS = new Set(["id", "arrival_period_start", "elevator_name"]);
+
+  // ── Value maps ────────────────────────────────────────────────
+  const STATUS_MAP = {
+    "new":              "UPCOMING",
+    "washout":          "WASHOUTED",
+    "shipment":         "SHIPMENT",
+    "delivery_period":  "DELIVERY PERIOD",
+    "cargo_executed":   "CARGO EXECUTED",
+    "executed":         "EXECUTED",
+    "cancelled":        "CANCELLED",
+  };
+
+  const CONTRACT_TYPE_MAP = {
+    "sale":     "SALE",
+    "purchase": "PURCHASE",
+  };
+
+  const TOL_OPT_MAP = {
+    "seller": "SELLER OPTION",
+    "buyer":  "BUYER OPTION",
+  };
+
+  const BU_MAP = {
+    "MOROCCO BU": "MOROCCO", "UKRAINE BU": "UKRAINE", "MAXIGRAIN": "MAXIGRAIN",
+    "EGYPT BU":   "EGYPT",   "RUSSIA BU":  "RUSSIA",  "BUTTER BU": "BUTTER",
+    "TURKEY BU":  "TURKEY",
+  };
+
+  // ── Date helpers ──────────────────────────────────────────────
+  const parseDateToSlash = (val) => {
+    if (!val) return "";
+    const s = String(val).trim();
+    // JJ.MM.AAAA → JJ/MM/AAAA
+    const dot = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    if (dot) return `${dot[1]}/${dot[2]}/${dot[3]}`;
+    // YYYY-MM-DD → DD/MM/YYYY
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+    // already dd/mm/yyyy
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) return s.slice(0, 10);
+    // Excel serial
+    if (/^\d{4,5}$/.test(s)) {
+      const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+      return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+    }
+    return s;
+  };
+
+  // ── processFile ───────────────────────────────────────────────
   const processFile = async (file) => {
-    setState("processing");
-    setResult(null);
+    setState("processing"); setResult(null);
     try {
       const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
@@ -5854,238 +5950,228 @@ const BatchContractsOldToNew = () => {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
 
-      // Case-insensitive column lookup
-      const col = (row, ...keys) => {
-        for (const k of keys) {
-          if (row[k] !== undefined && row[k] !== "") return String(row[k]).trim();
-          const found = Object.keys(row).find(rk => rk.toLowerCase().replace(/[^a-z0-9]/g,"") === k.toLowerCase().replace(/[^a-z0-9]/g,""));
-          if (found && row[found] !== undefined && row[found] !== "") return String(row[found]).trim();
-        }
-        return "";
-      };
-
-      // yyyy-mm-dd → dd/mm/yyyy
-      const parseISODate = (val) => {
-        if (!val) return "";
-        const s = String(val).trim();
-        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
-        // already dd/mm/yyyy
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
-        // Excel serial
-        if (/^\d{4,5}$/.test(s)) {
-          const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
-          return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
-        }
-        return s;
-      };
-
-      const STATUS_MAP = {
-        "new":              "UPCOMING",
-        "cargo_executed":   "CARGO EXECUTED",
-        "delivery_period":  "DELIVERY PERIOD",
-        "shipment":         "SHIPMENT",
-        "washout":          "WASHOUTED",
-      };
-
-      const BU_MAP = {
-        "MOROCCO BU": "MOROCCO",
-        "BUTTER BU":  "BUTTER",
-        "EGYPT BU":   "EGYPT",
-        "TURKEY BU":  "TURKEY",
-        "UKRAINE BU": "UKRAINE",
-        "RUSSIA BU":  "RUSSIA",
-      };
-
       const converted = rows.map(row => {
         const out = {};
+        const rowNorm = Object.keys(row).reduce((acc, k) => { acc[normKey(k)] = k; return acc; }, {});
 
-        // Id — preserved as-is from source
-        out["Id"] = String(row["id"] || row["Id"] || row["ID"] || "").trim();
+        const get = (srcKey) => {
+          let raw = row[srcKey];
+          if (raw === undefined) { const ak = rowNorm[normKey(srcKey)]; raw = ak !== undefined ? row[ak] : ""; }
+          return raw !== undefined && raw !== null ? String(raw).trim() : "";
+        };
 
-        // Contract Number
-        out["Contract Number"] = String(row["contract_number"] || "").trim();
+        // Iterate column map
+        for (const [srcKey, destKey] of Object.entries(COLUMN_MAP)) {
+          if (DROP_COLS.has(srcKey) || destKey === "-") continue;
+          let val = get(srcKey);
 
-        // Contract Type — "sale" → "SALE", others uppercase
-        const ctRaw = String(row["contract_type"] || "").trim().toLowerCase();
-        out["Contract Type"] = ctRaw === "sale" ? "SALE" : String(row["contract_type"] || "").trim().toUpperCase();
+          // ── Value transforms ──
+          if (destKey === "status") {
+            val = STATUS_MAP[val.toLowerCase()] ?? val.toUpperCase();
 
-        // Conclusion Date yyyy-mm-dd → dd/mm/yyyy
-        out["Conclusion Date"] = parseISODate(row["conclusion_date"]);
+          } else if (destKey === "contractType") {
+            val = CONTRACT_TYPE_MAP[val.toLowerCase()] ?? val.toUpperCase();
 
-        // Buyer / Seller / Broker
-        out["Buyer"]  = col(row, "buyer__name", "buyer_name", "buyername", "buyer");
-        out["Seller"] = col(row, "supplier__name", "supplier_name", "suppliername", "seller");
-        out["Broker"] = col(row, "broker_name", "broker__name", "brokername", "broker");
+          } else if (destKey === "contractPriceType") {
+            // derivative <>"" → PREMIUM, else → FLAT
+            val = val !== "" ? "PREMIUM" : "FLAT";
 
-        // Commodity
-        out["Commodity"] = col(row, "cargo__title", "cargo_title", "cargotitle", "cargo");
+          } else if (destKey === "qtyToleranceOption") {
+            val = TOL_OPT_MAP[val.toLowerCase()] ?? val;
 
-        // Status
-        const stRaw = String(row["status"] || "").trim().toLowerCase();
-        out["Status"] = STATUS_MAP[stRaw] || String(row["status"] || "").trim().toUpperCase();
+          } else if (destKey === "businessUnit") {
+            val = val.split(/[,;]/).map(p => {
+              const t = p.trim().toUpperCase();
+              return BU_MAP[t] ?? p.trim();
+            }).filter(Boolean).join(", ");
 
-        // Exec From / Exec To
-        out["Exec From"] = parseISODate(row["date_of_execution"]);
-        out["Exec To"]   = parseISODate(row["end_of_execution"]);
+          } else if (destKey === "transformation") {
+            const u = val.toUpperCase();
+            val = (u === "TRUE" || u === "VRAI" || u === "1") ? "TRUE"
+                : (u === "FALSE" || u === "FAUX" || u === "0") ? "FALSE" : val;
 
-        // Price Type — always FLAT
-        out["Price Type"] = "FLAT";
+          } else if (destKey === "vat") {
+            const u = val.toUpperCase();
+            val = (u === "TRUE" || u === "VRAI") ? "TRUE"
+                : (u === "FALSE" || u === "FAUX") ? "FALSE" : val;
 
-        // Flat Price / Price Currency
-        out["Flat Price"]       = row["price"]    || "";
-        out["Price Currency"]   = String(row["currency"] || "").trim();
+          } else if (destKey === "conclusionDate" || destKey === "executionDateFrom" || destKey === "executionDateTo") {
+            val = parseDateToSlash(val);
+          }
 
-        // Contract Port(s)
-        out["Contract Port(s)"] = String(row["ports"] || "").trim();
-
-        // Incoterm
-        out["Incoterm"] = col(row, "basis_name", "basis__name", "basisname");
-
-        // Payment Terms
-        out["Payment Terms"] = col(row, "payment_conditions_option", "payment_conditions", "paymentconditions", "payment_terms");
-
-        // Origin / Destination
-        out["Origin"]      = col(row, "origin_of_crop__title", "origin_of_crop_title", "origincrop", "origin");
-        out["Destination"] = col(row, "destination_of_crop__title", "destination_of_crop_title", "destinationcrop", "destination");
-
-        // Quantity + Qty Unit
-        out["Quantity"] = row["Volume"] || row["volume"] || "";
-        out["Qty Unit"] = "TON";
-
-        // Tolerance — format as % (value kept as-is, just append %)
-        const tolRaw = row["volume_options"];
-        if (tolRaw !== undefined && tolRaw !== "") {
-          const n = parseFloat(String(tolRaw).replace(/[%,\s]/g, "").replace(",", "."));
-          out["Tolerance"] = isNaN(n) ? String(tolRaw).trim() : `${n}%`;
-        } else {
-          out["Tolerance"] = "";
+          out[destKey] = val;
         }
 
-        // Tolerance Option — "buyer" → "BUYER OPTION", "seller" → "SELLER OPTION"
-        const tolOpt = String(row["volume_options_company"] || "").trim().toLowerCase();
-        out["Tolerance Option"] = tolOpt === "buyer" ? "BUYER OPTION" : tolOpt === "seller" ? "SELLER OPTION" : String(row["volume_options_company"] || "").trim();
+        // ── executionPeriodType — derived from arrival_period_start ──
+        const arrivalStart = get("arrival_period_start");
+        out["executionPeriodType"] = arrivalStart !== "" ? "Arrival" : "Loading";
 
-        // Final Qty
-        out["Final Qty"] = col(row, "final_volume", "finalvolume");
+        // ── executionDateFrom — prefer date_of_execution, fallback to arrival_period_start ──
+        if (!out["executionDateFrom"] && arrivalStart) {
+          out["executionDateFrom"] = parseDateToSlash(arrivalStart);
+        }
 
-        // Business Unit — map "MOROCCO BU" → "MOROCCO" etc.
-        const buRaw = String(row["business_unit__title"] || row["business_unit"] || "").trim().toUpperCase();
-        out["Business Unit"] = BU_MAP[buRaw] || buRaw;
+        // ── derivativeId — same source as contractPriceType ──
+        const derivVal = get("derivative");
+        out["derivativeId"] = derivVal !== "" ? derivVal : "";
 
-        // Info
-        out["Info"] = String(row["additional_info"] || "").trim();
-
-        // Delivery Conditions — normalize spacing variants
-        const dcRaw = String(row["delivery_condition"] || "").trim();
-        const DC_MAP = {
-          "1 SP 1 SB":   "1 SP / 1 SB",
-          "1 SP 2 SB":   "1 SP / 2 SB",
-          "1 SP 1-2 SB": "1 SP / 1-2 SB",
-        };
-        out["Delivery Conditions"] = DC_MAP[dcRaw] || dcRaw;
-
-        // VAT — "FAUX"/"FALSE" → "FALSE", "VRAI"/"TRUE" → "TRUE"
-        const vatRaw = String(row["VAT_option"] || "").trim().toUpperCase();
-        out["VAT"] = vatRaw === "VRAI" ? "TRUE" : vatRaw === "FAUX" ? "FALSE" : vatRaw;
-
-        // VAT Rate (%)
-        out["VAT Rate (%)"] = row["VAT_value"] !== undefined ? String(row["VAT_value"]).trim() : "";
-
-        // Contract Analytical Flat Price
-        out["Contract Analytical Flat Price"] = row["analytical_price"] !== undefined ? String(row["analytical_price"]).trim() : "";
-
-        // Transformation
-        const transRaw = String(row["custom_field__Has_transformation"] || "").trim().toUpperCase();
-        out["Transformation"] = transRaw === "VRAI" || transRaw === "TRUE" || transRaw === "1" ? "TRUE" : transRaw === "FAUX" || transRaw === "FALSE" || transRaw === "0" ? "FALSE" : transRaw;
-
-        // Shipment Terminal + Warehouse renames
-        out["SHIPMENT TERMINAL"] = String(row["shipment_terminal_name"] || "").trim();
-        out["WAREHOUSE"]         = String(row["elevator_name"]          || "").trim();
-
-        // Columns to DROP (passport_names, passport_business_dates, contractprices_data,
-        //                  exchange_rate, crop_year, price_without_vat_in_usd) — simply not included in out
+        // ── warehouse — from elevator_name ──
+        out["warehouse"] = get("elevator_name");
 
         return out;
       });
 
-      if (converted.length === 0) {
-        setResult({ error: "Aucune ligne valide dans le fichier." });
-        setState("error");
-        return;
-      }
+      if (converted.length === 0) { setResult({ error: "Aucune ligne valide." }); setState("error"); return; }
 
-      // Export
       const outWs = XLSX.utils.json_to_sheet(converted);
-      const colWidths = Object.keys(converted[0]).map(k => ({ wch: Math.max(k.length + 2, 16) }));
-      outWs["!cols"] = colWidths;
+      outWs["!cols"] = Object.keys(converted[0]).map(k => ({ wch: Math.max(k.length + 2, 18) }));
       const outWb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(outWb, outWs, "Contracts");
-      const date = new Date().toISOString().slice(0, 10);
-      XLSX.writeFile(outWb, `contracts_converted_${date}.xlsx`);
-
+      XLSX.writeFile(outWb, `contracts_converted_${new Date().toISOString().slice(0,10)}.xlsx`);
       setResult({ total: rows.length, converted: converted.length });
       setState("done");
-    } catch(e) {
-      setResult({ error: String(e) });
-      setState("error");
-    }
+    } catch(e) { setResult({ error: String(e) }); setState("error"); }
   };
 
-  const MAPPING = [
-    "id → Id  (conservé tel quel)",
-    "contract_number → Contract Number",
-    "contract_type → Contract Type  (sale → SALE)",
-    "conclusion_date → Conclusion Date  (yyyy-mm-dd → dd/mm/yyyy)",
-    "buyer__name → Buyer",
-    "supplier__name → Seller",
-    "broker_name → Broker",
-    "cargo__title → Commodity",
-    "status → Status  (new→UPCOMING · cargo_executed→CARGO EXECUTED · delivery_period→DELIVERY PERIOD · shipment→SHIPMENT · washout→WASHOUTED)",
-    "date_of_execution → Exec From  (yyyy-mm-dd → dd/mm/yyyy)",
-    "end_of_execution → Exec To  (yyyy-mm-dd → dd/mm/yyyy)",
-    "— [créé] → Price Type = FLAT",
-    "price → Flat Price",
-    "currency → Price Currency",
-    "ports → Contract Port(s)",
-    "basis_name → Incoterm",
-    "payment_conditions_option → Payment Terms",
-    "origin_of_crop__title → Origin",
-    "destination_of_crop__title → Destination",
-    "Volume → Quantity",
-    "— [créé] → Qty Unit = TON",
-    "volume_options → Tolerance  (valeur ÷ 100, format %)",
-    "volume_options_company → Tolerance Option  (buyer→BUYER OPTION · seller→SELLER OPTION)",
-    "final_volume → Final Qty",
-    "business_unit__title → Business Unit  (MOROCCO BU→MOROCCO · BUTTER BU→BUTTER · EGYPT BU→EGYPT · TURKEY BU→TURKEY · UKRAINE BU→UKRAINE · RUSSIA BU→RUSSIA)",
-    "additional_info → Info",
-    "delivery_condition → Delivery Conditions",
-    "VAT_option → VAT  (FAUX→FALSE · VRAI→TRUE)",
-    "VAT_value → VAT Rate (%)",
-    "analytical_price → Contract Analytical Flat Price",
-    "custom_field__Has_transformation → Transformation  (VRAI/TRUE/1→TRUE · FAUX/FALSE/0→FALSE)",
-    "shipment_terminal_name → SHIPMENT TERMINAL",
-    "elevator_name → WAREHOUSE",
-    "— [supprimé] → passport_names · passport_business_dates · contractprices_data · exchange_rate · crop_year · price_without_vat_in_usd",
+  // ── Table styles ──────────────────────────────────────────────
+  const TH = { padding: "5px 10px", textAlign: "left", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bg, whiteSpace: "nowrap" };
+  const TD = { padding: "4px 10px", fontSize: 11, color: COLORS.text, borderBottom: `1px solid ${COLORS.border}40`, whiteSpace: "nowrap" };
+  const TDm = { ...TD, color: COLORS.textMuted, fontStyle: "italic" };
+  const TAG = (c) => ({ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${c}18`, color: c, border: `1px solid ${c}40` });
+
+  // ── Display data ──────────────────────────────────────────────
+  const RENAME_ROWS = [
+    ["contract_number","contractNumber"],["contract_type","contractType"],["status","status"],
+    ["conclusion_date","conclusionDate"],["arrival_period_start","executionPeriodType + executionDateFrom"],
+    ["date_of_execution","executionDateFrom"],["end_of_execution","executionDateTo"],
+    ["buyer__name","buyerId"],["supplier__name","sellerId"],["broker__name","brokerId"],
+    ["cargo__title","commodity"],["derivative","contractPriceType + derivativeId"],
+    ["price","flatPrice"],["currency","flatCurrency"],["price_premium","premium"],
+    ["analytical_price","analyticalFlatPrice"],["estimated_lots","numberOfLots"],
+    ["VAT_option","vat"],["VAT_value","vatRate"],
+    ["basis__name","incoterm"],["ports","port"],["loadport","loadport"],["disport","disport"],
+    ["delivery_condition","deliveryConditions"],["warehouse","warehouse"],
+    ["elevator_name","warehouse"],["shipment_terminal_name","shipmentTerminal"],
+    ["payment_conditions_option","paymentTerms"],
+    ["origin_of_crop__title","originCountry"],["destination_of_crop__title","destinationCountry"],
+    ["volume","qtyValue"],["volume_min","qtyMin"],["volume_max","qtyMax"],
+    ["volume_options_company","qtyToleranceOption"],["volume_options","qtyTolerance"],
+    ["volume_estimated_open","qtyEstimated"],["final_volume","qtyFinal"],
+    ["custom_field__Has_transformation","transformation"],
+    ["business_unit__title","businessUnit"],["additional_info","info"],
+    ["id","— supprimé —"],
+  ];
+
+  const VALUES_ROWS = [
+    ["status","status","new","UPCOMING"],
+    ["","","washout","WASHOUTED"],
+    ["","","shipment","SHIPMENT"],
+    ["","","delivery_period","DELIVERY PERIOD"],
+    ["","","cargo_executed","CARGO EXECUTED"],
+    ["","","executed","EXECUTED"],
+    ["","","cancelled","CANCELLED"],
+    ["contract_type","contractType","sale","SALE"],
+    ["","","purchase","PURCHASE"],
+    ["arrival_period_start","executionPeriodType",'<>""',"Arrival"],
+    ["","",'"" (vide)',"Loading"],
+    ["derivative","contractPriceType",'<>""',"PREMIUM"],
+    ["","",'"" (vide)',"FLAT"],
+    ["volume_options_company","qtyToleranceOption","seller","SELLER OPTION"],
+    ["","","buyer","BUYER OPTION"],
+    ["custom_field__Has_transformation","transformation","true/VRAI/1","TRUE"],
+    ["","","false/FAUX/0","FALSE"],
+    ["VAT_option","vat","VRAI","TRUE"],
+    ["","","FAUX","FALSE"],
+    ["business_unit__title","businessUnit","MOROCCO BU","MOROCCO"],
+    ["","","UKRAINE BU","UKRAINE"],["","","EGYPT BU","EGYPT"],
+    ["","","RUSSIA BU","RUSSIA"],["","","BUTTER BU","BUTTER"],
+    ["","","TURKEY BU","TURKEY"],
+  ];
+
+  const FORMAT_ROWS = [
+    ["contract_type","contractType","sale/purchase","SALE/PURCHASE (majuscules)"],
+    ["conclusion_date","conclusionDate","JJ.MM.AAAA","JJ/MM/AAAA"],
+    ["date_of_execution","executionDateFrom","JJ.MM.AAAA","JJ/MM/AAAA"],
+    ["arrival_period_start","executionDateFrom","JJ.MM.AAAA","JJ/MM/AAAA"],
+    ["end_of_execution","executionDateTo","JJ.MM.AAAA","JJ/MM/AAAA"],
   ];
 
   return (
     <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      {/* Header */}
       <div style={{ padding: "18px 24px", background: `${COLORS.green}08`, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{ width: 38, height: 38, borderRadius: 10, background: `${COLORS.green}20`, border: `1px solid ${COLORS.green}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📄</div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>BATCH CONTRACTS — OLD TO NEW (FLAT PRICE ONLY)</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>BATCH CONTRACTS — OLD TO NEW</div>
           <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Convertit un export contrats ancien format vers le format d'import de l'app</div>
         </div>
       </div>
-      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
 
-        {/* Mapping info */}
-        <div style={{ fontSize: 12, color: COLORS.textMuted, background: COLORS.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
-          <div style={{ fontWeight: 700, marginBottom: 6, color: COLORS.textSub }}>Mapping appliqué :</div>
-          {MAPPING.map(m => <div key={m} style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>• {m}</div>)}
+      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
+
+        {/* ── 3 tables ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.6fr 1fr", gap: 14, alignItems: "start" }}>
+
+          {/* TABLE 1 — Colonnes à renommer */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.green}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.green, letterSpacing: 0.8 }}>① COLONNES RENOMMÉES</div>
+            <div style={{ overflowY: "auto", maxHeight: 420 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={TH}>SOURCE</th><th style={TH}>NOUVEAU</th></tr></thead>
+                <tbody>
+                  {RENAME_ROWS.map(([src, dst], i) => (
+                    <tr key={i}>
+                      <td style={src ? TD : TDm}>{src || ""}</td>
+                      <td style={dst === "— supprimé —" ? { ...TD, color: COLORS.red } : TD}>{dst}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* TABLE 2 — Valeurs à modifier */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.orange}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.orange, letterSpacing: 0.8 }}>② VALEURS MODIFIÉES</div>
+            <div style={{ overflowY: "auto", maxHeight: 420 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={TH}>SOURCE</th><th style={TH}>NOUVEAU</th><th style={TH}>ANCIEN</th><th style={TH}>NOUVEAU</th></tr></thead>
+                <tbody>
+                  {VALUES_ROWS.map(([src, dst, oldV, newV], i) => (
+                    <tr key={i}>
+                      <td style={src ? TD : TDm}>{src || ""}</td>
+                      <td style={dst ? TD : TDm}>{dst || ""}</td>
+                      <td style={{ ...TD, color: COLORS.textMuted }}>{oldV}</td>
+                      <td style={TD}><span style={TAG(COLORS.green)}>{newV}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* TABLE 3 — Formats à modifier */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.blue}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.blue, letterSpacing: 0.8 }}>③ FORMATS MODIFIÉS</div>
+            <div style={{ overflowY: "auto", maxHeight: 420 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={TH}>SOURCE</th><th style={TH}>NOUVEAU</th><th style={TH}>ANCIEN</th><th style={TH}>NOUVEAU</th></tr></thead>
+                <tbody>
+                  {FORMAT_ROWS.map(([src, dst, oldF, newF], i) => (
+                    <tr key={i}>
+                      <td style={src ? TD : TDm}>{src || ""}</td>
+                      <td style={dst ? TD : TDm}>{dst || ""}</td>
+                      <td style={{ ...TD, color: COLORS.textMuted }}>{oldF}</td>
+                      <td style={TD}><span style={TAG(COLORS.blue)}>{newF}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
+        {/* ── Upload button ── */}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
           onChange={e => { if (e.target.files[0]) processFile(e.target.files[0]); e.target.value = ""; }} />
 
@@ -6102,13 +6188,14 @@ const BatchContractsOldToNew = () => {
           {state === "error" && <span style={{ fontSize: 12, color: COLORS.red }}>❌ {result?.error}</span>}
         </div>
 
+        {/* ── Remarques ── */}
         <div style={{ background: `${COLORS.orange}10`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "10px 14px" }}>
           {[
-            "⚠ Seuls les contrats FLAT PRICE sont couverts par ce batch — les contrats PREMIUM nécessitent un traitement séparé.",
-            "⚠ La colonne 'Qty Unit' est fixée à 'TON' pour toutes les lignes.",
-            "⚠ Price Type = 'FLAT' est affecté à toutes les lignes.",
-            "⚠ Tolérance : la valeur est divisée par 100 (ex : 10 → 10%). Vérifiez le format source.",
-            "⚠ Transformation : VRAI/TRUE/1 → TRUE, FAUX/FALSE/0 → FALSE.",
+            "⚠ arrival_period_start non vide → executionPeriodType = \"Arrival\", vide → \"Loading\".",
+            "⚠ derivative non vide → contractPriceType = \"PREMIUM\" + derivativeId = valeur source ; vide → \"FLAT\".",
+            "⚠ <>\"\\ \" signifie \"si la cellule source est non vide\".",
+            "⚠ Dates : JJ.MM.AAAA et YYYY-MM-DD sont converties en JJ/MM/AAAA.",
+            "⚠ La colonne id est supprimée du fichier de sortie.",
           ].map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
         </div>
       </div>

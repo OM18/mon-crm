@@ -17544,10 +17544,20 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
     return "multiNego";
   });
 
-  // Initialize from form.multiPrice or defaults
+  // Initialize from form.multiPrice or defaults — pre-fill pos 0 from contract if first open
+  const pos0FromForm = () => ({
+    id: Date.now() + Math.random(),
+    conclusionDate: form.conclusionDate || "",
+    priceType: form.contractPriceType || "flat",
+    flatPrice: form.flatPrice || "", analyticalFlatPrice: form.analyticalFlatPrice || "", flatCurrency: form.flatCurrency || "",
+    premium: form.premium || "", analyticalPremium: form.analyticalPremium || "", derivativeId: form.derivativeId || "",
+    qtyValue: form.qtyValue || form.qtyMin || "", qtyUnit: form.qtyUnit || "",
+    label: "",
+  });
+
   const initMultiPrice = () => form.multiPrice || {
-    multiNego: { enabled: false, positions: [] },
-    rolling:   { enabled: false, positions: [] },
+    multiNego: { enabled: false, positions: [pos0FromForm()] },
+    rolling:   { enabled: false, positions: [pos0FromForm()] },
     optPort:   { enabled: false, defaultIdx: 0, options: [] },
     optPeriod: { enabled: false, defaultIdx: 0, options: [] },
   };
@@ -18808,6 +18818,35 @@ const Contracts = ({ companies = [] }) => {
                 </div>
               )}
 
+              {/* Multi-price button — always visible once price section is reached */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button onClick={() => setShowMultiPrice(true)}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", background: form.multiPrice && Object.values(form.multiPrice).some(v => v?.enabled) ? `${COLORS.accent}15` : COLORS.bg, border: `1px solid ${form.multiPrice && Object.values(form.multiPrice).some(v => v?.enabled) ? COLORS.accent+"60" : COLORS.border}`, borderRadius: 8, color: form.multiPrice && Object.values(form.multiPrice).some(v => v?.enabled) ? COLORS.accent : COLORS.textMuted, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                    <span>💱</span>
+                    <span>Prix multiples</span>
+                    {form.multiPrice && Object.values(form.multiPrice).some(v => v?.enabled) && (
+                      <span style={{ background: COLORS.accent, color: "#fff", borderRadius: 10, padding: "1px 7px", fontSize: 11 }}>
+                        {Object.values(form.multiPrice).filter(v => v?.enabled).length} actif{Object.values(form.multiPrice).filter(v => v?.enabled).length > 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </button>
+                  {form.multiPrice && (() => {
+                    const badges = [
+                      { key: "multiNego", label: "Multi-négocié", color: COLORS.blue },
+                      { key: "rolling",   label: "Rolling",       color: COLORS.purple },
+                      { key: "optPort",   label: "Port opt.",     color: COLORS.green },
+                      { key: "optPeriod", label: "Période opt.",  color: COLORS.orange },
+                    ].filter(b => form.multiPrice[b.key]?.enabled);
+                    return badges.map(b => (
+                      <span key={b.key} style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 5, background: `${b.color}18`, color: b.color, border: `1px solid ${b.color}40` }}>
+                        {b.label} {b.key === "multiNego" ? `(${form.multiPrice.multiNego.positions.length} pos.)` : b.key === "rolling" ? `(${form.multiPrice.rolling.positions.length} pos.)` : b.key === "optPort" ? `(${form.multiPrice.optPort.options.length} opt.)` : `(${form.multiPrice.optPeriod.options.length} opt.)`}
+                      </span>
+                    ));
+                  })()}
+                </div>
+              </div>
+
               {/* FLAT fields */}
               {form.contractPriceType === "flat" && <>
                 <div>
@@ -18868,38 +18907,6 @@ const Contracts = ({ companies = [] }) => {
                   </select>
                 </div>
               </>}
-
-              {/* Multi-price button */}
-              {form.contractPriceType && (
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <button onClick={() => setShowMultiPrice(true)}
-                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", background: form.multiPrice && Object.values(form.multiPrice).some(v => v?.enabled) ? `${COLORS.accent}15` : COLORS.bg, border: `1px solid ${form.multiPrice && Object.values(form.multiPrice).some(v => v?.enabled) ? COLORS.accent+"60" : COLORS.border}`, borderRadius: 8, color: form.multiPrice && Object.values(form.multiPrice).some(v => v?.enabled) ? COLORS.accent : COLORS.textMuted, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                      <span>💱</span>
-                      <span>Prix multiples</span>
-                      {form.multiPrice && Object.values(form.multiPrice).some(v => v?.enabled) && (
-                        <span style={{ background: COLORS.accent, color: "#fff", borderRadius: 10, padding: "1px 7px", fontSize: 11 }}>
-                          {Object.values(form.multiPrice).filter(v => v?.enabled).length} actif{Object.values(form.multiPrice).filter(v => v?.enabled).length > 1 ? "s" : ""}
-                        </span>
-                      )}
-                    </button>
-                    {/* Active mode badges */}
-                    {form.multiPrice && (() => {
-                      const badges = [
-                        { key: "multiNego", label: "Multi-négocié", color: COLORS.blue },
-                        { key: "rolling",   label: "Rolling",       color: COLORS.purple },
-                        { key: "optPort",   label: "Port opt.",     color: COLORS.green },
-                        { key: "optPeriod", label: "Période opt.",  color: COLORS.orange },
-                      ].filter(b => form.multiPrice[b.key]?.enabled);
-                      return badges.map(b => (
-                        <span key={b.key} style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 5, background: `${b.color}18`, color: b.color, border: `1px solid ${b.color}40` }}>
-                          {b.label} {b.key === "multiNego" ? `(${form.multiPrice.multiNego.positions.length} pos.)` : b.key === "rolling" ? `(${form.multiPrice.rolling.positions.length} pos.)` : b.key === "optPort" ? `(${form.multiPrice.optPort.options.length} opt.)` : `(${form.multiPrice.optPeriod.options.length} opt.)`}
-                        </span>
-                      ));
-                    })()}
-                  </div>
-                </div>
-              )}
 
               <div>
                 <CFL req>Payment Terms</CFL>

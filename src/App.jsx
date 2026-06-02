@@ -16730,8 +16730,7 @@ const CONTRACT_FIELD_MAP = {
   "shipmentTerminal":  ["shipment terminal", "terminal", "shipment_terminal_name", "shipment terminal name"],
   "businessUnit":      ["business unit", "bu", "businessunit", "unité commerciale", "unite commerciale"],
   "analyticalFlatPrice":              ["contract analytical flat price", "analytical flat price", "analytical price", "prix analytique", "prix flat analytique"],
-  "flatPriceVatIncluded":             ["flat price vat excluded", "flat price vat included", "flat price ht", "flat price ttc", "prix ht", "prix ttc", "prix flat ht", "prix flat ttc"],
-  "analyticalFlatPriceVatIncluded":   ["analytical flat price vat excluded", "analytical flat price vat included", "analytical price ht", "analytical price ttc", "prix analytique ht", "prix analytique ttc"],
+  "numberOfLots":                     ["number of lots", "nb lots", "nombre de lots", "lots"],
   "vat":                              ["vat", "tva", "tax"],
   "vatRate":                          ["vat rate (%)", "vat rate", "taux tva", "taux de tva", "tax rate"],
   "analyticalPremium":                ["analytical premium", "premium analytique", "prime analytique"],
@@ -16784,6 +16783,7 @@ const CONTRACT_FIELD_LABELS = {
   "vat":                              "VAT",
   "vatRate":                          "VAT Rate (%)",
   "analyticalPremium":                "Analytical Premium",
+  "numberOfLots":                     "Number of Lots",
   "info":                             "Info",
 };
 
@@ -16792,8 +16792,8 @@ const CONTRACT_EXPORT_HEADERS = [
   "executionDateFrom", "executionDateTo", "executionPeriodType",
   "buyerId", "sellerId", "brokerId", "commodity",
   "contractPriceType", "flatPrice", "flatCurrency", "premium",
-  "analyticalFlatPrice", "flatPriceVatIncluded", "analyticalFlatPriceVatIncluded",
-  "vat", "vatRate", "analyticalPremium",
+  "analyticalFlatPrice", "numberOfLots",
+  "vat", "vatRate", "analyticalPremium", "numberOfLots",
   "derivativeId", "incoterm", "port", "loadport", "disport",
   "deliveryConditions", "warehouse", "shipmentTerminal",
   "originCountry", "destinationCountry", "paymentTerms",
@@ -16818,8 +16818,7 @@ const CONTRACT_IMPORT_GUIDE = [
   { field: "flatCurrency",   format: "Texte", note: "",                                configKey: "contractCurrencies" },
   { field: "premium",        format: "Nombre", note: "",                               configKey: null },
   { field: "analyticalFlatPrice", format: "Nombre", note: "",                          configKey: null },
-  { field: "flatPriceVatIncluded", format: "Nombre", note: "",                         configKey: null },
-  { field: "analyticalFlatPriceVatIncluded", format: "Nombre", note: "",               configKey: null },
+  { field: "numberOfLots",              format: "Entier positif", note: "Prime uniquement",         configKey: null },
   { field: "vat",            format: "TRUE / FALSE", note: "",                         configKey: null },
   { field: "vatRate",        format: "Nombre (%)", note: "ex: 20",                     configKey: null },
   { field: "analyticalPremium", format: "Nombre", note: "",                            configKey: null },
@@ -17160,7 +17159,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
       }
 
       // Normalize number fields
-      ["analyticalFlatPrice","flatPriceVatIncluded","analyticalFlatPriceVatIncluded","analyticalPremium"].forEach(field => {
+      ["analyticalFlatPrice","analyticalPremium","numberOfLots"].forEach(field => {
         if (obj[field] !== undefined && obj[field] !== "") {
           const n = parseFloat(String(obj[field]).replace(/\s/g, "").replace(/,/g, "."));
           obj[field] = isNaN(n) ? "" : String(n);
@@ -17508,6 +17507,7 @@ const EMPTY_CONTRACT = (cfg = {}) => ({
   vatRate: "",                       // percentage
   premium: "",                       // integer
   analyticalPremium: "",             // integer
+  numberOfLots: "",                  // positive integer (prime only)
   derivativeId: "",                  // instrument id from deriv_products
   info: "",                          // free text note
   conclusionDate: new Date().toLocaleDateString("fr-FR").split("/").join("/"), // dd/mm/yyyy
@@ -18475,6 +18475,7 @@ const Contracts = ({ companies = [] }) => {
           {c.contractPriceType === "prime" && <>
             <DRow label="Premium">{c.premium ? `+${c.premium}` : "—"}</DRow>
             {c.analyticalPremium && <DRow label="Analytical Premium">{`+${c.analyticalPremium}`}</DRow>}
+            {c.numberOfLots && <DRow label="Number of Lots">{c.numberOfLots}</DRow>}
             <DRow label="Instrument">{instrument?.label || c.derivativeId || "—"}</DRow>
             {c.vat && <DRow label="VAT">{c.vatRate ? `${c.vatRate}%` : "Oui"}</DRow>}
           </>}
@@ -18901,6 +18902,11 @@ const Contracts = ({ companies = [] }) => {
                 <div>
                   <CFL>Analytical Premium</CFL>
                   <input type="number" step="1" value={form.analyticalPremium || ""} onChange={e => f("analyticalPremium", e.target.value)} placeholder="ex : 25"
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <CFL>Number of Lots</CFL>
+                  <input type="number" step="1" min="1" value={form.numberOfLots || ""} onChange={e => f("numberOfLots", e.target.value.replace(/[^0-9]/g, ""))} placeholder="ex : 10"
                     style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
                 </div>
                 <div>

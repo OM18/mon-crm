@@ -1849,6 +1849,7 @@ useEffect(() => {
   const [prodSearch, setProdSearch] = useState("");
   const [filterUnderlying, setFilterUnderlying] = useState("");
   const [filterYear, setFilterYear] = useState("");
+  const [dirtyActive, setDirtyActive] = useState(false);
 
   const isValid = () => form.label.trim() !== "" && form.stoxxExchange !== "" && form.instrumentType !== "" && form.underlyingCategory !== "" && form.underlying !== "" && form.underlyingOrigin !== "" && String(form.volumeSizePerLot).trim() !== "" && form.volumeUnit !== "" && form.currency !== "" && form.lastTradingDate !== "" && (form.instrumentType?.toLowerCase() !== "option" || form.expiryDate !== "");
 
@@ -2092,8 +2093,6 @@ useEffect(() => {
             }
             return true;
           });
-
-          const [dirtyActive, setDirtyActive] = useState(false);
 
           const toggleActive = (prod) => {
             const newActive = prod.active === false ? true : false;

@@ -61,14 +61,13 @@ const saveProducts = async (items, setStateFn, prevItems) => {
       if (sid) toUpdate.push({ sid, item });
       else toInsert.push(item);
     });
-    console.log('[saveProducts] existing:', existing?.length, 'toUpdate:', toUpdate.length, 'toInsert:', toInsert.length, 'idMap sample:', Object.entries(supabaseIdByJsonId).slice(0,3));
 
     // UPDATE existing one by one (cannot bulk-upsert GENERATED ALWAYS id columns)
     for (const { sid, item } of toUpdate) {
       const { error } = await supabase.from('deriv_products')
-        .update({ data: item })
+        .update({ data: item, updated_at: new Date().toISOString() })
         .eq('id', sid);
-      if (error) console.error('[saveProducts] update error:', error, 'item:', item.id);
+      if (error) console.error('[saveProducts] update error:', error, 'sid:', sid);
     }
 
     // INSERT new products in chunks (no id column — let Supabase generate it)
@@ -83,9 +82,6 @@ const saveProducts = async (items, setStateFn, prevItems) => {
     const currentIds = new Set(items.map(p => String(p.id)));
     const toDelete = (existing || []).filter(r => r.data?.id && !currentIds.has(String(r.data.id))).map(r => r.id);
     if (toDelete.length > 0) await supabase.from('deriv_products').delete().in('id', toDelete);
-
-    // Update module-level cache
-    _derivProductsCache = items;
   } catch (err) {
     console.error('[saveProducts] Error:', err);
     if (setStateFn && prevItems) setStateFn(prevItems);
@@ -1810,8 +1806,6 @@ const DerivSelectField = ({ label, field, options, form, setForm }) => (
   </div>
 );
 
-let _derivProductsCache = null; // module-level cache survives component remounts
-
 const DerivProductEditor = ({ config }) => {
   const [products, setProducts] = useState([]);
   const [lotSizes, setLotSizes] = useState([]);
@@ -1821,13 +1815,8 @@ const DerivProductEditor = ({ config }) => {
 
   useEffect(() => {
     async function loadProducts() {
-      if (_derivProductsCache) { setProducts(_derivProductsCache); return; }
       const { data } = await supabase.from('deriv_products').select('data');
-      if (data?.length) {
-        const loaded = data.map(r => r.data);
-        _derivProductsCache = loaded;
-        setProducts(loaded);
-      }
+      if (data?.length) setProducts(data.map(r => r.data));
     }
     loadProducts();
   }, []);

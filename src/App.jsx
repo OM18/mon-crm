@@ -1811,14 +1811,12 @@ const DerivProductEditor = ({ config }) => {
   const [lotSizes, setLotSizes] = useState([]);
   const [quotationUnits, setQuotationUnits] = useState([]);
 
-  const productsLoaded = useRef(false);
-
   useEffect(() => {
     async function loadProducts() {
       const { data } = await supabase.from('deriv_products').select('data');
       if (data?.length) setProducts(data.map(r => ({
         ...r.data,
-        active: r.data.active === false ? false : true  // normalize undefined → true
+        active: r.data.active === false ? false : true
       })));
     }
     loadProducts();

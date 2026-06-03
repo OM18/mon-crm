@@ -64,12 +64,10 @@ const saveProducts = async (items, setStateFn, prevItems) => {
 
     // UPDATE existing one by one (cannot bulk-upsert GENERATED ALWAYS id columns)
     for (const { sid, item } of toUpdate) {
-      const { data: updResult, error } = await supabase.from('deriv_products')
+      const { error } = await supabase.from('deriv_products')
         .update({ data: item, updated_at: new Date().toISOString() })
-        .eq('id', sid)
-        .select('id, data');
+        .eq('id', sid);
       if (error) console.error('[saveProducts] update error:', error, 'sid:', sid);
-      else console.log('[saveProducts] updated sid:', sid, 'active:', updResult?.[0]?.data?.active, 'rows:', updResult?.length);
     }
 
     // INSERT new products in chunks (no id column — let Supabase generate it)
@@ -1818,7 +1816,10 @@ const DerivProductEditor = ({ config }) => {
   useEffect(() => {
     async function loadProducts() {
       const { data } = await supabase.from('deriv_products').select('data');
-      if (data?.length) setProducts(data.map(r => r.data));
+      if (data?.length) setProducts(data.map(r => ({
+        ...r.data,
+        active: r.data.active === false ? false : true  // normalize undefined → true
+      })));
     }
     loadProducts();
   }, []);

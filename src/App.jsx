@@ -64,10 +64,12 @@ const saveProducts = async (items, setStateFn, prevItems) => {
 
     // UPDATE existing one by one (cannot bulk-upsert GENERATED ALWAYS id columns)
     for (const { sid, item } of toUpdate) {
-      const { error } = await supabase.from('deriv_products')
+      const { data: updResult, error } = await supabase.from('deriv_products')
         .update({ data: item, updated_at: new Date().toISOString() })
-        .eq('id', sid);
+        .eq('id', sid)
+        .select('id, data');
       if (error) console.error('[saveProducts] update error:', error, 'sid:', sid);
+      else console.log('[saveProducts] updated sid:', sid, 'active:', updResult?.[0]?.data?.active, 'rows:', updResult?.length);
     }
 
     // INSERT new products in chunks (no id column — let Supabase generate it)

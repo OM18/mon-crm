@@ -2093,10 +2093,18 @@ useEffect(() => {
             return true;
           });
 
-          const toggleActive = async (prod) => {
-            const updated = products.map(p => p.id === prod.id ? { ...p, active: p.active === false ? true : false } : p);
+          const [dirtyActive, setDirtyActive] = useState(false);
+
+          const toggleActive = (prod) => {
+            const newActive = prod.active === false ? true : false;
+            const updated = products.map(p => p.id === prod.id ? { ...p, active: newActive } : p);
             setProducts(updated);
-            await saveProducts(updated, setProducts, products);
+            setDirtyActive(true);
+          };
+
+          const saveActiveChanges = async () => {
+            await saveProducts(products, setProducts, products);
+            setDirtyActive(false);
           };
 
           const chkExchanges   = new Set((config.derivExchanges || []).map(e => e.value));
@@ -2206,6 +2214,12 @@ useEffect(() => {
                   </button>
                 )}
                 {hasFilters && <span style={{ fontSize: 12, color: COLORS.textMuted }}>{totalFiltered} résultat{totalFiltered !== 1 ? "s" : ""}</span>}
+                {dirtyActive && (
+                  <button onClick={saveActiveChanges}
+                    style={{ background: `${COLORS.green}20`, border: `1px solid ${COLORS.green}40`, borderRadius: 8, padding: "8px 14px", color: COLORS.green, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                    ✓ Sauvegarder
+                  </button>
+                )}
               </div>
 
               {/* Active */}

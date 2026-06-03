@@ -2102,10 +2102,30 @@ useEffect(() => {
           };
 
           const saveActiveChanges = async () => {
-            console.log('[saveActiveChanges] called, products:', products.length, 'dirty:', dirtyActive);
-            const result = await saveProducts(products, setProducts, products);
-            console.log('[saveActiveChanges] done');
-            setDirtyActive(false);
+            try {
+              // Only update changed instruments (compare with loaded state)
+              const { data: existing } = await supabase.from('deriv_products').select('id, data');
+              if (!existing) return;
+              const supabaseIdByJsonId = {};
+              existing.forEach(row => { if (row.data?.id) supabaseIdByJsonId[String(row.data.id)] = row.id; });
+              
+              for (const prod of products) {
+                const existingRow = existing.find(r => String(r.data?.id) === String(prod.id));
+                if (!existingRow) continue;
+                // Only save if active field changed
+                if (existingRow.data?.active !== prod.active) {
+                  const sid = supabaseIdByJsonId[String(prod.id)];
+                  if (sid) {
+                    await supabase.from('deriv_products')
+                      .update({ data: prod, updated_at: new Date().toISOString() })
+                      .eq('id', sid);
+                  }
+                }
+              }
+              setDirtyActive(false);
+            } catch(e) {
+              console.error('[saveActiveChanges] error:', e);
+            }
           };
 
           const chkExchanges   = new Set((config.derivExchanges || []).map(e => e.value));

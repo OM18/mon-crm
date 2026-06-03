@@ -18206,7 +18206,8 @@ const VirtualContractList = ({ filtered, selected, onSelect, onEdit, onRemove, C
 const Contracts = ({ companies = [], contracts = [], setContracts }) => {
   const { config } = useConfig();
   const setContractsRaw = setContracts; // alias for compatibility
-  const [instruments, setInstruments] = useState([]);
+  const [instruments, setInstruments] = useState([]);       // active only — for modal form
+  const [allInstruments, setAllInstruments] = useState([]); // all — for import
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -18217,11 +18218,15 @@ const Contracts = ({ companies = [], contracts = [], setContracts }) => {
   const [search, setSearch] = useState("");
   const dataLoaded = useRef(true); // already loaded by parent
 
-  // ── Load instruments (active only) ──
+  // ── Load instruments ──
   useEffect(() => {
     async function loadInstruments() {
       const { data } = await supabase.from('deriv_products').select('data');
-      if (data?.length) setInstruments(data.map(r => r.data).filter(p => p.active !== false));
+      if (data?.length) {
+        const all = data.map(r => r.data);
+        setAllInstruments(all);
+        setInstruments(all.filter(p => p.active !== false));
+      }
     }
     loadInstruments();
   }, []);
@@ -18795,7 +18800,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts }) => {
         <ContractImportModal
           onClose={() => setShowImport(false)}
           companies={companies}
-          instruments={instruments}
+          instruments={allInstruments}
           onImport={(items) => {
             const nextId = contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;
             const enriched = items.map((item, i) => ({ ...EMPTY_CONTRACT(config), ...item, id: nextId + i, createdAt: new Date().toISOString() }));

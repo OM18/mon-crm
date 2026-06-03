@@ -2102,7 +2102,9 @@ useEffect(() => {
           };
 
           const saveActiveChanges = async () => {
-            await saveProducts(products, setProducts, products);
+            console.log('[saveActiveChanges] called, products:', products.length, 'dirty:', dirtyActive);
+            const result = await saveProducts(products, setProducts, products);
+            console.log('[saveActiveChanges] done');
             setDirtyActive(false);
           };
 

@@ -17029,7 +17029,7 @@ const ContractExportModal = ({ all, filtered, onClose }) => {
 };
 
 const ContractImportModal = ({ onClose, onImport, companies = [], instruments = [] }) => {
-  const { config } = useConfig();
+  const { config, updateField } = useConfig();
   const [step, setStep] = useState("guide");
   const [rawRows, setRawRows] = useState([]);
   const [headers, setHeaders] = useState([]);
@@ -17332,10 +17332,25 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
     const key = `${currentItem.configKey || currentItem.fieldKey}:${currentItem.value}`;
     const newDecisions = { ...decisions, [key]: decision };
     setDecisions(newDecisions);
+
+    // If "add" and it's a config field — add to Admin Panel
+    if (decision === "add" && currentItem.configKey && currentItem.configKey !== "derivativeId") {
+      const existing = config[currentItem.configKey] || [];
+      const alreadyExists = existing.some(item =>
+        (item.value || item.label || "").toLowerCase() === currentItem.value.toLowerCase()
+      );
+      if (!alreadyExists) {
+        const newItem = {
+          value: currentItem.value.toLowerCase().replace(/\s+/g, "_"),
+          label: currentItem.value,
+        };
+        updateField(currentItem.configKey, [...existing, newItem]);
+      }
+    }
+
     if (currentQueueIdx + 1 < unknownQueue.length) {
       setCurrentQueueIdx(i => i + 1);
     } else {
-      // Apply decisions and import
       const resolved = parsedItems.map(obj => {
         const out = { ...obj };
         unknownQueue.forEach(u => {
@@ -17345,13 +17360,11 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
           if (dec === "skip" && out[u.fieldKey] === u.value) out[u.fieldKey] = "";
           // "add" keeps value as-is
         });
-        // Remove rows with missing required fields if decision was skip
         return out;
       }).filter(obj => {
         return CONTRACT_REQUIRED_FIELDS.every(key => {
-          const uKey = `missing_${key}`;
           const hasMissing = !obj[key] || String(obj[key]).trim() === "";
-          return !hasMissing; // rows with missing required fields are dropped
+          return !hasMissing;
         });
       });
       onImport(resolved);
@@ -17594,7 +17607,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
                       ✗ Vider ce champ
                     </button>
                     <button onClick={() => handleDecision("add")} style={{ padding: "12px 28px", borderRadius: 10, background: `${COLORS.green}20`, border: `1.5px solid ${COLORS.green}60`, color: COLORS.green, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                      ✓ Importer tel quel
+                      {currentItem.fieldKey === "derivativeId" ? "✓ Importer tel quel" : "✓ Ajouter à l'Admin Panel"}
                     </button>
                   </div>
                 </>

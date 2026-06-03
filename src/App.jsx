@@ -55,13 +55,13 @@ const saveProducts = async (items, setStateFn, prevItems) => {
     const supabaseIdByJsonId = {};
     (existing || []).forEach(row => { if (row.data?.id) supabaseIdByJsonId[String(row.data.id)] = row.id; });
 
-    const toUpdate = []; // existing rows → UPDATE by supabase row id
-    const toInsert = []; // new rows → INSERT without id (GENERATED ALWAYS)
+    const toUpdate = []; const toInsert = [];
     items.forEach(item => {
       const sid = supabaseIdByJsonId[String(item.id)];
       if (sid) toUpdate.push({ sid, item });
       else toInsert.push(item);
     });
+    console.log('[saveProducts] existing:', existing?.length, 'toUpdate:', toUpdate.length, 'toInsert:', toInsert.length, 'idMap sample:', Object.entries(supabaseIdByJsonId).slice(0,3));
 
     // UPDATE existing one by one (cannot bulk-upsert GENERATED ALWAYS id columns)
     for (const { sid, item } of toUpdate) {

@@ -6013,7 +6013,7 @@ const BatchContractsOldToNew = () => {
 
         // ── derivativeId — same source as contractPriceType ──
         const derivVal = get("derivative");
-        out["derivativeId"] = derivVal !== "" ? derivVal : "";
+        out["derivativeId"] = derivVal !== "" ? derivVal.toUpperCase() : "";
 
         // ── warehouse — from elevator_name ──
         out["warehouse"] = get("elevator_name");
@@ -6090,6 +6090,7 @@ const BatchContractsOldToNew = () => {
 
   const FORMAT_ROWS = [
     ["contract_type","contractType","sale/purchase","SALE/PURCHASE (majuscules)"],
+    ["derivative","derivativeId","texte quelconque","MAJUSCULES"],
     ["conclusion_date","conclusionDate","JJ.MM.AAAA","JJ/MM/AAAA"],
     ["date_of_execution","executionDateFrom","JJ.MM.AAAA","JJ/MM/AAAA"],
     ["arrival_period_start","executionDateFrom","JJ.MM.AAAA","JJ/MM/AAAA"],

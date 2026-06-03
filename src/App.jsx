@@ -17182,7 +17182,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         const types = config.contractTypes || [];
         const found = types.find(t => t.label?.toLowerCase() === obj.contractType.toLowerCase() || t.value?.toLowerCase() === obj.contractType.toLowerCase());
         if (found) obj.contractType = found.label;
-        else unknowns[`contractType:${obj.contractType}`] = { fieldKey: "contractType", fieldLabel: "Contract Type", value: obj.contractType, allowed: types.map(t => t.label) };
+        else unknowns[`contractType:${obj.contractType}`] = { fieldKey: "contractType", configKey: "contractTypes", fieldLabel: "Contract Type", value: obj.contractType, allowed: types.map(t => t.label) };
       }
 
       // Validate status
@@ -17190,7 +17190,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         const statuses = config.contractStatuses || [];
         const found = statuses.find(s => (s.label || s.value)?.toLowerCase() === obj.status.toLowerCase());
         if (found) obj.status = found.label || found.value;
-        else unknowns[`status:${obj.status}`] = { fieldKey: "status", fieldLabel: "Status", value: obj.status, allowed: statuses.map(s => s.label || s.value) };
+        else unknowns[`status:${obj.status}`] = { fieldKey: "status", configKey: "contractStatuses", fieldLabel: "Status", value: obj.status, allowed: statuses.map(s => s.label || s.value) };
       }
 
       // Validate commodity
@@ -17198,7 +17198,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         const comms = config.contractCommodities || [];
         const found = comms.find(c => c.label?.toLowerCase() === obj.commodity.toLowerCase() || c.value?.toLowerCase() === obj.commodity.toLowerCase());
         if (found) obj.commodity = found.label;
-        else unknowns[`commodity:${obj.commodity}`] = { fieldKey: "commodity", fieldLabel: "Commodity", value: obj.commodity, allowed: comms.map(c => c.label) };
+        else unknowns[`commodity:${obj.commodity}`] = { fieldKey: "commodity", configKey: "contractCommodities", fieldLabel: "Commodity", value: obj.commodity, allowed: comms.map(c => c.label) };
       }
 
       // Validate incoterm
@@ -17206,7 +17206,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         const incos = config.contractIncoterms || [];
         const found = incos.find(i => i.label?.toLowerCase() === obj.incoterm.toLowerCase());
         if (found) obj.incoterm = found.label;
-        else unknowns[`incoterm:${obj.incoterm}`] = { fieldKey: "incoterm", fieldLabel: "Incoterm", value: obj.incoterm, allowed: incos.map(i => i.label) };
+        else unknowns[`incoterm:${obj.incoterm}`] = { fieldKey: "incoterm", configKey: "contractIncoterms", fieldLabel: "Incoterm", value: obj.incoterm, allowed: incos.map(i => i.label) };
       }
 
       // Validate paymentTerms
@@ -17214,7 +17214,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         const terms = config.contractPaymentTerms || [];
         const found = terms.find(t => t.label?.toLowerCase() === obj.paymentTerms.toLowerCase());
         if (found) obj.paymentTerms = found.label;
-        else unknowns[`paymentTerms:${obj.paymentTerms}`] = { fieldKey: "paymentTerms", fieldLabel: "Payment Terms", value: obj.paymentTerms, allowed: terms.map(t => t.label) };
+        else unknowns[`paymentTerms:${obj.paymentTerms}`] = { fieldKey: "paymentTerms", configKey: "contractPaymentTerms", fieldLabel: "Payment Terms", value: obj.paymentTerms, allowed: terms.map(t => t.label) };
       }
 
       // Validate deliveryConditions against config
@@ -17222,7 +17222,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         const terms = config.contractDeliveryTerms || [];
         const found = terms.find(t => t.label?.toLowerCase() === obj.deliveryConditions.toLowerCase());
         if (found) obj.deliveryConditions = found.label;
-        else unknowns[`deliveryConditions:${obj.deliveryConditions}`] = { fieldKey: "deliveryConditions", fieldLabel: "Delivery Conditions", value: obj.deliveryConditions, allowed: terms.map(t => t.label) };
+        else unknowns[`deliveryConditions:${obj.deliveryConditions}`] = { fieldKey: "deliveryConditions", configKey: "contractDeliveryTerms", fieldLabel: "Delivery Conditions", value: obj.deliveryConditions, allowed: terms.map(t => t.label) };
       }
 
       // Validate originCountry / destinationCountry
@@ -17231,7 +17231,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
           const countries = config.country || [];
           const found = countries.find(c => c.label?.toLowerCase() === obj[field].toLowerCase() || c.value?.toLowerCase() === obj[field].toLowerCase());
           if (found) obj[field] = found.value;
-          else unknowns[`${field}:${obj[field]}`] = { fieldKey: field, fieldLabel: field === "originCountry" ? "Origin Country" : "Destination Country", value: obj[field], allowed: countries.map(c => c.label) };
+          else unknowns[`${field}:${obj[field]}`] = { fieldKey: field, configKey: "country", fieldLabel: field === "originCountry" ? "Origin Country" : "Destination Country", value: obj[field], allowed: countries.map(c => c.label) };
         }
       });
 
@@ -17242,7 +17242,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         obj.port.forEach(pv => {
           const found = configPorts.find(p => p.label?.toLowerCase() === pv.toLowerCase());
           if (found) resolved.push(found.label);
-          else unknowns[`port:${pv}`] = { fieldKey: "port", fieldLabel: "Contract Port", value: pv, allowed: configPorts.map(p => p.label) };
+          else unknowns[`port:${pv}`] = { fieldKey: "port", configKey: "contractPorts", fieldLabel: "Contract Port", value: pv, allowed: configPorts.map(p => p.label) };
         });
         obj.port = resolved;
       }
@@ -17252,7 +17252,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         const units = config.contractVolumeUnits || [];
         const found = units.find(u => u.display?.toLowerCase() === obj.qtyUnit.toLowerCase() || u.name?.toLowerCase() === obj.qtyUnit.toLowerCase());
         if (found) obj.qtyUnit = found.display;
-        else unknowns[`qtyUnit:${obj.qtyUnit}`] = { fieldKey: "qtyUnit", fieldLabel: "Qty Unit", value: obj.qtyUnit, allowed: units.map(u => `${u.display} (${u.name})`) };
+        else unknowns[`qtyUnit:${obj.qtyUnit}`] = { fieldKey: "qtyUnit", configKey: "contractVolumeUnits", fieldLabel: "Qty Unit", value: obj.qtyUnit, allowed: units.map(u => `${u.display} (${u.name})`) };
       }
 
       // Validate qtyTolerance
@@ -17304,7 +17304,7 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         const allowed = allBUs.filter(b => activeBUs.includes(b.value));
         const found = allowed.find(b => b.value?.toLowerCase() === obj.businessUnit.toLowerCase() || b.label?.toLowerCase() === obj.businessUnit.toLowerCase());
         if (found) obj.businessUnit = found.value;
-        else unknowns[`businessUnit:${obj.businessUnit}`] = { fieldKey: "businessUnit", fieldLabel: "Business Unit", value: obj.businessUnit, allowed: allowed.map(b => b.label) };
+        else unknowns[`businessUnit:${obj.businessUnit}`] = { fieldKey: "businessUnit", configKey: "businessUnit", fieldLabel: "Business Unit", value: obj.businessUnit, allowed: allowed.map(b => b.label) };
       }
 
       // Validate required fields

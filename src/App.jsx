@@ -19542,14 +19542,18 @@ const VesselRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, companies, 
         <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.vesselId || "—"}</span>
       </div>
       {/* FLAG */}
-      <div style={{ padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ padding: "0 6px", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {v.flag ? (() => {
-          const code = v.flag.toUpperCase();
-              const label = (config?.country || []).find(c => c.value === v.flag)?.label || code;
+          const isoCode = getCountryCode(v.flag) || (v.flag.length <= 3 ? v.flag.toLowerCase() : null);
+          const label = (config?.country || []).find(c => c.value === v.flag)?.label || v.flag;
+          const shortLabel = label.length > 9 ? label.slice(0, 8) + "…" : label;
           return (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-              <img src={`https://flagcdn.com/24x18/${code.toLowerCase()}.png`} style={{ width: 24, height: 18, borderRadius: 2 }} onError={e => e.target.style.display='none'} />
-              <span style={{ fontSize: 9, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 70, textAlign: "center" }}>{label}</span>
+              {isoCode
+                ? <img src={`https://flagcdn.com/20x15/${isoCode.toLowerCase()}.png`} style={{ width: 20, height: 15, borderRadius: 2 }} onError={e => { e.target.onerror=null; e.target.src=`https://flagcdn.com/w40/${isoCode.toLowerCase()}.png`; }} />
+                : <span style={{ fontSize: 13 }}>🏴</span>
+              }
+              <span style={{ fontSize: 9, color: COLORS.textMuted, whiteSpace: "nowrap", maxWidth: 80, textAlign: "center" }}>{shortLabel}</span>
             </div>
           );
         })() : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>}

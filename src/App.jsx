@@ -19768,6 +19768,17 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
         <button onClick={() => setShowImport(true)} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 12px", color: COLORS.textMuted, fontSize: 13, cursor: "pointer" }}>
           <img src="/logoxl.png" style={{ width: 18, height: 18, verticalAlign: "middle" }} /> Import
         </button>
+        {vessels.length > 0 && (
+          <button onClick={async () => {
+            if (window.confirm(`⚠️ Supprimer les ${vessels.length} navires ? Cette action est irréversible.`)) {
+              await supabase.from('vessels').delete().gt('id', 0);
+              setVesselsRaw([]);
+              setSelected(null);
+            }
+          }} style={{ background: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: "8px 14px" }}>
+            🗑 Effacer tout ({vessels.length})
+          </button>
+        )}
         <Btn onClick={openNew}>+ Ajouter</Btn>
       </div>
 

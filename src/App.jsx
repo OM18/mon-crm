@@ -19517,7 +19517,8 @@ const Contracts = ({ companies = [], contracts = [], setContracts }) => {
 
 // ─── VESSELS ──────────────────────────────────────────────────
 const EMPTY_VESSEL = () => ({
-  id: null, vesselId: "", name: "", imo: "", year: "", ownerId: "", managingCompanyId: "",
+  id: null, vesselId: "", name: "", imo: "", year: "", flag: "",
+  ownerId: "", managingCompanyId: "",
   vesselSize: "", marineTrafficLink: "", additionalInfos: "", blackListed: false,
   createdAt: "",
 });
@@ -19530,7 +19531,7 @@ const VesselRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, companies }
   const manager = companies.find(c => c.id === v.managingCompanyId);
   return (
     <div onClick={() => onSelect(v)}
-      style={{ display: "grid", gridTemplateColumns: "100px 180px 100px 70px 160px 160px 130px 80px 60px", borderBottom: `1px solid ${COLORS.border}`,
+      style={{ display: "grid", gridTemplateColumns: "100px 180px 100px 70px 100px 160px 160px 130px 80px 60px", borderBottom: `1px solid ${COLORS.border}`,
         height: ROW_H_VESSEL, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
         background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
         cursor: "pointer", transition: "background 0.1s" }}
@@ -19551,6 +19552,17 @@ const VesselRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, companies }
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 12, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{v.imo || "—"}</div>
       {/* YEAR */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 12, color: COLORS.text }}>{v.year || "—"}</div>
+      {/* FLAG */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
+        {v.flag ? (() => {
+          const countryCode = v.flag.toUpperCase();
+          const flagUrl = `https://flagcdn.com/20x15/${countryCode.toLowerCase()}.png`;
+          return <>
+            <img src={flagUrl} style={{ width: 20, height: 15, borderRadius: 2, flexShrink: 0 }} onError={e => e.target.style.display='none'} />
+            <span style={{ fontSize: 11, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{countryCode}</span>
+          </>;
+        })() : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>}
+      </div>
       {/* OWNER */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
         <span title={owner?.name} style={{ fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: owner ? COLORS.text : COLORS.textMuted }}>{owner?.name || "—"}</span>
@@ -19711,6 +19723,15 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
         {v.blackListed && <div style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}40`, borderRadius: 8, padding: "8px 12px", color: COLORS.red, fontSize: 12, fontWeight: 700, marginBottom: 16 }}>⛔ BLACKLISTED</div>}
         {v.vesselId && <DRow label="Vessel ID">{v.vesselId}</DRow>}
         <DRow label="Year">{v.year}</DRow>
+        {v.flag && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 10 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>Flag</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <img src={`https://flagcdn.com/20x15/${v.flag.toLowerCase()}.png`} style={{ width: 20, height: 15, borderRadius: 2 }} onError={e => e.target.style.display='none'} />
+              <span style={{ fontSize: 13, color: COLORS.text }}>{(config.country || []).find(c => c.value === v.flag)?.label || v.flag}</span>
+            </div>
+          </div>
+        )}
         <DRow label="Vessel Size">{v.vesselSize}</DRow>
         <DRow label="Owner">{owner?.name}</DRow>
         <DRow label="Managing Company">{manager?.name}</DRow>
@@ -19754,8 +19775,8 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
       <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0 }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
           {/* Header row */}
-          <div style={{ display: "grid", gridTemplateColumns: "100px 180px 100px 70px 160px 160px 130px 80px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
-            {["ID", "NAME", "IMO", "YEAR", "OWNER", "MANAGING CO.", "SIZE", "BLACKLIST", ""].map((h, i) => (
+          <div style={{ display: "grid", gridTemplateColumns: "100px 180px 100px 70px 100px 160px 160px 130px 80px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
+            {["ID", "NAME", "IMO", "YEAR", "FLAG", "OWNER", "MANAGING CO.", "SIZE", "BLACKLIST", ""].map((h, i) => (
               <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
             ))}
           </div>
@@ -19809,6 +19830,20 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
                   <option value="">— Sélectionner —</option>
                   {(config.vesselSize || []).map(s => <option key={s.value} value={s.value}>{s.label || s.value}</option>)}
                 </select>
+              </div>
+              {/* FLAG */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>FLAG</label>
+                <div style={{ position: "relative" }}>
+                  {form.flag && (
+                    <img src={`https://flagcdn.com/20x15/${form.flag.toLowerCase()}.png`} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 20, height: 15, borderRadius: 2 }} onError={e => e.target.style.display='none'} />
+                  )}
+                  <select value={form.flag || ""} onChange={e => f("flag", e.target.value)}
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: `10px 14px 10px ${form.flag ? "40px" : "14px"}`, color: form.flag ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                    <option value="">— Sélectionner —</option>
+                    {(config.country || []).map(c => <option key={c.value} value={c.value}>{c.label || c.value}</option>)}
+                  </select>
+                </div>
               </div>
               {/* OWNER */}
               <div>
@@ -19888,11 +19923,11 @@ const VESSEL_FIELD_ALIASES = {
   vesselSize:         ["vessel size", "size", "taille", "type navire"],
   marineTrafficLink:  ["marine traffic", "marinetraffic", "marine traffic link", "lien marine traffic", "mt link"],
   additionalInfos:    ["additional infos", "info", "notes", "informations", "additional info", "commentaire"],
-  blackListed:        ["blacklisted", "black listed", "black list", "liste noire"],
+  flag:               ["flag", "pavillon", "flag state", "pays pavillon", "country flag"],
 };
 
-const VESSEL_IMPORTABLE_FIELDS = ["vesselId","name","imo","year","ownerId","managingCompanyId","vesselSize","marineTrafficLink","additionalInfos","blackListed"];
-const VESSEL_FIELD_LABELS = { vesselId:"Vessel ID", name:"Name", imo:"IMO", year:"Year", ownerId:"Owner", managingCompanyId:"Managing Company", vesselSize:"Vessel Size", marineTrafficLink:"Marine Traffic Link", additionalInfos:"Additional Infos", blackListed:"Black Listed" };
+const VESSEL_IMPORTABLE_FIELDS = ["vesselId","name","imo","year","flag","ownerId","managingCompanyId","vesselSize","marineTrafficLink","additionalInfos","blackListed"];
+const VESSEL_FIELD_LABELS = { vesselId:"Vessel ID", name:"Name", imo:"IMO", year:"Year", flag:"Flag", ownerId:"Owner", managingCompanyId:"Managing Company", vesselSize:"Vessel Size", marineTrafficLink:"Marine Traffic Link", additionalInfos:"Additional Infos", blackListed:"Black Listed" };
 
 const VesselImportModal = ({ onClose, onImport, companies, config }) => {
   const [step, setStep] = useState("upload");
@@ -19959,6 +19994,13 @@ const VesselImportModal = ({ onClose, onImport, companies, config }) => {
       const items = rawRows.map(row => {
         const obj = {};
         Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[headers[ci]]?.toString().trim() || ""; });
+        // Resolve flag — match country name or code
+        if (obj.flag) {
+          const found = (config.country || []).find(c =>
+            normComp(c.label) === normComp(obj.flag) || normComp(c.value) === normComp(obj.flag)
+          );
+          obj.flag = found ? found.value : obj.flag.toUpperCase().slice(0, 2);
+        }
         // Resolve owner
         if (obj.ownerId) {
           const found = companies.find(c => normComp(c.name) === normComp(obj.ownerId));

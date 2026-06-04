@@ -19523,7 +19523,7 @@ const EMPTY_VESSEL = () => ({
   createdAt: "",
 });
 
-const ROW_H_VESSEL = 52;
+const ROW_H_VESSEL = 72;
 const OVERSCAN_VESSEL = 8;
 
 const VesselRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, companies, config }) => {
@@ -19531,7 +19531,7 @@ const VesselRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, companies, 
   const manager = companies.find(c => c.id === v.managingCompanyId);
   return (
     <div onClick={() => onSelect(v)}
-      style={{ display: "grid", gridTemplateColumns: "100px 90px 180px 100px 70px 160px 160px 130px 80px 60px", borderBottom: `1px solid ${COLORS.border}`,
+      style={{ display: "grid", gridTemplateColumns: "100px 110px 180px 100px 70px 160px 160px 130px 80px 60px", borderBottom: `1px solid ${COLORS.border}`,
         height: ROW_H_VESSEL, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
         background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
         cursor: "pointer", transition: "background 0.1s" }}
@@ -19545,11 +19545,10 @@ const VesselRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, companies, 
       <div style={{ padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {v.flag ? (() => {
           const label = (config?.country || []).find(c => c.value === v.flag)?.label || v.flag;
-          const shortLabel = label.length > 9 ? label.slice(0, 8) + "…" : label;
           return (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-              <CountryFlag country={v.flag} size={22} />
-              <span style={{ fontSize: 9, color: COLORS.textMuted, whiteSpace: "nowrap", maxWidth: 74, textAlign: "center" }}>{shortLabel}</span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+              <CountryFlag country={v.flag} size={28} />
+              <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.text, whiteSpace: "nowrap", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
             </div>
           );
         })() : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>}
@@ -19788,7 +19787,7 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
       <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0 }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
           {/* Header row */}
-          <div style={{ display: "grid", gridTemplateColumns: "100px 90px 180px 100px 70px 160px 160px 130px 80px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "100px 110px 180px 100px 70px 160px 160px 130px 80px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
             {["ID", "FLAG", "NAME", "IMO", "YEAR", "OWNER", "MANAGING CO.", "SIZE", "BLACKLIST", ""].map((h, i) => (
               <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
             ))}

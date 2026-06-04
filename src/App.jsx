@@ -290,6 +290,7 @@ const DEFAULT_CONFIG = {
   contractDefaultToleranceOption: "BUYER OPTION",
   documentTypes: [],
   documents: [],
+  vesselSize: [],
   derivInstrumentTypeDefault: "",
   derivCommodities: [
     { value: "corn", label: "Corn", underlyingCategory: "commodity" },
@@ -631,6 +632,7 @@ const FIELD_DEFINITIONS = [
   { key: "contractsCurrency", label: "Contracts Currency", icon: "💱", description: "Devises utilisées dans les contrats", hasColor: true, hasValue: true },
   { key: "foodFeed", label: "Food / Feed", icon: "🌾", description: "Catégorie de marchandise (Food, Feed, Food + Feed)", hasColor: true, hasValue: true },
   { key: "contactPositions", label: "Contact Positions", icon: "👤", description: "Postes disponibles pour les contacts (CEO, CFO…)", hasColor: false, hasValue: true },
+  { key: "vesselSize", label: "Vessel Size", icon: "🚢", description: "Tailles de navires disponibles (Panamax, Supramax…)", hasColor: false, hasValue: true },
 ];
 
 const DERIV_FIELD_DEFINITIONS = [
@@ -19513,6 +19515,506 @@ const Contracts = ({ companies = [], contracts = [], setContracts }) => {
   );
 };
 
+// ─── VESSELS ──────────────────────────────────────────────────
+const EMPTY_VESSEL = () => ({
+  id: null, name: "", imo: "", year: "", ownerId: "", managingCompanyId: "",
+  vesselSize: "", marineTrafficLink: "", additionalInfos: "", blackListed: false,
+  createdAt: "",
+});
+
+const ROW_H_VESSEL = 52;
+const OVERSCAN_VESSEL = 8;
+
+const VesselRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, companies }) => {
+  const owner = companies.find(c => c.id === v.ownerId);
+  const manager = companies.find(c => c.id === v.managingCompanyId);
+  return (
+    <div onClick={() => onSelect(v)}
+      style={{ display: "grid", gridTemplateColumns: "180px 100px 70px 160px 160px 130px 80px 60px", borderBottom: `1px solid ${COLORS.border}`,
+        height: ROW_H_VESSEL, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
+        background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
+        cursor: "pointer", transition: "background 0.1s" }}
+      onMouseOver={e => { if (!isSel) e.currentTarget.style.background = COLORS.hover; }}
+      onMouseOut={e => { if (!isSel) e.currentTarget.style.background = idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`; }}>
+      {/* NAME */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <div style={{ minWidth: 0 }}>
+          <div title={v.name} style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.name || "—"}</div>
+          {v.blackListed && <span style={{ fontSize: 9, fontWeight: 800, color: COLORS.red, background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}40`, borderRadius: 4, padding: "1px 5px" }}>BLACKLISTED</span>}
+        </div>
+      </div>
+      {/* IMO */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 12, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{v.imo || "—"}</div>
+      {/* YEAR */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 12, color: COLORS.text }}>{v.year || "—"}</div>
+      {/* OWNER */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={owner?.name} style={{ fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: owner ? COLORS.text : COLORS.textMuted }}>{owner?.name || "—"}</span>
+      </div>
+      {/* MANAGING COMPANY */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={manager?.name} style={{ fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: manager ? COLORS.text : COLORS.textMuted }}>{manager?.name || "—"}</span>
+      </div>
+      {/* VESSEL SIZE */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
+        {v.vesselSize ? <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5, background: `${COLORS.blue}18`, color: COLORS.blue, border: `1px solid ${COLORS.blue}30` }}>{v.vesselSize}</span> : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>}
+      </div>
+      {/* BLACKLISTED */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {v.blackListed ? <span style={{ fontSize: 10, fontWeight: 800, color: COLORS.red }}>⛔</span> : <span style={{ fontSize: 10, color: COLORS.textMuted }}>—</span>}
+      </div>
+      {/* ACTIONS */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, borderLeft: `1px solid ${COLORS.border}`, padding: "0 8px" }}
+        onClick={e => e.stopPropagation()}>
+        <button onClick={() => onEdit(v)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+          onMouseOver={e => e.currentTarget.style.color = COLORS.accent} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>✏</button>
+        <button onClick={() => onRemove(v.id)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+          onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>🗑</button>
+      </div>
+    </div>
+  );
+});
+
+const VirtualVesselList = ({ filtered, selected, onSelect, onEdit, onRemove, companies }) => {
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef(null);
+  const [containerH, setContainerH] = useState(600);
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(e => setContainerH(e[0].contentRect.height));
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+  const totalH = filtered.length * ROW_H_VESSEL;
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H_VESSEL) - OVERSCAN_VESSEL);
+  const endIdx = Math.min(filtered.length, Math.ceil((scrollTop + containerH) / ROW_H_VESSEL) + OVERSCAN_VESSEL);
+  return (
+    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)} style={{ overflowY: "auto", flex: 1 }}>
+      {filtered.length === 0
+        ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "56px 0", fontSize: 14 }}>Aucun navire — cliquez sur « + Ajouter »</div>
+        : <div style={{ height: totalH, position: "relative" }}>
+            <div style={{ position: "absolute", top: startIdx * ROW_H_VESSEL, left: 0, right: 0 }}>
+              {filtered.slice(startIdx, endIdx).map((v, vi) => (
+                <VesselRow key={v.id} v={v} idx={startIdx + vi} isSel={selected?.id === v.id}
+                  onSelect={onSelect} onEdit={onEdit} onRemove={onRemove} companies={companies} />
+              ))}
+            </div>
+          </div>
+      }
+    </div>
+  );
+};
+
+const Vessels = ({ companies = [], vessels = [], setVessels }) => {
+  const { config } = useConfig();
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState(EMPTY_VESSEL());
+  const [filterBlacklisted, setFilterBlacklisted] = useState("all");
+  const [filterSize, setFilterSize] = useState("");
+
+  const setVesselsRaw = setVessels;
+
+  const persist = async (updated) => {
+    setVesselsRaw(updated);
+    try {
+      await supabase.from('vessels').delete().gt('id', 0);
+      const CHUNK = 50;
+      for (let i = 0; i < updated.length; i += CHUNK) {
+        const chunk = updated.slice(i, i + CHUNK).map(v => ({ data: v }));
+        const { error } = await supabase.from('vessels').insert(chunk);
+        if (error) console.error('[Vessels] insert error:', error);
+      }
+    } catch(e) { console.error('[Vessels] persist error:', e); }
+  };
+
+  useEffect(() => {
+    const h = (e) => {
+      if (e.key !== "Escape") return;
+      if (showModal) { setShowModal(false); return; }
+      setSelected(null);
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [showModal]);
+
+  const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const openNew = () => { setForm({ ...EMPTY_VESSEL(), createdAt: new Date().toISOString() }); setEditId(null); setShowModal(true); };
+  const openEdit = (v) => { setForm({ ...v }); setEditId(v.id); setShowModal(true); };
+  const closeModal = () => { setShowModal(false); setForm(EMPTY_VESSEL()); setEditId(null); };
+
+  const nextId = () => vessels.length > 0 ? Math.max(...vessels.map(v => v.id || 0)) + 1 : 1;
+
+  const save = () => {
+    if (!form.name?.trim()) return;
+    if (editId !== null) {
+      persist(vessels.map(v => v.id === editId ? { ...form, id: editId } : v));
+    } else {
+      persist([...vessels, { ...form, id: nextId(), createdAt: new Date().toISOString() }]);
+    }
+    closeModal();
+  };
+
+  const remove = (id) => {
+    if (!window.confirm("Supprimer ce navire ?")) return;
+    persist(vessels.filter(v => v.id !== id));
+    if (selected?.id === id) setSelected(null);
+  };
+
+  // Helpers
+  const headOwners = companies.filter(c => Array.isArray(c.roles) ? c.roles.some(r => r?.toLowerCase() === "head owner") : (c.roles || "").toLowerCase().includes("head owner"));
+  const managers = companies.filter(c => {
+    const r = Array.isArray(c.roles) ? c.roles.map(x => x?.toLowerCase()) : [(c.roles || "").toLowerCase()];
+    return r.some(x => x.includes("vessel manager") || x.includes("head owner"));
+  });
+
+  const filtered = vessels.filter(v => {
+    const q = search.toLowerCase().trim();
+    if (q && !v.name?.toLowerCase().includes(q) && !String(v.imo || "").includes(q)) return false;
+    if (filterBlacklisted === "yes" && !v.blackListed) return false;
+    if (filterBlacklisted === "no" && v.blackListed) return false;
+    if (filterSize && v.vesselSize !== filterSize) return false;
+    return true;
+  });
+
+  // Detail panel
+  const DetailPanel = ({ v }) => {
+    if (!v) return null;
+    const owner = companies.find(c => c.id === v.ownerId);
+    const manager = companies.find(c => c.id === v.managingCompanyId);
+    const DRow = ({ label, children }) => (
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 10 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+        <div style={{ fontSize: 13, color: COLORS.text }}>{children || "—"}</div>
+      </div>
+    );
+    return (
+      <div style={{ width: 320, flexShrink: 0, background: COLORS.card, borderLeft: `1px solid ${COLORS.border}`, padding: 24, overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: COLORS.text }}>{v.name}</div>
+            <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>IMO {v.imo || "—"}</div>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => openEdit(v)} style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, color: COLORS.accent, cursor: "pointer", fontSize: 12, fontWeight: 700, padding: "6px 10px" }}>✏</button>
+            <button onClick={() => setSelected(null)} style={{ background: COLORS.border, border: "none", borderRadius: 8, color: COLORS.textMuted, cursor: "pointer", fontSize: 14, padding: "6px 10px" }}>×</button>
+          </div>
+        </div>
+        {v.blackListed && <div style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}40`, borderRadius: 8, padding: "8px 12px", color: COLORS.red, fontSize: 12, fontWeight: 700, marginBottom: 16 }}>⛔ BLACKLISTED</div>}
+        <DRow label="Year">{v.year}</DRow>
+        <DRow label="Vessel Size">{v.vesselSize}</DRow>
+        <DRow label="Owner">{owner?.name}</DRow>
+        <DRow label="Managing Company">{manager?.name}</DRow>
+        {v.marineTrafficLink && (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Marine Traffic</div>
+            <a href={v.marineTrafficLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: COLORS.accent }}>🔗 Ouvrir le lien</a>
+          </div>
+        )}
+        {v.additionalInfos && <DRow label="Additional Infos">{v.additionalInfos}</DRow>}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 0 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.text }}>🚢 Vessels</div>
+        <div style={{ flex: 1 }} />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher nom, IMO…"
+          style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 14px", color: COLORS.text, fontSize: 13, outline: "none", width: 220 }} />
+        <select value={filterSize} onChange={e => setFilterSize(e.target.value)}
+          style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 12px", color: filterSize ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none" }}>
+          <option value="">Toutes tailles</option>
+          {(config.vesselSize || []).map(s => <option key={s.value} value={s.value}>{s.label || s.value}</option>)}
+        </select>
+        <select value={filterBlacklisted} onChange={e => setFilterBlacklisted(e.target.value)}
+          style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none" }}>
+          <option value="all">Tous</option>
+          <option value="no">Non blacklistés</option>
+          <option value="yes">Blacklistés</option>
+        </select>
+        <button onClick={() => setShowImport(true)} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 12px", color: COLORS.textMuted, fontSize: 13, cursor: "pointer" }}>
+          <img src="/logoxl.png" style={{ width: 18, height: 18, verticalAlign: "middle" }} /> Import
+        </button>
+        <Btn onClick={openNew}>+ Ajouter</Btn>
+      </div>
+
+      {/* Blotter */}
+      <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          {/* Header row */}
+          <div style={{ display: "grid", gridTemplateColumns: "180px 100px 70px 160px 160px 130px 80px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
+            {["NAME", "IMO", "YEAR", "OWNER", "MANAGING CO.", "SIZE", "BLACKLIST", ""].map((h, i) => (
+              <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, padding: "4px 12px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
+            {filtered.length} navire{filtered.length !== 1 ? "s" : ""}
+          </div>
+          <VirtualVesselList filtered={filtered} selected={selected} onSelect={v => setSelected(selected?.id === v.id ? null : v)}
+            onEdit={openEdit} onRemove={remove} companies={companies} />
+        </div>
+        {selected && <DetailPanel v={selected} />}
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 640, maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>{editId !== null ? "Modifier le navire" : "Nouveau navire"}</div>
+              <button onClick={closeModal} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* NAME */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>NAME *</label>
+                <input value={form.name || ""} onChange={e => f("name", e.target.value)} placeholder="Nom du navire…"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${!form.name?.trim() ? COLORS.red+"60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+              {/* IMO */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>IMO</label>
+                <input type="number" value={form.imo || ""} onChange={e => f("imo", e.target.value.replace(/\D/g, ""))} placeholder="ex: 9234567"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+              {/* YEAR */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>YEAR</label>
+                <input type="number" min="1900" max="2100" value={form.year || ""} onChange={e => f("year", e.target.value)} placeholder="ex: 2015"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${form.year && (parseInt(form.year) < 1900 || parseInt(form.year) > 2100) ? COLORS.red+"60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+              {/* VESSEL SIZE */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>VESSEL SIZE</label>
+                <select value={form.vesselSize || ""} onChange={e => f("vesselSize", e.target.value)}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.vesselSize ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                  <option value="">— Sélectionner —</option>
+                  {(config.vesselSize || []).map(s => <option key={s.value} value={s.value}>{s.label || s.value}</option>)}
+                </select>
+              </div>
+              {/* OWNER */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>OWNER (Head Owner)</label>
+                <select value={form.ownerId || ""} onChange={e => f("ownerId", e.target.value ? parseInt(e.target.value) : "")}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.ownerId ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                  <option value="">— Sélectionner —</option>
+                  {headOwners.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              {/* MANAGING COMPANY */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>MANAGING COMPANY</label>
+                <select value={form.managingCompanyId || ""} onChange={e => f("managingCompanyId", e.target.value ? parseInt(e.target.value) : "")}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.managingCompanyId ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                  <option value="">— Sélectionner —</option>
+                  {managers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              {/* MARINE TRAFFIC LINK */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>MARINE TRAFFIC LINK</label>
+                <input value={form.marineTrafficLink || ""} onChange={e => f("marineTrafficLink", e.target.value)} placeholder="https://www.marinetraffic.com/…"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+              {/* ADDITIONAL INFOS */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>ADDITIONAL INFOS</label>
+                <textarea value={form.additionalInfos || ""} onChange={e => f("additionalInfos", e.target.value)} rows={3} placeholder="Informations complémentaires…"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+              </div>
+              {/* BLACKLISTED */}
+              <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
+                <div onClick={() => f("blackListed", !form.blackListed)}
+                  style={{ width: 44, height: 24, borderRadius: 12, background: form.blackListed ? COLORS.red : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+                  <div style={{ position: "absolute", top: 2, left: form.blackListed ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
+                </div>
+                <label style={{ fontSize: 13, color: form.blackListed ? COLORS.red : COLORS.text, fontWeight: form.blackListed ? 700 : 400, cursor: "pointer" }} onClick={() => f("blackListed", !form.blackListed)}>
+                  {form.blackListed ? "⛔ BLACKLISTED" : "Black Listed"}
+                </label>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}>
+              <button onClick={closeModal} style={{ padding: "10px 20px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+              <Btn onClick={save} disabled={!form.name?.trim()}>{editId !== null ? "✓ Enregistrer" : "✓ Créer"}</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {showImport && (
+        <VesselImportModal
+          onClose={() => setShowImport(false)}
+          companies={companies}
+          config={config}
+          onImport={(items) => {
+            const nextId = vessels.length > 0 ? Math.max(...vessels.map(v => v.id || 0)) + 1 : 1;
+            const enriched = items.map((item, i) => ({ ...EMPTY_VESSEL(), ...item, id: nextId + i, createdAt: new Date().toISOString() }));
+            persist([...vessels, ...enriched]);
+            setShowImport(false);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// ─── VESSEL IMPORT MODAL ───────────────────────────────────────
+const VESSEL_FIELD_ALIASES = {
+  name:               ["name", "vessel name", "ship name", "nom", "nom du navire"],
+  imo:                ["imo", "imo number", "numéro imo", "numero imo"],
+  year:               ["year", "built year", "year built", "année", "annee", "construction"],
+  ownerId:            ["owner", "head owner", "armateur", "propriétaire", "proprietaire"],
+  managingCompanyId:  ["managing company", "manager", "ship manager", "gestionnaire"],
+  vesselSize:         ["vessel size", "size", "taille", "type navire"],
+  marineTrafficLink:  ["marine traffic", "marinetraffic", "marine traffic link", "lien marine traffic", "mt link"],
+  additionalInfos:    ["additional infos", "info", "notes", "informations", "additional info", "commentaire"],
+  blackListed:        ["blacklisted", "black listed", "black list", "liste noire"],
+};
+
+const VesselImportModal = ({ onClose, onImport, companies, config }) => {
+  const [step, setStep] = useState("upload");
+  const [rawRows, setRawRows] = useState([]);
+  const [headers, setHeaders] = useState([]);
+  const [mapping, setMapping] = useState({});
+  const [error, setError] = useState("");
+  const fileRef = useRef(null);
+
+  const IMPORTABLE_FIELDS = ["name","imo","year","ownerId","managingCompanyId","vesselSize","marineTrafficLink","additionalInfos","blackListed"];
+  const FIELD_LABELS = { name:"Name", imo:"IMO", year:"Year", ownerId:"Owner", managingCompanyId:"Managing Company", vesselSize:"Vessel Size", marineTrafficLink:"Marine Traffic Link", additionalInfos:"Additional Infos", blackListed:"Black Listed" };
+
+  const normH = h => {
+    if (!h) return "";
+    const s = h.toString().trim();
+    const spaced = s.replace(/([a-z])([A-Z])/g, '$1 $2');
+    return spaced.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+  };
+
+  const guessField = (header) => {
+    const n = normH(header);
+    for (const [field, aliases] of Object.entries(VESSEL_FIELD_ALIASES)) {
+      if (aliases.some(a => normH(a) === n || n.includes(normH(a)))) return field;
+    }
+    return null;
+  };
+
+  const handleFile = async (file) => {
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      if (!rows.length) { setError("Fichier vide"); return; }
+      const hdrs = Object.keys(rows[0]);
+      setHeaders(hdrs);
+      setRawRows(rows);
+      const autoMap = {};
+      hdrs.forEach((h, i) => { const g = guessField(h); if (g && !Object.values(autoMap).includes(g)) autoMap[i] = g; });
+      setMapping(autoMap);
+      setStep("mapping");
+    } catch(e) { setError(String(e)); }
+  };
+
+  const doImport = () => {
+    const normComp = s => s?.toString().toLowerCase().trim() || "";
+    const items = rawRows.map(row => {
+      const obj = {};
+      Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[headers[ci]]?.toString().trim() || ""; });
+      // Resolve owner
+      if (obj.ownerId) {
+        const found = companies.find(c => normComp(c.name) === normComp(obj.ownerId));
+        obj.ownerId = found ? found.id : "";
+      }
+      // Resolve managingCompanyId
+      if (obj.managingCompanyId) {
+        const found = companies.find(c => normComp(c.name) === normComp(obj.managingCompanyId));
+        obj.managingCompanyId = found ? found.id : "";
+      }
+      // Resolve vesselSize
+      if (obj.vesselSize) {
+        const found = (config.vesselSize || []).find(s => normComp(s.label || s.value) === normComp(obj.vesselSize));
+        obj.vesselSize = found ? found.value : obj.vesselSize;
+      }
+      // Normalize blackListed
+      if (obj.blackListed !== undefined) {
+        obj.blackListed = ["true","yes","oui","1"].includes(String(obj.blackListed).toLowerCase().trim());
+      }
+      // Normalize imo/year to numbers
+      if (obj.imo) obj.imo = String(parseInt(obj.imo) || "");
+      if (obj.year) obj.year = String(parseInt(obj.year) || "");
+      return obj;
+    }).filter(obj => obj.name);
+
+    onImport(items);
+  };
+
+  // Export
+  const doExport = async () => {
+    const XLSX = await import("xlsx");
+    const headers = ["name","imo","year","ownerId","managingCompanyId","vesselSize","marineTrafficLink","additionalInfos","blackListed"];
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Vessels");
+    XLSX.writeFile(wb, `vessels_template_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 700, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>Import Vessels</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
+        </div>
+
+        {step === "upload" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ background: COLORS.bg, border: `1px dashed ${COLORS.border}`, borderRadius: 12, padding: 32, textAlign: "center" }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>📂</div>
+              <div style={{ fontSize: 14, color: COLORS.textMuted, marginBottom: 16 }}>Glissez un fichier Excel/CSV ou cliquez pour choisir</div>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); }} />
+              <Btn onClick={() => fileRef.current?.click()}>📂 Choisir un fichier</Btn>
+            </div>
+            <button onClick={doExport} style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 16px", color: COLORS.textMuted, fontSize: 12, cursor: "pointer" }}>
+              ⬇ Télécharger le modèle Excel
+            </button>
+            {error && <div style={{ color: COLORS.red, fontSize: 12 }}>{error}</div>}
+          </div>
+        )}
+
+        {step === "mapping" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 4 }}>{rawRows.length} lignes détectées — vérifiez le mapping des colonnes :</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxHeight: 400, overflowY: "auto" }}>
+              {headers.map((h, i) => (
+                <div key={i} style={{ background: COLORS.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${mapping[i] ? COLORS.accent+"40" : COLORS.border}` }}>
+                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4, fontFamily: "'DM Mono', monospace" }}>{h}</div>
+                  <select value={mapping[i] || ""} onChange={e => setMapping(p => ({ ...p, [i]: e.target.value || undefined }))}
+                    style={{ width: "100%", background: COLORS.card, border: "none", borderRadius: 6, padding: "5px 8px", color: mapping[i] ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit" }}>
+                    <option value="">— Ignorer —</option>
+                    {IMPORTABLE_FIELDS.map(f => <option key={f} value={f}>{FIELD_LABELS[f]}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => setStep("upload")} style={{ padding: "10px 18px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Retour</button>
+              <Btn onClick={doImport}>✓ Importer {rawRows.length} navires</Btn>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function CRM() {
   const [currentUser, setCurrentUser] = useState(() => { try { return JSON.parse(localStorage.getItem("crm_current_user") || "null"); } catch { return null; } });
   const logoSize = 50;
@@ -19520,6 +20022,7 @@ export default function CRM() {
   const [companies, setCompanies] = useState([]);
   const [tasks, setTasks] = useState(initialTasks);
   const [contracts, setContracts] = useState([]);
+  const [vessels, setVessels] = useState([]);
   const [derivativesCache, setDerivativesCache] = useState(null);
   const [fixingsCache, setFixingsCache] = useState(null);
   const [page, setPage] = useState(() => localStorage.getItem("crm_page") || "dashboard");
@@ -19577,13 +20080,14 @@ export default function CRM() {
     }
 
     async function loadData() {
-      const [contacts, companies, tasks, derivOps, fixingOps, contractsData] = await Promise.all([
+      const [contacts, companies, tasks, derivOps, fixingOps, contractsData, vesselsData] = await Promise.all([
         loadAllPages('contacts'),
         loadAllPages('companies'),
         loadAllPages('tasks'),
         loadAllPages('derivatives'),
         loadAllPages('fixings'),
         loadAllPages('contracts'),
+        loadAllPages('vessels'),
       ]);
       if (contacts.length) setContacts(contacts);
       if (companies.length) setCompanies(companies);
@@ -19591,6 +20095,7 @@ export default function CRM() {
       if (derivOps.length) setDerivativesCache(derivOps);
       if (fixingOps.length) setFixingsCache(fixingOps);
       if (contractsData.length) setContracts(contractsData);
+      if (vesselsData.length) setVessels(vesselsData);
       dataLoaded.current = true;
     }
     loadData();
@@ -19698,6 +20203,7 @@ export default function CRM() {
               <span style={{ fontSize: 12, fontWeight: page === "derivatives-statistics" ? 700 : 400 }}>Statistics</span>
             </div>
             <NavItem n={{ id: "contracts", label: "Contracts", icon: "📄" }} />
+            <NavItem n={{ id: "vessels", label: "Vessels", icon: "🚢" }} />
             <div style={{ height: 1, background: COLORS.border, margin: "16px 24px" }} />
             <div style={{ padding: "0 24px 10px", fontSize: 14, color: "#D4AF37", fontWeight: 700, letterSpacing: 1 }}>ACTIVITÉ</div>
             {[{ id: "dashboard", label: "Dashboard", icon: "◇" }, { id: "tasks", label: "Tâches", icon: "◎" }, { id: "pipeline", label: "Pipeline", icon: "◈" }].map(n => <NavItem key={n.id} n={n} />)}
@@ -19729,6 +20235,7 @@ export default function CRM() {
           {page === "derivatives-dashboard" && <DerivativesDashboard />}
           {page === "derivatives-statistics" && <DerivStatistics />}
           {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} />}
+          {page === "vessels" && <Vessels companies={companies} vessels={vessels} setVessels={setVessels} />}
           {page === "admin" && <AdminPanel companies={companies} />}
         </div>
       </div>

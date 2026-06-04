@@ -19517,7 +19517,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts }) => {
 
 // ─── VESSELS ──────────────────────────────────────────────────
 const EMPTY_VESSEL = () => ({
-  id: null, name: "", imo: "", year: "", ownerId: "", managingCompanyId: "",
+  id: null, vesselId: "", name: "", imo: "", year: "", ownerId: "", managingCompanyId: "",
   vesselSize: "", marineTrafficLink: "", additionalInfos: "", blackListed: false,
   createdAt: "",
 });
@@ -19530,12 +19530,16 @@ const VesselRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, companies }
   const manager = companies.find(c => c.id === v.managingCompanyId);
   return (
     <div onClick={() => onSelect(v)}
-      style={{ display: "grid", gridTemplateColumns: "180px 100px 70px 160px 160px 130px 80px 60px", borderBottom: `1px solid ${COLORS.border}`,
+      style={{ display: "grid", gridTemplateColumns: "100px 180px 100px 70px 160px 160px 130px 80px 60px", borderBottom: `1px solid ${COLORS.border}`,
         height: ROW_H_VESSEL, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
         background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
         cursor: "pointer", transition: "background 0.1s" }}
       onMouseOver={e => { if (!isSel) e.currentTarget.style.background = COLORS.hover; }}
       onMouseOut={e => { if (!isSel) e.currentTarget.style.background = idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`; }}>
+      {/* VESSEL ID */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.vesselId || "—"}</span>
+      </div>
       {/* NAME */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
         <div style={{ minWidth: 0 }}>
@@ -19705,6 +19709,7 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
           </div>
         </div>
         {v.blackListed && <div style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}40`, borderRadius: 8, padding: "8px 12px", color: COLORS.red, fontSize: 12, fontWeight: 700, marginBottom: 16 }}>⛔ BLACKLISTED</div>}
+        {v.vesselId && <DRow label="Vessel ID">{v.vesselId}</DRow>}
         <DRow label="Year">{v.year}</DRow>
         <DRow label="Vessel Size">{v.vesselSize}</DRow>
         <DRow label="Owner">{owner?.name}</DRow>
@@ -19749,8 +19754,8 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
       <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0 }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
           {/* Header row */}
-          <div style={{ display: "grid", gridTemplateColumns: "180px 100px 70px 160px 160px 130px 80px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
-            {["NAME", "IMO", "YEAR", "OWNER", "MANAGING CO.", "SIZE", "BLACKLIST", ""].map((h, i) => (
+          <div style={{ display: "grid", gridTemplateColumns: "100px 180px 100px 70px 160px 160px 130px 80px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
+            {["ID", "NAME", "IMO", "YEAR", "OWNER", "MANAGING CO.", "SIZE", "BLACKLIST", ""].map((h, i) => (
               <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
             ))}
           </div>
@@ -19772,8 +19777,14 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
               <button onClick={closeModal} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* VESSEL ID */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>VESSEL ID</label>
+                <input value={form.vesselId || ""} onChange={e => f("vesselId", e.target.value)} placeholder="ex: VS-001"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
               {/* NAME */}
-              <div style={{ gridColumn: "1 / -1" }}>
+              <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>NAME *</label>
                 <input value={form.name || ""} onChange={e => f("name", e.target.value)} placeholder="Nom du navire…"
                   style={{ width: "100%", background: COLORS.bg, border: `1px solid ${!form.name?.trim() ? COLORS.red+"60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
@@ -19868,6 +19879,7 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
 
 // ─── VESSEL IMPORT MODAL ───────────────────────────────────────
 const VESSEL_FIELD_ALIASES = {
+  vesselId:           ["vessel id", "vesselid", "id navire", "id", "vessel ref", "ref"],
   name:               ["name", "vessel name", "ship name", "nom", "nom du navire"],
   imo:                ["imo", "imo number", "numéro imo", "numero imo"],
   year:               ["year", "built year", "year built", "année", "annee", "construction"],
@@ -19879,16 +19891,18 @@ const VESSEL_FIELD_ALIASES = {
   blackListed:        ["blacklisted", "black listed", "black list", "liste noire"],
 };
 
+const VESSEL_IMPORTABLE_FIELDS = ["vesselId","name","imo","year","ownerId","managingCompanyId","vesselSize","marineTrafficLink","additionalInfos","blackListed"];
+const VESSEL_FIELD_LABELS = { vesselId:"Vessel ID", name:"Name", imo:"IMO", year:"Year", ownerId:"Owner", managingCompanyId:"Managing Company", vesselSize:"Vessel Size", marineTrafficLink:"Marine Traffic Link", additionalInfos:"Additional Infos", blackListed:"Black Listed" };
+
 const VesselImportModal = ({ onClose, onImport, companies, config }) => {
   const [step, setStep] = useState("upload");
   const [rawRows, setRawRows] = useState([]);
   const [headers, setHeaders] = useState([]);
   const [mapping, setMapping] = useState({});
+  const [preview, setPreview] = useState([]);
   const [error, setError] = useState("");
+  const [importing, setImporting] = useState(false);
   const fileRef = useRef(null);
-
-  const IMPORTABLE_FIELDS = ["name","imo","year","ownerId","managingCompanyId","vesselSize","marineTrafficLink","additionalInfos","blackListed"];
-  const FIELD_LABELS = { name:"Name", imo:"IMO", year:"Year", ownerId:"Owner", managingCompanyId:"Managing Company", vesselSize:"Vessel Size", marineTrafficLink:"Marine Traffic Link", additionalInfos:"Additional Infos", blackListed:"Black Listed" };
 
   const normH = h => {
     if (!h) return "";
@@ -19900,12 +19914,16 @@ const VesselImportModal = ({ onClose, onImport, companies, config }) => {
   const guessField = (header) => {
     const n = normH(header);
     for (const [field, aliases] of Object.entries(VESSEL_FIELD_ALIASES)) {
-      if (aliases.some(a => normH(a) === n || n.includes(normH(a)))) return field;
+      if (aliases.some(a => normH(a) === n || n === normH(a))) return field;
+    }
+    for (const [field, aliases] of Object.entries(VESSEL_FIELD_ALIASES)) {
+      if (aliases.some(a => n.includes(normH(a)) || normH(a).includes(n))) return field;
     }
     return null;
   };
 
   const handleFile = async (file) => {
+    setError("");
     try {
       const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
@@ -19923,90 +19941,169 @@ const VesselImportModal = ({ onClose, onImport, companies, config }) => {
     } catch(e) { setError(String(e)); }
   };
 
-  const doImport = () => {
-    const normComp = s => s?.toString().toLowerCase().trim() || "";
-    const items = rawRows.map(row => {
+  const buildPreview = () => {
+    const prev = rawRows.slice(0, 5).map(row => {
       const obj = {};
       Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[headers[ci]]?.toString().trim() || ""; });
-      // Resolve owner
-      if (obj.ownerId) {
-        const found = companies.find(c => normComp(c.name) === normComp(obj.ownerId));
-        obj.ownerId = found ? found.id : "";
-      }
-      // Resolve managingCompanyId
-      if (obj.managingCompanyId) {
-        const found = companies.find(c => normComp(c.name) === normComp(obj.managingCompanyId));
-        obj.managingCompanyId = found ? found.id : "";
-      }
-      // Resolve vesselSize
-      if (obj.vesselSize) {
-        const found = (config.vesselSize || []).find(s => normComp(s.label || s.value) === normComp(obj.vesselSize));
-        obj.vesselSize = found ? found.value : obj.vesselSize;
-      }
-      // Normalize blackListed
-      if (obj.blackListed !== undefined) {
-        obj.blackListed = ["true","yes","oui","1"].includes(String(obj.blackListed).toLowerCase().trim());
-      }
-      // Normalize imo/year to numbers
-      if (obj.imo) obj.imo = String(parseInt(obj.imo) || "");
-      if (obj.year) obj.year = String(parseInt(obj.year) || "");
       return obj;
-    }).filter(obj => obj.name);
-
-    onImport(items);
+    });
+    setPreview(prev);
+    setStep("preview");
   };
 
-  // Export
+  const normComp = s => s?.toString().toLowerCase().trim() || "";
+
+  const doImport = () => {
+    setImporting(true);
+    setTimeout(() => {
+      const items = rawRows.map(row => {
+        const obj = {};
+        Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[headers[ci]]?.toString().trim() || ""; });
+        // Resolve owner
+        if (obj.ownerId) {
+          const found = companies.find(c => normComp(c.name) === normComp(obj.ownerId));
+          obj.ownerId = found ? found.id : "";
+        }
+        // Resolve managingCompanyId
+        if (obj.managingCompanyId) {
+          const found = companies.find(c => normComp(c.name) === normComp(obj.managingCompanyId));
+          obj.managingCompanyId = found ? found.id : "";
+        }
+        // Resolve vesselSize
+        if (obj.vesselSize) {
+          const found = (config.vesselSize || []).find(s => normComp(s.label || s.value) === normComp(obj.vesselSize));
+          obj.vesselSize = found ? found.value : obj.vesselSize;
+        }
+        // Normalize blackListed
+        obj.blackListed = ["true","yes","oui","1"].includes(String(obj.blackListed || "").toLowerCase().trim());
+        // Normalize imo/year
+        if (obj.imo) obj.imo = String(parseInt(obj.imo) || "");
+        if (obj.year) obj.year = String(parseInt(obj.year) || "");
+        return obj;
+      }).filter(obj => obj.name);
+      onImport(items);
+      setImporting(false);
+    }, 50);
+  };
+
   const doExport = async () => {
     const XLSX = await import("xlsx");
-    const headers = ["name","imo","year","ownerId","managingCompanyId","vesselSize","marineTrafficLink","additionalInfos","blackListed"];
-    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    const hdrs = [["vesselId","name","imo","year","owner (name)","managingCompany (name)","vesselSize","marineTrafficLink","additionalInfos","blackListed"]];
+    const ws = XLSX.utils.aoa_to_sheet(hdrs);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Vessels");
     XLSX.writeFile(wb, `vessels_template_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
+  const mappedCount = Object.values(mapping).filter(Boolean).length;
+  const ignoredCount = headers.filter((h, i) => !mapping[i]).length;
+  const allMapped = ignoredCount === 0;
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 700, maxHeight: "90vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>Import Vessels</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>🚢 Import Vessels</div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
         </div>
 
+        {/* Upload */}
         {step === "upload" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ background: COLORS.bg, border: `1px dashed ${COLORS.border}`, borderRadius: 12, padding: 32, textAlign: "center" }}>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>📂</div>
-              <div style={{ fontSize: 14, color: COLORS.textMuted, marginBottom: 16 }}>Glissez un fichier Excel/CSV ou cliquez pour choisir</div>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); }} />
-              <Btn onClick={() => fileRef.current?.click()}>📂 Choisir un fichier</Btn>
+            <div style={{ background: COLORS.bg, border: `2px dashed ${COLORS.border}`, borderRadius: 14, padding: 40, textAlign: "center", cursor: "pointer" }}
+              onClick={() => fileRef.current?.click()}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>📂</div>
+              <div style={{ fontSize: 14, color: COLORS.textMuted, marginBottom: 8 }}>Cliquez pour choisir un fichier Excel ou CSV</div>
+              <div style={{ fontSize: 11, color: COLORS.textMuted }}>Formats acceptés : .xlsx, .xls, .csv</div>
             </div>
-            <button onClick={doExport} style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 16px", color: COLORS.textMuted, fontSize: 12, cursor: "pointer" }}>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
+            <button onClick={doExport} style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "9px 16px", color: COLORS.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
               ⬇ Télécharger le modèle Excel
             </button>
-            {error && <div style={{ color: COLORS.red, fontSize: 12 }}>{error}</div>}
+            {error && <div style={{ color: COLORS.red, fontSize: 12, padding: "8px 12px", background: `${COLORS.red}10`, borderRadius: 8 }}>{error}</div>}
           </div>
         )}
 
+        {/* Mapping */}
         {step === "mapping" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 4 }}>{rawRows.length} lignes détectées — vérifiez le mapping des colonnes :</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxHeight: 400, overflowY: "auto" }}>
-              {headers.map((h, i) => (
-                <div key={i} style={{ background: COLORS.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${mapping[i] ? COLORS.accent+"40" : COLORS.border}` }}>
-                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4, fontFamily: "'DM Mono', monospace" }}>{h}</div>
-                  <select value={mapping[i] || ""} onChange={e => setMapping(p => ({ ...p, [i]: e.target.value || undefined }))}
-                    style={{ width: "100%", background: COLORS.card, border: "none", borderRadius: 6, padding: "5px 8px", color: mapping[i] ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit" }}>
-                    <option value="">— Ignorer —</option>
-                    {IMPORTABLE_FIELDS.map(f => <option key={f} value={f}>{FIELD_LABELS[f]}</option>)}
-                  </select>
-                </div>
-              ))}
+          <div>
+            {/* Status bar */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, padding: "10px 16px", borderRadius: 10, background: allMapped ? `${COLORS.green}12` : `${COLORS.orange}12`, border: `1px solid ${allMapped ? COLORS.green : COLORS.orange}30` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: allMapped ? COLORS.green : COLORS.orange, boxShadow: `0 0 6px ${allMapped ? COLORS.green : COLORS.orange}` }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: allMapped ? COLORS.green : COLORS.orange }}>
+                  {allMapped ? "Toutes les colonnes sont mappées" : `${ignoredCount} colonne${ignoredCount > 1 ? "s" : ""} ignorée${ignoredCount > 1 ? "s" : ""}`}
+                </span>
+              </div>
+              <span style={{ fontSize: 12, color: COLORS.textSub }}>{mappedCount} / {headers.length} mappées</span>
+            </div>
+            <p style={{ color: COLORS.textSub, fontSize: 13, margin: "0 0 14px" }}>{rawRows.length} lignes détectées — vérifiez le mapping :</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxHeight: 380, overflowY: "auto", paddingRight: 4 }}>
+              {headers.map((h, i) => {
+                const isMapped = !!mapping[i];
+                const dotColor = isMapped ? COLORS.green : COLORS.red;
+                const borderColor = isMapped ? COLORS.green + "50" : COLORS.red + "40";
+                return (
+                  <div key={i} style={{ background: COLORS.bg, borderRadius: 10, padding: "10px 14px", border: `1px solid ${borderColor}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, background: dotColor, boxShadow: `0 0 4px ${dotColor}` }} />
+                      <div style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h || `Colonne ${i + 1}`}</div>
+                    </div>
+                    <select value={mapping[i] || ""} onChange={e => {
+                      const m = { ...mapping };
+                      if (e.target.value) { Object.keys(m).forEach(k => { if (m[k] === e.target.value) delete m[k]; }); m[i] = e.target.value; }
+                      else delete m[i];
+                      setMapping(m);
+                    }} style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 10px", color: mapping[i] ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit" }}>
+                      <option value="">— Ignorer —</option>
+                      {VESSEL_IMPORTABLE_FIELDS.map(f => <option key={f} value={f}>{VESSEL_FIELD_LABELS[f]}</option>)}
+                    </select>
+                    <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      Ex: {rawRows[0]?.[h]?.toString().slice(0, 35) || "—"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
+              <button onClick={() => setStep("upload")} style={{ padding: "10px 18px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Retour</button>
+              <Btn onClick={buildPreview}>Aperçu →</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* Preview */}
+        {step === "preview" && (
+          <div>
+            <p style={{ color: COLORS.textSub, fontSize: 13, margin: "0 0 14px" }}>Aperçu des 5 premières lignes sur {rawRows.length} :</p>
+            <div style={{ overflowX: "auto", borderRadius: 10, border: `1px solid ${COLORS.border}`, marginBottom: 14 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: COLORS.bg }}>
+                    {Object.entries(mapping).filter(([,v]) => v).map(([,f]) => (
+                      <th key={f} style={{ padding: "9px 12px", color: COLORS.textSub, fontWeight: 700, textAlign: "left", borderBottom: `1px solid ${COLORS.border}`, whiteSpace: "nowrap" }}>{VESSEL_FIELD_LABELS[f] || f}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.map((row, i) => (
+                    <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+                      {Object.entries(mapping).filter(([,v]) => v).map(([,f]) => (
+                        <td key={f} style={{ padding: "8px 12px", color: row[f] ? COLORS.text : COLORS.textMuted, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {row[f] || "—"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding: "10px 14px", background: `${COLORS.green}12`, border: `1px solid ${COLORS.green}30`, borderRadius: 8, fontSize: 13, color: COLORS.green, marginBottom: 16 }}>
+              ✓ {rawRows.length} navires prêts à l'import
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => setStep("upload")} style={{ padding: "10px 18px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Retour</button>
-              <Btn onClick={doImport}>✓ Importer {rawRows.length} navires</Btn>
+              <button onClick={() => setStep("mapping")} style={{ padding: "10px 18px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Modifier</button>
+              <Btn onClick={doImport} style={{ background: COLORS.green }}>{importing ? "Import…" : `✓ Importer ${rawRows.length} navires`}</Btn>
             </div>
           </div>
         )}

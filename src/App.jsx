@@ -6081,7 +6081,33 @@ const BatchContractsOldToNew = () => {
         // ── warehouse — from elevator_name ──
         out["warehouse"] = get("elevator_name");
 
-        return out;
+        // ── Trade links — parse multi-line cell ──
+        // Format: "TRADE_NAME, 1250.5 t\nTRADE_NAME2, 750.0 t\n..."
+        const tradeRaw = get("contractprices_data") || get("contract_prices") || get("trade_link") || get("trade") || get("trades") || "";
+        if (tradeRaw) {
+          // Split on newline characters (Excel multi-line = \n or \r\n)
+          const lines = tradeRaw.split(/[\r\n]+/).map(l => l.trim()).filter(Boolean);
+          lines.forEach((line, i) => {
+            if (i >= 3) return; // max 3 trades
+            const n = i + 1;
+            // Parse: "TRADE_NAME, 1250.50 t" or "TRADE_NAME 1250.5t"
+            // Match: everything before the last comma/space + number, then optional "t"
+            const match = line.match(/^(.+?)[,\s]+(\d+(?:[.,]\d+)?)\s*t?$/i);
+            if (match) {
+              out[`trade${n}`] = match[1].trim();
+              out[`connectedQty${n}`] = String(Math.round(parseFloat(match[2].replace(",", "."))));
+            } else {
+              // Fallback: take everything as trade name
+              out[`trade${n}`] = line;
+              out[`connectedQty${n}`] = "";
+            }
+          });
+        }
+        // Ensure columns always exist (empty if no data)
+        for (let n = 1; n <= 3; n++) {
+          if (!out[`trade${n}`]) out[`trade${n}`] = "";
+          if (!out[`connectedQty${n}`]) out[`connectedQty${n}`] = "";
+        }
       });
 
       if (converted.length === 0) { setResult({ error: "Aucune ligne valide." }); setState("error"); return; }
@@ -6122,6 +6148,7 @@ const BatchContractsOldToNew = () => {
     ["volume_estimated_open","qtyEstimated"],["final_volume","qtyFinal"],
     ["custom_field__Has_transformation","transformation"],
     ["business_unit__title","businessUnit"],["additional_info","info"],
+    ["contractprices_data","trade1 / connectedQty1 / trade2 / connectedQty2 / trade3 / connectedQty3"],
     ["id","— supprimé —"],
   ];
 
@@ -6154,6 +6181,7 @@ const BatchContractsOldToNew = () => {
   const FORMAT_ROWS = [
     ["contract_type","contractType","sale/purchase","SALE/PURCHASE (majuscules)"],
     ["derivative","derivativeId","texte quelconque","MAJUSCULES"],
+    ["contractprices_data","trade1 + connectedQty1...","\"NOM, 1250.5 t\\nNOM2, 750 t\"","Splitté en TRADE 1/2/3 + QTY 1/2/3"],
     ["conclusion_date","conclusionDate","JJ.MM.AAAA","JJ/MM/AAAA"],
     ["date_of_execution","executionDateFrom","JJ.MM.AAAA","JJ/MM/AAAA"],
     ["arrival_period_start","executionDateFrom","JJ.MM.AAAA","JJ/MM/AAAA"],
@@ -6257,6 +6285,8 @@ const BatchContractsOldToNew = () => {
           {[
             "⚠ arrival_period_start non vide → executionPeriodType = \"Arrival\", vide → \"Loading\".",
             "⚠ derivative non vide → contractPriceType = \"PREMIUM\" + derivativeId = valeur source ; vide → \"FLAT\".",
+            "⚠ contractprices_data : chaque ligne de la cellule est parsée comme \"NOM_TRADE, QUANTITE t\" → trade1/connectedQty1, trade2/connectedQty2, trade3/connectedQty3.",
+            "⚠ Les quantités sont converties en entiers (1250.5 t → 1251).",
             "⚠ <>\"\\ \" signifie \"si la cellule source est non vide\".",
             "⚠ Dates : JJ.MM.AAAA et YYYY-MM-DD sont converties en JJ/MM/AAAA.",
             "⚠ La colonne id est supprimée du fichier de sortie.",

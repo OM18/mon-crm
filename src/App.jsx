@@ -20188,7 +20188,337 @@ const VesselImportModal = ({ onClose, onImport, companies, config }) => {
   );
 };
 
-// ─── VOYAGES ──────────────────────────────────────────────────
+// ─── VOYAGE IMPORT MODAL ──────────────────────────────────────
+const VOYAGE_FIELD_ALIASES = {
+  voyageName:         ["voyage name", "voyagename", "voyage", "nom voyage", "name"],
+  vesselId:           ["vessel", "vessel name", "ship", "navire", "vesselid"],
+  status:             ["status", "statut"],
+  disponentOwnerId:   ["disponent owner", "disponentowner", "disponent", "owner"],
+  chartererId:        ["charterer", "affréteur", "affreteur"],
+  charterPartyDate:   ["charter party date", "charterpartydate", "cp date", "date cp"],
+  laycanStart:        ["laycan start", "laycanstart", "laycan from", "laycan debut"],
+  laycanEnd:          ["laycan end", "laycanend", "laycan to", "laycan fin"],
+  extensionStart:     ["extension start", "extensionstart", "extension from"],
+  extensionEnd:       ["extension end", "extensionend", "extension to"],
+  additionalInfo:     ["additional info", "additionalinfo", "info", "notes", "commentaire"],
+  brokerId:           ["broker", "brokerid", "courtier"],
+  businessUnit:       ["business unit", "businessunit", "bu"],
+  costsCurrency:      ["costs currency", "costscurrency", "currency", "devise"],
+  freightRate:        ["freight rate", "freightrate", "fret", "freight"],
+  demurrageRate:      ["demurrage rate", "demurragerate", "demurrage", "surestarie"],
+  dispatchRate:       ["dispatch rate", "dispatchrate", "dispatch"],
+};
+
+const VOYAGE_IMPORTABLE_FIELDS = [
+  "voyageName","vesselId","status","disponentOwnerId","chartererId","charterPartyDate",
+  "laycanStart","laycanEnd","extensionStart","extensionEnd","additionalInfo",
+  "brokerId","businessUnit","costsCurrency","freightRate","demurrageRate","dispatchRate",
+];
+const VOYAGE_FIELD_LABELS = {
+  voyageName:"Voyage Name", vesselId:"Vessel", status:"Status",
+  disponentOwnerId:"Disponent Owner", chartererId:"Charterer",
+  charterPartyDate:"Charter Party Date", laycanStart:"Laycan Start", laycanEnd:"Laycan End",
+  extensionStart:"Extension Start", extensionEnd:"Extension End",
+  additionalInfo:"Additional Info", brokerId:"Broker",
+  businessUnit:"Business Unit", costsCurrency:"Costs Currency",
+  freightRate:"Freight Rate", demurrageRate:"Demurrage Rate", dispatchRate:"Dispatch Rate",
+};
+
+const VOYAGE_IMPORT_GUIDE = [
+  { field: "voyageName",       format: "Texte",        note: "Obligatoire" },
+  { field: "vesselId",         format: "Texte",        note: "Nom du navire (résolu automatiquement)" },
+  { field: "status",           format: "Texte",        note: "" },
+  { field: "disponentOwnerId", format: "Texte",        note: "Nom de la société (rôle : Disponent Owner)" },
+  { field: "chartererId",      format: "Texte",        note: "Nom de la société" },
+  { field: "charterPartyDate", format: "JJ/MM/AAAA",   note: "" },
+  { field: "laycanStart",      format: "JJ/MM/AAAA",   note: "" },
+  { field: "laycanEnd",        format: "JJ/MM/AAAA",   note: "" },
+  { field: "extensionStart",   format: "JJ/MM/AAAA",   note: "" },
+  { field: "extensionEnd",     format: "JJ/MM/AAAA",   note: "" },
+  { field: "brokerId",         format: "Texte",        note: "Nom de la société (rôle : Broker)" },
+  { field: "businessUnit",     format: "Texte",        note: "Valeur de l'Admin Panel" },
+  { field: "costsCurrency",    format: "Texte",        note: "Ex: EUR, USD" },
+  { field: "freightRate",      format: "Nombre entier",note: "" },
+  { field: "demurrageRate",    format: "Nombre entier",note: "" },
+  { field: "dispatchRate",     format: "Nombre entier",note: "" },
+  { field: "additionalInfo",   format: "Texte",        note: "" },
+];
+
+const VoyageImportModal = ({ onClose, onImport, companies, vessels, config }) => {
+  const [step, setStep] = useState("guide");
+  const [rawRows, setRawRows] = useState([]);
+  const [headers, setHeaders] = useState([]);
+  const [mapping, setMapping] = useState({});
+  const [preview, setPreview] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [error, setError] = useState("");
+  const fileRef = useRef(null);
+
+  const normH = h => {
+    if (!h) return "";
+    const s = h.toString().trim();
+    const spaced = s.replace(/([a-z])([A-Z])/g, '$1 $2');
+    return spaced.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+  };
+
+  const guessField = (header) => {
+    const n = normH(header);
+    for (const [field, aliases] of Object.entries(VOYAGE_FIELD_ALIASES)) {
+      if (aliases.some(a => normH(a) === n)) return field;
+    }
+    for (const [field, aliases] of Object.entries(VOYAGE_FIELD_ALIASES)) {
+      if (aliases.some(a => n.includes(normH(a)) || normH(a).includes(n))) return field;
+    }
+    return null;
+  };
+
+  const handleFile = async (file) => {
+    setError("");
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      if (!rows.length) { setError("Fichier vide"); return; }
+      const hdrs = Object.keys(rows[0]);
+      setHeaders(hdrs); setRawRows(rows);
+      const autoMap = {};
+      hdrs.forEach((h, i) => { const g = guessField(h); if (g && !Object.values(autoMap).includes(g)) autoMap[i] = g; });
+      setMapping(autoMap);
+      setStep("mapping");
+    } catch(e) { setError(String(e)); }
+  };
+
+  const fmtDate = val => {
+    let v = String(val).replace(/[^\d]/g, "");
+    if (v.length > 2) v = v.slice(0,2)+"/"+v.slice(2);
+    if (v.length > 5) v = v.slice(0,5)+"/"+v.slice(5);
+    return v.slice(0,10);
+  };
+
+  const normComp = s => s?.toString().toLowerCase().trim() || "";
+
+  const buildPreview = () => {
+    const prev = rawRows.slice(0, 5).map(row => {
+      const obj = {};
+      Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[headers[ci]]?.toString().trim() || ""; });
+      return obj;
+    });
+    setPreview(prev);
+    setStep("preview");
+  };
+
+  const doImport = () => {
+    setImporting(true);
+    setTimeout(() => {
+      const items = rawRows.map(row => {
+        const obj = {};
+        Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[headers[ci]]?.toString().trim() || ""; });
+
+        // Resolve vessel
+        if (obj.vesselId) {
+          const found = vessels.find(v => normComp(v.name) === normComp(obj.vesselId) || normComp(v.vesselId) === normComp(obj.vesselId));
+          obj.vesselId = found ? found.id : "";
+        }
+        // Resolve companies
+        const resolveCompany = (val) => {
+          if (!val) return "";
+          const found = companies.find(c => normComp(c.name) === normComp(val));
+          return found ? found.id : "";
+        };
+        obj.disponentOwnerId = resolveCompany(obj.disponentOwnerId);
+        obj.chartererId = resolveCompany(obj.chartererId);
+        obj.brokerId = resolveCompany(obj.brokerId);
+        // Resolve businessUnit
+        if (obj.businessUnit) {
+          const found = (config.businessUnit || []).find(b => normComp(b.label) === normComp(obj.businessUnit) || normComp(b.value) === normComp(obj.businessUnit));
+          obj.businessUnit = found ? found.value : obj.businessUnit;
+        }
+        // Resolve costsCurrency
+        if (obj.costsCurrency) {
+          const found = (config.contractCurrencies || []).find(c => normComp(c.label||c.value) === normComp(obj.costsCurrency));
+          obj.costsCurrency = found ? (found.label||found.value) : obj.costsCurrency;
+        }
+        // Normalize dates
+        ["charterPartyDate","laycanStart","laycanEnd","extensionStart","extensionEnd"].forEach(k => {
+          if (obj[k]) obj[k] = fmtDate(obj[k]);
+        });
+        // Initialize empty ports
+        obj.loadingPorts = [EMPTY_PORT()];
+        obj.destinationPorts = [EMPTY_PORT()];
+        return obj;
+      }).filter(obj => obj.voyageName);
+      onImport(items);
+      setImporting(false);
+    }, 50);
+  };
+
+  const doExport = async () => {
+    const XLSX = await import("xlsx");
+    const hdrs = [VOYAGE_IMPORTABLE_FIELDS];
+    const ws = XLSX.utils.aoa_to_sheet(hdrs);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Voyages");
+    XLSX.writeFile(wb, `voyages_template_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
+  const mappedCount = Object.values(mapping).filter(Boolean).length;
+  const ignoredCount = headers.filter((h, i) => !mapping[i]).length;
+  const allMapped = ignoredCount === 0;
+
+  // Styles
+  const TH = { padding: "6px 10px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bg, textAlign: "left", whiteSpace: "nowrap" };
+  const TD = { padding: "5px 10px", fontSize: 11, color: COLORS.text, borderBottom: `1px solid ${COLORS.border}40` };
+  const TDm = { ...TD, color: COLORS.textMuted, fontStyle: "italic" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 740, maxHeight: "92vh", overflowY: "auto" }}>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>⚓ Import Voyages</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
+        </div>
+
+        {/* Step indicators */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
+          {[["guide","① Guide"], ["mapping","② Mapping"], ["preview","③ Aperçu"]].map(([s, l]) => (
+            <div key={s} style={{ padding: "4px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+              background: step === s ? COLORS.accent : COLORS.bg,
+              color: step === s ? "#fff" : COLORS.textMuted,
+              border: `1px solid ${step === s ? COLORS.accent : COLORS.border}` }}>{l}</div>
+          ))}
+        </div>
+
+        {/* ── GUIDE ── */}
+        {step === "guide" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ background: COLORS.bg, borderRadius: 12, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+              <div style={{ padding: "10px 16px", background: `${COLORS.accent}12`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 12, fontWeight: 700, color: COLORS.accent }}>
+                Champs importables
+              </div>
+              <div style={{ overflowY: "auto", maxHeight: 340 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr><th style={TH}>CHAMP</th><th style={TH}>FORMAT</th><th style={TH}>NOTE</th></tr>
+                  </thead>
+                  <tbody>
+                    {VOYAGE_IMPORT_GUIDE.map((row, i) => (
+                      <tr key={i}>
+                        <td style={{ ...TD, fontFamily: "'DM Mono', monospace", color: COLORS.accent }}>{row.field}</td>
+                        <td style={TDm}>{row.format}</td>
+                        <td style={TDm}>{row.note}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div style={{ background: `${COLORS.orange}10`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "10px 14px" }}>
+              {[
+                "⚠ vesselId : saisir le nom exact du navire tel qu'il apparaît dans Vessels.",
+                "⚠ disponentOwnerId, chartererId, brokerId : saisir le nom exact de la société.",
+                "⚠ Les ports de chargement/déchargement ne sont pas importables — à saisir manuellement.",
+              ].map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={doExport} style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "9px 16px", color: COLORS.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                ⬇ Télécharger le modèle Excel
+              </button>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
+              <Btn onClick={() => fileRef.current?.click()}>📂 Choisir un fichier</Btn>
+            </div>
+            {error && <div style={{ color: COLORS.red, fontSize: 12, padding: "8px 12px", background: `${COLORS.red}10`, borderRadius: 8 }}>{error}</div>}
+          </div>
+        )}
+
+        {/* ── MAPPING ── */}
+        {step === "mapping" && (
+          <div>
+            {/* Status bar */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, padding: "10px 16px", borderRadius: 10, background: allMapped ? `${COLORS.green}12` : `${COLORS.orange}12`, border: `1px solid ${allMapped ? COLORS.green : COLORS.orange}30` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: allMapped ? COLORS.green : COLORS.orange, boxShadow: `0 0 5px ${allMapped ? COLORS.green : COLORS.orange}` }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: allMapped ? COLORS.green : COLORS.orange }}>
+                  {allMapped ? "Toutes les colonnes mappées" : `${ignoredCount} colonne${ignoredCount > 1 ? "s" : ""} ignorée${ignoredCount > 1 ? "s" : ""}`}
+                </span>
+              </div>
+              <span style={{ fontSize: 12, color: COLORS.textSub }}>{mappedCount} / {headers.length} mappées · {rawRows.length} lignes</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxHeight: 380, overflowY: "auto", paddingRight: 4 }}>
+              {headers.map((h, i) => {
+                const isMapped = !!mapping[i];
+                return (
+                  <div key={i} style={{ background: COLORS.bg, borderRadius: 10, padding: "10px 14px", border: `1px solid ${isMapped ? COLORS.green+"50" : COLORS.red+"40"}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, background: isMapped ? COLORS.green : COLORS.red, boxShadow: `0 0 4px ${isMapped ? COLORS.green : COLORS.red}` }} />
+                      <div style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h || `Col ${i+1}`}</div>
+                    </div>
+                    <select value={mapping[i] || ""} onChange={e => {
+                      const m = { ...mapping };
+                      if (e.target.value) { Object.keys(m).forEach(k => { if (m[k] === e.target.value) delete m[k]; }); m[i] = e.target.value; }
+                      else delete m[i];
+                      setMapping(m);
+                    }} style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 10px", color: mapping[i] ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit" }}>
+                      <option value="">— Ignorer —</option>
+                      {VOYAGE_IMPORTABLE_FIELDS.map(f => <option key={f} value={f}>{VOYAGE_FIELD_LABELS[f]}</option>)}
+                    </select>
+                    <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      Ex: {rawRows[0]?.[h]?.toString().slice(0, 35) || "—"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "space-between" }}>
+              <button onClick={() => setStep("guide")} style={{ padding: "10px 18px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Retour</button>
+              <Btn onClick={buildPreview}>Aperçu →</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* ── PREVIEW ── */}
+        {step === "preview" && (
+          <div>
+            <p style={{ color: COLORS.textSub, fontSize: 13, margin: "0 0 14px" }}>Aperçu des 5 premières lignes sur {rawRows.length} :</p>
+            <div style={{ overflowX: "auto", borderRadius: 10, border: `1px solid ${COLORS.border}`, marginBottom: 14 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: COLORS.bg }}>
+                    {Object.entries(mapping).filter(([,v]) => v).map(([,f]) => (
+                      <th key={f} style={TH}>{VOYAGE_FIELD_LABELS[f] || f}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.map((row, i) => (
+                    <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+                      {Object.entries(mapping).filter(([,v]) => v).map(([,f]) => (
+                        <td key={f} style={{ padding: "7px 10px", color: row[f] ? COLORS.text : COLORS.textMuted, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {row[f] || "—"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding: "10px 14px", background: `${COLORS.green}12`, border: `1px solid ${COLORS.green}30`, borderRadius: 8, fontSize: 13, color: COLORS.green, marginBottom: 16 }}>
+              ✓ {rawRows.length} voyage{rawRows.length > 1 ? "s" : ""} prêt{rawRows.length > 1 ? "s" : ""} à l'import
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
+              <button onClick={() => setStep("mapping")} style={{ padding: "10px 18px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Modifier</button>
+              <Btn onClick={doImport} disabled={importing} style={{ background: COLORS.green }}>
+                {importing ? "⟳ Import…" : `✓ Importer ${rawRows.length} voyage${rawRows.length > 1 ? "s" : ""}`}
+              </Btn>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const EMPTY_PORT = () => ({
   portId: "", deliveryCondition: "", loadRate: "", dischargeRate: "",
@@ -20392,6 +20722,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(EMPTY_VOYAGE());
 
@@ -20521,6 +20852,9 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
             🗑 Effacer tout ({voyages.length})
           </button>
         )}
+        <button onClick={() => setShowImport(true)} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 12px", color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+          📂 Import
+        </button>
         <Btn onClick={openNew}>+ Ajouter</Btn>
       </div>
 
@@ -20701,6 +21035,21 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
             </div>
           </div>
         </div>
+      )}
+      {/* Import Modal */}
+      {showImport && (
+        <VoyageImportModal
+          onClose={() => setShowImport(false)}
+          companies={companies}
+          vessels={vessels}
+          config={config}
+          onImport={(items) => {
+            const nextId = voyages.length > 0 ? Math.max(...voyages.map(v => v.id || 0)) + 1 : 1;
+            const enriched = items.map((item, i) => ({ ...EMPTY_VOYAGE(), ...item, id: nextId + i, createdAt: new Date().toISOString() }));
+            persist([...voyages, ...enriched]);
+            setShowImport(false);
+          }}
+        />
       )}
     </div>
   );

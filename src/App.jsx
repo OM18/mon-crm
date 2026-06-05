@@ -291,6 +291,8 @@ const DEFAULT_CONFIG = {
   documentTypes: [],
   documents: [],
   vesselSize: [],
+  tradeCommodities: [],
+  tradeLogisticTypes: [],
   derivInstrumentTypeDefault: "",
   derivCommodities: [
     { value: "corn", label: "Corn", underlyingCategory: "commodity" },
@@ -8589,6 +8591,24 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           />
           <ContractIncotermsEditor config={config} updateField={updateField} />
           <ContractToleranceDefaultEditor config={config} updateField={updateField} />
+          <DerivPillsEditor
+            configKey="tradeCommodities"
+            label="Trade Commodities"
+            icon="🌾"
+            description="Commodités disponibles pour les Trades"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+          />
+          <DerivPillsEditor
+            configKey="tradeLogisticTypes"
+            label="Trade Logistic Types"
+            icon="🚛"
+            description="Types logistiques disponibles pour les Trades"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+          />
         </div>
       )}
 
@@ -21055,6 +21075,408 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
   );
 };
 
+// ─── TRADES ───────────────────────────────────────────────────
+
+const EMPTY_CONTRACT_LEG = () => ({ contractId: "", quantity: "" });
+
+const EMPTY_TRADE = () => ({
+  id: null, tradeName: "", voyageId: "", businessMonth: "",
+  commodities: [], volume: "", logisticType: "",
+  additionalInfos: "",
+  purchaseLegs: [EMPTY_CONTRACT_LEG()],
+  saleLegs: [EMPTY_CONTRACT_LEG()],
+  createdAt: "",
+});
+
+const ROW_H_TRADE = 56;
+const OVERSCAN_TRADE = 8;
+
+const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, contracts, config }) => {
+  const voyage = voyages.find(v => v.id === t.voyageId || String(v.id) === String(t.voyageId));
+  const purchaseContracts = (t.purchaseLegs || []).map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean);
+  const saleContracts = (t.saleLegs || []).map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean);
+  // Derive origin/destination from first purchase/sale contract
+  const originContract = purchaseContracts[0];
+  const destContract = saleContracts[0];
+
+  return (
+    <div onClick={() => onSelect(t)}
+      style={{ display: "grid", gridTemplateColumns: "180px 160px 100px 120px 160px 160px 80px 60px", borderBottom: `1px solid ${COLORS.border}`,
+        height: ROW_H_TRADE, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
+        background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
+        cursor: "pointer", transition: "background 0.1s" }}
+      onMouseOver={e => { if (!isSel) e.currentTarget.style.background = COLORS.hover; }}
+      onMouseOut={e => { if (!isSel) e.currentTarget.style.background = idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`; }}>
+      {/* TRADE NAME */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={t.tradeName} style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.tradeName || "—"}</span>
+      </div>
+      {/* VOYAGE */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span style={{ fontSize: 11, color: voyage ? COLORS.accent : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{voyage?.voyageName || "—"}</span>
+      </div>
+      {/* BUSINESS MONTH */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
+        <span style={{ fontSize: 11, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{t.businessMonth || "—"}</span>
+      </div>
+      {/* COMMODITY */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", gap: 4, overflow: "hidden" }}>
+        {(t.commodities || []).slice(0, 2).map((c, i) => (
+          <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4, background: `${COLORS.gold}18`, color: COLORS.gold, border: `1px solid ${COLORS.gold}30`, whiteSpace: "nowrap" }}>{c}</span>
+        ))}
+      </div>
+      {/* ORIGIN (from purchase contracts) */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {originContract?.originCountry || originContract?.port || "—"}
+        </span>
+      </div>
+      {/* DESTINATION (from sale contracts) */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {destContract?.destinationCountry || destContract?.port || "—"}
+        </span>
+      </div>
+      {/* VOLUME */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
+        <span style={{ fontSize: 11, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{t.volume ? `${Number(t.volume).toLocaleString("fr")} T` : "—"}</span>
+      </div>
+      {/* ACTIONS */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, borderLeft: `1px solid ${COLORS.border}`, padding: "0 8px" }}
+        onClick={e => e.stopPropagation()}>
+        <button onClick={() => onEdit(t)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+          onMouseOver={e => e.currentTarget.style.color = COLORS.accent} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>✏</button>
+        <button onClick={() => onRemove(t.id)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+          onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>🗑</button>
+      </div>
+    </div>
+  );
+});
+
+const VirtualTradeList = ({ filtered, selected, onSelect, onEdit, onRemove, voyages, contracts, config }) => {
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef(null);
+  const [containerH, setContainerH] = useState(600);
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(e => setContainerH(e[0].contentRect.height));
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+  const totalH = filtered.length * ROW_H_TRADE;
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H_TRADE) - OVERSCAN_TRADE);
+  const endIdx = Math.min(filtered.length, Math.ceil((scrollTop + containerH) / ROW_H_TRADE) + OVERSCAN_TRADE);
+  return (
+    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)} style={{ overflowY: "auto", flex: 1 }}>
+      {filtered.length === 0
+        ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "56px 0", fontSize: 14 }}>Aucun trade — cliquez sur « + Ajouter »</div>
+        : <div style={{ height: totalH, position: "relative" }}>
+            <div style={{ position: "absolute", top: startIdx * ROW_H_TRADE, left: 0, right: 0 }}>
+              {filtered.slice(startIdx, endIdx).map((t, vi) => (
+                <TradeRow key={t.id} t={t} idx={startIdx + vi} isSel={selected?.id === t.id}
+                  onSelect={onSelect} onEdit={onEdit} onRemove={onRemove}
+                  voyages={voyages} contracts={contracts} config={config} />
+              ))}
+            </div>
+          </div>
+      }
+    </div>
+  );
+};
+
+const Trades = ({ voyages = [], contracts = [], trades = [], setTrades }) => {
+  const { config } = useConfig();
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState(EMPTY_TRADE());
+
+  const persist = async (updated) => {
+    setTrades(updated);
+    try {
+      await supabase.from('trades').delete().gt('id', 0);
+      const CHUNK = 50;
+      for (let i = 0; i < updated.length; i += CHUNK) {
+        const chunk = updated.slice(i, i + CHUNK).map(t => ({ data: t }));
+        const { error } = await supabase.from('trades').insert(chunk);
+        if (error) console.error('[Trades] insert error:', error);
+      }
+    } catch(e) { console.error('[Trades] persist error:', e); }
+  };
+
+  useEffect(() => {
+    const h = e => { if (e.key === "Escape" && showModal) setShowModal(false); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [showModal]);
+
+  const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const openNew = () => { setForm({ ...EMPTY_TRADE(), createdAt: new Date().toISOString() }); setEditId(null); setShowModal(true); };
+  const openEdit = (t) => { setForm({ ...t }); setEditId(t.id); setShowModal(true); };
+  const closeModal = () => { setShowModal(false); setForm(EMPTY_TRADE()); setEditId(null); };
+  const nextId = () => trades.length > 0 ? Math.max(...trades.map(t => t.id || 0)) + 1 : 1;
+  const save = () => {
+    if (!form.tradeName?.trim()) return;
+    if (editId !== null) persist(trades.map(t => t.id === editId ? { ...form, id: editId } : t));
+    else persist([...trades, { ...form, id: nextId(), createdAt: new Date().toISOString() }]);
+    closeModal();
+  };
+  const remove = (id) => {
+    if (!window.confirm("Supprimer ce trade ?")) return;
+    persist(trades.filter(t => t.id !== id));
+  };
+
+  const updateLeg = (type, idx, field, value) => {
+    const key = type === "purchase" ? "purchaseLegs" : "saleLegs";
+    const legs = [...(form[key] || [])];
+    legs[idx] = { ...legs[idx], [field]: value };
+    f(key, legs);
+  };
+  const addLeg = (type) => {
+    const key = type === "purchase" ? "purchaseLegs" : "saleLegs";
+    f(key, [...(form[key] || []), EMPTY_CONTRACT_LEG()]);
+  };
+  const removeLeg = (type, idx) => {
+    const key = type === "purchase" ? "purchaseLegs" : "saleLegs";
+    f(key, (form[key] || []).filter((_, i) => i !== idx));
+  };
+
+  // Business month format mm/yyyy
+  const fmtMonth = val => {
+    let v = val.replace(/[^\d]/g, "");
+    if (v.length > 2) v = v.slice(0,2)+"/"+v.slice(2);
+    return v.slice(0,7);
+  };
+
+  const filtered = trades.filter(t => {
+    const q = search.toLowerCase().trim();
+    if (!q) return true;
+    return (t.tradeName||"").toLowerCase().includes(q);
+  });
+
+  // Commodities multi-select
+  const toggleCommodity = (val) => {
+    const cur = form.commodities || [];
+    f("commodities", cur.includes(val) ? cur.filter(c => c !== val) : [...cur, val]);
+  };
+
+  const LBL = ({ children, req }) => (
+    <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>
+      {children}{req && <span style={{ color: COLORS.red, marginLeft: 3 }}>*</span>}
+    </label>
+  );
+  const SEL = ({ field, children, empty = "— Sélectionner —" }) => (
+    <select value={form[field] || ""} onChange={e => f(field, e.target.value)}
+      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form[field] ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+      <option value="">{empty}</option>{children}
+    </select>
+  );
+  const SECT = ({ label, color = COLORS.accent }) => (
+    <div style={{ gridColumn: "1 / -1", borderBottom: `2px solid ${color}30`, paddingBottom: 4, marginTop: 8, marginBottom: 2 }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color, letterSpacing: 1, textTransform: "uppercase" }}>{label}</span>
+    </div>
+  );
+
+  // Leg block component
+  const LegBlock = ({ type, leg, idx, total }) => {
+    const isPurchase = type === "purchase";
+    const color = isPurchase ? COLORS.red : COLORS.green;
+    const label = isPurchase ? "Purchase Contract" : "Sale Contract";
+    const filteredContracts = isPurchase
+      ? contracts.filter(c => (c.contractType||"").toLowerCase().includes("purchase") || (c.contractType||"").toLowerCase().includes("achat"))
+      : contracts.filter(c => (c.contractType||"").toLowerCase().includes("sale") || (c.contractType||"").toLowerCase().includes("vente"));
+    const allContracts = filteredContracts.length > 0 ? filteredContracts : contracts;
+    const selectedContract = allContracts.find(c => c.id === leg.contractId || String(c.id) === String(leg.contractId));
+    return (
+      <div style={{ background: COLORS.bg, border: `1px solid ${color}30`, borderRadius: 10, padding: 14, marginBottom: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color }}>{label} {idx + 1}</span>
+          {total > 1 && <button onClick={() => removeLeg(type, idx)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 12 }} onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>× Supprimer</button>}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <LBL>CONTRAT</LBL>
+            <select value={leg.contractId || ""} onChange={e => updateLeg(type, idx, "contractId", e.target.value ? parseInt(e.target.value)||e.target.value : "")}
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${leg.contractId ? color+"60" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: leg.contractId ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+              <option value="">— Sélectionner —</option>
+              {contracts.map(c => <option key={c.id} value={c.id}>{c.contractNumber || `#${c.id}`}{c.commodity ? ` · ${c.commodity}` : ""}</option>)}
+            </select>
+          </div>
+          <div>
+            <LBL>QUANTITY (T)</LBL>
+            <div style={{ position: "relative" }}>
+              <input type="number" value={leg.quantity || ""} onChange={e => updateLeg(type, idx, "quantity", e.target.value)} placeholder="0"
+                style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 36px 8px 12px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: COLORS.textMuted, pointerEvents: "none" }}>T</span>
+            </div>
+          </div>
+          {selectedContract && (
+            <div style={{ gridColumn: "1 / -1", display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {selectedContract.originCountry && <span style={{ fontSize: 10, color: COLORS.textMuted }}>🌍 Origine: <strong style={{ color: COLORS.text }}>{selectedContract.originCountry}</strong></span>}
+              {selectedContract.destinationCountry && <span style={{ fontSize: 10, color: COLORS.textMuted }}>🎯 Dest: <strong style={{ color: COLORS.text }}>{selectedContract.destinationCountry}</strong></span>}
+              {selectedContract.port && <span style={{ fontSize: 10, color: COLORS.textMuted }}>⚓ Port: <strong style={{ color: COLORS.text }}>{Array.isArray(selectedContract.port) ? selectedContract.port.join(", ") : selectedContract.port}</strong></span>}
+              {selectedContract.qtyValue && <span style={{ fontSize: 10, color: COLORS.textMuted }}>📦 Qté: <strong style={{ color: COLORS.text }}>{selectedContract.qtyValue} {selectedContract.qtyUnit||"T"}</strong></span>}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 0 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.text }}>🔀 Trades</div>
+        <div style={{ flex: 1 }} />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un trade…"
+          style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 14px", color: COLORS.text, fontSize: 13, outline: "none", width: 220 }} />
+        {trades.length > 0 && (
+          <button onClick={async () => {
+            if (window.confirm(`⚠️ Supprimer les ${trades.length} trades ?`)) {
+              await supabase.from('trades').delete().gt('id', 0);
+              setTrades([]);
+            }
+          }} style={{ background: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: "8px 14px" }}>
+            🗑 Effacer tout ({trades.length})
+          </button>
+        )}
+        <Btn onClick={openNew}>+ Ajouter</Btn>
+      </div>
+
+      {/* Blotter */}
+      <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0, flexDirection: "column" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "180px 160px 100px 120px 160px 160px 80px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
+          {["TRADE NAME", "VOYAGE", "MONTH", "COMMODITY", "ORIGIN", "DESTINATION", "VOLUME", ""].map((h, i) => (
+            <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, padding: "4px 12px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
+          {filtered.length} trade{filtered.length !== 1 ? "s" : ""}
+        </div>
+        <VirtualTradeList filtered={filtered} selected={selected}
+          onSelect={t => setSelected(selected?.id === t.id ? null : t)}
+          onEdit={openEdit} onRemove={remove}
+          voyages={voyages} contracts={contracts} config={config} />
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: "28px 32px", width: "100%", maxWidth: 800, maxHeight: "92vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>{editId !== null ? "Modifier le trade" : "Nouveau trade"}</div>
+              <button onClick={closeModal} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <SECT label="Général" />
+
+              {/* Trade Name */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <LBL req>TRADE NAME</LBL>
+                <input value={form.tradeName || ""} onChange={e => f("tradeName", e.target.value)} placeholder="Nom du trade…"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${!form.tradeName?.trim() ? COLORS.red+"60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+
+              {/* Voyage */}
+              <div>
+                <LBL>VOYAGE</LBL>
+                <SEL field="voyageId">
+                  {voyages.map(v => <option key={v.id} value={v.id}>{v.voyageName}</option>)}
+                </SEL>
+              </div>
+
+              {/* Business Month */}
+              <div>
+                <LBL>BUSINESS MONTH</LBL>
+                <input value={form.businessMonth || ""} onChange={e => f("businessMonth", fmtMonth(e.target.value))} placeholder="mm/yyyy" maxLength={7}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+
+              {/* Logistic Type */}
+              <div>
+                <LBL>LOGISTIC TYPE</LBL>
+                <SEL field="logisticType">
+                  {(config.tradeLogisticTypes || []).map(t => <option key={t.value||t.label} value={t.value||t.label}>{t.label||t.value}</option>)}
+                </SEL>
+              </div>
+
+              {/* Volume */}
+              <div>
+                <LBL>VOLUME</LBL>
+                <div style={{ position: "relative" }}>
+                  <input type="number" value={form.volume || ""} onChange={e => f("volume", e.target.value)} placeholder="0"
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 40px 10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                  <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: COLORS.textMuted, pointerEvents: "none" }}>T</span>
+                </div>
+              </div>
+
+              {/* Commodities multi-select */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <LBL>COMMODITY (choix multiple)</LBL>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {(config.tradeCommodities || []).map(c => {
+                    const val = c.value || c.label;
+                    const active = (form.commodities || []).includes(val);
+                    return (
+                      <div key={val} onClick={() => toggleCommodity(val)}
+                        style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+                          background: active ? `${COLORS.gold}25` : COLORS.bg,
+                          color: active ? COLORS.gold : COLORS.textMuted,
+                          border: `1.5px solid ${active ? COLORS.gold : COLORS.border}` }}>
+                        {c.label || c.value}
+                      </div>
+                    );
+                  })}
+                  {(config.tradeCommodities || []).length === 0 && <span style={{ fontSize: 12, color: COLORS.textMuted }}>Aucune commodité configurée dans l'Admin Panel</span>}
+                </div>
+              </div>
+
+              {/* Additional Infos */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <LBL>ADDITIONAL INFOS</LBL>
+                <textarea value={form.additionalInfos || ""} onChange={e => f("additionalInfos", e.target.value)} rows={2} placeholder="Informations complémentaires…"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+              </div>
+
+              {/* ── PURCHASE CONTRACTS ── */}
+              <SECT label="Purchase Contracts" color={COLORS.red} />
+              <div style={{ gridColumn: "1 / -1" }}>
+                {(form.purchaseLegs || []).map((leg, idx) => (
+                  <LegBlock key={idx} type="purchase" leg={leg} idx={idx} total={(form.purchaseLegs||[]).length} />
+                ))}
+                <button onClick={() => addLeg("purchase")}
+                  style={{ background: `${COLORS.red}12`, border: `1px dashed ${COLORS.red}40`, borderRadius: 10, padding: "8px 16px", color: COLORS.red, fontSize: 12, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit" }}>
+                  + Ajouter un Purchase Contract
+                </button>
+              </div>
+
+              {/* ── SALE CONTRACTS ── */}
+              <SECT label="Sale Contracts" color={COLORS.green} />
+              <div style={{ gridColumn: "1 / -1" }}>
+                {(form.saleLegs || []).map((leg, idx) => (
+                  <LegBlock key={idx} type="sale" leg={leg} idx={idx} total={(form.saleLegs||[]).length} />
+                ))}
+                <button onClick={() => addLeg("sale")}
+                  style={{ background: `${COLORS.green}12`, border: `1px dashed ${COLORS.green}40`, borderRadius: 10, padding: "8px 16px", color: COLORS.green, fontSize: 12, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit" }}>
+                  + Ajouter un Sale Contract
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
+              <button onClick={closeModal} style={{ padding: "10px 20px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+              <Btn onClick={save} disabled={!form.tradeName?.trim()}>{editId !== null ? "✓ Enregistrer" : "✓ Créer"}</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function CRM() {
   const [currentUser, setCurrentUser] = useState(() => { try { return JSON.parse(localStorage.getItem("crm_current_user") || "null"); } catch { return null; } });
   const logoSize = 50;
@@ -21064,6 +21486,7 @@ export default function CRM() {
   const [contracts, setContracts] = useState([]);
   const [vessels, setVessels] = useState([]);
   const [voyages, setVoyages] = useState([]);
+  const [trades, setTrades] = useState([]);
   const [derivativesCache, setDerivativesCache] = useState(null);
   const [fixingsCache, setFixingsCache] = useState(null);
   const [page, setPage] = useState(() => localStorage.getItem("crm_page") || "dashboard");
@@ -21121,7 +21544,7 @@ export default function CRM() {
     }
 
     async function loadData() {
-      const [contacts, companies, tasks, derivOps, fixingOps, contractsData, vesselsData, voyagesData] = await Promise.all([
+      const [contacts, companies, tasks, derivOps, fixingOps, contractsData, vesselsData, voyagesData, tradesData] = await Promise.all([
         loadAllPages('contacts'),
         loadAllPages('companies'),
         loadAllPages('tasks'),
@@ -21130,6 +21553,7 @@ export default function CRM() {
         loadAllPages('contracts'),
         loadAllPages('vessels'),
         loadAllPages('voyages'),
+        loadAllPages('trades'),
       ]);
       if (contacts.length) setContacts(contacts);
       if (companies.length) setCompanies(companies);
@@ -21139,6 +21563,7 @@ export default function CRM() {
       if (contractsData.length) setContracts(contractsData);
       if (vesselsData.length) setVessels(vesselsData);
       if (voyagesData.length) setVoyages(voyagesData);
+      if (tradesData.length) setTrades(tradesData);
       dataLoaded.current = true;
     }
     loadData();
@@ -21248,6 +21673,7 @@ export default function CRM() {
             <NavItem n={{ id: "contracts", label: "Contracts", icon: "📄" }} />
             <NavItem n={{ id: "vessels", label: "Vessels", icon: "🚢" }} />
             <NavItem n={{ id: "voyages", label: "Voyages", icon: "⚓" }} />
+            <NavItem n={{ id: "trades", label: "Trades", icon: "🔀" }} />
             <div style={{ height: 1, background: COLORS.border, margin: "16px 24px" }} />
             <div style={{ padding: "0 24px 10px", fontSize: 14, color: "#D4AF37", fontWeight: 700, letterSpacing: 1 }}>ACTIVITÉ</div>
             {[{ id: "dashboard", label: "Dashboard", icon: "◇" }, { id: "tasks", label: "Tâches", icon: "◎" }, { id: "pipeline", label: "Pipeline", icon: "◈" }].map(n => <NavItem key={n.id} n={n} />)}
@@ -21281,6 +21707,7 @@ export default function CRM() {
           {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} />}
           {page === "vessels" && <Vessels companies={companies} vessels={vessels} setVessels={setVessels} />}
           {page === "voyages" && <Voyages companies={companies} vessels={vessels} voyages={voyages} setVoyages={setVoyages} />}
+          {page === "trades" && <Trades voyages={voyages} contracts={contracts} trades={trades} setTrades={setTrades} />}
           {page === "admin" && <AdminPanel companies={companies} />}
         </div>
       </div>

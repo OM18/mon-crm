@@ -17714,6 +17714,7 @@ const EMPTY_CONTRACT = (cfg = {}) => ({
   qtyEstimated: "",
   qtyFinal: "",
   businessUnit: "",
+  tradeLinks: [],                    // [{ tradeId, connectedQty }]
   createdAt: "",
 });
 
@@ -18260,7 +18261,7 @@ const VirtualContractList = ({ filtered, selected, onSelect, onEdit, onRemove, C
   );
 };
 
-const Contracts = ({ companies = [], contracts = [], setContracts }) => {
+const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], setTrades }) => {
   const { config } = useConfig();
   const setContractsRaw = setContracts; // alias for compatibility
   const [instruments, setInstruments] = useState([]);       // active only — for modal form
@@ -18390,10 +18391,39 @@ const Contracts = ({ companies = [], contracts = [], setContracts }) => {
       flatPriceVatIncluded:           form.vat ? computeVatExcluded(form.flatPrice, form.vatRate)           : "",
       analyticalFlatPriceVatIncluded: form.vat ? computeVatExcluded(form.analyticalFlatPrice, form.vatRate) : "",
     };
+    const contractId = editId !== null ? editId : nextId();
+    const savedContract = editId !== null
+      ? { ...enriched, id: editId }
+      : { ...enriched, id: contractId, createdAt: new Date().toISOString() };
+
+    // ── Sync trade legs bidirectionally ──
+    if (setTrades && trades.length > 0 && (enriched.tradeLinks || []).length > 0) {
+      const contractType = (enriched.contractType || "").toLowerCase();
+      const isPurchase = contractType.includes("purchase") || contractType.includes("achat");
+      const updatedTrades = trades.map(trade => {
+        const link = (enriched.tradeLinks || []).find(l => String(l.tradeId) === String(trade.id));
+        if (!link) return trade;
+        // Update the matching leg in this trade
+        const legKey = isPurchase ? "purchaseLegs" : "saleLegs";
+        const legs = [...(trade[legKey] || [])];
+        const legIdx = legs.findIndex(l => String(l.contractId) === String(contractId));
+        if (legIdx >= 0) {
+          legs[legIdx] = { ...legs[legIdx], quantity: link.connectedQty };
+        } else {
+          legs.push({ contractId: String(contractId), quantity: link.connectedQty });
+        }
+        return { ...trade, [legKey]: legs };
+      });
+      if (JSON.stringify(updatedTrades) !== JSON.stringify(trades)) {
+        setTrades(updatedTrades);
+        saveLargeTable('trades', updatedTrades);
+      }
+    }
+
     if (editId !== null) {
-      persist(contracts.map(c => c.id === editId ? { ...enriched, id: editId } : c));
+      persist(contracts.map(c => c.id === editId ? savedContract : c));
     } else {
-      persist([...contracts, { ...enriched, id: nextId(), createdAt: new Date().toISOString() }]);
+      persist([...contracts, savedContract]);
     }
     closeModal();
   };
@@ -19384,6 +19414,46 @@ const Contracts = ({ companies = [], contracts = [], setContracts }) => {
                   {(config.businessUnit || []).filter(bu => (config.contractBusinessUnits || []).includes(bu.value)).length === 0 && (
                     <div style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic", padding: "8px 0" }}>Aucune BU active — configurez-les dans l'Admin Panel → Contracts</div>
                   )}
+                </div>
+              </div>
+
+              {/* ── TRADE LINKS ── */}
+              <CFSec label="Trades liés" />
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {(form.tradeLinks || []).map((link, idx) => (
+                    <div key={idx} style={{ display: "flex", gap: 10, alignItems: "flex-end", background: COLORS.bg, border: `1px solid ${COLORS.accent}30`, borderRadius: 10, padding: "12px 14px" }}>
+                      <div style={{ flex: 2 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textSub, marginBottom: 4 }}>TRADE {idx + 1}</div>
+                        <select value={link.tradeId || ""} onChange={e => {
+                          const updated = (form.tradeLinks || []).map((l, i) => i === idx ? { ...l, tradeId: e.target.value } : l);
+                          f("tradeLinks", updated);
+                        }} style={{ width: "100%", background: COLORS.card, border: `1px solid ${link.tradeId ? COLORS.accent+"60" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: link.tradeId ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit" }}>
+                          <option value="">— Sélectionner un trade —</option>
+                          {(trades || []).map(t => <option key={t.id} value={t.id}>{t.tradeName}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textSub, marginBottom: 4 }}>CONNECTED QUANTITY (T)</div>
+                        <div style={{ position: "relative" }}>
+                          <input type="number" value={link.connectedQty || ""} onChange={e => {
+                            const updated = (form.tradeLinks || []).map((l, i) => i === idx ? { ...l, connectedQty: e.target.value } : l);
+                            f("tradeLinks", updated);
+                          }} placeholder="0"
+                            style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 32px 8px 12px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                          <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: COLORS.textMuted, pointerEvents: "none" }}>T</span>
+                        </div>
+                      </div>
+                      <button onClick={() => f("tradeLinks", (form.tradeLinks || []).filter((_, i) => i !== idx))}
+                        style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1, paddingBottom: 6, flexShrink: 0 }}
+                        onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                        onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+                    </div>
+                  ))}
+                  <button onClick={() => f("tradeLinks", [...(form.tradeLinks || []), { tradeId: "", connectedQty: "" }])}
+                    style={{ background: `${COLORS.accent}10`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 10, padding: "8px 14px", color: COLORS.accent, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                    + Lier à un trade
+                  </button>
                 </div>
               </div>
 
@@ -21431,7 +21501,7 @@ const VirtualTradeList = ({ filtered, selected, onSelect, onEdit, onRemove, voya
   );
 };
 
-const Trades = ({ voyages = [], contracts = [], trades = [], setTrades }) => {
+const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTrades }) => {
   const { config } = useConfig();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
@@ -21466,8 +21536,40 @@ const Trades = ({ voyages = [], contracts = [], trades = [], setTrades }) => {
   const nextId = () => trades.length > 0 ? Math.max(...trades.map(t => t.id || 0)) + 1 : 1;
   const save = () => {
     if (!form.tradeName?.trim()) return;
-    if (editId !== null) persist(trades.map(t => t.id === editId ? { ...form, id: editId } : t));
-    else persist([...trades, { ...form, id: nextId(), createdAt: new Date().toISOString() }]);
+    const savedTrade = editId !== null
+      ? { ...form, id: editId }
+      : { ...form, id: nextId(), createdAt: new Date().toISOString() };
+
+    // ── Sync contract tradeLinks from trade legs ──
+    if (setContracts && contracts.length > 0) {
+      const allLegs = [
+        ...(savedTrade.purchaseLegs || []).map(l => ({ ...l, type: "purchase" })),
+        ...(savedTrade.saleLegs || []).map(l => ({ ...l, type: "sale" })),
+      ].filter(l => l.contractId);
+
+      let updatedContracts = [...contracts];
+      allLegs.forEach(leg => {
+        updatedContracts = updatedContracts.map(c => {
+          if (String(c.id) !== String(leg.contractId)) return c;
+          const existingLinks = c.tradeLinks || [];
+          const linkIdx = existingLinks.findIndex(l => String(l.tradeId) === String(savedTrade.id));
+          let newLinks;
+          if (linkIdx >= 0) {
+            newLinks = existingLinks.map((l, i) => i === linkIdx ? { ...l, connectedQty: leg.quantity } : l);
+          } else {
+            newLinks = [...existingLinks, { tradeId: String(savedTrade.id), connectedQty: leg.quantity }];
+          }
+          return { ...c, tradeLinks: newLinks };
+        });
+      });
+      if (JSON.stringify(updatedContracts) !== JSON.stringify(contracts)) {
+        setContracts(updatedContracts);
+        saveLargeTable('contracts', updatedContracts);
+      }
+    }
+
+    if (editId !== null) persist(trades.map(t => t.id === editId ? savedTrade : t));
+    else persist([...trades, savedTrade]);
     closeModal();
   };
   const remove = (id) => {
@@ -21975,10 +22077,10 @@ export default function CRM() {
           {page === "derivatives" && <Derivatives companies={companies} initialOps={derivativesCache} initialFixings={fixingsCache} />}
           {page === "derivatives-dashboard" && <DerivativesDashboard />}
           {page === "derivatives-statistics" && <DerivStatistics />}
-          {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} />}
+          {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} />}
           {page === "vessels" && <Vessels companies={companies} vessels={vessels} setVessels={setVessels} />}
           {page === "voyages" && <Voyages companies={companies} vessels={vessels} voyages={voyages} setVoyages={setVoyages} />}
-          {page === "trades" && <Trades voyages={voyages} contracts={contracts} trades={trades} setTrades={setTrades} />}
+          {page === "trades" && <Trades voyages={voyages} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} />}
           {page === "admin" && <AdminPanel companies={companies} />}
         </div>
       </div>

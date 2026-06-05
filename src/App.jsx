@@ -21075,6 +21075,253 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
   );
 };
 
+// ─── TRADE IMPORT MODAL ───────────────────────────────────────
+const TRADE_FIELD_ALIASES = {
+  tradeName:       ["trade name", "tradename", "trade", "nom du trade", "nom"],
+  voyageId:        ["voyage", "voyage name", "voyageid", "nom voyage"],
+  businessMonth:   ["business month", "businessmonth", "month", "mois", "mois affaires"],
+  logisticType:    ["logistic type", "logistictype", "logistique", "type logistique"],
+  volume:          ["volume", "quantité", "quantity", "qty"],
+  additionalInfos: ["additional infos", "additionalinfos", "info", "notes", "commentaire"],
+};
+const TRADE_IMPORTABLE_FIELDS = ["tradeName","voyageId","businessMonth","logisticType","volume","additionalInfos"];
+const TRADE_FIELD_LABELS = { tradeName:"Trade Name", voyageId:"Voyage", businessMonth:"Business Month", logisticType:"Logistic Type", volume:"Volume (T)", additionalInfos:"Additional Infos" };
+const TRADE_IMPORT_GUIDE = [
+  { field: "tradeName",       format: "Texte",         note: "Obligatoire" },
+  { field: "voyageId",        format: "Texte",         note: "Nom exact du voyage" },
+  { field: "businessMonth",   format: "MM/YYYY",       note: "" },
+  { field: "logisticType",    format: "Texte",         note: "Valeur de l'Admin Panel" },
+  { field: "volume",          format: "Nombre entier", note: "En tonnes" },
+  { field: "additionalInfos", format: "Texte",         note: "" },
+];
+
+const TradeImportModal = ({ onClose, onImport, voyages, config }) => {
+  const [step, setStep] = useState("guide");
+  const [rawRows, setRawRows] = useState([]);
+  const [headers, setHeaders] = useState([]);
+  const [mapping, setMapping] = useState({});
+  const [preview, setPreview] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [error, setError] = useState("");
+  const fileRef = useRef(null);
+
+  const normH = h => {
+    if (!h) return "";
+    const s = h.toString().trim().replace(/([a-z])([A-Z])/g, '$1 $2');
+    return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9 ]/g,"").replace(/\s+/g," ").trim();
+  };
+
+  const guessField = header => {
+    const n = normH(header);
+    for (const [f, aliases] of Object.entries(TRADE_FIELD_ALIASES)) {
+      if (aliases.some(a => normH(a) === n)) return f;
+    }
+    for (const [f, aliases] of Object.entries(TRADE_FIELD_ALIASES)) {
+      if (aliases.some(a => n.includes(normH(a)) || normH(a).includes(n))) return f;
+    }
+    return null;
+  };
+
+  const handleFile = async file => {
+    setError("");
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+      if (!rows.length) { setError("Fichier vide"); return; }
+      const hdrs = Object.keys(rows[0]);
+      setHeaders(hdrs); setRawRows(rows);
+      const autoMap = {};
+      hdrs.forEach((h, i) => { const g = guessField(h); if (g && !Object.values(autoMap).includes(g)) autoMap[i] = g; });
+      setMapping(autoMap);
+      setStep("mapping");
+    } catch(e) { setError(String(e)); }
+  };
+
+  const normComp = s => s?.toString().toLowerCase().trim() || "";
+  const fmtMonth = val => { let v = String(val).replace(/[^\d]/g,""); if (v.length>2) v=v.slice(0,2)+"/"+v.slice(2); return v.slice(0,7); };
+
+  const buildPreview = () => {
+    setPreview(rawRows.slice(0,5).map(row => {
+      const obj = {};
+      Object.entries(mapping).forEach(([ci,f]) => { if(f) obj[f]=row[headers[ci]]?.toString().trim()||""; });
+      return obj;
+    }));
+    setStep("preview");
+  };
+
+  const doExport = async () => {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.aoa_to_sheet([TRADE_IMPORTABLE_FIELDS]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Trades");
+    XLSX.writeFile(wb, `trades_template_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
+  const doImport = () => {
+    setImporting(true);
+    setTimeout(() => {
+      const items = rawRows.map(row => {
+        const obj = {};
+        Object.entries(mapping).forEach(([ci,f]) => { if(f) obj[f]=row[headers[ci]]?.toString().trim()||""; });
+        // Resolve voyage
+        if (obj.voyageId) {
+          const found = voyages.find(v => normComp(v.voyageName) === normComp(obj.voyageId));
+          obj.voyageId = found ? found.id : "";
+        }
+        // Resolve logistic type
+        if (obj.logisticType) {
+          const found = (config.tradeLogisticTypes||[]).find(t => normComp(t.label||t.value) === normComp(obj.logisticType));
+          obj.logisticType = found ? (found.value||found.label) : obj.logisticType;
+        }
+        if (obj.businessMonth) obj.businessMonth = fmtMonth(obj.businessMonth);
+        obj.commodities = []; obj.purchaseLegs = [EMPTY_CONTRACT_LEG()]; obj.saleLegs = [EMPTY_CONTRACT_LEG()];
+        return obj;
+      }).filter(o => o.tradeName);
+      onImport(items);
+      setImporting(false);
+    }, 50);
+  };
+
+  const mappedCount = Object.values(mapping).filter(Boolean).length;
+  const ignoredCount = headers.filter((_,i) => !mapping[i]).length;
+  const allMapped = ignoredCount === 0;
+
+  const TH = { padding:"6px 10px", fontSize:10, fontWeight:700, color:COLORS.textSub, letterSpacing:0.5, borderBottom:`1px solid ${COLORS.border}`, background:COLORS.bg, textAlign:"left", whiteSpace:"nowrap" };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"#00000090", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1100, padding:20 }}>
+      <div style={{ background:COLORS.card, border:`1px solid ${COLORS.border}`, borderRadius:18, padding:30, width:"100%", maxWidth:720, maxHeight:"92vh", overflowY:"auto" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <img src="/logoxl.png" style={{ width:32, height:32, objectFit:"contain" }} />
+            <div style={{ fontSize:18, fontWeight:700, color:COLORS.text }}>Import Trades</div>
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:"none", color:COLORS.textSub, cursor:"pointer", fontSize:22 }}>×</button>
+        </div>
+
+        {/* Step indicators */}
+        <div style={{ display:"flex", gap:6, marginBottom:24 }}>
+          {[["guide","① Guide"],["mapping","② Mapping"],["preview","③ Aperçu"]].map(([s,l]) => (
+            <div key={s} style={{ padding:"4px 14px", borderRadius:20, fontSize:12, fontWeight:600,
+              background:step===s?COLORS.accent:COLORS.bg, color:step===s?"#fff":COLORS.textMuted,
+              border:`1px solid ${step===s?COLORS.accent:COLORS.border}` }}>{l}</div>
+          ))}
+        </div>
+
+        {/* ── GUIDE ── */}
+        {step === "guide" && (
+          <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+            <div style={{ background:COLORS.bg, borderRadius:12, border:`1px solid ${COLORS.border}`, overflow:"hidden" }}>
+              <div style={{ padding:"10px 16px", background:`${COLORS.accent}12`, borderBottom:`1px solid ${COLORS.border}`, fontSize:12, fontWeight:700, color:COLORS.accent }}>Champs importables</div>
+              <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                <thead><tr><th style={TH}>CHAMP</th><th style={TH}>FORMAT</th><th style={TH}>NOTE</th></tr></thead>
+                <tbody>
+                  {TRADE_IMPORT_GUIDE.map((r,i) => (
+                    <tr key={i}>
+                      <td style={{ padding:"6px 10px", fontSize:11, color:COLORS.accent, fontFamily:"'DM Mono',monospace", borderBottom:`1px solid ${COLORS.border}40` }}>{r.field}</td>
+                      <td style={{ padding:"6px 10px", fontSize:11, color:COLORS.textMuted, borderBottom:`1px solid ${COLORS.border}40`, fontStyle:"italic" }}>{r.format}</td>
+                      <td style={{ padding:"6px 10px", fontSize:11, color:COLORS.textMuted, borderBottom:`1px solid ${COLORS.border}40`, fontStyle:"italic" }}>{r.note}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ background:`${COLORS.orange}10`, border:`1px solid ${COLORS.orange}40`, borderRadius:8, padding:"10px 14px" }}>
+              {["⚠ voyageId : saisir le nom exact du voyage.", "⚠ Les commodités, purchase/sale contracts sont à saisir manuellement après import.", "⚠ businessMonth : format MM/YYYY (ex: 06/2026)"].map((w,i) =>
+                <div key={i} style={{ fontSize:11, color:COLORS.orange, marginTop:i>0?4:0 }}>{w}</div>)}
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={doExport} style={{ background:"transparent", border:`1px solid ${COLORS.border}`, borderRadius:10, padding:"9px 16px", color:COLORS.textMuted, fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>⬇ Télécharger le modèle</button>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display:"none" }} onChange={e => { if(e.target.files[0]) handleFile(e.target.files[0]); e.target.value=""; }} />
+              <Btn onClick={() => fileRef.current?.click()}>📂 Choisir un fichier</Btn>
+            </div>
+            {error && <div style={{ color:COLORS.red, fontSize:12, padding:"8px 12px", background:`${COLORS.red}10`, borderRadius:8 }}>{error}</div>}
+          </div>
+        )}
+
+        {/* ── MAPPING ── */}
+        {step === "mapping" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, padding:"10px 16px", borderRadius:10, background:allMapped?`${COLORS.green}12`:`${COLORS.orange}12`, border:`1px solid ${allMapped?COLORS.green:COLORS.orange}30` }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ width:10, height:10, borderRadius:"50%", background:allMapped?COLORS.green:COLORS.orange, boxShadow:`0 0 5px ${allMapped?COLORS.green:COLORS.orange}` }} />
+                <span style={{ fontSize:13, fontWeight:600, color:allMapped?COLORS.green:COLORS.orange }}>
+                  {allMapped ? "Toutes les colonnes mappées" : `${ignoredCount} colonne${ignoredCount>1?"s":""} ignorée${ignoredCount>1?"s":""}`}
+                </span>
+              </div>
+              <span style={{ fontSize:12, color:COLORS.textSub }}>{mappedCount} / {headers.length} mappées · {rawRows.length} lignes</span>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, maxHeight:360, overflowY:"auto", paddingRight:4 }}>
+              {headers.map((h,i) => {
+                const isMapped = !!mapping[i];
+                return (
+                  <div key={i} style={{ background:COLORS.bg, borderRadius:10, padding:"10px 14px", border:`1px solid ${isMapped?COLORS.green+"50":COLORS.red+"40"}` }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:6 }}>
+                      <div style={{ width:8, height:8, borderRadius:"50%", flexShrink:0, background:isMapped?COLORS.green:COLORS.red, boxShadow:`0 0 4px ${isMapped?COLORS.green:COLORS.red}` }} />
+                      <div style={{ fontSize:12, color:COLORS.accent, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{h||`Col ${i+1}`}</div>
+                    </div>
+                    <select value={mapping[i]||""} onChange={e => {
+                      const m={...mapping};
+                      if(e.target.value){Object.keys(m).forEach(k=>{if(m[k]===e.target.value)delete m[k];}); m[i]=e.target.value;}
+                      else delete m[i];
+                      setMapping(m);
+                    }} style={{ width:"100%", background:COLORS.card, border:`1px solid ${COLORS.border}`, borderRadius:6, padding:"6px 10px", color:mapping[i]?COLORS.text:COLORS.textMuted, fontSize:12, outline:"none", fontFamily:"inherit" }}>
+                      <option value="">— Ignorer —</option>
+                      {TRADE_IMPORTABLE_FIELDS.map(f => <option key={f} value={f}>{TRADE_FIELD_LABELS[f]}</option>)}
+                    </select>
+                    <div style={{ fontSize:10, color:COLORS.textMuted, marginTop:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>Ex: {rawRows[0]?.[h]?.toString().slice(0,35)||"—"}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:16, justifyContent:"space-between" }}>
+              <button onClick={() => setStep("guide")} style={{ padding:"10px 18px", background:COLORS.bg, border:`1px solid ${COLORS.border}`, borderRadius:10, color:COLORS.textMuted, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>← Retour</button>
+              <Btn onClick={buildPreview}>Aperçu →</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* ── PREVIEW ── */}
+        {step === "preview" && (
+          <div>
+            <p style={{ color:COLORS.textSub, fontSize:13, margin:"0 0 14px" }}>Aperçu des 5 premières lignes sur {rawRows.length} :</p>
+            <div style={{ overflowX:"auto", borderRadius:10, border:`1px solid ${COLORS.border}`, marginBottom:14 }}>
+              <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+                <thead>
+                  <tr style={{ background:COLORS.bg }}>
+                    {Object.entries(mapping).filter(([,v])=>v).map(([,f]) => <th key={f} style={TH}>{TRADE_FIELD_LABELS[f]||f}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.map((row,i) => (
+                    <tr key={i} style={{ borderBottom:`1px solid ${COLORS.border}` }}>
+                      {Object.entries(mapping).filter(([,v])=>v).map(([,f]) => (
+                        <td key={f} style={{ padding:"7px 10px", color:row[f]?COLORS.text:COLORS.textMuted, maxWidth:140, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {row[f]||"—"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding:"10px 14px", background:`${COLORS.green}12`, border:`1px solid ${COLORS.green}30`, borderRadius:8, fontSize:13, color:COLORS.green, marginBottom:16 }}>
+              ✓ {rawRows.length} trade{rawRows.length>1?"s":""} prêt{rawRows.length>1?"s":""} à l'import
+            </div>
+            <div style={{ display:"flex", gap:10, justifyContent:"space-between" }}>
+              <button onClick={() => setStep("mapping")} style={{ padding:"10px 18px", background:COLORS.bg, border:`1px solid ${COLORS.border}`, borderRadius:10, color:COLORS.textMuted, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>← Modifier</button>
+              <Btn onClick={doImport} disabled={importing} style={{ background:COLORS.green }}>
+                {importing ? "⟳ Import…" : `✓ Importer ${rawRows.length} trade${rawRows.length>1?"s":""}`}
+              </Btn>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ─── TRADES ───────────────────────────────────────────────────
 
 const EMPTY_CONTRACT_LEG = () => ({ contractId: "", quantity: "" });
@@ -21189,6 +21436,7 @@ const Trades = ({ voyages = [], contracts = [], trades = [], setTrades }) => {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(EMPTY_TRADE());
 
@@ -21342,6 +21590,14 @@ const Trades = ({ voyages = [], contracts = [], trades = [], setTrades }) => {
             🗑 Effacer tout ({trades.length})
           </button>
         )}
+        <XlButton onImport={() => setShowImport(true)} onExport={async () => {
+          const XLSX = await import("xlsx");
+          const rows = trades.map(t => ({ tradeName:t.tradeName, voyageId:t.voyageId, businessMonth:t.businessMonth, logisticType:t.logisticType, volume:t.volume, additionalInfos:t.additionalInfos }));
+          const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "Trades");
+          XLSX.writeFile(wb, `trades_export_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }} />
         <Btn onClick={openNew}>+ Ajouter</Btn>
       </div>
 
@@ -21472,6 +21728,21 @@ const Trades = ({ voyages = [], contracts = [], trades = [], setTrades }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Import Modal */}
+      {showImport && (
+        <TradeImportModal
+          onClose={() => setShowImport(false)}
+          voyages={voyages}
+          config={config}
+          onImport={(items) => {
+            const nextId = trades.length > 0 ? Math.max(...trades.map(t => t.id || 0)) + 1 : 1;
+            const enriched = items.map((item, i) => ({ ...EMPTY_TRADE(), ...item, id: nextId + i, createdAt: new Date().toISOString() }));
+            persist([...trades, ...enriched]);
+            setShowImport(false);
+          }}
+        />
       )}
     </div>
   );

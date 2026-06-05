@@ -20188,6 +20188,524 @@ const VesselImportModal = ({ onClose, onImport, companies, config }) => {
   );
 };
 
+// ─── VOYAGES ──────────────────────────────────────────────────
+
+const EMPTY_PORT = () => ({
+  portId: "", deliveryCondition: "", loadRate: "", dischargeRate: "",
+  etaNotice: "", etaBerthing: "", dateStart: "", dateEnd: "", ets: "",
+  agent: "",
+});
+
+const EMPTY_VOYAGE = () => ({
+  id: null, voyageName: "", vesselId: "", status: "",
+  disponentOwnerId: "", chartererId: "", charterPartyDate: "",
+  laycanStart: "", laycanEnd: "", extensionStart: "", extensionEnd: "",
+  additionalInfo: "", brokerId: "", businessUnit: "", costsCurrency: "",
+  demurrageRate: "", dispatchRate: "", freightRate: "",
+  loadingPorts: [EMPTY_PORT()],
+  destinationPorts: [EMPTY_PORT()],
+  createdAt: "",
+});
+
+const ROW_H_VOYAGE = 56;
+const OVERSCAN_VOYAGE = 8;
+
+const VoyageRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, vessels, companies, config }) => {
+  const vessel = vessels.find(x => x.id === v.vesselId || String(x.id) === String(v.vesselId));
+  const owner = companies.find(c => c.id === v.disponentOwnerId || String(c.id) === String(v.disponentOwnerId));
+  const charterer = companies.find(c => c.id === v.chartererId || String(c.id) === String(v.chartererId));
+  const buDef = v.businessUnit ? (config.businessUnit || []).find(b => b.value === v.businessUnit) : null;
+  return (
+    <div onClick={() => onSelect(v)}
+      style={{ display: "grid", gridTemplateColumns: "200px 180px 120px 180px 180px 130px 60px", borderBottom: `1px solid ${COLORS.border}`,
+        height: ROW_H_VOYAGE, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
+        background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
+        cursor: "pointer", transition: "background 0.1s" }}
+      onMouseOver={e => { if (!isSel) e.currentTarget.style.background = COLORS.hover; }}
+      onMouseOut={e => { if (!isSel) e.currentTarget.style.background = idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`; }}>
+      {/* VOYAGE NAME */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={v.voyageName} style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.voyageName || "—"}</span>
+      </div>
+      {/* VESSEL */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={vessel?.name} style={{ fontSize: 12, color: vessel ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{vessel?.name || "—"}</span>
+      </div>
+      {/* STATUS */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
+        {v.status ? <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${COLORS.accent}18`, color: COLORS.accent, border: `1px solid ${COLORS.accent}30` }}>{v.status}</span> : <span style={{ color: COLORS.textMuted, fontSize: 12 }}>—</span>}
+      </div>
+      {/* DISPONENT OWNER */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={owner?.name} style={{ fontSize: 11, color: owner ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{owner?.name || "—"}</span>
+      </div>
+      {/* CHARTERER */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={charterer?.name} style={{ fontSize: 11, color: charterer ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{charterer?.name || "—"}</span>
+      </div>
+      {/* BU */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
+        {buDef ? <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: `${buDef.color || COLORS.blue}20`, color: buDef.color || COLORS.blue, border: `1px solid ${buDef.color || COLORS.blue}40` }}>{buDef.label}</span> : <span style={{ color: COLORS.textMuted, fontSize: 11 }}>—</span>}
+      </div>
+      {/* ACTIONS */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, borderLeft: `1px solid ${COLORS.border}`, padding: "0 8px" }}
+        onClick={e => e.stopPropagation()}>
+        <button onClick={() => onEdit(v)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+          onMouseOver={e => e.currentTarget.style.color = COLORS.accent} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>✏</button>
+        <button onClick={() => onRemove(v.id)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+          onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>🗑</button>
+      </div>
+    </div>
+  );
+});
+
+const VirtualVoyageList = ({ filtered, selected, onSelect, onEdit, onRemove, vessels, companies, config }) => {
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef(null);
+  const [containerH, setContainerH] = useState(600);
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(e => setContainerH(e[0].contentRect.height));
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+  const totalH = filtered.length * ROW_H_VOYAGE;
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H_VOYAGE) - OVERSCAN_VOYAGE);
+  const endIdx = Math.min(filtered.length, Math.ceil((scrollTop + containerH) / ROW_H_VOYAGE) + OVERSCAN_VOYAGE);
+  return (
+    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)} style={{ overflowY: "auto", flex: 1 }}>
+      {filtered.length === 0
+        ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "56px 0", fontSize: 14 }}>Aucun voyage — cliquez sur « + Ajouter »</div>
+        : <div style={{ height: totalH, position: "relative" }}>
+            <div style={{ position: "absolute", top: startIdx * ROW_H_VOYAGE, left: 0, right: 0 }}>
+              {filtered.slice(startIdx, endIdx).map((v, vi) => (
+                <VoyageRow key={v.id} v={v} idx={startIdx + vi} isSel={selected?.id === v.id}
+                  onSelect={onSelect} onEdit={onEdit} onRemove={onRemove}
+                  vessels={vessels} companies={companies} config={config} />
+              ))}
+            </div>
+          </div>
+      }
+    </div>
+  );
+};
+
+// ── Port Block (Loading or Destination) ──
+const PortBlock = ({ port, onChange, idx, onRemove, canRemove, label, isLoading, config, companies }) => {
+  const LBL = ({ children, req }) => (
+    <label style={{ fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 5 }}>
+      {children}{req && <span style={{ color: COLORS.red, marginLeft: 3 }}>*</span>}
+    </label>
+  );
+  const INP = ({ value, onChange, placeholder, type = "text" }) => (
+    <input type={type} value={value || ""} onChange={onChange} placeholder={placeholder}
+      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+  );
+  const SEL = ({ value, onChange, children, empty = "— Sélectionner —" }) => (
+    <select value={value || ""} onChange={onChange}
+      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: value ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+      <option value="">{empty}</option>
+      {children}
+    </select>
+  );
+  const fmtDate = val => {
+    let v = val.replace(/[^\d]/g, "");
+    if (v.length > 2) v = v.slice(0,2)+"/"+v.slice(2);
+    if (v.length > 5) v = v.slice(0,5)+"/"+v.slice(5);
+    return v.slice(0,10);
+  };
+  const agents = companies.filter(c => {
+    const r = Array.isArray(c.roles) ? c.roles.map(x => (x||"").toLowerCase()) : [(c.roles||"").toLowerCase()];
+    return r.some(x => x.includes("agent"));
+  });
+  const configPorts = config.contractPorts || [];
+  const deliveryTerms = config.contractDeliveryTerms || [];
+
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: isLoading ? COLORS.blue : COLORS.green }}>{label} {idx + 1}</div>
+        {canRemove && <button onClick={onRemove} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16 }} onMouseOver={e => e.currentTarget.style.color=COLORS.red} onMouseOut={e => e.currentTarget.style.color=COLORS.textMuted}>× Supprimer</button>}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        {/* Port */}
+        <div>
+          <LBL>PORT</LBL>
+          <SEL value={port.portId} onChange={e => onChange("portId", e.target.value)}>
+            {configPorts.map(p => <option key={p.value||p.label} value={p.value||p.label}>{p.label||p.value}</option>)}
+          </SEL>
+        </div>
+        {/* Delivery condition */}
+        <div>
+          <LBL>DELIVERY CONDITION</LBL>
+          <SEL value={port.deliveryCondition} onChange={e => onChange("deliveryCondition", e.target.value)}>
+            {deliveryTerms.map(t => <option key={t.value||t.label} value={t.value||t.label}>{t.label||t.value}</option>)}
+          </SEL>
+        </div>
+        {/* Load or Discharge rate */}
+        <div>
+          <LBL>{isLoading ? "LOAD RATE" : "DISCHARGE RATE"}</LBL>
+          <div style={{ position: "relative" }}>
+            <INP value={isLoading ? port.loadRate : port.dischargeRate} onChange={e => onChange(isLoading ? "loadRate" : "dischargeRate", e.target.value)} placeholder="ex: 5000" />
+            <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: COLORS.textMuted, pointerEvents: "none" }}>T/DAY</span>
+          </div>
+        </div>
+        {/* Agent */}
+        <div>
+          <LBL>AGENT</LBL>
+          <SEL value={port.agent} onChange={e => onChange("agent", e.target.value)}>
+            {agents.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </SEL>
+        </div>
+        {/* ETA / Notice */}
+        <div>
+          <LBL>ETA / NOTICE</LBL>
+          <INP value={port.etaNotice} onChange={e => onChange("etaNotice", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
+        </div>
+        {/* ETA / Date of berthing */}
+        <div>
+          <LBL>ETA / DATE OF BERTHING</LBL>
+          <INP value={port.etaBerthing} onChange={e => onChange("etaBerthing", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
+        </div>
+        {/* Date of loading/discharging start */}
+        <div>
+          <LBL>{isLoading ? "DATE OF LOADING START" : "DATE OF DISCHARGING START"}</LBL>
+          <INP value={port.dateStart} onChange={e => onChange("dateStart", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
+        </div>
+        {/* ETC / Loading/Discharging end */}
+        <div>
+          <LBL>{isLoading ? "ETC / LOADING END" : "ETC / DISCHARGING END"}</LBL>
+          <INP value={port.dateEnd} onChange={e => onChange("dateEnd", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
+        </div>
+        {/* ETS */}
+        <div>
+          <LBL>ETS</LBL>
+          <INP value={port.ets} onChange={e => onChange("ets", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => {
+  const { config } = useConfig();
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState(EMPTY_VOYAGE());
+
+  const setVoyagesRaw = setVoyages;
+
+  const persist = async (updated) => {
+    setVoyagesRaw(updated);
+    try {
+      await supabase.from('voyages').delete().gt('id', 0);
+      const CHUNK = 50;
+      for (let i = 0; i < updated.length; i += CHUNK) {
+        const chunk = updated.slice(i, i + CHUNK).map(v => ({ data: v }));
+        const { error } = await supabase.from('voyages').insert(chunk);
+        if (error) console.error('[Voyages] insert error:', error);
+      }
+    } catch(e) { console.error('[Voyages] persist error:', e); }
+  };
+
+  useEffect(() => {
+    const h = e => { if (e.key === "Escape" && showModal) { setShowModal(false); } };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [showModal]);
+
+  const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const openNew = () => { setForm({ ...EMPTY_VOYAGE(), createdAt: new Date().toISOString() }); setEditId(null); setShowModal(true); };
+  const openEdit = (v) => { setForm({ ...v }); setEditId(v.id); setShowModal(true); };
+  const closeModal = () => { setShowModal(false); setForm(EMPTY_VOYAGE()); setEditId(null); };
+
+  const nextId = () => voyages.length > 0 ? Math.max(...voyages.map(v => v.id || 0)) + 1 : 1;
+
+  const save = () => {
+    if (!form.voyageName?.trim()) return;
+    if (editId !== null) persist(voyages.map(v => v.id === editId ? { ...form, id: editId } : v));
+    else persist([...voyages, { ...form, id: nextId(), createdAt: new Date().toISOString() }]);
+    closeModal();
+  };
+
+  const remove = (id) => {
+    if (!window.confirm("Supprimer ce voyage ?")) return;
+    persist(voyages.filter(v => v.id !== id));
+  };
+
+  const updatePort = (type, idx, field, value) => {
+    const key = type === "loading" ? "loadingPorts" : "destinationPorts";
+    const ports = [...(form[key] || [])];
+    ports[idx] = { ...ports[idx], [field]: value };
+    f(key, ports);
+  };
+
+  const addPort = (type) => {
+    const key = type === "loading" ? "loadingPorts" : "destinationPorts";
+    f(key, [...(form[key] || []), EMPTY_PORT()]);
+  };
+
+  const removePort = (type, idx) => {
+    const key = type === "loading" ? "loadingPorts" : "destinationPorts";
+    f(key, (form[key] || []).filter((_, i) => i !== idx));
+  };
+
+  // Company filters
+  const disponentOwners = companies.filter(c => {
+    const r = Array.isArray(c.roles) ? c.roles.map(x => (x||"").toLowerCase()) : [(c.roles||"").toLowerCase()];
+    return r.some(x => x.includes("disponent owner"));
+  });
+  const brokers = companies.filter(c => {
+    const r = Array.isArray(c.roles) ? c.roles.map(x => (x||"").toLowerCase()) : [(c.roles||"").toLowerCase()];
+    return r.some(x => x.includes("broker"));
+  });
+
+  const filtered = voyages.filter(v => {
+    const q = search.toLowerCase().trim();
+    if (!q) return true;
+    const vessel = vessels.find(x => x.id === v.vesselId || String(x.id) === String(v.vesselId));
+    return (v.voyageName||"").toLowerCase().includes(q) || (vessel?.name||"").toLowerCase().includes(q);
+  });
+
+  const currency = form.costsCurrency || "";
+  const currencyUnit = currency ? `${(config.contractCurrencies||[]).find(c=>c.label===currency||c.value===currency)?.label || currency}/DAY` : "/DAY";
+
+  // Shared field components
+  const LBL = ({ children, req }) => (
+    <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>
+      {children}{req && <span style={{ color: COLORS.red, marginLeft: 3 }}>*</span>}
+    </label>
+  );
+  const INP = ({ field, placeholder, type = "text", fmt }) => (
+    <input type={type} value={form[field] || ""} placeholder={placeholder}
+      onChange={e => f(field, fmt ? fmt(e.target.value) : e.target.value)}
+      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${field === "voyageName" && !form.voyageName?.trim() ? COLORS.red+"60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+  );
+  const SEL = ({ field, children, empty = "— Sélectionner —" }) => (
+    <select value={form[field] || ""} onChange={e => f(field, e.target.value)}
+      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form[field] ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+      <option value="">{empty}</option>
+      {children}
+    </select>
+  );
+  const fmtDate = val => {
+    let v = val.replace(/[^\d]/g, "");
+    if (v.length > 2) v = v.slice(0,2)+"/"+v.slice(2);
+    if (v.length > 5) v = v.slice(0,5)+"/"+v.slice(5);
+    return v.slice(0,10);
+  };
+  const SECT = ({ label, color = COLORS.accent }) => (
+    <div style={{ gridColumn: "1 / -1", borderBottom: `2px solid ${color}30`, paddingBottom: 4, marginTop: 8, marginBottom: 2 }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color, letterSpacing: 1, textTransform: "uppercase" }}>{label}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 0 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.text }}>⚓ Voyages</div>
+        <div style={{ flex: 1 }} />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher voyage, navire…"
+          style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 14px", color: COLORS.text, fontSize: 13, outline: "none", width: 240 }} />
+        {voyages.length > 0 && (
+          <button onClick={async () => {
+            if (window.confirm(`⚠️ Supprimer les ${voyages.length} voyages ?`)) {
+              await supabase.from('voyages').delete().gt('id', 0);
+              setVoyagesRaw([]);
+            }
+          }} style={{ background: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: "8px 14px" }}>
+            🗑 Effacer tout ({voyages.length})
+          </button>
+        )}
+        <Btn onClick={openNew}>+ Ajouter</Btn>
+      </div>
+
+      {/* Blotter */}
+      <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0, flexDirection: "column" }}>
+        {/* Header row */}
+        <div style={{ display: "grid", gridTemplateColumns: "200px 180px 120px 180px 180px 130px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
+          {["VOYAGE NAME", "VESSEL", "STATUS", "DISPONENT OWNER", "CHARTERER", "BU", ""].map((h, i) => (
+            <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, padding: "4px 12px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
+          {filtered.length} voyage{filtered.length !== 1 ? "s" : ""}
+        </div>
+        <VirtualVoyageList filtered={filtered} selected={selected}
+          onSelect={v => setSelected(selected?.id === v.id ? null : v)}
+          onEdit={openEdit} onRemove={remove}
+          vessels={vessels} companies={companies} config={config} />
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: "28px 32px", width: "100%", maxWidth: 780, maxHeight: "92vh", overflowY: "auto" }}>
+            {/* Modal header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>{editId !== null ? "Modifier le voyage" : "Nouveau voyage"}</div>
+              <button onClick={closeModal} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              {/* ── GÉNÉRAL ── */}
+              <SECT label="Général" color={COLORS.accent} />
+
+              <div style={{ gridColumn: "1 / -1" }}>
+                <LBL req>VOYAGE NAME</LBL>
+                <INP field="voyageName" placeholder="Nom du voyage…" />
+              </div>
+              <div>
+                <LBL>VESSEL</LBL>
+                <SEL field="vesselId">
+                  {vessels.map(v => <option key={v.id} value={v.id}>{v.name}{v.imo ? ` (IMO ${v.imo})` : ""}</option>)}
+                </SEL>
+              </div>
+              <div>
+                <LBL>STATUS</LBL>
+                <INP field="status" placeholder="ex: In Progress" />
+              </div>
+              <div>
+                <LBL>DISPONENT OWNER</LBL>
+                <SEL field="disponentOwnerId">
+                  {disponentOwners.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </SEL>
+              </div>
+              <div>
+                <LBL>CHARTERER</LBL>
+                <SEL field="chartererId">
+                  {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </SEL>
+              </div>
+              <div>
+                <LBL>CHARTER PARTY DATE</LBL>
+                <input value={form.charterPartyDate || ""} onChange={e => f("charterPartyDate", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <LBL>BROKER</LBL>
+                <SEL field="brokerId">
+                  {brokers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </SEL>
+              </div>
+              <div>
+                <LBL>BUSINESS UNIT</LBL>
+                <SEL field="businessUnit">
+                  {(config.businessUnit || []).map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
+                </SEL>
+              </div>
+
+              {/* ── LAYCAN / EXTENSION ── */}
+              <SECT label="Laycan / Extension" color={COLORS.blue} />
+              <div>
+                <LBL>LAYCAN START</LBL>
+                <input value={form.laycanStart || ""} onChange={e => f("laycanStart", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <LBL>LAYCAN END</LBL>
+                <input value={form.laycanEnd || ""} onChange={e => f("laycanEnd", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <LBL>EXTENSION START</LBL>
+                <input value={form.extensionStart || ""} onChange={e => f("extensionStart", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <LBL>EXTENSION END</LBL>
+                <input value={form.extensionEnd || ""} onChange={e => f("extensionEnd", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+
+              {/* ── FINANCIER ── */}
+              <SECT label="Financier" color={COLORS.gold} />
+              <div>
+                <LBL>COSTS CURRENCY</LBL>
+                <SEL field="costsCurrency">
+                  {(config.contractCurrencies || []).map(c => <option key={c.label||c.value} value={c.label||c.value}>{c.label||c.value}</option>)}
+                </SEL>
+              </div>
+              <div />
+              <div>
+                <LBL>FREIGHT RATE</LBL>
+                <div style={{ position: "relative" }}>
+                  <input type="number" value={form.freightRate || ""} onChange={e => f("freightRate", e.target.value)} placeholder="0"
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 48px 10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                  <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: COLORS.textMuted, pointerEvents: "none" }}>{currencyUnit}</span>
+                </div>
+              </div>
+              <div>
+                <LBL>DEMURRAGE RATE</LBL>
+                <div style={{ position: "relative" }}>
+                  <input type="number" value={form.demurrageRate || ""} onChange={e => f("demurrageRate", e.target.value)} placeholder="0"
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 48px 10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                  <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: COLORS.textMuted, pointerEvents: "none" }}>{currencyUnit}</span>
+                </div>
+              </div>
+              <div>
+                <LBL>DISPATCH RATE</LBL>
+                <div style={{ position: "relative" }}>
+                  <input type="number" value={form.dispatchRate || ""} onChange={e => f("dispatchRate", e.target.value)} placeholder="0"
+                    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 48px 10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                  <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: COLORS.textMuted, pointerEvents: "none" }}>{currencyUnit}</span>
+                </div>
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <LBL>ADDITIONAL INFO</LBL>
+                <textarea value={form.additionalInfo || ""} onChange={e => f("additionalInfo", e.target.value)} rows={2} placeholder="Informations complémentaires…"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+              </div>
+
+              {/* ── LOADING PORTS ── */}
+              <SECT label="Loading Ports" color={COLORS.blue} />
+              <div style={{ gridColumn: "1 / -1" }}>
+                {(form.loadingPorts || []).map((port, idx) => (
+                  <PortBlock key={idx} port={port} idx={idx} label="Loading Port"
+                    isLoading={true} canRemove={(form.loadingPorts||[]).length > 1}
+                    onChange={(field, value) => updatePort("loading", idx, field, value)}
+                    onRemove={() => removePort("loading", idx)}
+                    config={config} companies={companies} />
+                ))}
+                <button onClick={() => addPort("loading")}
+                  style={{ background: `${COLORS.blue}15`, border: `1px dashed ${COLORS.blue}50`, borderRadius: 10, padding: "8px 16px", color: COLORS.blue, fontSize: 12, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit" }}>
+                  + Ajouter un Loading Port
+                </button>
+              </div>
+
+              {/* ── DESTINATION PORTS ── */}
+              <SECT label="Destination Ports" color={COLORS.green} />
+              <div style={{ gridColumn: "1 / -1" }}>
+                {(form.destinationPorts || []).map((port, idx) => (
+                  <PortBlock key={idx} port={port} idx={idx} label="Destination Port"
+                    isLoading={false} canRemove={(form.destinationPorts||[]).length > 1}
+                    onChange={(field, value) => updatePort("destination", idx, field, value)}
+                    onRemove={() => removePort("destination", idx)}
+                    config={config} companies={companies} />
+                ))}
+                <button onClick={() => addPort("destination")}
+                  style={{ background: `${COLORS.green}15`, border: `1px dashed ${COLORS.green}50`, borderRadius: 10, padding: "8px 16px", color: COLORS.green, fontSize: 12, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit" }}>
+                  + Ajouter un Destination Port
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
+              <button onClick={closeModal} style={{ padding: "10px 20px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+              <Btn onClick={save} disabled={!form.voyageName?.trim()}>{editId !== null ? "✓ Enregistrer" : "✓ Créer"}</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function CRM() {
   const [currentUser, setCurrentUser] = useState(() => { try { return JSON.parse(localStorage.getItem("crm_current_user") || "null"); } catch { return null; } });
   const logoSize = 50;
@@ -20196,6 +20714,7 @@ export default function CRM() {
   const [tasks, setTasks] = useState(initialTasks);
   const [contracts, setContracts] = useState([]);
   const [vessels, setVessels] = useState([]);
+  const [voyages, setVoyages] = useState([]);
   const [derivativesCache, setDerivativesCache] = useState(null);
   const [fixingsCache, setFixingsCache] = useState(null);
   const [page, setPage] = useState(() => localStorage.getItem("crm_page") || "dashboard");
@@ -20253,7 +20772,7 @@ export default function CRM() {
     }
 
     async function loadData() {
-      const [contacts, companies, tasks, derivOps, fixingOps, contractsData, vesselsData] = await Promise.all([
+      const [contacts, companies, tasks, derivOps, fixingOps, contractsData, vesselsData, voyagesData] = await Promise.all([
         loadAllPages('contacts'),
         loadAllPages('companies'),
         loadAllPages('tasks'),
@@ -20261,6 +20780,7 @@ export default function CRM() {
         loadAllPages('fixings'),
         loadAllPages('contracts'),
         loadAllPages('vessels'),
+        loadAllPages('voyages'),
       ]);
       if (contacts.length) setContacts(contacts);
       if (companies.length) setCompanies(companies);
@@ -20269,6 +20789,7 @@ export default function CRM() {
       if (fixingOps.length) setFixingsCache(fixingOps);
       if (contractsData.length) setContracts(contractsData);
       if (vesselsData.length) setVessels(vesselsData);
+      if (voyagesData.length) setVoyages(voyagesData);
       dataLoaded.current = true;
     }
     loadData();
@@ -20377,6 +20898,7 @@ export default function CRM() {
             </div>
             <NavItem n={{ id: "contracts", label: "Contracts", icon: "📄" }} />
             <NavItem n={{ id: "vessels", label: "Vessels", icon: "🚢" }} />
+            <NavItem n={{ id: "voyages", label: "Voyages", icon: "⚓" }} />
             <div style={{ height: 1, background: COLORS.border, margin: "16px 24px" }} />
             <div style={{ padding: "0 24px 10px", fontSize: 14, color: "#D4AF37", fontWeight: 700, letterSpacing: 1 }}>ACTIVITÉ</div>
             {[{ id: "dashboard", label: "Dashboard", icon: "◇" }, { id: "tasks", label: "Tâches", icon: "◎" }, { id: "pipeline", label: "Pipeline", icon: "◈" }].map(n => <NavItem key={n.id} n={n} />)}
@@ -20409,6 +20931,7 @@ export default function CRM() {
           {page === "derivatives-statistics" && <DerivStatistics />}
           {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} />}
           {page === "vessels" && <Vessels companies={companies} vessels={vessels} setVessels={setVessels} />}
+          {page === "voyages" && <Voyages companies={companies} vessels={vessels} voyages={voyages} setVoyages={setVoyages} />}
           {page === "admin" && <AdminPanel companies={companies} />}
         </div>
       </div>

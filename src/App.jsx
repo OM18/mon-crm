@@ -20117,7 +20117,7 @@ const VESSEL_IMPORTABLE_FIELDS = ["vesselId","name","imo","year","flag","ownerId
 const VESSEL_FIELD_LABELS = { vesselId:"Vessel ID", name:"Name", imo:"IMO", year:"Year", flag:"Flag", ownerId:"Owner", managingCompanyId:"Managing Company", vesselSize:"Vessel Size", marineTrafficLink:"Marine Traffic Link", additionalInfos:"Additional Infos", blackListed:"Black Listed" };
 
 const VesselImportModal = ({ onClose, onImport, companies, config }) => {
-  const [step, setStep] = useState("upload");
+  const [step, setStep] = useState("guide");
   const [rawRows, setRawRows] = useState([]);
   const [headers, setHeaders] = useState([]);
   const [mapping, setMapping] = useState({});
@@ -20231,24 +20231,67 @@ const VesselImportModal = ({ onClose, onImport, companies, config }) => {
   return (
     <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 700, maxHeight: "90vh", overflowY: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>🚢 Import Vessels</div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
         </div>
 
-        {/* Upload */}
-        {step === "upload" && (
+        {/* Step indicators */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 22 }}>
+          {[["guide","① Guide"],["mapping","② Mapping"],["preview","③ Aperçu"]].map(([s, l]) => (
+            <div key={s} style={{ padding: "4px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+              background: step === s ? COLORS.accent : COLORS.bg,
+              color: step === s ? "#fff" : COLORS.textMuted,
+              border: `1px solid ${step === s ? COLORS.accent : COLORS.border}` }}>{l}</div>
+          ))}
+        </div>
+        {step === "guide" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ background: COLORS.bg, border: `2px dashed ${COLORS.border}`, borderRadius: 14, padding: 40, textAlign: "center", cursor: "pointer" }}
-              onClick={() => fileRef.current?.click()}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>📂</div>
-              <div style={{ fontSize: 14, color: COLORS.textMuted, marginBottom: 8 }}>Cliquez pour choisir un fichier Excel ou CSV</div>
-              <div style={{ fontSize: 11, color: COLORS.textMuted }}>Formats acceptés : .xlsx, .xls, .csv</div>
+            {/* Field guide table */}
+            <div style={{ background: COLORS.bg, borderRadius: 12, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+              <div style={{ padding: "10px 16px", background: `${COLORS.accent}12`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 12, fontWeight: 700, color: COLORS.accent }}>COLONNES RECONNUES AUTOMATIQUEMENT</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "14px 16px" }}>
+                {[
+                  { f: "vesselId",           l: "Vessel ID" },
+                  { f: "name",               l: "Name", req: true },
+                  { f: "imo",                l: "IMO" },
+                  { f: "year",               l: "Year" },
+                  { f: "flag",               l: "Flag" },
+                  { f: "ownerId",            l: "Owner" },
+                  { f: "managingCompanyId",  l: "Managing Company" },
+                  { f: "vesselSize",         l: "Vessel Size" },
+                  { f: "marineTrafficLink",  l: "Marine Traffic Link" },
+                  { f: "additionalInfos",    l: "Additional Infos" },
+                  { f: "blackListed",        l: "Black Listed" },
+                ].map(({ f, l, req }) => (
+                  <span key={f} style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 5,
+                    background: req ? `${COLORS.red}15` : `${COLORS.accent}10`,
+                    color: req ? COLORS.red : COLORS.textMuted,
+                    border: `1px solid ${req ? COLORS.red+"30" : COLORS.border}` }}>
+                    {l}{req ? " *" : ""}
+                  </span>
+                ))}
+              </div>
+              <div style={{ padding: "0 16px 12px", fontSize: 11, color: COLORS.textMuted }}>* Champ obligatoire</div>
             </div>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
-            <button onClick={doExport} style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "9px 16px", color: COLORS.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-              ⬇ Télécharger le modèle Excel
-            </button>
+            {/* Notes */}
+            <div style={{ background: `${COLORS.orange}10`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "10px 14px" }}>
+              {[
+                "⚠ owner / managingCompanyId : saisir le nom exact de la société.",
+                "⚠ flag : code ISO 2 lettres (ex: FR, MA, LR) ou nom du pays.",
+                "⚠ vesselSize : valeur exacte de l'Admin Panel.",
+                "⚠ blackListed : TRUE/FALSE ou OUI/NON.",
+                "⚠ year : nombre entier entre 1900 et 2100.",
+              ].map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
+            </div>
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={doExport} style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "9px 16px", color: COLORS.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                ⬇ Télécharger le modèle Excel
+              </button>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
+              <Btn onClick={() => fileRef.current?.click()}>📂 Choisir un fichier</Btn>
+            </div>
             {error && <div style={{ color: COLORS.red, fontSize: 12, padding: "8px 12px", background: `${COLORS.red}10`, borderRadius: 8 }}>{error}</div>}
           </div>
         )}
@@ -20295,7 +20338,7 @@ const VesselImportModal = ({ onClose, onImport, companies, config }) => {
               })}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
-              <button onClick={() => setStep("upload")} style={{ padding: "10px 18px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Retour</button>
+              <button onClick={() => setStep("guide")} style={{ padding: "10px 18px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Retour</button>
               <Btn onClick={buildPreview}>Aperçu →</Btn>
             </div>
           </div>

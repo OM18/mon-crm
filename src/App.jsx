@@ -16934,6 +16934,12 @@ const CONTRACT_FIELD_MAP = {
   "vat":               ["vat", "tva", "tax"],
   "vatRate":           ["vat rate (%)", "vatrate", "vat rate", "taux tva", "taux de tva", "tax rate"],
   "info":              ["info", "note", "information", "notes", "remarks", "commentaire"],
+  "trade1":            ["trade 1", "trade1", "trade n°1", "trade no 1", "1st trade"],
+  "connectedQty1":     ["connected quantity 1", "connectedqty1", "qty 1", "quantite 1", "connected qty 1", "quantity 1"],
+  "trade2":            ["trade 2", "trade2", "trade n°2", "trade no 2", "2nd trade"],
+  "connectedQty2":     ["connected quantity 2", "connectedqty2", "qty 2", "quantite 2", "connected qty 2", "quantity 2"],
+  "trade3":            ["trade 3", "trade3", "trade n°3", "trade no 3", "3rd trade"],
+  "connectedQty3":     ["connected quantity 3", "connectedqty3", "qty 3", "quantite 3", "connected qty 3", "quantity 3"],
 };
 
 const CONTRACT_REQUIRED_FIELDS = ["contractNumber", "contractType", "conclusionDate", "buyerId", "sellerId", "commodity"];
@@ -16984,6 +16990,12 @@ const CONTRACT_FIELD_LABELS = {
   "analyticalPremium":                "Analytical Premium",
   "numberOfLots":                     "Number of Lots",
   "info":                             "Info",
+  "trade1":                           "Trade 1",
+  "connectedQty1":                    "Connected Quantity 1",
+  "trade2":                           "Trade 2",
+  "connectedQty2":                    "Connected Quantity 2",
+  "trade3":                           "Trade 3",
+  "connectedQty3":                    "Connected Quantity 3",
 };
 
 const CONTRACT_EXPORT_HEADERS = [
@@ -17381,6 +17393,21 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
         else unknowns[`businessUnit:${obj.businessUnit}`] = { fieldKey: "businessUnit", configKey: "businessUnit", fieldLabel: "Business Unit", value: obj.businessUnit, allowed: allowed.map(b => b.label) };
       }
 
+      // Build tradeLinks from trade1/connectedQty1, trade2/connectedQty2, trade3/connectedQty3
+      const tradeLinks = [];
+      for (let n = 1; n <= 3; n++) {
+        const tradeVal = obj[`trade${n}`];
+        const qtyVal   = obj[`connectedQty${n}`];
+        if (tradeVal && String(tradeVal).trim() !== "") {
+          const qty = qtyVal ? String(Math.round(parseFloat(String(qtyVal).replace(/[^\d.,]/g,"").replace(",",".")) || 0)) : "";
+          tradeLinks.push({ tradeId: String(tradeVal).trim(), connectedQty: qty });
+        }
+        // Remove raw fields from obj — not needed in contract data
+        delete obj[`trade${n}`];
+        delete obj[`connectedQty${n}`];
+      }
+      if (tradeLinks.length > 0) obj.tradeLinks = tradeLinks;
+
       // Validate required fields
       CONTRACT_REQUIRED_FIELDS.forEach(key => {
         if (!obj[key] || String(obj[key]).trim() === "") {
@@ -17581,6 +17608,12 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
                   { f: "transformation", l: "Transformation" },
                   { f: "businessUnit", l: "Business Unit" },
                   { f: "info", l: "Info" },
+                  { f: "trade1", l: "Trade 1" },
+                  { f: "connectedQty1", l: "Connected Qty 1" },
+                  { f: "trade2", l: "Trade 2" },
+                  { f: "connectedQty2", l: "Connected Qty 2" },
+                  { f: "trade3", l: "Trade 3" },
+                  { f: "connectedQty3", l: "Connected Qty 3" },
                   { f: "vat", l: "VAT" },
                   { f: "vatRate", l: "VAT Rate (%)" },
                   { f: "analyticalFlatPrice", l: "Contract Analytical Flat Price" },

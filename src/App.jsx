@@ -6575,6 +6575,233 @@ const BatchCompaniesNewToOld = () => {
   );
 };
 
+// ─── BATCH VESSELS — OLD TO NEW ───────────────────────────────
+const BatchVesselsOldToNew = () => {
+  const [state, setState] = useState("idle");
+  const [result, setResult] = useState(null);
+  const fileRef = useRef(null);
+
+  const normKey = k => k.trim().toLowerCase().replace(/[-_\s]+/g, "_");
+
+  // ── Column rename map ─────────────────────────────────────────
+  const COLUMN_MAP = {
+    "id":                                   "vesselId",
+    "name":                                 "name",
+    "imo":                                  "imo",
+    "age":                                  "year",
+    "blacklisted":                          "blackListed",
+    "marinetraffic":                        "marineTrafficLink",
+    "owner__client__name":                  "ownerId",
+    "managing_company__client__name":       "managingCompanyId",
+    "size__title":                          "vesselSize",
+    "owner_info":                           "additionalInfos",
+    "flag":                                 "flag",
+  };
+
+  const DROP_COLS = new Set(["owner", "capacity"]);
+
+  // ── processFile ───────────────────────────────────────────────
+  const processFile = async (file) => {
+    setState("processing"); setResult(null);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      const converted = rows.map(row => {
+        const out = {};
+        const rowNorm = Object.keys(row).reduce((acc, k) => { acc[normKey(k)] = k; return acc; }, {});
+
+        const get = (srcKey) => {
+          let raw = row[srcKey];
+          if (raw === undefined) { const ak = rowNorm[normKey(srcKey)]; raw = ak !== undefined ? row[ak] : ""; }
+          return raw !== undefined && raw !== null ? String(raw).trim() : "";
+        };
+
+        for (const [srcKey, destKey] of Object.entries(COLUMN_MAP)) {
+          if (DROP_COLS.has(srcKey)) continue;
+          let val = get(srcKey);
+
+          // ── Transforms ──
+          if (destKey === "blackListed") {
+            const u = val.toUpperCase();
+            val = (u === "TRUE" || u === "VRAI" || u === "OUI" || u === "1") ? "TRUE"
+                : (u === "FALSE" || u === "FAUX" || u === "NON" || u === "0") ? "FALSE" : val;
+
+          } else if (destKey === "year") {
+            // "age" (number) → current year - age = year built
+            const age = parseInt(val);
+            if (!isNaN(age) && age > 0 && age < 200) {
+              val = String(new Date().getFullYear() - age);
+            }
+
+          } else if (destKey === "imo") {
+            val = val.replace(/[^\d]/g, "");
+          }
+
+          out[destKey] = val;
+        }
+
+        // Drop columns explicitly
+        DROP_COLS.forEach(k => delete out[k]);
+
+        return out;
+      });
+
+      if (converted.length === 0) { setResult({ error: "Aucune ligne valide." }); setState("error"); return; }
+
+      const outWs = XLSX.utils.json_to_sheet(converted);
+      outWs["!cols"] = Object.keys(converted[0]).map(k => ({ wch: Math.max(k.length + 2, 18) }));
+      const outWb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(outWb, outWs, "Vessels");
+      XLSX.writeFile(outWb, `vessels_converted_${new Date().toISOString().slice(0,10)}.xlsx`);
+      setResult({ total: rows.length, converted: converted.length });
+      setState("done");
+    } catch(e) { setResult({ error: String(e) }); setState("error"); }
+  };
+
+  // ── Table styles ──────────────────────────────────────────────
+  const TH = { padding: "5px 10px", textAlign: "left", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bg, whiteSpace: "nowrap" };
+  const TD = { padding: "4px 10px", fontSize: 11, color: COLORS.text, borderBottom: `1px solid ${COLORS.border}40`, whiteSpace: "nowrap" };
+  const TDm = { ...TD, color: COLORS.textMuted, fontStyle: "italic" };
+  const TAG = (c) => ({ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${c}18`, color: c, border: `1px solid ${c}40` });
+
+  const RENAME_ROWS = [
+    ["id", "vesselId"],
+    ["name", "name"],
+    ["imo", "imo"],
+    ["age", "year"],
+    ["blacklisted", "blackListed"],
+    ["marinetraffic", "marineTrafficLink"],
+    ["owner__client__name", "ownerId"],
+    ["managing_company__client__name", "managingCompanyId"],
+    ["size__title", "vesselSize"],
+    ["owner_info", "additionalInfos"],
+    ["flag", "flag"],
+  ];
+
+  const DROP_ROWS = [
+    ["owner", "— supprimé —"],
+    ["capacity", "— supprimé —"],
+  ];
+
+  const FORMAT_ROWS = [
+    ["age", "year", "Nombre (âge)", "Année (année en cours − âge)"],
+    ["blacklisted", "blackListed", "TRUE/VRAI/OUI/1", "TRUE / FALSE"],
+    ["imo", "imo", "Texte", "Chiffres uniquement"],
+  ];
+
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ padding: "18px 24px", background: `${COLORS.accent}08`, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: `${COLORS.accent}20`, border: `1px solid ${COLORS.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🚢</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>BATCH VESSELS — OLD TO NEW</div>
+          <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Convertit un export navires ancien format vers le format d'import de l'app</div>
+        </div>
+      </div>
+
+      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
+
+        {/* ── 3 tables ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 0.8fr 1.2fr", gap: 14, alignItems: "start" }}>
+
+          {/* TABLE 1 — Colonnes renommées */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.blue}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.blue, letterSpacing: 0.8 }}>① COLONNES RENOMMÉES</div>
+            <div style={{ overflowY: "auto", maxHeight: 360 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={TH}>OLD</th><th style={TH}>NEW</th></tr></thead>
+                <tbody>
+                  {RENAME_ROWS.map(([o, n], i) => (
+                    <tr key={i}>
+                      <td style={{ ...TD, color: COLORS.accent, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{o}</td>
+                      <td style={{ ...TD, color: COLORS.green, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{n}</td>
+                    </tr>
+                  ))}
+                  {DROP_ROWS.map(([o, n], i) => (
+                    <tr key={"d"+i}>
+                      <td style={{ ...TD, color: COLORS.accent, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{o}</td>
+                      <td style={{ ...TD, color: COLORS.red, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{n}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* TABLE 2 — Valeurs à modifier (empty for vessels) */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.orange}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.orange, letterSpacing: 0.8 }}>② VALEURS MODIFIÉES</div>
+            <div style={{ padding: "12px 14px" }}>
+              {[
+                ["blacklisted", "blackListed", "TRUE/VRAI/OUI/1", "TRUE"],
+                ["", "", "FALSE/FAUX/NON/0", "FALSE"],
+              ].map(([src, col, ov, nv], i) => (
+                <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                  {src && <span style={{ fontSize: 10, color: COLORS.accent, fontFamily: "'DM Mono',monospace", minWidth: 80 }}>{src}</span>}
+                  {!src && <span style={{ minWidth: 80 }} />}
+                  <span style={{ fontSize: 10, color: COLORS.textMuted }}>{ov}</span>
+                  <span style={{ fontSize: 10, color: COLORS.textMuted }}>→</span>
+                  <span style={TAG(COLORS.green)}>{nv}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* TABLE 3 — Formats */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.gold}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.gold, letterSpacing: 0.8 }}>③ FORMATS MODIFIÉS</div>
+            <div style={{ overflowY: "auto", maxHeight: 360 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={TH}>SOURCE</th><th style={TH}>NOUVEAU</th><th style={TH}>ANCIEN</th><th style={TH}>NOUVEAU</th></tr></thead>
+                <tbody>
+                  {FORMAT_ROWS.map(([src, dst, oldF, newF], i) => (
+                    <tr key={i}>
+                      <td style={{ ...TD, color: COLORS.accent, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{src}</td>
+                      <td style={{ ...TD, color: COLORS.green, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{dst}</td>
+                      <td style={{ ...TDm, fontSize: 10 }}>{oldF}</td>
+                      <td style={{ ...TD, fontSize: 10 }}><span style={TAG(COLORS.gold)}>{newF}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Note */}
+        <div style={{ background: `${COLORS.orange}10`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "10px 14px" }}>
+          {[
+            "⚠ owner / managing_company : les noms de sociétés sont conservés tels quels — résolution par nom au moment de l'import Vessels.",
+            "⚠ age → year : calculé comme (année courante − âge). Si la valeur source est déjà une année (ex: 2015), elle est conservée.",
+            "⚠ Les colonnes 'owner' et 'capacity' sont supprimées du fichier de sortie.",
+          ].map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
+        </div>
+
+        {/* Action */}
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
+          onChange={e => { if (e.target.files[0]) processFile(e.target.files[0]); e.target.value = ""; }} />
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <Btn onClick={() => { setState("idle"); setResult(null); fileRef.current?.click(); }}
+            disabled={state === "processing"} style={{ background: COLORS.accent, borderColor: COLORS.accent }}>
+            {state === "processing" ? "⟳ Traitement…" : "📂 Charger fichier Excel / CSV"}
+          </Btn>
+          {state === "done" && result && (
+            <span style={{ fontSize: 12, color: COLORS.green, fontWeight: 700 }}>
+              ✓ {result.converted} navires convertis sur {result.total} — fichier téléchargé
+            </span>
+          )}
+          {state === "error" && <span style={{ fontSize: 12, color: COLORS.red }}>❌ {result?.error}</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const BatchCompaniesOldToNew = () => {
   const [state, setState] = useState("idle");
   const [result, setResult] = useState(null);
@@ -8551,6 +8778,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <BatchFixingsOldToNew />
           <BatchFixingsNewToOld />
           <BatchContractsOldToNew />
+          <BatchVesselsOldToNew />
         </div>
       )}
 

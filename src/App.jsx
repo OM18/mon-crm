@@ -6589,7 +6589,7 @@ const BatchVesselsOldToNew = () => {
     "name":                                 "name",
     "imo":                                  "imo",
     "age":                                  "year",
-    "blacklisted":                          "blackListed",
+    "blacklisted":                          "Black Listed",
     "marinetraffic":                        "marineTrafficLink",
     "owner__client__name":                  "owner",
     "managing_company__client__name":       "managingCompany",
@@ -6625,7 +6625,7 @@ const BatchVesselsOldToNew = () => {
           let val = get(srcKey);
 
           // ── Transforms ──
-          if (destKey === "blackListed") {
+          if (destKey === "Black Listed") {
             const u = val.toUpperCase();
             val = (u === "TRUE" || u === "VRAI" || u === "OUI" || u === "1") ? "TRUE"
                 : (u === "FALSE" || u === "FAUX" || u === "NON" || u === "0") ? "FALSE" : val;
@@ -6673,7 +6673,7 @@ const BatchVesselsOldToNew = () => {
     ["name", "name"],
     ["imo", "imo"],
     ["age", "year"],
-    ["blacklisted", "blackListed"],
+    ["blacklisted", "Black Listed"],
     ["marinetraffic", "marineTrafficLink"],
     ["owner__client__name", "owner"],
     ["managing_company__client__name", "managingCompany"],

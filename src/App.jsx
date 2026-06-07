@@ -21237,52 +21237,145 @@ const EMPTY_VOYAGE = () => ({
   createdAt: "",
 });
 
-const ROW_H_VOYAGE = 56;
 const OVERSCAN_VOYAGE = 8;
+
+// ── helpers for blotter field display ──
+const VF = ({ label, value, mono, accent }) => (
+  <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+    <span style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.6, textTransform: "uppercase", lineHeight: 1.2, marginBottom: 2 }}>{label}</span>
+    <span style={{ fontSize: 11, color: accent ? COLORS.accent : (value && value !== "—" ? COLORS.text : COLORS.textMuted), fontFamily: mono ? "monospace" : "inherit", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value || "—"}</span>
+  </div>
+);
+const VFRow = ({ children }) => (
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 10px" }}>{children}</div>
+);
+const VFSep = () => <div style={{ height: 1, background: COLORS.border, margin: "6px 0" }} />;
 
 const VoyageRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, vessels, companies, config }) => {
   const vessel = vessels.find(x => x.id === v.vesselId || String(x.id) === String(v.vesselId));
   const owner = companies.find(c => c.id === v.disponentOwnerId || String(c.id) === String(v.disponentOwnerId));
   const charterer = companies.find(c => c.id === v.chartererId || String(c.id) === String(v.chartererId));
+  const broker = companies.find(c => c.id === v.brokerId || String(c.id) === String(v.brokerId));
   const buDef = v.businessUnit ? (config.businessUnit || []).find(b => b.value === v.businessUnit) : null;
+  const ho = companies.find(c => c.id === v.hoId || String(c.id) === String(v.hoId));
+  const doComp = companies.find(c => c.id === v.doId || String(c.id) === String(v.doId));
+  const managingComp = companies.find(c => c.id === v.managingCompanyId || String(c.id) === String(v.managingCompanyId));
+
+  const loadingPort1 = (v.loadingPorts || [])[0];
+  const destPort1 = (v.destinationPorts || [])[0];
+  const intake = v.intake || v.intakeQty || "";
+  const capacityEst = v.capacityEst || v.capacity || "";
+  const insuranceStatus = v.insuranceStatus || "";
+  const insuranceDone = v.insuranceDone || 0;
+  const insuranceTotal = v.insuranceTotal || 0;
+  const marineTrafficLink = v.marineTrafficLink || v.marineTraffic || "";
+
+  const rowBg = isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`;
+
+  const cellStyle = { padding: "10px 14px", borderRight: `1px solid ${COLORS.border}`, verticalAlign: "top", minWidth: 0 };
+
   return (
     <div onClick={() => onSelect(v)}
-      style={{ display: "grid", gridTemplateColumns: "200px 180px 120px 180px 180px 130px 60px", borderBottom: `1px solid ${COLORS.border}`,
-        height: ROW_H_VOYAGE, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
-        background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
-        cursor: "pointer", transition: "background 0.1s" }}
+      style={{ display: "grid", gridTemplateColumns: "320px 280px 60px", borderBottom: `1px solid ${COLORS.border}`,
+        boxSizing: "border-box", minWidth: "max-content",
+        background: rowBg, cursor: "pointer", transition: "background 0.1s", alignItems: "stretch" }}
       onMouseOver={e => { if (!isSel) e.currentTarget.style.background = COLORS.hover; }}
-      onMouseOut={e => { if (!isSel) e.currentTarget.style.background = idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`; }}>
-      {/* VOYAGE NAME */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
-        <span title={v.voyageName} style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.voyageName || "—"}</span>
+      onMouseOut={e => { if (!isSel) e.currentTarget.style.background = rowBg; }}>
+
+      {/* ── COL 1 : VOYAGE ── */}
+      <div style={{ ...cellStyle, display: "flex", flexDirection: "column", gap: 0 }}>
+        {/* Title */}
+        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.voyageName || "—"}</div>
+        <VFRow>
+          <VF label="Vessel" value={vessel?.name} />
+          <VF label="Size" value={vessel?.size || vessel?.vesselSize} />
+        </VFRow>
+        <VFRow>
+          <VF label="Trade" value={v.trade} />
+          <VF label="CP Date" value={v.charterPartyDate} />
+        </VFRow>
+        <VFSep />
+        <VFRow>
+          <VF label="Laycan Start" value={v.laycanStart} />
+          <VF label="Laycan End" value={v.laycanEnd} />
+        </VFRow>
+        <div style={{ marginTop: 4 }}>
+          <VF label="Freight Rate" value={v.freightRate ? `${v.freightRate} $/T` : ""} accent />
+        </div>
+        <VFSep />
+        <VFRow>
+          <VF label="Load Rate" value={v.loadingPorts?.[0]?.loadRate ? `${v.loadingPorts[0].loadRate} T/Day` : (v.loadRate ? `${v.loadRate} T/Day` : "")} mono />
+          <VF label="Disch Rate" value={v.destinationPorts?.[0]?.dischargeRate ? `${v.destinationPorts[0].dischargeRate} T/Day` : (v.dischRate ? `${v.dischRate} T/Day` : "")} mono />
+        </VFRow>
+        <VFRow>
+          <VF label="Dem Rate" value={v.demurrageRate ? `${v.demurrageRate} $/Day` : ""} mono />
+          <VF label="Dispatch Rate" value={v.dispatchRate ? `${v.dispatchRate} $/Day` : ""} mono />
+        </VFRow>
+        {v.additionalInfo && (<><VFSep /><div style={{ fontSize: 11, color: COLORS.textSub, fontStyle: "italic", lineHeight: 1.4 }}>{v.additionalInfo}</div></>)}
+        <VFSep />
+        {marineTrafficLink
+          ? <a href={marineTrafficLink} target="_blank" rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              style={{ fontSize: 11, color: COLORS.blue, textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
+              onMouseOver={e => e.currentTarget.style.textDecoration="underline"} onMouseOut={e => e.currentTarget.style.textDecoration="none"}>
+              🔗 Live Position
+            </a>
+          : <span style={{ fontSize: 11, color: COLORS.textMuted }}>🔗 Marine Traffic —</span>
+        }
       </div>
-      {/* VESSEL */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
-        <span title={vessel?.name} style={{ fontSize: 12, color: vessel ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{vessel?.name || "—"}</span>
+
+      {/* ── COL 2 : PARAMETERS ── */}
+      <div style={{ ...cellStyle, display: "flex", flexDirection: "column", gap: 0 }}>
+        {/* Loading section */}
+        <div style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6, padding: "2px 6px", background: `${COLORS.accent}15`, borderRadius: 4, display: "inline-block", alignSelf: "flex-start" }}>Loading</div>
+        <VFRow>
+          <VF label="Intake" value={intake} mono />
+          <VF label="Capacity Est." value={capacityEst} mono />
+        </VFRow>
+        <VFSep />
+        {/* Parties */}
+        <VF label="Broker" value={broker?.name} />
+        <div style={{ marginTop: 4 }}><VF label="HO" value={ho?.name || v.hoName} /></div>
+        <div style={{ marginTop: 4 }}><VF label="DO" value={doComp?.name || owner?.name} /></div>
+        <div style={{ marginTop: 4 }}><VF label="Managing Company" value={managingComp?.name || v.managingCompany} /></div>
+        <div style={{ marginTop: 4 }}><VF label="Charterer" value={charterer?.name} /></div>
+        <VFSep />
+        {/* Ports */}
+        <VFRow>
+          <VF label="Loading Port" value={loadingPort1?.portId || loadingPort1?.name} />
+          <VF label="Disch. Port" value={destPort1?.portId || destPort1?.name} />
+        </VFRow>
+        <VFSep />
+        {/* Insurance */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.6, textTransform: "uppercase" }}>Insurance</span>
+          {insuranceStatus
+            ? <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 4,
+                background: insuranceStatus.toLowerCase().includes("done") || insuranceStatus.toLowerCase().includes("ok") ? `${COLORS.green}20` : `${COLORS.red}20`,
+                color: insuranceStatus.toLowerCase().includes("done") || insuranceStatus.toLowerCase().includes("ok") ? COLORS.green : COLORS.red,
+                border: `1px solid ${insuranceStatus.toLowerCase().includes("done") || insuranceStatus.toLowerCase().includes("ok") ? COLORS.green : COLORS.red}40` }}>
+                {insuranceStatus}
+              </span>
+            : <span style={{ fontSize: 10, color: COLORS.textMuted }}>—</span>
+          }
+          {(insuranceDone || insuranceTotal) ? <span style={{ fontSize: 10, color: COLORS.textMuted }}>({insuranceDone} / {insuranceTotal})</span> : null}
+        </div>
+        {/* BU */}
+        {buDef && (
+          <div style={{ marginTop: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: `${buDef.color || COLORS.blue}20`, color: buDef.color || COLORS.blue, border: `1px solid ${buDef.color || COLORS.blue}40` }}>{buDef.label}</span>
+          </div>
+        )}
       </div>
-      {/* STATUS */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
-        {v.status ? <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${COLORS.accent}18`, color: COLORS.accent, border: `1px solid ${COLORS.accent}30` }}>{v.status}</span> : <span style={{ color: COLORS.textMuted, fontSize: 12 }}>—</span>}
-      </div>
-      {/* DISPONENT OWNER */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
-        <span title={owner?.name} style={{ fontSize: 11, color: owner ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{owner?.name || "—"}</span>
-      </div>
-      {/* CHARTERER */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
-        <span title={charterer?.name} style={{ fontSize: 11, color: charterer ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{charterer?.name || "—"}</span>
-      </div>
-      {/* BU */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
-        {buDef ? <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: `${buDef.color || COLORS.blue}20`, color: buDef.color || COLORS.blue, border: `1px solid ${buDef.color || COLORS.blue}40` }}>{buDef.label}</span> : <span style={{ color: COLORS.textMuted, fontSize: 11 }}>—</span>}
-      </div>
-      {/* ACTIONS */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, borderLeft: `1px solid ${COLORS.border}`, padding: "0 8px" }}
+
+      {/* ── COL 3 : ACTIONS ── */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: 6, padding: "10px 8px" }}
         onClick={e => e.stopPropagation()}>
-        <button onClick={() => onEdit(v)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+        <button onClick={() => onEdit(v)} title="Modifier"
+          style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 15, padding: "4px 6px", borderRadius: 5 }}
           onMouseOver={e => e.currentTarget.style.color = COLORS.accent} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>✏</button>
-        <button onClick={() => onRemove(v.id)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+        <button onClick={() => onRemove(v.id)} title="Supprimer"
+          style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 15, padding: "4px 6px", borderRadius: 5 }}
           onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>🗑</button>
       </div>
     </div>
@@ -21290,31 +21383,15 @@ const VoyageRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, vessels, co
 });
 
 const VirtualVoyageList = ({ filtered, selected, onSelect, onEdit, onRemove, vessels, companies, config }) => {
-  const [scrollTop, setScrollTop] = useState(0);
-  const containerRef = useRef(null);
-  const [containerH, setContainerH] = useState(600);
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const ro = new ResizeObserver(e => setContainerH(e[0].contentRect.height));
-    ro.observe(containerRef.current);
-    return () => ro.disconnect();
-  }, []);
-  const totalH = filtered.length * ROW_H_VOYAGE;
-  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H_VOYAGE) - OVERSCAN_VOYAGE);
-  const endIdx = Math.min(filtered.length, Math.ceil((scrollTop + containerH) / ROW_H_VOYAGE) + OVERSCAN_VOYAGE);
   return (
-    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)} style={{ overflowY: "auto", flex: 1 }}>
+    <div style={{ overflowY: "auto", flex: 1 }}>
       {filtered.length === 0
         ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "56px 0", fontSize: 14 }}>Aucun voyage — cliquez sur « + Ajouter »</div>
-        : <div style={{ height: totalH, position: "relative" }}>
-            <div style={{ position: "absolute", top: startIdx * ROW_H_VOYAGE, left: 0, right: 0 }}>
-              {filtered.slice(startIdx, endIdx).map((v, vi) => (
-                <VoyageRow key={v.id} v={v} idx={startIdx + vi} isSel={selected?.id === v.id}
-                  onSelect={onSelect} onEdit={onEdit} onRemove={onRemove}
-                  vessels={vessels} companies={companies} config={config} />
-              ))}
-            </div>
-          </div>
+        : filtered.map((v, vi) => (
+            <VoyageRow key={v.id} v={v} idx={vi} isSel={selected?.id === v.id}
+              onSelect={onSelect} onEdit={onEdit} onRemove={onRemove}
+              vessels={vessels} companies={companies} config={config} />
+          ))
       }
     </div>
   );
@@ -21625,9 +21702,9 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
       {/* Blotter */}
       <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0, flexDirection: "column" }}>
         {/* Header row */}
-        <div style={{ display: "grid", gridTemplateColumns: "200px 180px 120px 180px 180px 130px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
-          {["VOYAGE NAME", "VESSEL", "STATUS", "DISPONENT OWNER", "CHARTERER", "BU", ""].map((h, i) => (
-            <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "320px 280px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
+          {["VOYAGE", "PARAMETERS", ""].map((h, i) => (
+            <div key={i} style={{ padding: "10px 14px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap", borderRight: i < 2 ? `1px solid ${COLORS.border}` : "none" }}>{h}</div>
           ))}
         </div>
         <div style={{ fontSize: 11, color: COLORS.textMuted, padding: "4px 12px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>

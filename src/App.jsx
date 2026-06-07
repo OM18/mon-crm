@@ -21237,145 +21237,52 @@ const EMPTY_VOYAGE = () => ({
   createdAt: "",
 });
 
+const ROW_H_VOYAGE = 56;
 const OVERSCAN_VOYAGE = 8;
-
-// ── helpers for blotter field display ──
-const VF = ({ label, value, mono, accent }) => (
-  <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-    <span style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.6, textTransform: "uppercase", lineHeight: 1.2, marginBottom: 2 }}>{label}</span>
-    <span style={{ fontSize: 11, color: accent ? COLORS.accent : (value && value !== "—" ? COLORS.text : COLORS.textMuted), fontFamily: mono ? "monospace" : "inherit", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value || "—"}</span>
-  </div>
-);
-const VFRow = ({ children }) => (
-  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 10px" }}>{children}</div>
-);
-const VFSep = () => <div style={{ height: 1, background: COLORS.border, margin: "6px 0" }} />;
 
 const VoyageRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, vessels, companies, config }) => {
   const vessel = vessels.find(x => x.id === v.vesselId || String(x.id) === String(v.vesselId));
   const owner = companies.find(c => c.id === v.disponentOwnerId || String(c.id) === String(v.disponentOwnerId));
   const charterer = companies.find(c => c.id === v.chartererId || String(c.id) === String(v.chartererId));
-  const broker = companies.find(c => c.id === v.brokerId || String(c.id) === String(v.brokerId));
   const buDef = v.businessUnit ? (config.businessUnit || []).find(b => b.value === v.businessUnit) : null;
-  const ho = companies.find(c => c.id === v.hoId || String(c.id) === String(v.hoId));
-  const doComp = companies.find(c => c.id === v.doId || String(c.id) === String(v.doId));
-  const managingComp = companies.find(c => c.id === v.managingCompanyId || String(c.id) === String(v.managingCompanyId));
-
-  const loadingPort1 = (v.loadingPorts || [])[0];
-  const destPort1 = (v.destinationPorts || [])[0];
-  const intake = v.intake || v.intakeQty || "";
-  const capacityEst = v.capacityEst || v.capacity || "";
-  const insuranceStatus = v.insuranceStatus || "";
-  const insuranceDone = v.insuranceDone || 0;
-  const insuranceTotal = v.insuranceTotal || 0;
-  const marineTrafficLink = v.marineTrafficLink || v.marineTraffic || "";
-
-  const rowBg = isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`;
-
-  const cellStyle = { padding: "10px 14px", borderRight: `1px solid ${COLORS.border}`, verticalAlign: "top", minWidth: 0 };
-
   return (
     <div onClick={() => onSelect(v)}
-      style={{ display: "grid", gridTemplateColumns: "320px 280px 60px", borderBottom: `1px solid ${COLORS.border}`,
-        boxSizing: "border-box", minWidth: "max-content",
-        background: rowBg, cursor: "pointer", transition: "background 0.1s", alignItems: "stretch" }}
+      style={{ display: "grid", gridTemplateColumns: "200px 180px 120px 180px 180px 130px 60px", borderBottom: `1px solid ${COLORS.border}`,
+        height: ROW_H_VOYAGE, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
+        background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
+        cursor: "pointer", transition: "background 0.1s" }}
       onMouseOver={e => { if (!isSel) e.currentTarget.style.background = COLORS.hover; }}
-      onMouseOut={e => { if (!isSel) e.currentTarget.style.background = rowBg; }}>
-
-      {/* ── COL 1 : VOYAGE ── */}
-      <div style={{ ...cellStyle, display: "flex", flexDirection: "column", gap: 0 }}>
-        {/* Title */}
-        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.voyageName || "—"}</div>
-        <VFRow>
-          <VF label="Vessel" value={vessel?.name} />
-          <VF label="Size" value={vessel?.size || vessel?.vesselSize} />
-        </VFRow>
-        <VFRow>
-          <VF label="Trade" value={v.trade} />
-          <VF label="CP Date" value={v.charterPartyDate} />
-        </VFRow>
-        <VFSep />
-        <VFRow>
-          <VF label="Laycan Start" value={v.laycanStart} />
-          <VF label="Laycan End" value={v.laycanEnd} />
-        </VFRow>
-        <div style={{ marginTop: 4 }}>
-          <VF label="Freight Rate" value={v.freightRate ? `${v.freightRate} $/T` : ""} accent />
-        </div>
-        <VFSep />
-        <VFRow>
-          <VF label="Load Rate" value={v.loadingPorts?.[0]?.loadRate ? `${v.loadingPorts[0].loadRate} T/Day` : (v.loadRate ? `${v.loadRate} T/Day` : "")} mono />
-          <VF label="Disch Rate" value={v.destinationPorts?.[0]?.dischargeRate ? `${v.destinationPorts[0].dischargeRate} T/Day` : (v.dischRate ? `${v.dischRate} T/Day` : "")} mono />
-        </VFRow>
-        <VFRow>
-          <VF label="Dem Rate" value={v.demurrageRate ? `${v.demurrageRate} $/Day` : ""} mono />
-          <VF label="Dispatch Rate" value={v.dispatchRate ? `${v.dispatchRate} $/Day` : ""} mono />
-        </VFRow>
-        {v.additionalInfo && (<><VFSep /><div style={{ fontSize: 11, color: COLORS.textSub, fontStyle: "italic", lineHeight: 1.4 }}>{v.additionalInfo}</div></>)}
-        <VFSep />
-        {marineTrafficLink
-          ? <a href={marineTrafficLink} target="_blank" rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()}
-              style={{ fontSize: 11, color: COLORS.blue, textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
-              onMouseOver={e => e.currentTarget.style.textDecoration="underline"} onMouseOut={e => e.currentTarget.style.textDecoration="none"}>
-              🔗 Live Position
-            </a>
-          : <span style={{ fontSize: 11, color: COLORS.textMuted }}>🔗 Marine Traffic —</span>
-        }
+      onMouseOut={e => { if (!isSel) e.currentTarget.style.background = idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`; }}>
+      {/* VOYAGE NAME */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={v.voyageName} style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.voyageName || "—"}</span>
       </div>
-
-      {/* ── COL 2 : PARAMETERS ── */}
-      <div style={{ ...cellStyle, display: "flex", flexDirection: "column", gap: 0 }}>
-        {/* Loading section */}
-        <div style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6, padding: "2px 6px", background: `${COLORS.accent}15`, borderRadius: 4, display: "inline-block", alignSelf: "flex-start" }}>Loading</div>
-        <VFRow>
-          <VF label="Intake" value={intake} mono />
-          <VF label="Capacity Est." value={capacityEst} mono />
-        </VFRow>
-        <VFSep />
-        {/* Parties */}
-        <VF label="Broker" value={broker?.name} />
-        <div style={{ marginTop: 4 }}><VF label="HO" value={ho?.name || v.hoName} /></div>
-        <div style={{ marginTop: 4 }}><VF label="DO" value={doComp?.name || owner?.name} /></div>
-        <div style={{ marginTop: 4 }}><VF label="Managing Company" value={managingComp?.name || v.managingCompany} /></div>
-        <div style={{ marginTop: 4 }}><VF label="Charterer" value={charterer?.name} /></div>
-        <VFSep />
-        {/* Ports */}
-        <VFRow>
-          <VF label="Loading Port" value={loadingPort1?.portId || loadingPort1?.name} />
-          <VF label="Disch. Port" value={destPort1?.portId || destPort1?.name} />
-        </VFRow>
-        <VFSep />
-        {/* Insurance */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.6, textTransform: "uppercase" }}>Insurance</span>
-          {insuranceStatus
-            ? <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 4,
-                background: insuranceStatus.toLowerCase().includes("done") || insuranceStatus.toLowerCase().includes("ok") ? `${COLORS.green}20` : `${COLORS.red}20`,
-                color: insuranceStatus.toLowerCase().includes("done") || insuranceStatus.toLowerCase().includes("ok") ? COLORS.green : COLORS.red,
-                border: `1px solid ${insuranceStatus.toLowerCase().includes("done") || insuranceStatus.toLowerCase().includes("ok") ? COLORS.green : COLORS.red}40` }}>
-                {insuranceStatus}
-              </span>
-            : <span style={{ fontSize: 10, color: COLORS.textMuted }}>—</span>
-          }
-          {(insuranceDone || insuranceTotal) ? <span style={{ fontSize: 10, color: COLORS.textMuted }}>({insuranceDone} / {insuranceTotal})</span> : null}
-        </div>
-        {/* BU */}
-        {buDef && (
-          <div style={{ marginTop: 6 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: `${buDef.color || COLORS.blue}20`, color: buDef.color || COLORS.blue, border: `1px solid ${buDef.color || COLORS.blue}40` }}>{buDef.label}</span>
-          </div>
-        )}
+      {/* VESSEL */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={vessel?.name} style={{ fontSize: 12, color: vessel ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{vessel?.name || "—"}</span>
       </div>
-
-      {/* ── COL 3 : ACTIONS ── */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: 6, padding: "10px 8px" }}
+      {/* STATUS */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
+        {v.status ? <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${COLORS.accent}18`, color: COLORS.accent, border: `1px solid ${COLORS.accent}30` }}>{v.status}</span> : <span style={{ color: COLORS.textMuted, fontSize: 12 }}>—</span>}
+      </div>
+      {/* DISPONENT OWNER */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={owner?.name} style={{ fontSize: 11, color: owner ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{owner?.name || "—"}</span>
+      </div>
+      {/* CHARTERER */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={charterer?.name} style={{ fontSize: 11, color: charterer ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{charterer?.name || "—"}</span>
+      </div>
+      {/* BU */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
+        {buDef ? <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: `${buDef.color || COLORS.blue}20`, color: buDef.color || COLORS.blue, border: `1px solid ${buDef.color || COLORS.blue}40` }}>{buDef.label}</span> : <span style={{ color: COLORS.textMuted, fontSize: 11 }}>—</span>}
+      </div>
+      {/* ACTIONS */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, borderLeft: `1px solid ${COLORS.border}`, padding: "0 8px" }}
         onClick={e => e.stopPropagation()}>
-        <button onClick={() => onEdit(v)} title="Modifier"
-          style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 15, padding: "4px 6px", borderRadius: 5 }}
+        <button onClick={() => onEdit(v)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
           onMouseOver={e => e.currentTarget.style.color = COLORS.accent} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>✏</button>
-        <button onClick={() => onRemove(v.id)} title="Supprimer"
-          style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 15, padding: "4px 6px", borderRadius: 5 }}
+        <button onClick={() => onRemove(v.id)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
           onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>🗑</button>
       </div>
     </div>
@@ -21383,15 +21290,31 @@ const VoyageRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, vessels, co
 });
 
 const VirtualVoyageList = ({ filtered, selected, onSelect, onEdit, onRemove, vessels, companies, config }) => {
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef(null);
+  const [containerH, setContainerH] = useState(600);
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(e => setContainerH(e[0].contentRect.height));
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+  const totalH = filtered.length * ROW_H_VOYAGE;
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H_VOYAGE) - OVERSCAN_VOYAGE);
+  const endIdx = Math.min(filtered.length, Math.ceil((scrollTop + containerH) / ROW_H_VOYAGE) + OVERSCAN_VOYAGE);
   return (
-    <div style={{ overflowY: "auto", flex: 1 }}>
+    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)} style={{ overflowY: "auto", flex: 1 }}>
       {filtered.length === 0
         ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "56px 0", fontSize: 14 }}>Aucun voyage — cliquez sur « + Ajouter »</div>
-        : filtered.map((v, vi) => (
-            <VoyageRow key={v.id} v={v} idx={vi} isSel={selected?.id === v.id}
-              onSelect={onSelect} onEdit={onEdit} onRemove={onRemove}
-              vessels={vessels} companies={companies} config={config} />
-          ))
+        : <div style={{ height: totalH, position: "relative" }}>
+            <div style={{ position: "absolute", top: startIdx * ROW_H_VOYAGE, left: 0, right: 0 }}>
+              {filtered.slice(startIdx, endIdx).map((v, vi) => (
+                <VoyageRow key={v.id} v={v} idx={startIdx + vi} isSel={selected?.id === v.id}
+                  onSelect={onSelect} onEdit={onEdit} onRemove={onRemove}
+                  vessels={vessels} companies={companies} config={config} />
+              ))}
+            </div>
+          </div>
       }
     </div>
   );
@@ -21702,9 +21625,9 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
       {/* Blotter */}
       <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0, flexDirection: "column" }}>
         {/* Header row */}
-        <div style={{ display: "grid", gridTemplateColumns: "320px 280px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
-          {["VOYAGE", "PARAMETERS", ""].map((h, i) => (
-            <div key={i} style={{ padding: "10px 14px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap", borderRight: i < 2 ? `1px solid ${COLORS.border}` : "none" }}>{h}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "200px 180px 120px 180px 180px 130px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
+          {["VOYAGE NAME", "VESSEL", "STATUS", "DISPONENT OWNER", "CHARTERER", "BU", ""].map((h, i) => (
+            <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
           ))}
         </div>
         <div style={{ fontSize: 11, color: COLORS.textMuted, padding: "4px 12px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
@@ -21892,22 +21815,28 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
 
 // ─── TRADE IMPORT MODAL ───────────────────────────────────────
 const TRADE_FIELD_ALIASES = {
-  tradeName:       ["trade name", "tradename", "trade", "nom du trade", "nom"],
-  voyageId:        ["voyage", "voyage name", "voyageid", "nom voyage"],
-  businessMonth:   ["business month", "businessmonth", "month", "mois", "mois affaires"],
-  logisticType:    ["logistic type", "logistictype", "logistique", "type logistique"],
-  volume:          ["volume", "quantité", "quantity", "qty"],
-  additionalInfos: ["additional infos", "additionalinfos", "info", "notes", "commentaire"],
+  tradeName:           ["trade name", "tradename", "trade", "nom du trade", "nom"],
+  voyageId:            ["voyage", "voyage name", "voyageid", "nom voyage"],
+  businessMonth:       ["business month", "businessmonth", "month", "mois", "mois affaires"],
+  logisticType:        ["logistic type", "logistictype", "logistique", "type logistique"],
+  volume:              ["volume", "quantité", "quantity", "qty"],
+  originCountry:       ["origin country", "origincountry", "pays origine", "pays d origine", "origin"],
+  destinationCountry:  ["destination country", "destinationcountry", "pays destination", "destination"],
+  tradeBusinessUnit:   ["trade business unit", "tradebusinessunit", "bu trade", "business unit trade", "trade bu"],
+  additionalInfos:     ["additional infos", "additionalinfos", "info", "notes", "commentaire"],
 };
-const TRADE_IMPORTABLE_FIELDS = ["tradeName","voyageId","businessMonth","logisticType","volume","additionalInfos"];
-const TRADE_FIELD_LABELS = { tradeName:"Trade Name", voyageId:"Voyage", businessMonth:"Business Month", logisticType:"Logistic Type", volume:"Volume (T)", additionalInfos:"Additional Infos" };
+const TRADE_IMPORTABLE_FIELDS = ["tradeName","voyageId","businessMonth","logisticType","volume","originCountry","destinationCountry","tradeBusinessUnit","additionalInfos"];
+const TRADE_FIELD_LABELS = { tradeName:"Trade Name", voyageId:"Voyage", businessMonth:"Business Month", logisticType:"Logistic Type", volume:"Volume (T)", originCountry:"Origin Country", destinationCountry:"Destination Country", tradeBusinessUnit:"Trade Business Unit", additionalInfos:"Additional Infos" };
 const TRADE_IMPORT_GUIDE = [
-  { field: "tradeName",       format: "Texte",         note: "Obligatoire" },
-  { field: "voyageId",        format: "Texte",         note: "Nom exact du voyage" },
-  { field: "businessMonth",   format: "MM/YYYY",       note: "" },
-  { field: "logisticType",    format: "Texte",         note: "Valeur de l'Admin Panel" },
-  { field: "volume",          format: "Nombre entier", note: "En tonnes" },
-  { field: "additionalInfos", format: "Texte",         note: "" },
+  { field: "tradeName",          format: "Texte",         note: "Obligatoire" },
+  { field: "voyageId",           format: "Texte",         note: "Nom exact du voyage" },
+  { field: "businessMonth",      format: "MM/YYYY",       note: "" },
+  { field: "logisticType",       format: "Texte",         note: "Valeur de l'Admin Panel" },
+  { field: "volume",             format: "Nombre entier", note: "En tonnes" },
+  { field: "originCountry",      format: "Texte",         note: "Pays d'origine" },
+  { field: "destinationCountry", format: "Texte",         note: "Pays de destination" },
+  { field: "tradeBusinessUnit",  format: "Texte",         note: "Business Unit du trade" },
+  { field: "additionalInfos",    format: "Texte",         note: "" },
 ];
 
 const TradeImportModal = ({ onClose, onImport, voyages, config }) => {
@@ -22144,6 +22073,7 @@ const EMPTY_CONTRACT_LEG = () => ({ contractId: "", quantity: "" });
 const EMPTY_TRADE = () => ({
   id: null, tradeName: "", voyageId: "", businessMonth: "",
   commodities: [], volume: "", logisticType: "",
+  originCountry: "", destinationCountry: "", tradeBusinessUnit: "",
   additionalInfos: "",
   purchaseLegs: [EMPTY_CONTRACT_LEG()],
   saleLegs: [EMPTY_CONTRACT_LEG()],
@@ -22163,7 +22093,7 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
 
   return (
     <div onClick={() => onSelect(t)}
-      style={{ display: "grid", gridTemplateColumns: "180px 160px 100px 120px 160px 160px 80px 60px", borderBottom: `1px solid ${COLORS.border}`,
+      style={{ display: "grid", gridTemplateColumns: "180px 160px 100px 120px 140px 140px 110px 80px 60px", borderBottom: `1px solid ${COLORS.border}`,
         height: ROW_H_TRADE, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
         background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
         cursor: "pointer", transition: "background 0.1s" }}
@@ -22187,17 +22117,19 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
           <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4, background: `${COLORS.gold}18`, color: COLORS.gold, border: `1px solid ${COLORS.gold}30`, whiteSpace: "nowrap" }}>{c}</span>
         ))}
       </div>
-      {/* ORIGIN (from purchase contracts) */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
-        <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {originContract?.originCountry || originContract?.port || "—"}
-        </span>
+      {/* ORIGIN COUNTRY */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
+        {(() => { const val = t.originCountry || originContract?.originCountry || originContract?.port || ""; const code = val ? getCountryCode(val) : null; return (<><span style={{ fontSize: 11, color: val ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val || "—"}</span></>); })()}
       </div>
-      {/* DESTINATION (from sale contracts) */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
-        <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {destContract?.destinationCountry || destContract?.port || "—"}
-        </span>
+      {/* DESTINATION COUNTRY */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
+        {(() => { const val = t.destinationCountry || destContract?.destinationCountry || destContract?.port || ""; return (<span style={{ fontSize: 11, color: val ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val || "—"}</span>); })()}
+      </div>
+      {/* TRADE BUSINESS UNIT */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
+        {t.tradeBusinessUnit
+          ? <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: `${COLORS.purple}20`, color: COLORS.purple, border: `1px solid ${COLORS.purple}40`, whiteSpace: "nowrap" }}>{t.tradeBusinessUnit}</span>
+          : <span style={{ color: COLORS.textMuted, fontSize: 11 }}>—</span>}
       </div>
       {/* VOLUME */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
@@ -22450,8 +22382,8 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
 
       {/* Blotter */}
       <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0, flexDirection: "column" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "180px 160px 100px 120px 160px 160px 80px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
-          {["TRADE NAME", "VOYAGE", "MONTH", "COMMODITY", "ORIGIN", "DESTINATION", "VOLUME", ""].map((h, i) => (
+        <div style={{ display: "grid", gridTemplateColumns: "180px 160px 100px 120px 140px 140px 110px 80px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
+          {["TRADE NAME", "VOYAGE", "MONTH", "COMMODITY", "ORIGIN", "DESTINATION", "BU", "VOLUME", ""].map((h, i) => (
             <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
           ))}
         </div>
@@ -22542,6 +22474,36 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
                 <LBL>ADDITIONAL INFOS</LBL>
                 <textarea value={form.additionalInfos || ""} onChange={e => f("additionalInfos", e.target.value)} rows={2} placeholder="Informations complémentaires…"
                   style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+              </div>
+
+              {/* Origin Country */}
+              <div>
+                <LBL>ORIGIN COUNTRY</LBL>
+                <select value={form.originCountry || ""} onChange={e => f("originCountry", e.target.value)}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.originCountry ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                  <option value="">— Pays d'origine —</option>
+                  {(config.country || []).map(c => <option key={c.value||c.label} value={c.value||c.label}>{c.label||c.value}</option>)}
+                </select>
+              </div>
+
+              {/* Destination Country */}
+              <div>
+                <LBL>DESTINATION COUNTRY</LBL>
+                <select value={form.destinationCountry || ""} onChange={e => f("destinationCountry", e.target.value)}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.destinationCountry ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                  <option value="">— Pays de destination —</option>
+                  {(config.country || []).map(c => <option key={c.value||c.label} value={c.value||c.label}>{c.label||c.value}</option>)}
+                </select>
+              </div>
+
+              {/* Trade Business Unit */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <LBL>TRADE BUSINESS UNIT</LBL>
+                <select value={form.tradeBusinessUnit || ""} onChange={e => f("tradeBusinessUnit", e.target.value)}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.tradeBusinessUnit ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                  <option value="">— Business Unit —</option>
+                  {(config.businessUnit || []).map(b => <option key={b.value||b.label} value={b.value||b.label}>{b.label||b.value}</option>)}
+                </select>
               </div>
 
               {/* ── PURCHASE CONTRACTS ── */}

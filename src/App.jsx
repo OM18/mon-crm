@@ -21390,32 +21390,30 @@ const VirtualVoyageList = ({ filtered, selected, onSelect, onEdit, onRemove, ves
   );
 };
 
-// ── Port Block helpers (outside component to avoid remount on each render) ──
-const PortLBL = ({ children, req }) => (
-  <label style={{ fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 5 }}>
-    {children}{req && <span style={{ color: COLORS.red, marginLeft: 3 }}>*</span>}
-  </label>
-);
-const PortINP = ({ value, onChange, placeholder, type = "text" }) => (
-  <input type={type} value={value || ""} onChange={onChange} placeholder={placeholder}
-    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-);
-const PortSEL = ({ value, onChange, children, empty = "\u2014 S\u00e9lectionner \u2014" }) => (
-  <select value={value || ""} onChange={onChange}
-    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: value ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
-    <option value="">{empty}</option>
-    {children}
-  </select>
-);
-const portFmtDate = val => {
-  let v = val.replace(/[^\d]/g, "");
-  if (v.length > 2) v = v.slice(0,2)+"/"+v.slice(2);
-  if (v.length > 5) v = v.slice(0,5)+"/"+v.slice(5);
-  return v.slice(0,10);
-};
-
 // ── Port Block (Loading or Destination) ──
 const PortBlock = ({ port, onChange, idx, onRemove, canRemove, label, isLoading, config, companies }) => {
+  const LBL = ({ children, req }) => (
+    <label style={{ fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 5 }}>
+      {children}{req && <span style={{ color: COLORS.red, marginLeft: 3 }}>*</span>}
+    </label>
+  );
+  const INP = ({ value, onChange, placeholder, type = "text" }) => (
+    <input type={type} value={value || ""} onChange={onChange} placeholder={placeholder}
+      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+  );
+  const SEL = ({ value, onChange, children, empty = "— Sélectionner —" }) => (
+    <select value={value || ""} onChange={onChange}
+      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: value ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+      <option value="">{empty}</option>
+      {children}
+    </select>
+  );
+  const fmtDate = val => {
+    let v = val.replace(/[^\d]/g, "");
+    if (v.length > 2) v = v.slice(0,2)+"/"+v.slice(2);
+    if (v.length > 5) v = v.slice(0,5)+"/"+v.slice(5);
+    return v.slice(0,10);
+  };
   const agents = companies.filter(c => {
     const r = Array.isArray(c.roles) ? c.roles.map(x => (x||"").toLowerCase()) : [(c.roles||"").toLowerCase()];
     return r.some(x => x.includes("agent"));
@@ -21432,57 +21430,57 @@ const PortBlock = ({ port, onChange, idx, onRemove, canRemove, label, isLoading,
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {/* Port */}
         <div>
-          <PortLBL>PORT</PortLBL>
-          <PortSEL value={port.portId} onChange={e => onChange("portId", e.target.value)}>
+          <LBL>PORT</LBL>
+          <SEL value={port.portId} onChange={e => onChange("portId", e.target.value)}>
             {configPorts.map(p => <option key={p.value||p.label} value={p.value||p.label}>{p.label||p.value}</option>)}
-          </PortSEL>
+          </SEL>
         </div>
         {/* Delivery condition */}
         <div>
-          <PortLBL>DELIVERY CONDITION</PortLBL>
-          <PortSEL value={port.deliveryCondition} onChange={e => onChange("deliveryCondition", e.target.value)}>
+          <LBL>DELIVERY CONDITION</LBL>
+          <SEL value={port.deliveryCondition} onChange={e => onChange("deliveryCondition", e.target.value)}>
             {deliveryTerms.map(t => <option key={t.value||t.label} value={t.value||t.label}>{t.label||t.value}</option>)}
-          </PortSEL>
+          </SEL>
         </div>
         {/* Load or Discharge rate */}
         <div>
-          <PortLBL>{isLoading ? "LOAD RATE" : "DISCHARGE RATE"}</PortLBL>
+          <LBL>{isLoading ? "LOAD RATE" : "DISCHARGE RATE"}</LBL>
           <div style={{ position: "relative" }}>
-            <PortINP value={isLoading ? port.loadRate : port.dischargeRate} onChange={e => onChange(isLoading ? "loadRate" : "dischargeRate", e.target.value)} placeholder="ex: 5000" />
+            <INP value={isLoading ? port.loadRate : port.dischargeRate} onChange={e => onChange(isLoading ? "loadRate" : "dischargeRate", e.target.value)} placeholder="ex: 5000" />
             <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: COLORS.textMuted, pointerEvents: "none" }}>T/DAY</span>
           </div>
         </div>
         {/* Agent */}
         <div>
-          <PortLBL>AGENT</PortLBL>
-          <PortSEL value={port.agent} onChange={e => onChange("agent", e.target.value)}>
+          <LBL>AGENT</LBL>
+          <SEL value={port.agent} onChange={e => onChange("agent", e.target.value)}>
             {agents.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </PortSEL>
+          </SEL>
         </div>
         {/* ETA / Notice */}
         <div>
-          <PortLBL>ETA / NOTICE</PortLBL>
-          <PortINP value={port.etaNotice} onChange={e => onChange("etaNotice", portFmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
+          <LBL>ETA / NOTICE</LBL>
+          <INP value={port.etaNotice} onChange={e => onChange("etaNotice", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
         </div>
         {/* ETA / Date of berthing */}
         <div>
-          <PortLBL>ETB / DATE OF BERTHING</PortLBL>
-          <PortINP value={port.etaBerthing} onChange={e => onChange("etaBerthing", portFmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
+          <LBL>ETA / DATE OF BERTHING</LBL>
+          <INP value={port.etaBerthing} onChange={e => onChange("etaBerthing", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
         </div>
         {/* Date of loading/discharging start */}
         <div>
-          <PortLBL>{isLoading ? "DATE OF LOADING START" : "DATE OF DISCHARGING START"}</PortLBL>
-          <PortINP value={port.dateStart} onChange={e => onChange("dateStart", portFmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
+          <LBL>{isLoading ? "DATE OF LOADING START" : "DATE OF DISCHARGING START"}</LBL>
+          <INP value={port.dateStart} onChange={e => onChange("dateStart", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
         </div>
         {/* ETC / Loading/Discharging end */}
         <div>
-          <PortLBL>{isLoading ? "ETC / LOADING END" : "ETC / DISCHARGING END"}</PortLBL>
-          <PortINP value={port.dateEnd} onChange={e => onChange("dateEnd", portFmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
+          <LBL>{isLoading ? "ETC / LOADING END" : "ETC / DISCHARGING END"}</LBL>
+          <INP value={port.dateEnd} onChange={e => onChange("dateEnd", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
         </div>
         {/* ETS */}
         <div>
-          <PortLBL>ETS</PortLBL>
-          <PortINP value={port.ets} onChange={e => onChange("ets", portFmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
+          <LBL>ETS</LBL>
+          <INP value={port.ets} onChange={e => onChange("ets", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
         </div>
       </div>
     </div>
@@ -21657,6 +21655,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
   };
   const disponentOwners = filterByRole("disponent owner");
   const brokers = filterByRole("broker");
+  const charterers = filterByRole("charterer");
 
   const filtered = voyages.filter(v => {
     const q = search.toLowerCase().trim();
@@ -21745,7 +21744,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
               </div>
               <div>
                 <VoyageLBL>CHARTERER</VoyageLBL>
-                <CompanyAutocomplete fieldId="chartererId" fieldSearch="_chartererSearch" form={form} onChange={fMerge} pool={companies} />
+                <CompanyAutocomplete fieldId="chartererId" fieldSearch="_chartererSearch" form={form} onChange={fMerge} pool={charterers} />
               </div>
               <div>
                 <VoyageLBL>CHARTER PARTY DATE</VoyageLBL>

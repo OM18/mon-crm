@@ -20322,6 +20322,7 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
   }, [showModal]);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const fMerge = (obj) => setForm(p => ({ ...p, ...obj }));
 
   const openNew = () => { setForm({ ...EMPTY_VESSEL(), createdAt: new Date().toISOString() }); setEditId(null); setShowModal(true); };
   const openEdit = (v) => { const resolvedFlag = v.flag ? (getCountryCode(v.flag) || v.flag) : v.flag; setForm({ ...v, flag: resolvedFlag }); setEditId(v.id); setShowModal(true); };
@@ -21416,6 +21417,47 @@ const PortBlock = ({ port, onChange, idx, onRemove, canRemove, label, isLoading,
   );
 };
 
+// ── Generic company autocomplete for voyage modal ──────────────────────────
+const CompanyAutocomplete = ({ label, fieldId, fieldSearch, form, onChange, pool, required }) => {
+  const sel = pool.find(c => String(c.id) === String(form[fieldId]));
+  const searchVal = form[fieldSearch] !== undefined ? form[fieldSearch] : (sel?.name || "");
+  const isOpen = !!form[fieldSearch + "_open"];
+  const q = (form[fieldSearch] || "").toLowerCase();
+  const suggestions = (isOpen && q.length > 0)
+    ? pool.filter(c => c.name.toLowerCase().includes(q)).slice(0, 8)
+    : (isOpen ? pool.slice(0, 8) : []);
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        value={searchVal}
+        onChange={e => onChange({ [fieldId]: "", [fieldSearch]: e.target.value, [fieldSearch+"_open"]: true })}
+        onFocus={() => onChange({ [fieldSearch]: form[fieldId] ? (sel?.name || "") : (form[fieldSearch] || ""), [fieldSearch+"_open"]: true })}
+        onBlur={() => setTimeout(() => onChange({ [fieldSearch+"_open"]: false }), 150)}
+        placeholder={"Rechercher…"}
+        style={{ width: "100%", background: COLORS.bg, border: `1px solid ${form[fieldId] ? COLORS.green+"80" : (required && !form[fieldId] ? COLORS.red+"60" : COLORS.border)}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+      />
+      {form[fieldId] && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: COLORS.green, fontSize: 13 }}>✓</span>}
+      {suggestions.length > 0 && (
+        <div style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, boxShadow: "0 8px 24px #00000060", overflow: "hidden" }}>
+          {suggestions.map(c => (
+            <div key={c.id}
+              onMouseDown={() => onChange({ [fieldId]: c.id, [fieldSearch]: c.name, [fieldSearch+"_open"]: false })}
+              style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, color: COLORS.text, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 8 }}
+              onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
+              onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+              <Avatar initials={(c.avatar || c.name?.slice(0,2) || "?").toUpperCase()} size={22} color={COLORS.accent} square />
+              <div>
+                <div style={{ fontWeight: 600 }}>{c.name}</div>
+                {c.roles?.length > 0 && <div style={{ fontSize: 10, color: COLORS.textSub }}>{Array.isArray(c.roles) ? c.roles.join(", ") : c.roles}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Voyage modal field helpers (defined outside Voyages to prevent focus loss on re-render) ──
 const VoyageLBL = ({ children, req }) => (
   <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>
@@ -21479,7 +21521,13 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const openNew = () => { setForm({ ...EMPTY_VOYAGE(), createdAt: new Date().toISOString() }); setEditId(null); setShowModal(true); };
-  const openEdit = (v) => { setForm({ ...v }); setEditId(v.id); setShowModal(true); };
+  const openEdit = (v) => {
+    const disponentName = companies.find(c => String(c.id) === String(v.disponentOwnerId))?.name || "";
+    const chartererName = companies.find(c => String(c.id) === String(v.chartererId))?.name || "";
+    const brokerName    = companies.find(c => String(c.id) === String(v.brokerId))?.name || "";
+    setForm({ ...v, _disponentSearch: disponentName, _chartererSearch: chartererName, _brokerSearch: brokerName });
+    setEditId(v.id); setShowModal(true);
+  };
   const closeModal = () => { setShowModal(false); setForm(EMPTY_VOYAGE()); setEditId(null); };
 
   const nextId = () => voyages.length > 0 ? Math.max(...voyages.map(v => v.id || 0)) + 1 : 1;
@@ -21607,15 +21655,11 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
               </div>
               <div>
                 <VoyageLBL>DISPONENT OWNER</VoyageLBL>
-                <VoyageSEL form={form} onChange={f} field="disponentOwnerId">
-                  {disponentOwners.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </VoyageSEL>
+                <CompanyAutocomplete fieldId="disponentOwnerId" fieldSearch="_disponentSearch" form={form} onChange={fMerge} pool={disponentOwners.length > 0 ? disponentOwners : companies} />
               </div>
               <div>
                 <VoyageLBL>CHARTERER</VoyageLBL>
-                <VoyageSEL form={form} onChange={f} field="chartererId">
-                  {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </VoyageSEL>
+                <CompanyAutocomplete fieldId="chartererId" fieldSearch="_chartererSearch" form={form} onChange={fMerge} pool={companies} />
               </div>
               <div>
                 <VoyageLBL>CHARTER PARTY DATE</VoyageLBL>
@@ -21624,9 +21668,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
               </div>
               <div>
                 <VoyageLBL>BROKER</VoyageLBL>
-                <VoyageSEL form={form} onChange={f} field="brokerId">
-                  {brokers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </VoyageSEL>
+                <CompanyAutocomplete fieldId="brokerId" fieldSearch="_brokerSearch" form={form} onChange={fMerge} pool={brokers.length > 0 ? brokers : companies} />
               </div>
               <div>
                 <VoyageLBL>BUSINESS UNIT</VoyageLBL>

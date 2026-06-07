@@ -22385,6 +22385,26 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
       : contracts.filter(c => (c.contractType||"").toLowerCase().includes("sale") || (c.contractType||"").toLowerCase().includes("vente"));
     const allContracts = filteredContracts.length > 0 ? filteredContracts : contracts;
     const selectedContract = allContracts.find(c => c.id === leg.contractId || String(c.id) === String(leg.contractId));
+    const [legSearch, setLegSearch] = useState("");
+    const [legOpen, setLegOpen] = useState(false);
+    const legInputRef = useRef(null);
+    const legDropRef = useRef(null);
+    const contractLabel = c => `${c.contractNumber || `#${c.id}`}${c.commodity ? ` · ${c.commodity}` : ""}`;
+    const displayVal = selectedContract ? contractLabel(selectedContract) : "";
+    const suggestions = allContracts.filter(c => !legSearch || contractLabel(c).toLowerCase().includes(legSearch.toLowerCase()));
+    useEffect(() => {
+      if (!legOpen) return;
+      const handler = e => {
+        if (!legInputRef.current?.contains(e.target) && !legDropRef.current?.contains(e.target)) setLegOpen(false);
+      };
+      document.addEventListener("mousedown", handler);
+      return () => document.removeEventListener("mousedown", handler);
+    }, [legOpen]);
+    const selectContract = (c) => {
+      updateLeg(type, idx, "contractId", c ? (parseInt(c.id) || c.id) : "");
+      setLegSearch("");
+      setLegOpen(false);
+    };
     return (
       <div style={{ background: COLORS.bg, border: `1px solid ${color}30`, borderRadius: 10, padding: 14, marginBottom: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -22392,13 +22412,38 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
           {total > 1 && <button onClick={() => removeLeg(type, idx)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 12 }} onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>× Supprimer</button>}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div>
+          <div style={{ position: "relative" }}>
             <LBL>CONTRAT</LBL>
-            <select value={leg.contractId || ""} onChange={e => updateLeg(type, idx, "contractId", e.target.value ? parseInt(e.target.value)||e.target.value : "")}
-              style={{ width: "100%", background: COLORS.card, border: `1px solid ${leg.contractId ? color+"60" : COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: leg.contractId ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
-              <option value="">— Sélectionner —</option>
-              {contracts.map(c => <option key={c.id} value={c.id}>{c.contractNumber || `#${c.id}`}{c.commodity ? ` · ${c.commodity}` : ""}</option>)}
-            </select>
+            <div ref={legInputRef} style={{ position: "relative" }}>
+              <input
+                value={legOpen ? legSearch : displayVal}
+                onChange={e => { setLegSearch(e.target.value); setLegOpen(true); }}
+                onFocus={() => { setLegSearch(""); setLegOpen(true); }}
+                placeholder="Rechercher un contrat…"
+                style={{ width: "100%", background: COLORS.card, border: `1px solid ${leg.contractId ? color+"60" : COLORS.border}`, borderRadius: 8, padding: "8px 30px 8px 12px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+              />
+              {leg.contractId && (
+                <button onMouseDown={e => { e.preventDefault(); selectContract(null); }}
+                  style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+              )}
+            </div>
+            {legOpen && (
+              <div ref={legDropRef} style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, marginTop: 3, maxHeight: 220, overflowY: "auto", boxShadow: "0 4px 16px #00000060" }}>
+                {suggestions.length === 0
+                  ? <div style={{ padding: "10px 12px", fontSize: 12, color: COLORS.textMuted }}>Aucun résultat</div>
+                  : suggestions.map(c => (
+                      <div key={c.id} onMouseDown={() => selectContract(c)}
+                        style={{ padding: "9px 12px", fontSize: 12, color: COLORS.text, cursor: "pointer", borderBottom: `1px solid ${COLORS.border}`, background: (leg.contractId && String(c.id) === String(leg.contractId)) ? `${color}15` : "transparent" }}
+                        onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
+                        onMouseOut={e => e.currentTarget.style.background = (leg.contractId && String(c.id) === String(leg.contractId)) ? `${color}15` : "transparent"}>
+                        <span style={{ fontWeight: 600 }}>{c.contractNumber || `#${c.id}`}</span>
+                        {c.commodity && <span style={{ color: COLORS.textMuted, marginLeft: 6 }}>{c.commodity}</span>}
+                        {c.contractType && <span style={{ marginLeft: 8, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${color}15`, color }}>{c.contractType}</span>}
+                      </div>
+                    ))
+                }
+              </div>
+            )}
           </div>
           <div>
             <LBL>QUANTITY (T)</LBL>

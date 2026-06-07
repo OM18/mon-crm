@@ -19998,7 +19998,8 @@ const VesselRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, companies, 
       {/* FLAG */}
       <div style={{ padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {v.flag ? (() => {
-          const label = (config?.country || []).find(c => c.value === v.flag)?.label || v.flag;
+          const resolvedFlagCode = getCountryCode(v.flag) || v.flag;
+          const label = (config?.country || []).find(c => c.value === resolvedFlagCode)?.label || resolvedFlagCode;
           return (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
               <CountryFlag country={v.flag} size={28} />
@@ -20115,7 +20116,7 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const openNew = () => { setForm({ ...EMPTY_VESSEL(), createdAt: new Date().toISOString() }); setEditId(null); setShowModal(true); };
-  const openEdit = (v) => { setForm({ ...v }); setEditId(v.id); setShowModal(true); };
+  const openEdit = (v) => { const resolvedFlag = v.flag ? (getCountryCode(v.flag) || v.flag) : v.flag; setForm({ ...v, flag: resolvedFlag }); setEditId(v.id); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setForm(EMPTY_VESSEL()); setEditId(null); };
 
   const nextId = () => vessels.length > 0 ? Math.max(...vessels.map(v => v.id || 0)) + 1 : 1;
@@ -20182,8 +20183,8 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
           <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 10 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>Flag</div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <img src={`https://flagcdn.com/20x15/${v.flag.toLowerCase()}.png`} style={{ width: 20, height: 15, borderRadius: 2 }} onError={e => e.target.style.display='none'} />
-              <span style={{ fontSize: 13, color: COLORS.text }}>{(config.country || []).find(c => c.value === v.flag)?.label || v.flag}</span>
+              <img src={`https://flagcdn.com/20x15/${(getCountryCode(v.flag) || v.flag).toLowerCase()}.png`} style={{ width: 20, height: 15, borderRadius: 2 }} onError={e => e.target.style.display='none'} />
+              <span style={{ fontSize: 13, color: COLORS.text }}>{(config.country || []).find(c => c.value === (getCountryCode(v.flag) || v.flag))?.label || getCountryCode(v.flag) || v.flag}</span>
             </div>
           </div>
         )}
@@ -20302,7 +20303,7 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
                 <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>FLAG</label>
                 <div style={{ position: "relative" }}>
                   {form.flag && (
-                    <img src={`https://flagcdn.com/20x15/${form.flag.toLowerCase()}.png`} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 20, height: 15, borderRadius: 2 }} onError={e => e.target.style.display='none'} />
+                    <img src={`https://flagcdn.com/20x15/${(getCountryCode(form.flag) || form.flag).toLowerCase()}.png`} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 20, height: 15, borderRadius: 2 }} onError={e => e.target.style.display='none'} />
                   )}
                   <select value={form.flag || ""} onChange={e => f("flag", e.target.value)}
                     style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: `10px 14px 10px ${form.flag ? "40px" : "14px"}`, color: form.flag ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>

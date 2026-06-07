@@ -455,6 +455,57 @@ const COUNTRY_TO_CODE = {
   "sao tome": "ST", "são tomé": "ST",
   "maldives": "MV",
   "comoros": "KM", "comores": "KM",
+  // ── Shipping registry cities / ports (flag state by port of registration) ──
+  "majuro": "MH",            // Marshall Islands capital
+  "ebeye": "MH",             // Marshall Islands
+  "monrovia": "LR",          // Liberia capital
+  "nassau": "BS",            // Bahamas capital
+  "freeport": "BS",          // Bahamas
+  "victoria": "SC",          // Seychelles capital
+  "port louis": "MU",        // Mauritius capital
+  "kingstown": "VC",         // Saint Vincent
+  "bridgetown": "BB",        // Barbados capital
+  "valletta": "MT",          // Malta capital
+  "limassol": "CY",          // Cyprus major port
+  "nicosia": "CY",           // Cyprus capital
+  "piraeus": "GR",           // Greece major port
+  "athens": "GR",            // Greece capital
+  "george town": "KY",       // Cayman Islands
+  "georgetown": "KY",        // Cayman Islands
+  "douglas": "IM",           // Isle of Man
+  "st john's": "AG",         // Antigua
+  "panama city": "PA",       // Panama
+  "colon": "PA",             // Panama port
+  "funafuti": "TV",          // Tuvalu
+  "tuvalu": "TV",
+  "kiribati": "KI",
+  "tarawa": "KI",            // Kiribati capital
+  "porto novo": "BJ",        // Benin
+  "cotonou": "BJ",           // Benin main port
+  "lome": "TG",              // Togo capital
+  "libreville": "GA",        // Gabon capital
+  "port gentil": "GA",       // Gabon port
+  "nuuk": "GL",              // Greenland
+  "greenland": "GL",
+  "groenland": "GL",
+  "faroe islands": "FO", "îles féroé": "FO", "iles feroe": "FO",
+  "torshavn": "FO",
+  "st. kitts": "KN", "saint kitts and nevis": "KN",
+  "saint lucia": "LC", "st lucia": "LC", "st. lucia": "LC",
+  "saint vincent and the grenadines": "VC",
+  "dominica": "DM",
+  "grenada": "GD",
+  "anguilla": "AI",
+  "turks and caicos": "TC", "turks & caicos": "TC",
+  "british virgin islands": "VG", "bvi": "VG",
+  "us virgin islands": "VI", "usvi": "VI",
+  "puerto rico": "PR",
+  "guam": "GU",
+  "samoa": "WS", "western samoa": "WS",
+  "american samoa": "AS",
+  "fiji": "FJ",
+  "papua new guinea": "PG",
+  "solomon islands": "SB",
 };
 
 const getCountryCode = (country) => {
@@ -20411,10 +20462,25 @@ const VesselImportModal = ({ onClose, onImport, companies, config }) => {
         Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[headers[ci]]?.toString().trim() || ""; });
         // Resolve flag — match country name or code
         if (obj.flag) {
+          // 1) Try exact match in config (label or value)
           const found = (config.country || []).find(c =>
             normComp(c.label) === normComp(obj.flag) || normComp(c.value) === normComp(obj.flag)
           );
-          obj.flag = found ? found.value : obj.flag.toUpperCase().slice(0, 2);
+          if (found) {
+            obj.flag = found.value;
+          } else {
+            // 2) Try COUNTRY_TO_CODE (handles city names like "Majuro" → "MH")
+            const mapped = getCountryCode(obj.flag);
+            if (mapped) {
+              const byCode = (config.country || []).find(c => normComp(c.value) === normComp(mapped));
+              obj.flag = byCode ? byCode.value : mapped;
+            } else if (obj.flag.length === 2) {
+              obj.flag = obj.flag.toUpperCase();
+            } else {
+              // Unknown: keep raw so user can review (don't silently truncate)
+              obj.flag = obj.flag.toUpperCase();
+            }
+          }
         }
         // Resolve owner
         if (obj.ownerId) {

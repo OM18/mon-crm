@@ -370,7 +370,7 @@ const DEFAULT_CONFIG = {
     { value: "Farm", label: "Farm", color: "#7EC86A" },
     { value: "Elevator", label: "Elevator", color: "#4ECDC4" },
     { value: "Bank", label: "Bank", color: COLORS.accent },
-    { value: "Disponent Owner", label: "Disponent Owner", color: COLORS.purple },
+    { value: "DISPONENT OWNER", label: "DISPONENT OWNER", color: COLORS.purple },
     { value: "Shipowner", label: "Shipowner", color: COLORS.blue },
     { value: "Charterer", label: "Charterer", color: COLORS.green },
   ],
@@ -21514,12 +21514,12 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
   };
 
   // Company filters
+  // Find companies by role — matches stored role values case-insensitively
   const filterByRole = (keyword) => {
-    const matched = companies.filter(c => {
-      const r = Array.isArray(c.roles) ? c.roles.map(x => (x||"").toLowerCase()) : [(c.roles||"").toLowerCase()];
-      return r.some(x => x.includes(keyword));
+    return companies.filter(c => {
+      const roles = Array.isArray(c.roles) ? c.roles : (c.roles ? [c.roles] : []);
+      return roles.some(r => (r||"").toLowerCase().includes(keyword));
     });
-    return matched.length > 0 ? matched : companies;
   };
   const disponentOwners = filterByRole("disponent owner");
   const brokers = filterByRole("broker");

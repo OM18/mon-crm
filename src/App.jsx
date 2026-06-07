@@ -21438,6 +21438,11 @@ const CompanyAutocomplete = ({ label, fieldId, fieldSearch, form, onChange, pool
         style={{ width: "100%", background: COLORS.bg, border: `1px solid ${form[fieldId] ? COLORS.green+"80" : (required && !form[fieldId] ? COLORS.red+"60" : COLORS.border)}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
       />
       {form[fieldId] && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: COLORS.green, fontSize: 13 }}>✓</span>}
+      {isOpen && safePool.length === 0 && (
+        <div style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, boxShadow: "0 8px 24px #00000060", padding: "10px 14px", fontSize: 12, color: COLORS.textMuted }}>
+          Aucune société avec ce rôle
+        </div>
+      )}
       {suggestions.length > 0 && (
         <div style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, boxShadow: "0 8px 24px #00000060", overflow: "hidden" }}>
           {suggestions.map(c => (
@@ -21657,7 +21662,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
               </div>
               <div>
                 <VoyageLBL>DISPONENT OWNER</VoyageLBL>
-                <CompanyAutocomplete fieldId="disponentOwnerId" fieldSearch="_disponentSearch" form={form} onChange={fMerge} pool={disponentOwners.length > 0 ? disponentOwners : companies} />
+                <CompanyAutocomplete fieldId="disponentOwnerId" fieldSearch="_disponentSearch" form={form} onChange={fMerge} pool={disponentOwners} />
               </div>
               <div>
                 <VoyageLBL>CHARTERER</VoyageLBL>
@@ -21670,7 +21675,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
               </div>
               <div>
                 <VoyageLBL>BROKER</VoyageLBL>
-                <CompanyAutocomplete fieldId="brokerId" fieldSearch="_brokerSearch" form={form} onChange={fMerge} pool={brokers.length > 0 ? brokers : companies} />
+                <CompanyAutocomplete fieldId="brokerId" fieldSearch="_brokerSearch" form={form} onChange={fMerge} pool={brokers} />
               </div>
               <div>
                 <VoyageLBL>BUSINESS UNIT</VoyageLBL>

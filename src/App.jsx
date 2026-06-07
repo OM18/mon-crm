@@ -21570,14 +21570,20 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
 
   // Company filters
   // Find companies by role — matches stored role values case-insensitively
+  // Filter companies by role: match config.roles label (from Supabase) → get its value → filter companies
   const filterByRole = (keyword) => {
+    const matchingValues = new Set(
+      (config.roles || [])
+        .filter(r => (r.label || "").toLowerCase().includes(keyword) || (r.value || "").toLowerCase().includes(keyword))
+        .map(r => r.value)
+    );
+    if (matchingValues.size === 0) return [];
     return companies.filter(c => {
       const roles = Array.isArray(c.roles) ? c.roles : (c.roles ? [c.roles] : []);
-      return roles.some(r => (r||"").toLowerCase().includes(keyword));
+      return roles.some(r => matchingValues.has(r));
     });
   };
   const disponentOwners = filterByRole("disponent owner");
-  console.log("[DEBUG roles with content]", JSON.stringify(companies.filter(c => c.roles?.length > 0).slice(0,10).map(c => ({n:c.name, r:c.roles}))));
   const brokers = filterByRole("broker");
 
   const filtered = voyages.filter(v => {

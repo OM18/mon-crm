@@ -22248,6 +22248,70 @@ const VirtualTradeList = ({ filtered, selected, onSelect, onEdit, onRemove, voya
   );
 };
 
+const TradeCountryCombo = ({ label, placeholder, field, form, f, config }) => {
+  const countries = config.country || [];
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef(null);
+  const dropRef = useRef(null);
+  const selected = countries.find(c => (c.value||c.label) === form[field]);
+  const displayVal = selected ? (selected.label || selected.value) : (form[field] || "");
+  const suggestions = countries.filter(c => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (c.label||"").toLowerCase().includes(s) || (c.value||"").toLowerCase().includes(s);
+  });
+  useEffect(() => {
+    if (!open) return;
+    const handler = e => {
+      if (!inputRef.current?.contains(e.target) && !dropRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+  const select = (c) => { f(field, c ? (c.value||c.label) : ""); setSearch(""); setOpen(false); };
+  return (
+    <div>
+      <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>{label}</label>
+      <div style={{ position: "relative" }}>
+        <div ref={inputRef} style={{ position: "relative" }}>
+          <input
+            value={open ? search : displayVal}
+            onChange={e => { setSearch(e.target.value); setOpen(true); }}
+            onFocus={() => { setSearch(""); setOpen(true); }}
+            placeholder={placeholder}
+            style={{ width: "100%", background: COLORS.bg, border: `1px solid ${form[field] ? COLORS.accent+"50" : COLORS.border}`, borderRadius: 8, padding: "10px 30px 10px 14px", color: form[field] ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+          />
+          {form[field] && (
+            <button onMouseDown={e => { e.preventDefault(); select(null); }}
+              style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+          )}
+        </div>
+        {open && (
+          <div ref={dropRef} style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 300, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, marginTop: 3, maxHeight: 200, overflowY: "auto", boxShadow: "0 4px 16px #00000060" }}>
+            {suggestions.length === 0
+              ? <div style={{ padding: "10px 14px", fontSize: 12, color: COLORS.textMuted }}>Aucun résultat</div>
+              : suggestions.map(c => {
+                  const val = c.value || c.label;
+                  const isSelected = form[field] === val;
+                  return (
+                    <div key={val} onMouseDown={() => select(c)}
+                      style={{ padding: "9px 14px", fontSize: 13, color: COLORS.text, cursor: "pointer", borderBottom: `1px solid ${COLORS.border}`, background: isSelected ? `${COLORS.accent}15` : "transparent", display: "flex", alignItems: "center", gap: 8 }}
+                      onMouseOver={e => e.currentTarget.style.background = isSelected ? `${COLORS.accent}20` : COLORS.hover}
+                      onMouseOut={e => e.currentTarget.style.background = isSelected ? `${COLORS.accent}15` : "transparent"}>
+                      {c.label || c.value}
+                      {isSelected && <span style={{ marginLeft: "auto", color: COLORS.accent, fontSize: 12 }}>✓</span>}
+                    </div>
+                  );
+                })
+            }
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTrades }) => {
   const { config } = useConfig();
   const [search, setSearch] = useState("");
@@ -22593,22 +22657,12 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
 
               {/* Origin Country */}
               <div>
-                <LBL>ORIGIN COUNTRY</LBL>
-                <select value={form.originCountry || ""} onChange={e => f("originCountry", e.target.value)}
-                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.originCountry ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
-                  <option value="">— Pays d'origine —</option>
-                  {(config.country || []).map(c => <option key={c.value||c.label} value={c.value||c.label}>{c.label||c.value}</option>)}
-                </select>
+                <TradeCountryCombo label="ORIGIN COUNTRY" placeholder="— Pays d'origine —" field="originCountry" form={form} f={f} config={config} />
               </div>
 
               {/* Destination Country */}
               <div>
-                <LBL>DESTINATION COUNTRY</LBL>
-                <select value={form.destinationCountry || ""} onChange={e => f("destinationCountry", e.target.value)}
-                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.destinationCountry ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
-                  <option value="">— Pays de destination —</option>
-                  {(config.country || []).map(c => <option key={c.value||c.label} value={c.value||c.label}>{c.label||c.value}</option>)}
-                </select>
+                <TradeCountryCombo label="DESTINATION COUNTRY" placeholder="— Pays de destination —" field="destinationCountry" form={form} f={f} config={config} />
               </div>
 
               {/* Trade Business Unit */}

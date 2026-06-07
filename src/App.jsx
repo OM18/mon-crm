@@ -21462,9 +21462,9 @@ const PortBlock = ({ port, onChange, idx, onRemove, canRemove, label, isLoading,
           <LBL>ETA / NOTICE</LBL>
           <INP value={port.etaNotice} onChange={e => onChange("etaNotice", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
         </div>
-        {/* ETA / Date of berthing */}
+        {/* ETB / Date of berthing */}
         <div>
-          <LBL>ETA / DATE OF BERTHING</LBL>
+          <LBL>ETB / DATE OF BERTHING</LBL>
           <INP value={port.etaBerthing} onChange={e => onChange("etaBerthing", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" />
         </div>
         {/* Date of loading/discharging start */}

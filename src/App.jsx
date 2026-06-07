@@ -21419,13 +21419,14 @@ const PortBlock = ({ port, onChange, idx, onRemove, canRemove, label, isLoading,
 
 // ── Generic company autocomplete for voyage modal ──────────────────────────
 const CompanyAutocomplete = ({ label, fieldId, fieldSearch, form, onChange, pool, required }) => {
-  const sel = pool.find(c => String(c.id) === String(form[fieldId]));
+  const safePool = pool || [];
+  const sel = safePool.find(c => String(c.id) === String(form[fieldId]));
   const searchVal = form[fieldSearch] !== undefined ? form[fieldSearch] : (sel?.name || "");
   const isOpen = !!form[fieldSearch + "_open"];
   const q = (form[fieldSearch] || "").toLowerCase();
   const suggestions = (isOpen && q.length > 0)
-    ? pool.filter(c => c.name.toLowerCase().includes(q)).slice(0, 8)
-    : (isOpen ? pool.slice(0, 8) : []);
+    ? safePool.filter(c => c.name.toLowerCase().includes(q)).slice(0, 8)
+    : (isOpen ? safePool.slice(0, 8) : []);
   return (
     <div style={{ position: "relative" }}>
       <input
@@ -21519,6 +21520,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
   }, [showModal]);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const fMerge = (obj) => setForm(p => ({ ...p, ...obj }));
 
   const openNew = () => { setForm({ ...EMPTY_VOYAGE(), createdAt: new Date().toISOString() }); setEditId(null); setShowModal(true); };
   const openEdit = (v) => {

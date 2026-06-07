@@ -21413,6 +21413,36 @@ const PortBlock = ({ port, onChange, idx, onRemove, canRemove, label, isLoading,
   );
 };
 
+// ── Voyage modal field helpers (defined outside Voyages to prevent focus loss on re-render) ──
+const VoyageLBL = ({ children, req }) => (
+  <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>
+    {children}{req && <span style={{ color: COLORS.red, marginLeft: 3 }}>*</span>}
+  </label>
+);
+const VoyageINP = ({ field, placeholder, type = "text", fmt, form, onChange }) => (
+  <input type={type} value={form[field] || ""} placeholder={placeholder}
+    onChange={e => onChange(field, fmt ? fmt(e.target.value) : e.target.value)}
+    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${field === "voyageName" && !form.voyageName?.trim() ? COLORS.red+"60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+);
+const VoyageSEL = ({ field, children, empty = "— Sélectionner —", form, onChange }) => (
+  <select value={form[field] || ""} onChange={e => onChange(field, e.target.value)}
+    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form[field] ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+    <option value="">{empty}</option>
+    {children}
+  </select>
+);
+const voyageFmtDate = val => {
+  let v = val.replace(/[^\d]/g, "");
+  if (v.length > 2) v = v.slice(0,2)+"/"+v.slice(2);
+  if (v.length > 5) v = v.slice(0,5)+"/"+v.slice(5);
+  return v.slice(0,10);
+};
+const VoyageSECT = ({ label, color = COLORS.accent }) => (
+  <div style={{ gridColumn: "1 / -1", borderBottom: `2px solid ${color}30`, paddingBottom: 4, marginTop: 8, marginBottom: 2 }}>
+    <span style={{ fontSize: 11, fontWeight: 800, color, letterSpacing: 1, textTransform: "uppercase" }}>{label}</span>
+  </div>
+);
+
 const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => {
   const { config } = useConfig();
   const [search, setSearch] = useState("");
@@ -21500,35 +21530,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
   const currency = form.costsCurrency || "";
   const currencyUnit = currency ? `${(config.contractCurrencies||[]).find(c=>c.label===currency||c.value===currency)?.label || currency}/DAY` : "/DAY";
 
-  // Shared field components
-  const LBL = ({ children, req }) => (
-    <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>
-      {children}{req && <span style={{ color: COLORS.red, marginLeft: 3 }}>*</span>}
-    </label>
-  );
-  const INP = ({ field, placeholder, type = "text", fmt }) => (
-    <input type={type} value={form[field] || ""} placeholder={placeholder}
-      onChange={e => f(field, fmt ? fmt(e.target.value) : e.target.value)}
-      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${field === "voyageName" && !form.voyageName?.trim() ? COLORS.red+"60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-  );
-  const SEL = ({ field, children, empty = "— Sélectionner —" }) => (
-    <select value={form[field] || ""} onChange={e => f(field, e.target.value)}
-      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form[field] ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
-      <option value="">{empty}</option>
-      {children}
-    </select>
-  );
-  const fmtDate = val => {
-    let v = val.replace(/[^\d]/g, "");
-    if (v.length > 2) v = v.slice(0,2)+"/"+v.slice(2);
-    if (v.length > 5) v = v.slice(0,5)+"/"+v.slice(5);
-    return v.slice(0,10);
-  };
-  const SECT = ({ label, color = COLORS.accent }) => (
-    <div style={{ gridColumn: "1 / -1", borderBottom: `2px solid ${color}30`, paddingBottom: 4, marginTop: 8, marginBottom: 2 }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color, letterSpacing: 1, textTransform: "uppercase" }}>{label}</span>
-    </div>
-  );
+
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 0 }}>
@@ -21583,86 +21585,86 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               {/* ── GÉNÉRAL ── */}
-              <SECT label="Général" color={COLORS.accent} />
+              <VoyageSECT label="Général" color={COLORS.accent} />
 
               <div style={{ gridColumn: "1 / -1" }}>
-                <LBL req>VOYAGE NAME</LBL>
-                <INP field="voyageName" placeholder="Nom du voyage…" />
+                <VoyageLBL req>VOYAGE NAME</VoyageLBL>
+                <VoyageINP form={form} onChange={f} field="voyageName" placeholder="Nom du voyage…" />
               </div>
               <div>
-                <LBL>VESSEL</LBL>
-                <SEL field="vesselId">
+                <VoyageLBL>VESSEL</VoyageLBL>
+                <VoyageSEL form={form} onChange={f} field="vesselId">
                   {vessels.map(v => <option key={v.id} value={v.id}>{v.name}{v.imo ? ` (IMO ${v.imo})` : ""}</option>)}
-                </SEL>
+                </VoyageSEL>
               </div>
               <div>
-                <LBL>STATUS</LBL>
-                <INP field="status" placeholder="ex: In Progress" />
+                <VoyageLBL>STATUS</VoyageLBL>
+                <VoyageINP form={form} onChange={f} field="status" placeholder="ex: In Progress" />
               </div>
               <div>
-                <LBL>DISPONENT OWNER</LBL>
-                <SEL field="disponentOwnerId">
+                <VoyageLBL>DISPONENT OWNER</VoyageLBL>
+                <VoyageSEL form={form} onChange={f} field="disponentOwnerId">
                   {disponentOwners.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </SEL>
+                </VoyageSEL>
               </div>
               <div>
-                <LBL>CHARTERER</LBL>
-                <SEL field="chartererId">
+                <VoyageLBL>CHARTERER</VoyageLBL>
+                <VoyageSEL form={form} onChange={f} field="chartererId">
                   {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </SEL>
+                </VoyageSEL>
               </div>
               <div>
-                <LBL>CHARTER PARTY DATE</LBL>
-                <input value={form.charterPartyDate || ""} onChange={e => f("charterPartyDate", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
+                <VoyageLBL>CHARTER PARTY DATE</VoyageLBL>
+                <input value={form.charterPartyDate || ""} onChange={e => f("charterPartyDate", voyageFmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
                   style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
               </div>
               <div>
-                <LBL>BROKER</LBL>
-                <SEL field="brokerId">
+                <VoyageLBL>BROKER</VoyageLBL>
+                <VoyageSEL form={form} onChange={f} field="brokerId">
                   {brokers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </SEL>
+                </VoyageSEL>
               </div>
               <div>
-                <LBL>BUSINESS UNIT</LBL>
-                <SEL field="businessUnit">
+                <VoyageLBL>BUSINESS UNIT</VoyageLBL>
+                <VoyageSEL form={form} onChange={f} field="businessUnit">
                   {(config.businessUnit || []).map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
-                </SEL>
+                </VoyageSEL>
               </div>
 
               {/* ── LAYCAN / EXTENSION ── */}
-              <SECT label="Laycan / Extension" color={COLORS.blue} />
+              <VoyageSECT label="Laycan / Extension" color={COLORS.blue} />
               <div>
-                <LBL>LAYCAN START</LBL>
-                <input value={form.laycanStart || ""} onChange={e => f("laycanStart", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
+                <VoyageLBL>LAYCAN START</VoyageLBL>
+                <input value={form.laycanStart || ""} onChange={e => f("laycanStart", voyageFmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
                   style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
               </div>
               <div>
-                <LBL>LAYCAN END</LBL>
-                <input value={form.laycanEnd || ""} onChange={e => f("laycanEnd", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
+                <VoyageLBL>LAYCAN END</VoyageLBL>
+                <input value={form.laycanEnd || ""} onChange={e => f("laycanEnd", voyageFmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
                   style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
               </div>
               <div>
-                <LBL>EXTENSION START</LBL>
-                <input value={form.extensionStart || ""} onChange={e => f("extensionStart", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
+                <VoyageLBL>EXTENSION START</VoyageLBL>
+                <input value={form.extensionStart || ""} onChange={e => f("extensionStart", voyageFmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
                   style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
               </div>
               <div>
-                <LBL>EXTENSION END</LBL>
-                <input value={form.extensionEnd || ""} onChange={e => f("extensionEnd", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
+                <VoyageLBL>EXTENSION END</VoyageLBL>
+                <input value={form.extensionEnd || ""} onChange={e => f("extensionEnd", voyageFmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
                   style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
               </div>
 
               {/* ── FINANCIER ── */}
-              <SECT label="Financier" color={COLORS.gold} />
+              <VoyageSECT label="Financier" color={COLORS.gold} />
               <div>
-                <LBL>COSTS CURRENCY</LBL>
-                <SEL field="costsCurrency">
+                <VoyageLBL>COSTS CURRENCY</VoyageLBL>
+                <VoyageSEL form={form} onChange={f} field="costsCurrency">
                   {(config.contractCurrencies || []).map(c => <option key={c.label||c.value} value={c.label||c.value}>{c.label||c.value}</option>)}
-                </SEL>
+                </VoyageSEL>
               </div>
               <div />
               <div>
-                <LBL>FREIGHT RATE</LBL>
+                <VoyageLBL>FREIGHT RATE</VoyageLBL>
                 <div style={{ position: "relative" }}>
                   <input type="number" value={form.freightRate || ""} onChange={e => f("freightRate", e.target.value)} placeholder="0"
                     style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 48px 10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
@@ -21670,7 +21672,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
                 </div>
               </div>
               <div>
-                <LBL>DEMURRAGE RATE</LBL>
+                <VoyageLBL>DEMURRAGE RATE</VoyageLBL>
                 <div style={{ position: "relative" }}>
                   <input type="number" value={form.demurrageRate || ""} onChange={e => f("demurrageRate", e.target.value)} placeholder="0"
                     style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 48px 10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
@@ -21678,7 +21680,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
                 </div>
               </div>
               <div>
-                <LBL>DISPATCH RATE</LBL>
+                <VoyageLBL>DISPATCH RATE</VoyageLBL>
                 <div style={{ position: "relative" }}>
                   <input type="number" value={form.dispatchRate || ""} onChange={e => f("dispatchRate", e.target.value)} placeholder="0"
                     style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 48px 10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
@@ -21686,13 +21688,13 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
                 </div>
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
-                <LBL>ADDITIONAL INFO</LBL>
+                <VoyageLBL>ADDITIONAL INFO</VoyageLBL>
                 <textarea value={form.additionalInfo || ""} onChange={e => f("additionalInfo", e.target.value)} rows={2} placeholder="Informations complémentaires…"
                   style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
               </div>
 
               {/* ── LOADING PORTS ── */}
-              <SECT label="Loading Ports" color={COLORS.blue} />
+              <VoyageSECT label="Loading Ports" color={COLORS.blue} />
               <div style={{ gridColumn: "1 / -1" }}>
                 {(form.loadingPorts || []).map((port, idx) => (
                   <PortBlock key={idx} port={port} idx={idx} label="Loading Port"
@@ -21708,7 +21710,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
               </div>
 
               {/* ── DESTINATION PORTS ── */}
-              <SECT label="Destination Ports" color={COLORS.green} />
+              <VoyageSECT label="Destination Ports" color={COLORS.green} />
               <div style={{ gridColumn: "1 / -1" }}>
                 {(form.destinationPorts || []).map((port, idx) => (
                   <PortBlock key={idx} port={port} idx={idx} label="Destination Port"

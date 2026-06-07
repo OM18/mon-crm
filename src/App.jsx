@@ -114,6 +114,204 @@ const COLORS = {
 };
 
 // ─── DEFAULT CONFIG VALUES ────────────────────────────────────
+const MASTER_COUNTRIES = [
+  // Europe
+  { value: "FR", label: "France" },
+  { value: "DE", label: "Germany" },
+  { value: "ES", label: "Spain" },
+  { value: "IT", label: "Italy" },
+  { value: "PT", label: "Portugal" },
+  { value: "NL", label: "Netherlands" },
+  { value: "BE", label: "Belgium" },
+  { value: "CH", label: "Switzerland" },
+  { value: "AT", label: "Austria" },
+  { value: "SE", label: "Sweden" },
+  { value: "NO", label: "Norway" },
+  { value: "DK", label: "Denmark" },
+  { value: "FI", label: "Finland" },
+  { value: "PL", label: "Poland" },
+  { value: "UA", label: "Ukraine" },
+  { value: "GB", label: "United Kingdom" },
+  { value: "IE", label: "Ireland" },
+  { value: "GR", label: "Greece" },
+  { value: "TR", label: "Turkey" },
+  { value: "RU", label: "Russia" },
+  { value: "RO", label: "Romania" },
+  { value: "BG", label: "Bulgaria" },
+  { value: "HR", label: "Croatia" },
+  { value: "RS", label: "Serbia" },
+  { value: "HU", label: "Hungary" },
+  { value: "CZ", label: "Czechia" },
+  { value: "SK", label: "Slovakia" },
+  { value: "LT", label: "Lithuania" },
+  { value: "LV", label: "Latvia" },
+  { value: "EE", label: "Estonia" },
+  { value: "LU", label: "Luxembourg" },
+  { value: "MT", label: "Malta" },
+  { value: "CY", label: "Cyprus" },
+  { value: "IS", label: "Iceland" },
+  { value: "SI", label: "Slovenia" },
+  { value: "AL", label: "Albania" },
+  { value: "MD", label: "Moldova" },
+  { value: "BY", label: "Belarus" },
+  { value: "ME", label: "Montenegro" },
+  { value: "MK", label: "North Macedonia" },
+  { value: "BA", label: "Bosnia and Herzegovina" },
+  { value: "GI", label: "Gibraltar" },
+  { value: "IM", label: "Isle of Man" },
+  { value: "FO", label: "Faroe Islands" },
+  // Africa
+  { value: "MA", label: "Morocco" },
+  { value: "DZ", label: "Algeria" },
+  { value: "TN", label: "Tunisia" },
+  { value: "EG", label: "Egypt" },
+  { value: "LY", label: "Libya" },
+  { value: "SD", label: "Sudan" },
+  { value: "SN", label: "Senegal" },
+  { value: "NG", label: "Nigeria" },
+  { value: "GH", label: "Ghana" },
+  { value: "CI", label: "Côte d'Ivoire" },
+  { value: "CM", label: "Cameroon" },
+  { value: "ET", label: "Ethiopia" },
+  { value: "KE", label: "Kenya" },
+  { value: "TZ", label: "Tanzania" },
+  { value: "ZA", label: "South Africa" },
+  { value: "MZ", label: "Mozambique" },
+  { value: "AO", label: "Angola" },
+  { value: "MG", label: "Madagascar" },
+  { value: "MU", label: "Mauritius" },
+  { value: "SC", label: "Seychelles" },
+  { value: "LR", label: "Liberia" },
+  { value: "BJ", label: "Benin" },
+  { value: "TG", label: "Togo" },
+  { value: "GA", label: "Gabon" },
+  { value: "ML", label: "Mali" },
+  { value: "BF", label: "Burkina Faso" },
+  { value: "NE", label: "Niger" },
+  { value: "MR", label: "Mauritania" },
+  { value: "GM", label: "Gambia" },
+  { value: "GN", label: "Guinea" },
+  { value: "GW", label: "Guinea-Bissau" },
+  { value: "SL", label: "Sierra Leone" },
+  { value: "CD", label: "DR Congo" },
+  { value: "CG", label: "Congo" },
+  { value: "UG", label: "Uganda" },
+  { value: "RW", label: "Rwanda" },
+  { value: "ZM", label: "Zambia" },
+  { value: "ZW", label: "Zimbabwe" },
+  { value: "MW", label: "Malawi" },
+  { value: "BI", label: "Burundi" },
+  { value: "TD", label: "Chad" },
+  { value: "SO", label: "Somalia" },
+  { value: "DJ", label: "Djibouti" },
+  { value: "ER", label: "Eritrea" },
+  { value: "NA", label: "Namibia" },
+  { value: "BW", label: "Botswana" },
+  { value: "LS", label: "Lesotho" },
+  { value: "SZ", label: "Eswatini" },
+  { value: "CV", label: "Cape Verde" },
+  { value: "KM", label: "Comoros" },
+  { value: "GQ", label: "Equatorial Guinea" },
+  { value: "ST", label: "São Tomé and Príncipe" },
+  // Middle East
+  { value: "SA", label: "Saudi Arabia" },
+  { value: "AE", label: "United Arab Emirates" },
+  { value: "QA", label: "Qatar" },
+  { value: "KW", label: "Kuwait" },
+  { value: "BH", label: "Bahrain" },
+  { value: "OM", label: "Oman" },
+  { value: "YE", label: "Yemen" },
+  { value: "IL", label: "Israel" },
+  { value: "JO", label: "Jordan" },
+  { value: "LB", label: "Lebanon" },
+  { value: "IQ", label: "Iraq" },
+  { value: "IR", label: "Iran" },
+  { value: "SY", label: "Syria" },
+  // Asia
+  { value: "CN", label: "China" },
+  { value: "JP", label: "Japan" },
+  { value: "IN", label: "India" },
+  { value: "KR", label: "South Korea" },
+  { value: "TW", label: "Taiwan" },
+  { value: "HK", label: "Hong Kong" },
+  { value: "SG", label: "Singapore" },
+  { value: "MY", label: "Malaysia" },
+  { value: "TH", label: "Thailand" },
+  { value: "VN", label: "Vietnam" },
+  { value: "ID", label: "Indonesia" },
+  { value: "PH", label: "Philippines" },
+  { value: "MM", label: "Myanmar" },
+  { value: "KH", label: "Cambodia" },
+  { value: "PK", label: "Pakistan" },
+  { value: "BD", label: "Bangladesh" },
+  { value: "LK", label: "Sri Lanka" },
+  { value: "NP", label: "Nepal" },
+  { value: "MV", label: "Maldives" },
+  { value: "KZ", label: "Kazakhstan" },
+  { value: "UZ", label: "Uzbekistan" },
+  { value: "AZ", label: "Azerbaijan" },
+  { value: "GE", label: "Georgia" },
+  { value: "AM", label: "Armenia" },
+  { value: "AF", label: "Afghanistan" },
+  // Americas
+  { value: "US", label: "United States" },
+  { value: "CA", label: "Canada" },
+  { value: "MX", label: "Mexico" },
+  { value: "BR", label: "Brazil" },
+  { value: "AR", label: "Argentina" },
+  { value: "CL", label: "Chile" },
+  { value: "CO", label: "Colombia" },
+  { value: "PE", label: "Peru" },
+  { value: "VE", label: "Venezuela" },
+  { value: "EC", label: "Ecuador" },
+  { value: "BO", label: "Bolivia" },
+  { value: "PY", label: "Paraguay" },
+  { value: "UY", label: "Uruguay" },
+  { value: "PA", label: "Panama" },
+  { value: "CR", label: "Costa Rica" },
+  { value: "GT", label: "Guatemala" },
+  { value: "HN", label: "Honduras" },
+  { value: "SV", label: "El Salvador" },
+  { value: "NI", label: "Nicaragua" },
+  { value: "CU", label: "Cuba" },
+  { value: "DO", label: "Dominican Republic" },
+  { value: "HT", label: "Haiti" },
+  { value: "JM", label: "Jamaica" },
+  { value: "TT", label: "Trinidad and Tobago" },
+  { value: "BB", label: "Barbados" },
+  { value: "BS", label: "Bahamas" },
+  { value: "AG", label: "Antigua and Barbuda" },
+  { value: "VC", label: "Saint Vincent and the Grenadines" },
+  { value: "LC", label: "Saint Lucia" },
+  { value: "KN", label: "Saint Kitts and Nevis" },
+  { value: "GD", label: "Grenada" },
+  { value: "DM", label: "Dominica" },
+  { value: "BZ", label: "Belize" },
+  { value: "KY", label: "Cayman Islands" },
+  { value: "BM", label: "Bermuda" },
+  { value: "VG", label: "British Virgin Islands" },
+  { value: "AI", label: "Anguilla" },
+  { value: "TC", label: "Turks and Caicos" },
+  { value: "PR", label: "Puerto Rico" },
+  // Oceania & Pacific
+  { value: "AU", label: "Australia" },
+  { value: "NZ", label: "New Zealand" },
+  { value: "FJ", label: "Fiji" },
+  { value: "PG", label: "Papua New Guinea" },
+  { value: "SB", label: "Solomon Islands" },
+  { value: "VU", label: "Vanuatu" },
+  { value: "WS", label: "Samoa" },
+  { value: "TO", label: "Tonga" },
+  { value: "PW", label: "Palau" },
+  { value: "CK", label: "Cook Islands" },
+  { value: "NU", label: "Niue" },
+  { value: "TV", label: "Tuvalu" },
+  { value: "KI", label: "Kiribati" },
+  // Key shipping flag states
+  { value: "MH", label: "Marshall Islands" },
+  { value: "GL", label: "Greenland" },
+];
+
 const DEFAULT_CONFIG = {
   activityStatus: [
     { value: "prospect", label: "Prospect", color: COLORS.orange },
@@ -340,6 +538,13 @@ const ConfigProvider = ({ children }) => {
       const { data } = await supabase.from('config').select('data').eq('key', 'admin-config').single();
       if (data) {
         const loaded = { ...DEFAULT_CONFIG, ...data.data };
+        // Auto-merge missing countries from master list (never overwrites existing entries)
+        const existingValues = new Set((loaded.country || []).map(c => c.value.toUpperCase()));
+        const added = MASTER_COUNTRIES.filter(c => !existingValues.has(c.value.toUpperCase()));
+        if (added.length > 0) {
+          loaded.country = [...(loaded.country || []), ...added];
+          await supabase.from('config').upsert({ key: 'admin-config', data: loaded }, { onConflict: 'key' });
+        }
         // Normalize fields that must be arrays but may have been saved as objects
         if (!Array.isArray(loaded.derivAccountTypes)) loaded.derivAccountTypes = DEFAULT_CONFIG.derivAccountTypes;
         if (!Array.isArray(loaded.derivFinancingBanks)) loaded.derivFinancingBanks = DEFAULT_CONFIG.derivFinancingBanks;
@@ -19999,7 +20204,7 @@ const VesselRow = memo(({ v, idx, isSel, onSelect, onEdit, onRemove, companies, 
       <div style={{ padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {v.flag ? (() => {
           const resolvedFlagCode = getCountryCode(v.flag) || v.flag;
-          const label = (config?.country || []).find(c => c.value === resolvedFlagCode)?.label || resolvedFlagCode;
+          const label = (config?.country || []).find(c => c.value.toUpperCase() === resolvedFlagCode.toUpperCase())?.label || resolvedFlagCode;
           return (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
               <CountryFlag country={v.flag} size={28} />
@@ -20184,7 +20389,7 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
             <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>Flag</div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <img src={`https://flagcdn.com/20x15/${(getCountryCode(v.flag) || v.flag).toLowerCase()}.png`} style={{ width: 20, height: 15, borderRadius: 2 }} onError={e => e.target.style.display='none'} />
-              <span style={{ fontSize: 13, color: COLORS.text }}>{(config.country || []).find(c => c.value === (getCountryCode(v.flag) || v.flag))?.label || getCountryCode(v.flag) || v.flag}</span>
+              <span style={{ fontSize: 13, color: COLORS.text }}>{(config.country || []).find(c => c.value.toUpperCase() === (getCountryCode(v.flag) || v.flag).toUpperCase())?.label || getCountryCode(v.flag) || v.flag}</span>
             </div>
           </div>
         )}

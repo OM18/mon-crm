@@ -21577,7 +21577,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
     });
   };
   const disponentOwners = filterByRole("disponent owner");
-  console.log("[DEBUG roles] sample:", companies.slice(0,10).map(c => ({name:c.name, roles:c.roles})));
+  console.log("[DEBUG roles with content]", JSON.stringify(companies.filter(c => c.roles?.length > 0).slice(0,10).map(c => ({n:c.name, r:c.roles}))));
   const brokers = filterByRole("broker");
 
   const filtered = voyages.filter(v => {

@@ -17423,11 +17423,11 @@ const CONTRACT_FIELD_MAP = {
   "vatRate":           ["vat rate (%)", "vatrate", "vat rate", "taux tva", "taux de tva", "tax rate"],
   "info":              ["info", "note", "information", "notes", "remarks", "commentaire"],
   "trade1":            ["trade 1", "trade1", "trade n°1", "trade no 1", "1st trade"],
-  "connectedQty1":     ["connected quantity 1", "connectedqty1", "qty 1", "quantite 1", "connected qty 1", "quantity 1"],
+  "connectedQty1":     ["connected quantity 1", "connectedqty1", "qty 1", "quantite 1", "connected qty 1", "connected qty1", "quantity 1"],
   "trade2":            ["trade 2", "trade2", "trade n°2", "trade no 2", "2nd trade"],
-  "connectedQty2":     ["connected quantity 2", "connectedqty2", "qty 2", "quantite 2", "connected qty 2", "quantity 2"],
+  "connectedQty2":     ["connected quantity 2", "connectedqty2", "qty 2", "quantite 2", "connected qty 2", "connected qty2", "quantity 2"],
   "trade3":            ["trade 3", "trade3", "trade n°3", "trade no 3", "3rd trade"],
-  "connectedQty3":     ["connected quantity 3", "connectedqty3", "qty 3", "quantite 3", "connected qty 3", "quantity 3"],
+  "connectedQty3":     ["connected quantity 3", "connectedqty3", "qty 3", "quantite 3", "connected qty 3", "connected qty3", "quantity 3"],
 };
 
 const CONTRACT_REQUIRED_FIELDS = ["contractNumber", "contractType", "conclusionDate", "buyerId", "sellerId", "commodity"];

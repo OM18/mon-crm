@@ -19374,6 +19374,43 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
               {(config.country || []).find(x => x.value === c.destinationCountry)?.label || c.destinationCountry || "—"}
             </div>
           </DRow>
+
+          {/* ── TRADES LIÉS ── */}
+          {(c.tradeLinks || []).length > 0 && (
+            <>
+              <Sec label="Trades liés" />
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 8 }}>
+                {(c.tradeLinks || []).map((link, idx) => {
+                  const trade = (trades || []).find(t => String(t.id) === String(link.tradeId));
+                  return (
+                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: 14, background: COLORS.bg, border: `1px solid ${COLORS.accent}25`, borderRadius: 10, padding: "10px 14px" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, minWidth: 50 }}>TRADE {idx + 1}</div>
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: trade ? COLORS.accent : COLORS.textMuted }}>
+                          {trade ? trade.tradeName : (
+                            <span style={{ fontStyle: "italic", fontSize: 12 }}>ID {link.tradeId} (non trouvé)</span>
+                          )}
+                        </span>
+                        {trade?.businessMonth && (
+                          <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{trade.businessMonth}</span>
+                        )}
+                        {trade?.tradeBusinessUnit && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: `${COLORS.purple}20`, color: COLORS.purple, border: `1px solid ${COLORS.purple}40` }}>{trade.tradeBusinessUnit}</span>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                        <span style={{ fontSize: 10, color: COLORS.textMuted }}>QTÉ</span>
+                        <span style={{ fontSize: 14, fontWeight: 800, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>
+                          {link.connectedQty ? `${Number(link.connectedQty).toLocaleString("fr")} T` : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
         </div>
       </div>
     );

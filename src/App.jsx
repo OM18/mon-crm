@@ -18896,10 +18896,14 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
     const normalizedLinks = (c.tradeLinks || []).map(link => {
       const v = String(link.tradeId || "").trim();
       if (!v) return link;
-      const byId = trades.find(t => String(t.id) === v);
+      const norm = s => String(s || "").replace(/[\u00a0\u200b\ufeff]/g, " ").trim().toLowerCase();
+      const vn = v.replace(/[\u00a0\u200b\ufeff]/g, " ").trim();
+      const byId = trades.find(t => String(t.id) === vn);
       if (byId) return { ...link, tradeId: byId.id };
-      const byName = trades.find(t => (t.tradeName || "").toLowerCase() === v.toLowerCase());
-      if (byName) return { ...link, tradeId: byName.id };
+      const byExact = trades.find(t => norm(t.tradeName) === norm(vn));
+      if (byExact) return { ...link, tradeId: byExact.id };
+      const byPartial = trades.find(t => norm(t.tradeName).includes(norm(vn)) || norm(vn).includes(norm(t.tradeName)));
+      if (byPartial) return { ...link, tradeId: byPartial.id };
       return link;
     });
     setForm({ ...c, tradeLinks: normalizedLinks });
@@ -19028,8 +19032,12 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
     // filtre par trade lié
     if (tq) {
       const linked = (c.tradeLinks || []).some(link => {
-        const trade = trades.find(t => String(t.id) === String(link.tradeId));
-        return trade && (trade.tradeName || "").toLowerCase().includes(tq);
+        const lv = String(link.tradeId || "").trim();
+        const trade = trades.find(t => String(t.id) === lv) ||
+                      trades.find(t => (t.tradeName || "").toLowerCase() === lv.toLowerCase());
+        // aussi matcher directement sur le nom brut stocké dans tradeId
+        return (trade && (trade.tradeName || "").toLowerCase().includes(tq)) ||
+               lv.toLowerCase().includes(tq);
       });
       if (!linked) return false;
     }
@@ -19394,7 +19402,9 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
               <Sec label="Trades liés" />
               <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 8 }}>
                 {(c.tradeLinks || []).map((link, idx) => {
-                  const trade = (trades || []).find(t => String(t.id) === String(link.tradeId));
+                  const v = String(link.tradeId || "").trim();
+                  const trade = (trades || []).find(t => String(t.id) === v) ||
+                                (trades || []).find(t => (t.tradeName || "").toLowerCase() === v.toLowerCase());
                   return (
                     <div key={idx} style={{ display: "flex", alignItems: "center", gap: 14, background: COLORS.bg, border: `1px solid ${COLORS.accent}25`, borderRadius: 10, padding: "10px 14px" }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, minWidth: 50 }}>TRADE {idx + 1}</div>
@@ -19530,18 +19540,20 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
             const nextId = contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;
             const enriched = items.map((item, i) => {
               const base = { ...EMPTY_CONTRACT(config), ...item, id: nextId + i, createdAt: new Date().toISOString() };
-              // Normalise tradeId : si la cellule contient un nom, on résout vers l'id numérique
+              // Normalise tradeId : résout nom → id numérique
               if ((base.tradeLinks || []).length > 0) {
                 base.tradeLinks = base.tradeLinks.map(link => {
-                  const v = String(link.tradeId || "").trim();
+                  const v = String(link.tradeId || "").replace(/[\u00a0\u200b\ufeff]/g, " ").trim();
                   if (!v) return link;
-                  // Déjà numérique et correspond à un trade existant
+                  const norm = s => String(s || "").replace(/[\u00a0\u200b\ufeff]/g, " ").trim().toLowerCase();
                   const byId = trades.find(t => String(t.id) === v);
                   if (byId) return { ...link, tradeId: byId.id };
-                  // Sinon chercher par tradeName (insensible casse)
-                  const byName = trades.find(t => (t.tradeName || "").toLowerCase() === v.toLowerCase());
-                  if (byName) return { ...link, tradeId: byName.id };
-                  return link; // non résolu, on garde tel quel
+                  const byExact = trades.find(t => norm(t.tradeName) === norm(v));
+                  if (byExact) return { ...link, tradeId: byExact.id };
+                  // fallback : contient
+                  const byPartial = trades.find(t => norm(t.tradeName).includes(norm(v)) || norm(v).includes(norm(t.tradeName)));
+                  if (byPartial) return { ...link, tradeId: byPartial.id };
+                  return link;
                 });
               }
               return base;

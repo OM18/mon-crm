@@ -22314,6 +22314,168 @@ const TradeCountryCombo = ({ label, placeholder, field, form, f, config }) => {
   );
 };
 
+// ─── TRADE DETAIL PANEL ──────────────────────────────────────
+const TradeDetailPanel = ({ trade, onClose, onEdit, voyages, contracts }) => {
+  if (!trade) return null;
+  const voyage = voyages.find(v => String(v.id) === String(trade.voyageId));
+
+  const DRow = ({ label, value, accent, mono }) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textTransform: "uppercase" }}>{label}</span>
+      <span style={{
+        fontSize: 13, color: value ? (accent || COLORS.text) : COLORS.textMuted,
+        fontFamily: mono ? "'DM Mono', monospace" : "inherit", fontWeight: accent ? 600 : 400
+      }}>{value || "—"}</span>
+    </div>
+  );
+
+  const Section = ({ label, color = COLORS.accent }) => (
+    <div style={{ borderBottom: `2px solid ${color}30`, paddingBottom: 4, marginTop: 14, marginBottom: 10 }}>
+      <span style={{ fontSize: 10, fontWeight: 800, color, letterSpacing: 1, textTransform: "uppercase" }}>{label}</span>
+    </div>
+  );
+
+  const LegDetail = ({ leg, type, idx }) => {
+    const color = type === "purchase" ? COLORS.red : COLORS.green;
+    const label = type === "purchase" ? "Purchase" : "Sale";
+    const contract = contracts.find(c => String(c.id) === String(leg.contractId));
+    return (
+      <div style={{ background: COLORS.bg, border: `1px solid ${color}25`, borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 8 }}>{label} Contract {idx + 1}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <DRow label="Contrat" value={contract ? (contract.contractNumber || `#${contract.id}`) : (leg.contractId ? `#${leg.contractId}` : null)} accent={color} />
+          <DRow label="Quantity" value={leg.quantity ? `${Number(leg.quantity).toLocaleString("fr")} T` : null} mono />
+          {contract?.commodity && <DRow label="Commodity" value={contract.commodity} />}
+          {contract?.contractType && <DRow label="Type" value={contract.contractType} />}
+          {contract?.originCountry && <DRow label="Origine" value={contract.originCountry} />}
+          {contract?.destinationCountry && <DRow label="Destination" value={contract.destinationCountry} />}
+          {(contract?.port) && <DRow label="Port" value={Array.isArray(contract.port) ? contract.port.join(", ") : contract.port} />}
+          {contract?.qtyValue && <DRow label="Qté contrat" value={`${contract.qtyValue} ${contract.qtyUnit || "T"}`} mono />}
+        </div>
+      </div>
+    );
+  };
+
+  const purchaseLegs = (trade.purchaseLegs || []).filter(l => l.contractId);
+  const saleLegs = (trade.saleLegs || []).filter(l => l.contractId);
+
+  return (
+    <div style={{
+      width: 360, flexShrink: 0,
+      background: COLORS.surface, border: `1px solid ${COLORS.border}`,
+      borderRadius: 16, display: "flex", flexDirection: "column",
+      overflow: "hidden", height: "100%"
+    }}>
+      {/* Header */}
+      <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, marginBottom: 4 }}>TRADE</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: COLORS.text, wordBreak: "break-word" }}>{trade.tradeName}</div>
+          {trade.createdAt && (
+            <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 4 }}>
+              Créé le {new Date(trade.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          <button onClick={() => onEdit(trade)} title="Modifier"
+            style={{ background: `${COLORS.accent}18`, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, padding: "6px 10px", color: COLORS.accent, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
+            ✏ Éditer
+          </button>
+          <button onClick={onClose}
+            style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "4px 6px", borderRadius: 6 }}>
+            ×
+          </button>
+        </div>
+      </div>
+
+      {/* Body scrollable */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 24px" }}>
+
+        {/* Badges commodities */}
+        {(trade.commodities || []).length > 0 && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+            {trade.commodities.map((c, i) => (
+              <span key={i} style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: `${COLORS.gold}20`, color: COLORS.gold, border: `1px solid ${COLORS.gold}35` }}>{c}</span>
+            ))}
+          </div>
+        )}
+
+        <Section label="Général" />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <DRow label="Voyage" value={voyage?.voyageName} accent={COLORS.accent} />
+          <DRow label="Business Month" value={trade.businessMonth} mono />
+          <DRow label="Logistic Type" value={trade.logisticType} />
+          <DRow label="Volume" value={trade.volume ? `${Number(trade.volume).toLocaleString("fr")} T` : null} mono />
+          <DRow label="Origin Country" value={trade.originCountry} />
+          <DRow label="Destination Country" value={trade.destinationCountry} />
+          <div style={{ gridColumn: "1 / -1" }}>
+            <DRow label="Business Unit" value={trade.tradeBusinessUnit} accent={COLORS.purple} />
+          </div>
+          {trade.additionalInfos && (
+            <div style={{ gridColumn: "1 / -1", background: COLORS.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${COLORS.border}` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, marginBottom: 6 }}>ADDITIONAL INFOS</div>
+              <div style={{ fontSize: 12, color: COLORS.textSub, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{trade.additionalInfos}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Purchase Legs */}
+        {(purchaseLegs.length > 0 || (trade.purchaseLegs || []).length > 0) && (
+          <>
+            <Section label={`Purchase Contracts (${purchaseLegs.length})`} color={COLORS.red} />
+            {purchaseLegs.length === 0
+              ? <div style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>Aucun contrat purchase lié</div>
+              : purchaseLegs.map((leg, i) => <LegDetail key={i} leg={leg} type="purchase" idx={i} />)
+            }
+          </>
+        )}
+
+        {/* Sale Legs */}
+        {(saleLegs.length > 0 || (trade.saleLegs || []).length > 0) && (
+          <>
+            <Section label={`Sale Contracts (${saleLegs.length})`} color={COLORS.green} />
+            {saleLegs.length === 0
+              ? <div style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: "italic" }}>Aucun contrat sale lié</div>
+              : saleLegs.map((leg, i) => <LegDetail key={i} leg={leg} type="sale" idx={i} />)
+            }
+          </>
+        )}
+
+        {/* P&L rapide */}
+        {(purchaseLegs.length > 0 || saleLegs.length > 0) && (() => {
+          const totalPurchaseQty = purchaseLegs.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0);
+          const totalSaleQty = saleLegs.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0);
+          const diff = totalSaleQty - totalPurchaseQty;
+          if (!totalPurchaseQty && !totalSaleQty) return null;
+          return (
+            <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, padding: "12px 14px", marginTop: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: COLORS.textMuted, letterSpacing: 0.8, marginBottom: 10 }}>RÉSUMÉ QUANTITÉS</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: COLORS.red, fontWeight: 700, marginBottom: 4 }}>ACHAT</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: COLORS.red, fontFamily: "'DM Mono', monospace" }}>{totalPurchaseQty.toLocaleString("fr")} T</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: COLORS.green, fontWeight: 700, marginBottom: 4 }}>VENTE</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: COLORS.green, fontFamily: "'DM Mono', monospace" }}>{totalSaleQty.toLocaleString("fr")} T</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 700, marginBottom: 4 }}>SOLDE</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: diff === 0 ? COLORS.green : diff > 0 ? COLORS.accent : COLORS.red }}>
+                    {diff > 0 ? "+" : ""}{diff.toLocaleString("fr")} T
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+      </div>
+    </div>
+  );
+};
+
 const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTrades }) => {
   const { config } = useConfig();
   const [search, setSearch] = useState("");
@@ -22561,20 +22723,35 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
         <Btn onClick={openNew}>+ Ajouter</Btn>
       </div>
 
-      {/* Blotter */}
-      <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0, flexDirection: "column" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "180px 160px 100px 120px 140px 140px 110px 80px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
-          {["TRADE NAME", "VOYAGE", "MONTH", "COMMODITY", "ORIGIN", "DESTINATION", "BU", "VOLUME", ""].map((h, i) => (
-            <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
-          ))}
+      {/* Blotter + Detail Panel */}
+      <div style={{ flex: 1, display: "flex", gap: 16, minHeight: 0 }}>
+        {/* Blotter */}
+        <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0, flexDirection: "column", minWidth: 0 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "180px 160px 100px 120px 140px 140px 110px 80px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
+            {["TRADE NAME", "VOYAGE", "MONTH", "COMMODITY", "ORIGIN", "DESTINATION", "BU", "VOLUME", ""].map((h, i) => (
+              <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, padding: "4px 12px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
+            {filtered.length} trade{filtered.length !== 1 ? "s" : ""}
+            {selected && <span style={{ marginLeft: 10, color: COLORS.accent }}>· {selected.tradeName} sélectionné</span>}
+          </div>
+          <VirtualTradeList filtered={filtered} selected={selected}
+            onSelect={t => setSelected(selected?.id === t.id ? null : t)}
+            onEdit={openEdit} onRemove={remove}
+            voyages={voyages} contracts={contracts} config={config} />
         </div>
-        <div style={{ fontSize: 11, color: COLORS.textMuted, padding: "4px 12px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
-          {filtered.length} trade{filtered.length !== 1 ? "s" : ""}
-        </div>
-        <VirtualTradeList filtered={filtered} selected={selected}
-          onSelect={t => setSelected(selected?.id === t.id ? null : t)}
-          onEdit={openEdit} onRemove={remove}
-          voyages={voyages} contracts={contracts} config={config} />
+
+        {/* Detail Panel */}
+        {selected && (
+          <TradeDetailPanel
+            trade={selected}
+            onClose={() => setSelected(null)}
+            onEdit={openEdit}
+            voyages={voyages}
+            contracts={contracts}
+          />
+        )}
       </div>
 
       {/* Modal */}

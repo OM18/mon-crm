@@ -19450,6 +19450,16 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
         </div>
         <input placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ width: 220, background: COLORS.card, border: `1px solid ${search ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.card, border: `1px solid ${tradeFilter ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "6px 12px", transition: "border-color 0.2s" }}>
+          <span style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600, whiteSpace: "nowrap" }}>TRADE</span>
+          <input
+            value={tradeFilter}
+            onChange={e => setTradeFilter(e.target.value)}
+            placeholder="Filtrer par trade…"
+            style={{ background: "transparent", border: "none", color: tradeFilter ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", width: 180, cursor: "text" }}
+          />
+          {tradeFilter && <span onClick={() => setTradeFilter("")} style={{ cursor: "pointer", color: COLORS.textMuted, fontSize: 14, lineHeight: 1 }}>✕</span>}
+        </div>
         <XlButton onImport={() => setShowImport(true)} onExport={() => setShowExport(true)} />
         <Btn onClick={openNew}>+ NEW CONTRACT</Btn>
         <button onClick={() => setShowDeleteAll(true)} title="Supprimer tous les contrats"
@@ -19461,31 +19471,8 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
       {/* Blotter table */}
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden", flex: selected ? "0 0 auto" : 1, display: "flex", flexDirection: "column", maxHeight: selected ? "45vh" : undefined }}>
         <div style={{ overflowX: "auto", flex: 1, display: "flex", flexDirection: "column" }}>
-          {/* Filter row */}
-          <div style={{ display: "grid", gridTemplateColumns: gridTpl, background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content", position: "sticky", top: 0, zIndex: 3 }}>
-            {COLS.map(col => (
-              <div key={col.key} style={{ padding: "4px 6px" }}>
-                {col.key === "contractRef" ? (
-                  <div style={{ position: "relative" }}>
-                    <input
-                      value={tradeFilter}
-                      onChange={e => setTradeFilter(e.target.value)}
-                      placeholder="Filtrer par trade…"
-                      style={{ width: "100%", background: tradeFilter ? `${COLORS.accent}12` : COLORS.surface, border: `1px solid ${tradeFilter ? COLORS.accent + "70" : COLORS.border}`, borderRadius: 6, padding: "5px 24px 5px 8px", color: COLORS.text, fontSize: 11, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
-                    />
-                    {tradeFilter
-                      ? <button onMouseDown={e => { e.preventDefault(); setTradeFilter(""); }} style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "0 2px" }}>×</button>
-                      : <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: COLORS.textMuted, pointerEvents: "none" }}>🔀</span>
-                    }
-                  </div>
-                ) : null}
-              </div>
-            ))}
-            <div style={{ padding: "4px 6px" }} />
-          </div>
-
           {/* Header row */}
-          <div style={{ display: "grid", gridTemplateColumns: gridTpl, background: COLORS.tableHeader, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content", position: "sticky", top: 33, zIndex: 2 }}>
+          <div style={{ display: "grid", gridTemplateColumns: gridTpl, background: COLORS.tableHeader, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content", position: "sticky", top: 0, zIndex: 2 }}>
             {COLS.map(col => (
               <div key={col.key} style={{ padding: "10px 12px", fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textTransform: "uppercase", whiteSpace: "nowrap", textAlign: "center" }}>{col.label}</div>
             ))}

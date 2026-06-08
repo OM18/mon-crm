@@ -19443,6 +19443,45 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
             const nextId = contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;
             const enriched = items.map((item, i) => ({ ...EMPTY_CONTRACT(config), ...item, id: nextId + i, createdAt: new Date().toISOString() }));
             persist([...contracts, ...enriched]);
+
+            // ── Sync tradeLinks → trade legs (bidirectionnel) ──
+            if (setTrades && trades.length > 0) {
+              let updatedTrades = [...trades];
+              // Résolution tradeId : la cellule Excel peut contenir le nom OU l'id numérique du trade
+              const resolveTradeIdx = (tradeVal) => {
+                const v = String(tradeVal).trim();
+                // 1) match par id numérique exact
+                let idx = updatedTrades.findIndex(t => String(t.id) === v);
+                if (idx >= 0) return idx;
+                // 2) match par tradeName (insensible casse)
+                idx = updatedTrades.findIndex(t => (t.tradeName || "").toLowerCase() === v.toLowerCase());
+                return idx;
+              };
+              enriched.forEach(contract => {
+                if (!(contract.tradeLinks || []).length) return;
+                const contractType = (contract.contractType || "").toLowerCase();
+                const isPurchase = contractType.includes("purchase") || contractType.includes("achat");
+                const legKey = isPurchase ? "purchaseLegs" : "saleLegs";
+                contract.tradeLinks.forEach(link => {
+                  const tradeIdx = resolveTradeIdx(link.tradeId);
+                  if (tradeIdx < 0) return;
+                  const trade = updatedTrades[tradeIdx];
+                  const legs = [...(trade[legKey] || [])];
+                  const legIdx = legs.findIndex(l => String(l.contractId) === String(contract.id));
+                  if (legIdx >= 0) {
+                    legs[legIdx] = { ...legs[legIdx], quantity: link.connectedQty };
+                  } else {
+                    legs.push({ contractId: String(contract.id), quantity: link.connectedQty });
+                  }
+                  updatedTrades[tradeIdx] = { ...trade, [legKey]: legs };
+                });
+              });
+              if (JSON.stringify(updatedTrades) !== JSON.stringify(trades)) {
+                setTrades(updatedTrades);
+                saveLargeTable('trades', updatedTrades);
+              }
+            }
+
             setShowImport(false);
           }}
         />

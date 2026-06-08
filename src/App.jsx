@@ -6342,7 +6342,7 @@ const BatchContractsOldToNew = () => {
 
         // ── Trade links — parse multi-line cell ──
         // Format: "TRADE_NAME, 1250.5 t\nTRADE_NAME2, 750.0 t\n..."
-        const tradeRaw = get("contractprices_data") || get("contract_prices") || get("trade_link") || get("trade") || get("trades") || "";
+        const tradeRaw = get("contractprices_data") || get("contract_prices") || get("trade_link") || get("trade") || get("trades") || get("passport_names") || "";
         if (tradeRaw) {
           // Split on newline characters (Excel multi-line = \n or \r\n)
           const lines = tradeRaw.split(/[\r\n]+/).map(l => l.trim()).filter(Boolean);
@@ -6367,7 +6367,6 @@ const BatchContractsOldToNew = () => {
           if (!out[`trade${n}`]) out[`trade${n}`] = "";
           if (!out[`connectedQty${n}`]) out[`connectedQty${n}`] = "";
         }
-        return out;
       });
 
       if (converted.length === 0) { setResult({ error: "Aucune ligne valide." }); setState("error"); return; }

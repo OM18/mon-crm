@@ -6367,6 +6367,7 @@ const BatchContractsOldToNew = () => {
           if (!out[`trade${n}`]) out[`trade${n}`] = "";
           if (!out[`connectedQty${n}`]) out[`connectedQty${n}`] = "";
         }
+        return out;
       });
 
       if (converted.length === 0) { setResult({ error: "Aucune ligne valide." }); setState("error"); return; }

@@ -18890,7 +18890,21 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
   };
 
   const openNew  = () => { setForm({ ...EMPTY_CONTRACT(config), conclusionDate: todayDDMMYYYY() }); setEditId(null); setShowModal(true); };
-  const openEdit = (c) => { setForm({ ...c }); setEditId(c.id); setShowModal(true); };
+  const openEdit = (c) => {
+    // Normalise tradeId : résout les noms de trades vers leurs id numériques
+    const normalizedLinks = (c.tradeLinks || []).map(link => {
+      const v = String(link.tradeId || "").trim();
+      if (!v) return link;
+      const byId = trades.find(t => String(t.id) === v);
+      if (byId) return { ...link, tradeId: byId.id };
+      const byName = trades.find(t => (t.tradeName || "").toLowerCase() === v.toLowerCase());
+      if (byName) return { ...link, tradeId: byName.id };
+      return link;
+    });
+    setForm({ ...c, tradeLinks: normalizedLinks });
+    setEditId(c.id);
+    setShowModal(true);
+  };
   const closeModal = () => { setShowModal(false); setForm(EMPTY_CONTRACT(config)); setEditId(null); setFormErrors({}); };
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -19441,7 +19455,24 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
           instruments={allInstruments}
           onImport={(items) => {
             const nextId = contracts.length > 0 ? Math.max(...contracts.map(c => c.id || 0)) + 1 : 1;
-            const enriched = items.map((item, i) => ({ ...EMPTY_CONTRACT(config), ...item, id: nextId + i, createdAt: new Date().toISOString() }));
+            const enriched = items.map((item, i) => {
+              const base = { ...EMPTY_CONTRACT(config), ...item, id: nextId + i, createdAt: new Date().toISOString() };
+              // Normalise tradeId : si la cellule contient un nom, on résout vers l'id numérique
+              if ((base.tradeLinks || []).length > 0) {
+                base.tradeLinks = base.tradeLinks.map(link => {
+                  const v = String(link.tradeId || "").trim();
+                  if (!v) return link;
+                  // Déjà numérique et correspond à un trade existant
+                  const byId = trades.find(t => String(t.id) === v);
+                  if (byId) return { ...link, tradeId: byId.id };
+                  // Sinon chercher par tradeName (insensible casse)
+                  const byName = trades.find(t => (t.tradeName || "").toLowerCase() === v.toLowerCase());
+                  if (byName) return { ...link, tradeId: byName.id };
+                  return link; // non résolu, on garde tel quel
+                });
+              }
+              return base;
+            });
             persist([...contracts, ...enriched]);
 
             // ── Sync tradeLinks → trade legs (bidirectionnel) ──

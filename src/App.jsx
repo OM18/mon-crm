@@ -18825,6 +18825,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
   const [form, setForm] = useState(EMPTY_CONTRACT());
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
+  const [tradeFilter, setTradeFilter] = useState("");
   const dataLoaded = useRef(true); // already loaded by parent
 
   // ── Load instruments ──
@@ -19013,15 +19014,27 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
 
   // ── Search filter ──
   const q = search.toLowerCase();
-  const filtered = contracts.filter(c =>
-    !q ||
-    String(c.id).includes(q) ||
-    (c.contractNumber || "").toLowerCase().includes(q) ||
-    companyName(c.buyerId).toLowerCase().includes(q) ||
-    companyName(c.sellerId).toLowerCase().includes(q) ||
-    (c.commodity || "").toLowerCase().includes(q) ||
-    (c.status || "").toLowerCase().includes(q)
-  ).sort((a, b) => {
+  const tq = tradeFilter.toLowerCase().trim();
+  const filtered = contracts.filter(c => {
+    // filtre texte général
+    if (q && !(
+      String(c.id).includes(q) ||
+      (c.contractNumber || "").toLowerCase().includes(q) ||
+      companyName(c.buyerId).toLowerCase().includes(q) ||
+      companyName(c.sellerId).toLowerCase().includes(q) ||
+      (c.commodity || "").toLowerCase().includes(q) ||
+      (c.status || "").toLowerCase().includes(q)
+    )) return false;
+    // filtre par trade lié
+    if (tq) {
+      const linked = (c.tradeLinks || []).some(link => {
+        const trade = trades.find(t => String(t.id) === String(link.tradeId));
+        return trade && (trade.tradeName || "").toLowerCase().includes(tq);
+      });
+      if (!linked) return false;
+    }
+    return true;
+  }).sort((a, b) => {
     // Parse dd/mm/yyyy → comparable string yyyymmdd
     const toYMD = d => { if (!d) return ""; const p = d.split("/"); return p.length === 3 ? p[2]+p[1]+p[0] : ""; };
     const da = toYMD(a.conclusionDate), db = toYMD(b.conclusionDate);
@@ -19438,8 +19451,31 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
       {/* Blotter table */}
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden", flex: selected ? "0 0 auto" : 1, display: "flex", flexDirection: "column", maxHeight: selected ? "45vh" : undefined }}>
         <div style={{ overflowX: "auto", flex: 1, display: "flex", flexDirection: "column" }}>
+          {/* Filter row */}
+          <div style={{ display: "grid", gridTemplateColumns: gridTpl, background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content", position: "sticky", top: 0, zIndex: 3 }}>
+            {COLS.map(col => (
+              <div key={col.key} style={{ padding: "4px 6px" }}>
+                {col.key === "contractRef" ? (
+                  <div style={{ position: "relative" }}>
+                    <input
+                      value={tradeFilter}
+                      onChange={e => setTradeFilter(e.target.value)}
+                      placeholder="Filtrer par trade…"
+                      style={{ width: "100%", background: tradeFilter ? `${COLORS.accent}12` : COLORS.surface, border: `1px solid ${tradeFilter ? COLORS.accent + "70" : COLORS.border}`, borderRadius: 6, padding: "5px 24px 5px 8px", color: COLORS.text, fontSize: 11, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+                    />
+                    {tradeFilter
+                      ? <button onMouseDown={e => { e.preventDefault(); setTradeFilter(""); }} style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "0 2px" }}>×</button>
+                      : <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: COLORS.textMuted, pointerEvents: "none" }}>🔀</span>
+                    }
+                  </div>
+                ) : null}
+              </div>
+            ))}
+            <div style={{ padding: "4px 6px" }} />
+          </div>
+
           {/* Header row */}
-          <div style={{ display: "grid", gridTemplateColumns: gridTpl, background: COLORS.tableHeader, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content", position: "sticky", top: 0, zIndex: 2 }}>
+          <div style={{ display: "grid", gridTemplateColumns: gridTpl, background: COLORS.tableHeader, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content", position: "sticky", top: 33, zIndex: 2 }}>
             {COLS.map(col => (
               <div key={col.key} style={{ padding: "10px 12px", fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textTransform: "uppercase", whiteSpace: "nowrap", textAlign: "center" }}>{col.label}</div>
             ))}

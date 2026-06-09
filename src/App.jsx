@@ -22618,6 +22618,99 @@ const TradeDetailPanel = ({ trade, onClose, onEdit, voyages, contracts }) => {
   );
 };
 
+// TradeLegBlock: extracted to module level (hooks cannot be inside render functions)
+const TradeLegBlock = ({ type, leg, idx, total, contracts, updateLeg, removeLeg }) => {
+  const isPurchase = type === "purchase";
+  const color = isPurchase ? COLORS.red : COLORS.green;
+  const label = isPurchase ? "Purchase Contract" : "Sale Contract";
+  const filteredContracts = isPurchase
+    ? contracts.filter(c => (c.contractType||"")
+        .toLowerCase().includes("purchase") || (c.contractType||"").toLowerCase().includes("achat"))
+    : contracts.filter(c => (c.contractType||"")
+        .toLowerCase().includes("sale") || (c.contractType||"").toLowerCase().includes("vente"));
+  const allContracts = filteredContracts.length > 0 ? filteredContracts : contracts;
+  const selectedContract = allContracts.find(c => c.id === leg.contractId || String(c.id) === String(leg.contractId));
+  const [legSearch, setLegSearch] = useState("");
+  const [legOpen, setLegOpen] = useState(false);
+  const legInputRef = useRef(null);
+  const legDropRef = useRef(null);
+  const contractLabel = c => `${c.contractNumber || `#${c.id}`}${c.commodity ? ` · ${c.commodity}` : ""}`;
+  const displayVal = selectedContract ? contractLabel(selectedContract) : "";
+  const suggestions = allContracts.filter(c => !legSearch || contractLabel(c).toLowerCase().includes(legSearch.toLowerCase()));
+  useEffect(() => {
+    if (!legOpen) return;
+    const handler = e => {
+      if (!legInputRef.current?.contains(e.target) && !legDropRef.current?.contains(e.target)) setLegOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [legOpen]);
+  const selectContract = (c) => {
+    updateLeg(type, idx, "contractId", c ? (parseInt(c.id) || c.id) : "");
+    setLegSearch("");
+    setLegOpen(false);
+  };
+  return (
+    <div style={{ background: COLORS.bg, border: `1px solid ${color}30`, borderRadius: 10, padding: 14, marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color }}>{label} {idx + 1}</span>
+        {total > 1 && <button onClick={() => removeLeg(type, idx)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 12 }} onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>× Supprimer</button>}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ position: "relative" }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>CONTRAT</label>
+          <div ref={legInputRef} style={{ position: "relative" }}>
+            <input
+              value={legOpen ? legSearch : displayVal}
+              onChange={e => { setLegSearch(e.target.value); setLegOpen(true); }}
+              onFocus={() => { setLegSearch(""); setLegOpen(true); }}
+              placeholder="Rechercher un contrat…"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${leg.contractId ? color+"60" : COLORS.border}`, borderRadius: 8, padding: "8px 30px 8px 12px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+            />
+            {leg.contractId && (
+              <button onMouseDown={e => { e.preventDefault(); selectContract(null); }}
+                style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+            )}
+          </div>
+          {legOpen && (
+            <div ref={legDropRef} style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, marginTop: 3, maxHeight: 220, overflowY: "auto", boxShadow: "0 4px 16px #00000060" }}>
+              {suggestions.length === 0
+                ? <div style={{ padding: "10px 12px", fontSize: 12, color: COLORS.textMuted }}>Aucun résultat</div>
+                : suggestions.map(c => (
+                    <div key={c.id} onMouseDown={() => selectContract(c)}
+                      style={{ padding: "9px 12px", fontSize: 12, color: COLORS.text, cursor: "pointer", borderBottom: `1px solid ${COLORS.border}`, background: (leg.contractId && String(c.id) === String(leg.contractId)) ? `${color}15` : "transparent" }}
+                      onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
+                      onMouseOut={e => e.currentTarget.style.background = (leg.contractId && String(c.id) === String(leg.contractId)) ? `${color}15` : "transparent"}>
+                      <span style={{ fontWeight: 600 }}>{c.contractNumber || `#${c.id}`}</span>
+                      {c.commodity && <span style={{ color: COLORS.textMuted, marginLeft: 6 }}>{c.commodity}</span>}
+                      {c.contractType && <span style={{ marginLeft: 8, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${color}15`, color }}>{c.contractType}</span>}
+                    </div>
+                  ))
+              }
+            </div>
+          )}
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>QUANTITY (T)</label>
+          <div style={{ position: "relative" }}>
+            <input type="number" value={leg.quantity || ""} onChange={e => updateLeg(type, idx, "quantity", e.target.value)} placeholder="0"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 36px 8px 12px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+            <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: COLORS.textMuted, pointerEvents: "none" }}>T</span>
+          </div>
+        </div>
+        {selectedContract && (
+          <div style={{ gridColumn: "1 / -1", display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {selectedContract.originCountry && <span style={{ fontSize: 10, color: COLORS.textMuted }}>🌍 Origine: <strong style={{ color: COLORS.text }}>{selectedContract.originCountry}</strong></span>}
+            {selectedContract.destinationCountry && <span style={{ fontSize: 10, color: COLORS.textMuted }}>🎯 Dest: <strong style={{ color: COLORS.text }}>{selectedContract.destinationCountry}</strong></span>}
+            {selectedContract.port && <span style={{ fontSize: 10, color: COLORS.textMuted }}>⚓ Port: <strong style={{ color: COLORS.text }}>{Array.isArray(selectedContract.port) ? selectedContract.port.join(", ") : selectedContract.port}</strong></span>}
+            {selectedContract.qtyValue && <span style={{ fontSize: 10, color: COLORS.textMuted }}>📦 Qté: <strong style={{ color: COLORS.text }}>{selectedContract.qtyValue} {selectedContract.qtyUnit||"T"}</strong></span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTrades }) => {
   const { config } = useConfig();
   const [search, setSearch] = useState("");
@@ -22745,96 +22838,7 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
     </div>
   );
 
-  // Leg block component
-  const LegBlock = ({ type, leg, idx, total }) => {
-    const isPurchase = type === "purchase";
-    const color = isPurchase ? COLORS.red : COLORS.green;
-    const label = isPurchase ? "Purchase Contract" : "Sale Contract";
-    const filteredContracts = isPurchase
-      ? contracts.filter(c => (c.contractType||"").toLowerCase().includes("purchase") || (c.contractType||"").toLowerCase().includes("achat"))
-      : contracts.filter(c => (c.contractType||"").toLowerCase().includes("sale") || (c.contractType||"").toLowerCase().includes("vente"));
-    const allContracts = filteredContracts.length > 0 ? filteredContracts : contracts;
-    const selectedContract = allContracts.find(c => c.id === leg.contractId || String(c.id) === String(leg.contractId));
-    const [legSearch, setLegSearch] = useState("");
-    const [legOpen, setLegOpen] = useState(false);
-    const legInputRef = useRef(null);
-    const legDropRef = useRef(null);
-    const contractLabel = c => `${c.contractNumber || `#${c.id}`}${c.commodity ? ` · ${c.commodity}` : ""}`;
-    const displayVal = selectedContract ? contractLabel(selectedContract) : "";
-    const suggestions = allContracts.filter(c => !legSearch || contractLabel(c).toLowerCase().includes(legSearch.toLowerCase()));
-    useEffect(() => {
-      if (!legOpen) return;
-      const handler = e => {
-        if (!legInputRef.current?.contains(e.target) && !legDropRef.current?.contains(e.target)) setLegOpen(false);
-      };
-      document.addEventListener("mousedown", handler);
-      return () => document.removeEventListener("mousedown", handler);
-    }, [legOpen]);
-    const selectContract = (c) => {
-      updateLeg(type, idx, "contractId", c ? (parseInt(c.id) || c.id) : "");
-      setLegSearch("");
-      setLegOpen(false);
-    };
-    return (
-      <div style={{ background: COLORS.bg, border: `1px solid ${color}30`, borderRadius: 10, padding: 14, marginBottom: 10 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color }}>{label} {idx + 1}</span>
-          {total > 1 && <button onClick={() => removeLeg(type, idx)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 12 }} onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>× Supprimer</button>}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div style={{ position: "relative" }}>
-            <LBL>CONTRAT</LBL>
-            <div ref={legInputRef} style={{ position: "relative" }}>
-              <input
-                value={legOpen ? legSearch : displayVal}
-                onChange={e => { setLegSearch(e.target.value); setLegOpen(true); }}
-                onFocus={() => { setLegSearch(""); setLegOpen(true); }}
-                placeholder="Rechercher un contrat…"
-                style={{ width: "100%", background: COLORS.card, border: `1px solid ${leg.contractId ? color+"60" : COLORS.border}`, borderRadius: 8, padding: "8px 30px 8px 12px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
-              />
-              {leg.contractId && (
-                <button onMouseDown={e => { e.preventDefault(); selectContract(null); }}
-                  style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
-              )}
-            </div>
-            {legOpen && (
-              <div ref={legDropRef} style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, marginTop: 3, maxHeight: 220, overflowY: "auto", boxShadow: "0 4px 16px #00000060" }}>
-                {suggestions.length === 0
-                  ? <div style={{ padding: "10px 12px", fontSize: 12, color: COLORS.textMuted }}>Aucun résultat</div>
-                  : suggestions.map(c => (
-                      <div key={c.id} onMouseDown={() => selectContract(c)}
-                        style={{ padding: "9px 12px", fontSize: 12, color: COLORS.text, cursor: "pointer", borderBottom: `1px solid ${COLORS.border}`, background: (leg.contractId && String(c.id) === String(leg.contractId)) ? `${color}15` : "transparent" }}
-                        onMouseOver={e => e.currentTarget.style.background = COLORS.hover}
-                        onMouseOut={e => e.currentTarget.style.background = (leg.contractId && String(c.id) === String(leg.contractId)) ? `${color}15` : "transparent"}>
-                        <span style={{ fontWeight: 600 }}>{c.contractNumber || `#${c.id}`}</span>
-                        {c.commodity && <span style={{ color: COLORS.textMuted, marginLeft: 6 }}>{c.commodity}</span>}
-                        {c.contractType && <span style={{ marginLeft: 8, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${color}15`, color }}>{c.contractType}</span>}
-                      </div>
-                    ))
-                }
-              </div>
-            )}
-          </div>
-          <div>
-            <LBL>QUANTITY (T)</LBL>
-            <div style={{ position: "relative" }}>
-              <input type="number" value={leg.quantity || ""} onChange={e => updateLeg(type, idx, "quantity", e.target.value)} placeholder="0"
-                style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 36px 8px 12px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-              <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: COLORS.textMuted, pointerEvents: "none" }}>T</span>
-            </div>
-          </div>
-          {selectedContract && (
-            <div style={{ gridColumn: "1 / -1", display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {selectedContract.originCountry && <span style={{ fontSize: 10, color: COLORS.textMuted }}>🌍 Origine: <strong style={{ color: COLORS.text }}>{selectedContract.originCountry}</strong></span>}
-              {selectedContract.destinationCountry && <span style={{ fontSize: 10, color: COLORS.textMuted }}>🎯 Dest: <strong style={{ color: COLORS.text }}>{selectedContract.destinationCountry}</strong></span>}
-              {selectedContract.port && <span style={{ fontSize: 10, color: COLORS.textMuted }}>⚓ Port: <strong style={{ color: COLORS.text }}>{Array.isArray(selectedContract.port) ? selectedContract.port.join(", ") : selectedContract.port}</strong></span>}
-              {selectedContract.qtyValue && <span style={{ fontSize: 10, color: COLORS.textMuted }}>📦 Qté: <strong style={{ color: COLORS.text }}>{selectedContract.qtyValue} {selectedContract.qtyUnit||"T"}</strong></span>}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+  // TradeLegBlock is defined at module level above
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 0 }}>
@@ -23000,7 +23004,7 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
               <SECT label="Purchase Contracts" color={COLORS.red} />
               <div style={{ gridColumn: "1 / -1" }}>
                 {(form.purchaseLegs || []).map((leg, idx) => (
-                  <LegBlock key={idx} type="purchase" leg={leg} idx={idx} total={(form.purchaseLegs||[]).length} />
+                  <TradeLegBlock key={idx} type="purchase" leg={leg} idx={idx} total={(form.purchaseLegs||[]).length} contracts={contracts} updateLeg={updateLeg} removeLeg={removeLeg} />
                 ))}
                 <button onClick={() => addLeg("purchase")}
                   style={{ background: `${COLORS.red}12`, border: `1px dashed ${COLORS.red}40`, borderRadius: 10, padding: "8px 16px", color: COLORS.red, fontSize: 12, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit" }}>
@@ -23012,7 +23016,7 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
               <SECT label="Sale Contracts" color={COLORS.green} />
               <div style={{ gridColumn: "1 / -1" }}>
                 {(form.saleLegs || []).map((leg, idx) => (
-                  <LegBlock key={idx} type="sale" leg={leg} idx={idx} total={(form.saleLegs||[]).length} />
+                  <TradeLegBlock key={idx} type="sale" leg={leg} idx={idx} total={(form.saleLegs||[]).length} contracts={contracts} updateLeg={updateLeg} removeLeg={removeLeg} />
                 ))}
                 <button onClick={() => addLeg("sale")}
                   style={{ background: `${COLORS.green}12`, border: `1px dashed ${COLORS.green}40`, borderRadius: 10, padding: "8px 16px", color: COLORS.green, fontSize: 12, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit" }}>

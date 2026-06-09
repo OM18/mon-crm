@@ -19025,10 +19025,10 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
       (c.status || "").toLowerCase().includes(q)
     )) return false;
     if (tq) {
-      const lv = s => String(s||"").replace(/[\u00a0\u200b]/g," ").trim().toLowerCase();
+      const normTrade = s => String(s||"").replace(/[\u00a0\u200b]/g," ").trim().toLowerCase();
       const linked = (c.tradeLinks||[]).some(link => {
         const trade = trades.find(t => String(t.id)===String(link.tradeId));
-        return (trade && lv(trade.tradeName).includes(tq)) || lv(link.tradeId).includes(tq);
+        return (trade && normTrade(trade.tradeName).includes(tq)) || normTrade(String(link.tradeId||"")).includes(tq);
       });
       if (!linked) return false;
     }
@@ -19391,8 +19391,8 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
               <Sec label="Trades liés" />
               <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 8 }}>
                 {(c.tradeLinks || []).map((link, idx) => {
-                  const lv = String(link.tradeId||"").replace(/[\u00a0\u200b]/g," ").trim();
-                  const trade = (trades||[]).find(t => String(t.id)===lv) || (trades||[]).find(t => (t.tradeName||"").toLowerCase()===lv.toLowerCase());
+                  const tradeIdStr = String(link.tradeId||"").replace(/[\u00a0\u200b]/g," ").trim();
+                  const trade = (trades||[]).find(t => String(t.id)===tradeIdStr) || (trades||[]).find(t => (t.tradeName||"").toLowerCase()===tradeIdStr.toLowerCase());
                   return (
                     <div key={idx} style={{ display: "flex", alignItems: "center", gap: 14, background: COLORS.bg, border: `1px solid ${COLORS.accent}25`, borderRadius: 10, padding: "10px 14px" }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, minWidth: 50 }}>TRADE {idx+1}</div>
@@ -21640,7 +21640,7 @@ const VoyageLBL = ({ children, req }) => (
 const VoyageINP = ({ field, placeholder, type = "text", fmt, form, onChange }) => (
   <input type={type} value={form[field] || ""} placeholder={placeholder}
     onChange={e => onChange(field, fmt ? fmt(e.target.value) : e.target.value)}
-    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${field === "voyageName" && !form.voyageName?.trim() ? COLORS.red+"60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+    style={{ width: "100%", background: COLORS.bg, border: `1px solid ${field === "voyageName" && !String(form.voyageName||"").trim() ? COLORS.red+"60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
 );
 const VoyageSEL = ({ field, children, empty = "— Sélectionner —", form, onChange }) => (
   <select value={form[field] || ""} onChange={e => onChange(field, e.target.value)}
@@ -21707,7 +21707,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
   const nextId = () => voyages.length > 0 ? Math.max(...voyages.map(v => v.id || 0)) + 1 : 1;
 
   const save = () => {
-    if (!form.voyageName?.trim()) return;
+    if (!String(form.voyageName||"").trim()) return;
     if (editId !== null) persist(voyages.map(v => v.id === editId ? { ...form, id: editId } : v));
     else persist([...voyages, { ...form, id: nextId(), createdAt: new Date().toISOString() }]);
     closeModal();
@@ -21957,7 +21957,7 @@ const Voyages = ({ companies = [], vessels = [], voyages = [], setVoyages }) => 
             {/* Footer */}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
               <button onClick={closeModal} style={{ padding: "10px 20px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
-              <Btn onClick={save} disabled={!form.voyageName?.trim()}>{editId !== null ? "✓ Enregistrer" : "✓ Créer"}</Btn>
+              <Btn onClick={save} disabled={!String(form.voyageName||"").trim()}>{editId !== null ? "✓ Enregistrer" : "✓ Créer"}</Btn>
             </div>
           </div>
         </div>
@@ -22316,6 +22316,7 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
 });
 
 const VirtualTradeList = ({ filtered, selected, onSelect, onEdit, onRemove, voyages, contracts, config }) => {
+  const safeFiltered = (filtered||[]).filter(t => t && typeof t === 'object' && t.id != null);
   const [scrollTop, setScrollTop] = useState(0);
   const containerRef = useRef(null);
   const [containerH, setContainerH] = useState(600);
@@ -22616,7 +22617,7 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
   const closeModal = () => { setShowModal(false); setForm(EMPTY_TRADE()); setEditId(null); };
   const nextId = () => trades.length > 0 ? Math.max(...trades.map(t => t.id || 0)) + 1 : 1;
   const save = () => {
-    if (!form.tradeName?.trim()) return;
+    if (!String(form.tradeName||"").trim()) return;
     const savedTrade = editId !== null
       ? { ...form, id: editId }
       : { ...form, id: nextId(), createdAt: new Date().toISOString() };
@@ -22675,15 +22676,16 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
 
   // Business month format mm/yyyy
   const fmtMonth = val => {
-    let v = val.replace(/[^\d]/g, "");
+    let v = String(val||"").replace(/[^\d]/g, "");
     if (v.length > 2) v = v.slice(0,2)+"/"+v.slice(2);
     return v.slice(0,7);
   };
 
-  const filtered = trades.filter(t => {
-    const q = search.toLowerCase().trim();
+  const filtered = (trades||[]).filter(t => {
+    if (!t || typeof t !== 'object') return false;
+    const q = String(search||"").toLowerCase().trim();
     if (!q) return true;
-    return (t.tradeName||"").toLowerCase().includes(q);
+    return String(t.tradeName||"").toLowerCase().includes(q);
   });
 
   // Commodities multi-select
@@ -22774,7 +22776,7 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
               <div style={{ gridColumn: "1 / -1" }}>
                 <LBL req>TRADE NAME</LBL>
                 <input value={form.tradeName || ""} onChange={e => f("tradeName", e.target.value)} placeholder="Nom du trade…"
-                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${!form.tradeName?.trim() ? COLORS.red+"60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${!String(form.tradeName||"").trim() ? COLORS.red+"60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
               </div>
 
               {/* Voyage */}
@@ -22885,7 +22887,7 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
               <button onClick={closeModal} style={{ padding: "10px 20px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
-              <Btn onClick={save} disabled={!form.tradeName?.trim()}>{editId !== null ? "✓ Enregistrer" : "✓ Créer"}</Btn>
+              <Btn onClick={save} disabled={!String(form.tradeName||"").trim()}>{editId !== null ? "✓ Enregistrer" : "✓ Créer"}</Btn>
             </div>
           </div>
         </div>

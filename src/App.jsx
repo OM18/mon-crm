@@ -718,7 +718,7 @@ const COUNTRY_TO_CODE = {
 
 const getCountryCode = (country) => {
   if (!country) return null;
-  const trimmed = country.trim();
+  const trimmed = String(country).trim();
   if (trimmed.length === 2) return trimmed.toUpperCase();
   const threeLetter = { "UAE": "AE", "USA": "US", "UK": "GB" };
   if (threeLetter[trimmed.toUpperCase()]) return threeLetter[trimmed.toUpperCase()];
@@ -6345,7 +6345,7 @@ const BatchContractsOldToNew = () => {
         const tradeRaw = get("contractprices_data") || get("contract_prices") || get("trade_link") || get("trade") || get("trades") || get("passport_names") || "";
         if (tradeRaw) {
           // Split on newline characters (Excel multi-line = \n or \r\n)
-          const lines = tradeRaw.split(/[\r\n]+/).map(l => l.trim()).filter(Boolean);
+          const lines = tradeRaw.split(/[\r\n]+/).map(l => String(l||"").trim()).filter(Boolean);
           lines.forEach((line, i) => {
             if (i >= 3) return; // max 3 trades
             const n = i + 1;
@@ -7792,7 +7792,7 @@ useEffect(() => {
     if (data?.length) setDerivAccounts(data.map(r => {
       const acc = r.data ?? r;
       if (typeof acc.isActive === "string") {
-        acc.isActive = acc.isActive.trim().toLowerCase() !== "false" && acc.isActive.trim() !== "0";
+        acc.isActive = String(acc.isActive||"").trim().toLowerCase() !== "false" && String(acc.isActive||"").trim() !== "0";
       }
       return acc;
     }));
@@ -11981,7 +11981,7 @@ const sel = useMemo(() => selected ? companies.find(c => (c.ref || String(c.id))
     const isNew = !editCompany;
     const data = {
       ...form,
-      tags: form.tags.split(",").map(t => t.trim()).filter(Boolean),
+      tags: (typeof form.tags === "string" ? form.tags : "").split(",").map(t => t.trim()).filter(Boolean),
       avatar: form.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase(),
       revenue: Number(form.revenue) || 0,
       roles: form.roles || [],
@@ -13955,7 +13955,7 @@ useEffect(() => {
     if (accounts.length) setDerivAccounts(accounts.map(r => {
       const acc = r.data ?? r;
       if (typeof acc.isActive === "string") {
-        acc.isActive = acc.isActive.trim().toLowerCase() !== "false" && acc.isActive.trim() !== "0";
+        acc.isActive = String(acc.isActive||"").trim().toLowerCase() !== "false" && String(acc.isActive||"").trim() !== "0";
       }
       return acc;
     }));
@@ -15228,7 +15228,7 @@ const CompaniesDashboard = ({ companies, setCompanies }) => {
   };
 
   const saveEdit = () => {
-    const data = { ...form, tags: form.tags.split(",").map(t => t.trim()).filter(Boolean), avatar: form.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase(), revenue: Number(form.revenue) || 0, roles: form.roles || [] };
+    const data = { ...form, tags: (typeof form.tags === "string" ? form.tags : "").split(",").map(t => t.trim()).filter(Boolean), avatar: form.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase(), revenue: Number(form.revenue) || 0, roles: form.roles || [] };
     setCompanies(companies.map(c => c.id === editCompany.id ? { ...c, ...data } : c));
     setEditCompany(null);
   };
@@ -16283,7 +16283,7 @@ const DerivativesDashboard = () => {
       if (accData?.length) setDerivAccounts(accData.map(r => {
         const acc = r.data ?? r;
         if (typeof acc.isActive === "string") {
-          acc.isActive = acc.isActive.trim().toLowerCase() !== "false" && acc.isActive.trim() !== "0";
+          acc.isActive = String(acc.isActive||"").trim().toLowerCase() !== "false" && String(acc.isActive||"").trim() !== "0";
         }
         return acc;
       }));

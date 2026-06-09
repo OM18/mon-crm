@@ -22248,13 +22248,30 @@ const EMPTY_TRADE = () => ({
   createdAt: "",
 });
 
+class TradesErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) { console.error('[Trades] render error:', error, info); }
+  render() {
+    if (this.state.hasError) return (
+      <div style={{ padding: 40, textAlign: 'center', color: COLORS.textMuted }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 8 }}>Erreur dans le module Trades</div>
+        <div style={{ fontSize: 12, marginBottom: 20, fontFamily: "'DM Mono',monospace", color: COLORS.red }}>{this.state.error?.message}</div>
+        <button onClick={() => this.setState({ hasError: false, error: null })} style={{ background: COLORS.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>Réessayer</button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 const ROW_H_TRADE = 56;
 const OVERSCAN_TRADE = 8;
 
 const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, contracts, config }) => {
   const voyage = voyages.find(v => v.id === t.voyageId || String(v.id) === String(t.voyageId));
-  const purchaseContracts = (t.purchaseLegs || []).map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean);
-  const saleContracts = (t.saleLegs || []).map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean);
+  const purchaseContracts = Array.isArray(t.purchaseLegs) ? t.purchaseLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
+  const saleContracts = Array.isArray(t.saleLegs) ? t.saleLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
   // Derive origin/destination from first purchase/sale contract
   const originContract = purchaseContracts[0];
   const destContract = saleContracts[0];
@@ -23142,7 +23159,7 @@ export default function CRM() {
           {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} />}
           {page === "vessels" && <Vessels companies={companies} vessels={vessels} setVessels={setVessels} />}
           {page === "voyages" && <Voyages companies={companies} vessels={vessels} voyages={voyages} setVoyages={setVoyages} />}
-          {page === "trades" && <Trades voyages={voyages} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} />}
+          {page === "trades" && <TradesErrorBoundary><Trades voyages={voyages} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} /></TradesErrorBoundary>}
           {page === "admin" && <AdminPanel companies={companies} />}
         </div>
       </div>

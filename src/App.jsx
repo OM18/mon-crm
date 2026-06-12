@@ -2654,7 +2654,7 @@ const UnderlyingOriginEditor = ({ config, updateField, setAdminTab }) => {
 // ─── GENERIC DERIV PILLS EDITOR ──────────────────────────────
 // Reusable pill-style editor for any config list field
 // Pills are white/neutral by default (no color)
-const DerivPillsEditor = ({ configKey, label, icon, description, config, updateField, defaultKey, defaultValue, onSetDefault, hasColor = false }) => {
+const DerivPillsEditor = ({ configKey, label, icon, description, config, updateField, defaultKey, defaultValue, onSetDefault, hasColor = false, sortAlpha = false }) => {
   const rawItems = config[configKey];
   const items = Array.isArray(rawItems) ? rawItems : [];
   const [localItems, setLocalItems] = useState(items);
@@ -2666,7 +2666,8 @@ const DerivPillsEditor = ({ configKey, label, icon, description, config, updateF
 
   useEffect(() => {
     const raw = config[configKey];
-    setLocalItems(Array.isArray(raw) ? raw : []);
+    const items = Array.isArray(raw) ? raw : [];
+    setLocalItems(sortAlpha ? [...items].sort((a, b) => a.label.localeCompare(b.label)) : items);
     setDirty(false);
   }, [config[configKey]]);
 
@@ -2676,7 +2677,8 @@ const DerivPillsEditor = ({ configKey, label, icon, description, config, updateF
     if (!newLabel.trim()) return;
     const newItem = { value: newLabel.trim().toLowerCase().replace(/\s+/g, "_"), label: newLabel.trim() };
     if (hasColor) newItem.color = newColor;
-    mark([...localItems, newItem]);
+    const nextItems = [...localItems, newItem];
+    mark(sortAlpha ? nextItems.sort((a, b) => a.label.localeCompare(b.label)) : nextItems);
     setNewLabel(""); if (hasColor) setNewColor(COLORS.accent);
   };
 
@@ -4821,7 +4823,8 @@ const ContractCommoditiesEditor = ({ config, updateField }) => {
   const fileRef = useRef(null);
 
   useEffect(() => {
-    setLocalItems(Array.isArray(config.contractCommodities) ? config.contractCommodities : []);
+    const raw = Array.isArray(config.contractCommodities) ? config.contractCommodities : [];
+    setLocalItems([...raw].sort((a, b) => a.label.localeCompare(b.label)));
     setDirty(false);
   }, [config.contractCommodities]);
 
@@ -4831,7 +4834,8 @@ const ContractCommoditiesEditor = ({ config, updateField }) => {
     if (!newLabel.trim()) return;
     const value = newLabel.trim().toLowerCase().replace(/\s+/g, "_");
     if (localItems.find(i => i.value === value)) return;
-    mark([...localItems, { value, label: newLabel.trim() }]);
+    const next = [...localItems, { value, label: newLabel.trim() }].sort((a, b) => a.label.localeCompare(b.label));
+    mark(next);
     setNewLabel("");
   };
 
@@ -4879,7 +4883,7 @@ const ContractCommoditiesEditor = ({ config, updateField }) => {
         added++;
       }
     });
-    mark(merged);
+    mark(merged.sort((a, b) => a.label.localeCompare(b.label)));
     setImportResult({ added, skipped: newItems.length - added });
     setImportStep("summary");
   };
@@ -9188,6 +9192,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             config={config}
             updateField={updateField}
             hasColor={false}
+            sortAlpha={true}
           />
           <DerivPillsEditor
             configKey="tradeLogisticTypes"

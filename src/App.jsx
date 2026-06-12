@@ -4730,6 +4730,7 @@ while (true) {
 // Pills editor for contract commodities with Excel import button (logo style = Instruments bloc)
 const ContractCommoditiesEditor = ({ config, updateField }) => {
   const items = Array.isArray(config.contractCommodities) ? config.contractCommodities : [];
+  const tradeCommodities = Array.isArray(config.tradeCommodities) ? config.tradeCommodities : [];
   const [localItems, setLocalItems] = useState(items);
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -4845,14 +4846,42 @@ const ContractCommoditiesEditor = ({ config, updateField }) => {
           <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
               {localItems.map((s, idx) => (
-                <div key={s.value} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
-                  <input value={s.label} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, label: e.target.value } : x))}
-                    style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
-                  <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
-                    style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
-                    onMouseOver={e => e.currentTarget.style.color = COLORS.red}
-                    onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+                <div key={s.value} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
+                    <input value={s.label} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, label: e.target.value } : x))}
+                      style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
+                    <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
+                      style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                      onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+                      onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+                  </div>
+                  <div style={{ paddingLeft: 18 }}>
+                    <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 700, marginBottom: 5, letterSpacing: "0.05em" }}>TRADE COMMODITIES</div>
+                    {tradeCommodities.length === 0
+                      ? <div style={{ fontSize: 11, color: COLORS.textMuted, fontStyle: "italic" }}>Aucune Trade Commodity configurée dans l'Admin Panel</div>
+                      : <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                          {tradeCommodities.map(tc => {
+                            const selected = (s.tradeCommodities || []).includes(tc.value);
+                            return (
+                              <div key={tc.value}
+                                onClick={() => {
+                                  const cur = s.tradeCommodities || [];
+                                  const next = selected ? cur.filter(v => v !== tc.value) : [...cur, tc.value];
+                                  mark(localItems.map((x, i) => i === idx ? { ...x, tradeCommodities: next } : x));
+                                }}
+                                style={{ cursor: "pointer", fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 6,
+                                  border: `1px solid ${selected ? COLORS.accent + "80" : COLORS.border}`,
+                                  background: selected ? `${COLORS.accent}18` : "transparent",
+                                  color: selected ? COLORS.accent : COLORS.textMuted,
+                                  userSelect: "none", transition: "all 0.15s" }}>
+                                {tc.label}
+                              </div>
+                            );
+                          })}
+                        </div>
+                    }
+                  </div>
                 </div>
               ))}
               {localItems.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "16px 0", fontSize: 13 }}>Aucune commodité — ajoutez-en ci-dessous ou importez via Excel</div>}
@@ -19317,7 +19346,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
           <DRow label="Transformation">{c.transformation ? "YES" : "NO"}</DRow>
 
           <Sec label="Prix" />
-          <DRow label="Price Type">{c.contractPriceType?.toUpperCase() || "—"}</DRow>
+          <DRow label="Price Type">{c.priceType?.toUpperCase() || "—"}</DRow>
           {c.contractPriceType === "flat" && <>
             <DRow label="Contract Flat Price">{c.flatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>
             {c.analyticalFlatPrice && <DRow label="Analytical Flat Price">{c.analyticalFlatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}

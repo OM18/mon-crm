@@ -2666,8 +2666,14 @@ const DerivPillsEditor = ({ configKey, label, icon, description, config, updateF
 
   useEffect(() => {
     const raw = config[configKey];
-    const items = Array.isArray(raw) ? raw : [];
-    setLocalItems(sortAlpha ? [...items].sort((a, b) => a.label.localeCompare(b.label)) : items);
+    let items = Array.isArray(raw) ? raw : [];
+    if (sortAlpha) {
+      // Dédupliquer par label normalisé avant de trier
+      const norm = s => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+      items = items.filter((it, i, arr) => arr.findIndex(x => norm(x.label) === norm(it.label)) === i);
+      items = [...items].sort((a, b) => a.label.localeCompare(b.label));
+    }
+    setLocalItems(items);
     setDirty(false);
   }, [config[configKey]]);
 
@@ -4730,9 +4736,10 @@ while (true) {
 
 // ─── CONTRACT COMMODITY ROW (autocomplete trade commodity — valeur unique) ────
 const TradeCommodityRow = ({ s, idx, localItems, tradeCommodities, mark }) => {
-  // On stocke et compare par label (insensible à la casse) pour éviter les bugs de value dupliquées
+  // Dédupliquer par label normalisé (trim + lowercase + collapse espaces)
+  const normLabel = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
   const dedupedTc = tradeCommodities.filter((tc, i, arr) =>
-    arr.findIndex(x => x.label.toLowerCase() === tc.label.toLowerCase()) === i
+    arr.findIndex(x => normLabel(x.label) === normLabel(tc.label)) === i
   );
   const currentLabel = dedupedTc.find(tc => tc.label.toLowerCase() === (s.tradeCommodity || "").toLowerCase())?.label
     || dedupedTc.find(tc => tc.value === s.tradeCommodity)?.label
@@ -4748,10 +4755,10 @@ const TradeCommodityRow = ({ s, idx, localItems, tradeCommodities, mark }) => {
     setTcInput(lbl);
   }, [s.tradeCommodity]);
 
-  const isExactMatch = tcInput.trim() !== "" && dedupedTc.some(tc => tc.label.toLowerCase() === tcInput.trim().toLowerCase());
-  const needle = tcInput.trim().toLowerCase();
+  const isExactMatch = tcInput.trim() !== "" && dedupedTc.some(tc => normLabel(tc.label) === normLabel(tcInput));
+  const needle = normLabel(tcInput);
   const suggestions = isExactMatch ? [] : dedupedTc.filter(tc =>
-    needle === "" || tc.label.toLowerCase().startsWith(needle)
+    needle === "" || normLabel(tc.label).startsWith(needle)
   );
 
   const selectTc = (tc) => {

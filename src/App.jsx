@@ -4726,6 +4726,79 @@ while (true) {
   );
 };
 
+// ─── CONTRACT COMMODITY ROW (autocomplete trade commodity) ───────────────
+const TradeCommodityRow = ({ s, idx, localItems, tradeCommodities, mark }) => {
+  const [tcInput, setTcInput] = useState("");
+  const [tcFocused, setTcFocused] = useState(false);
+  const inputRef = useRef(null);
+
+  const selected = s.tradeCommodities || [];
+  const suggestions = tradeCommodities.filter(tc =>
+    !selected.includes(tc.value) &&
+    (tcInput.trim() === "" || tc.label.toLowerCase().startsWith(tcInput.trim().toLowerCase()))
+  );
+
+  const addTc = (tc) => {
+    mark(localItems.map((x, i) => i === idx ? { ...x, tradeCommodities: [...selected, tc.value] } : x));
+    setTcInput("");
+    inputRef.current?.focus();
+  };
+
+  const removeTc = (val) => {
+    mark(localItems.map((x, i) => i === idx ? { ...x, tradeCommodities: selected.filter(v => v !== val) } : x));
+  };
+
+  const selectedLabels = selected.map(v => tradeCommodities.find(tc => tc.value === v)?.label || v);
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px" }}>
+      <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
+      <input value={s.label} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, label: e.target.value } : x))}
+        style={{ width: 160, flexShrink: 0, background: "transparent", border: "none", borderRight: `1px solid ${COLORS.border}`, paddingRight: 12, marginRight: 4, color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+        {selectedLabels.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {selectedLabels.map((lbl, i) => (
+              <span key={selected[i]} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600,
+                padding: "2px 8px", borderRadius: 5,
+                background: `${COLORS.accent}18`, color: COLORS.accent, border: `1px solid ${COLORS.accent}40` }}>
+                {lbl}
+                <span onClick={() => removeTc(selected[i])} style={{ cursor: "pointer", lineHeight: 1, fontSize: 13, color: COLORS.accent, opacity: 0.7 }}>×</span>
+              </span>
+            ))}
+          </div>
+        )}
+        <div style={{ position: "relative" }}>
+          <input ref={inputRef} value={tcInput}
+            onChange={e => { setTcInput(e.target.value); setTcFocused(true); }}
+            onFocus={() => setTcFocused(true)}
+            onBlur={() => setTimeout(() => setTcFocused(false), 150)}
+            placeholder={tradeCommodities.length === 0 ? "Aucune Trade Commodity configurée…" : "Rechercher une Trade Commodity…"}
+            disabled={tradeCommodities.length === 0}
+            style={{ width: "100%", boxSizing: "border-box", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "5px 10px", color: COLORS.text, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+          {tcFocused && suggestions.length > 0 && (
+            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200, background: COLORS.card,
+              border: `1px solid ${COLORS.border}`, borderRadius: 8, boxShadow: "0 4px 16px #0004", maxHeight: 180, overflowY: "auto", marginTop: 2 }}>
+              {suggestions.map(tc => (
+                <div key={tc.value} onMouseDown={() => addTc(tc)}
+                  style={{ padding: "8px 12px", fontSize: 12, color: COLORS.text, cursor: "pointer" }}
+                  onMouseOver={e => e.currentTarget.style.background = `${COLORS.accent}12`}
+                  onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                  {tc.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
+        style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1, flexShrink: 0 }}
+        onMouseOver={e => e.currentTarget.style.color = COLORS.red}
+        onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+    </div>
+  );
+};
+
 // ─── CONTRACT COMMODITIES EDITOR ─────────────────────────────
 // Pills editor for contract commodities with Excel import button (logo style = Instruments bloc)
 const ContractCommoditiesEditor = ({ config, updateField }) => {
@@ -4846,43 +4919,7 @@ const ContractCommoditiesEditor = ({ config, updateField }) => {
           <div style={{ padding: "14px 18px", borderTop: `1px solid ${COLORS.border}` }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
               {localItems.map((s, idx) => (
-                <div key={s.value} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.textMuted, flexShrink: 0 }} />
-                    <input value={s.label} onChange={e => mark(localItems.map((x, i) => i === idx ? { ...x, label: e.target.value } : x))}
-                      style={{ flex: 1, background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
-                    <button onClick={() => mark(localItems.filter((_, i) => i !== idx))}
-                      style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
-                      onMouseOver={e => e.currentTarget.style.color = COLORS.red}
-                      onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
-                  </div>
-                  <div style={{ paddingLeft: 18 }}>
-                    <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 700, marginBottom: 5, letterSpacing: "0.05em" }}>TRADE COMMODITIES</div>
-                    {tradeCommodities.length === 0
-                      ? <div style={{ fontSize: 11, color: COLORS.textMuted, fontStyle: "italic" }}>Aucune Trade Commodity configurée dans l'Admin Panel</div>
-                      : <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                          {tradeCommodities.map(tc => {
-                            const selected = (s.tradeCommodities || []).includes(tc.value);
-                            return (
-                              <div key={tc.value}
-                                onClick={() => {
-                                  const cur = s.tradeCommodities || [];
-                                  const next = selected ? cur.filter(v => v !== tc.value) : [...cur, tc.value];
-                                  mark(localItems.map((x, i) => i === idx ? { ...x, tradeCommodities: next } : x));
-                                }}
-                                style={{ cursor: "pointer", fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 6,
-                                  border: `1px solid ${selected ? COLORS.accent + "80" : COLORS.border}`,
-                                  background: selected ? `${COLORS.accent}18` : "transparent",
-                                  color: selected ? COLORS.accent : COLORS.textMuted,
-                                  userSelect: "none", transition: "all 0.15s" }}>
-                                {tc.label}
-                              </div>
-                            );
-                          })}
-                        </div>
-                    }
-                  </div>
-                </div>
+                <TradeCommodityRow key={s.value} s={s} idx={idx} localItems={localItems} tradeCommodities={tradeCommodities} mark={mark} />
               ))}
               {localItems.length === 0 && <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "16px 0", fontSize: 13 }}>Aucune commodité — ajoutez-en ci-dessous ou importez via Excel</div>}
             </div>

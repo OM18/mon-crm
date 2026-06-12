@@ -4740,8 +4740,15 @@ const TradeCommodityRow = ({ s, idx, localItems, tradeCommodities, mark }) => {
     setTcInput(lbl);
   }, [s.tradeCommodity, tradeCommodities]);
 
-  const suggestions = tradeCommodities.filter(tc =>
-    tcInput.trim() === "" || tc.label.toLowerCase().startsWith(tcInput.trim().toLowerCase())
+  // Dédupliquer par label (au cas où des doublons existent en config)
+  const dedupedTc = tradeCommodities.filter((tc, i, arr) =>
+    arr.findIndex(x => x.label.toLowerCase() === tc.label.toLowerCase()) === i
+  );
+  // Ne pas afficher le dropdown si l'input correspond exactement à la valeur déjà sélectionnée
+  const isExactMatch = s.tradeCommodity && tcInput === (tradeCommodities.find(tc => tc.value === s.tradeCommodity)?.label || "");
+  const needle = tcInput.trim().toLowerCase();
+  const suggestions = isExactMatch ? [] : dedupedTc.filter(tc =>
+    needle === "" || tc.label.toLowerCase().includes(needle)
   );
 
   const selectTc = (tc) => {

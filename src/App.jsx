@@ -4730,29 +4730,33 @@ while (true) {
 
 // ─── CONTRACT COMMODITY ROW (autocomplete trade commodity — valeur unique) ────
 const TradeCommodityRow = ({ s, idx, localItems, tradeCommodities, mark }) => {
-  const currentLabel = tradeCommodities.find(tc => tc.value === s.tradeCommodity)?.label || "";
+  // On stocke et compare par label (insensible à la casse) pour éviter les bugs de value dupliquées
+  const dedupedTc = tradeCommodities.filter((tc, i, arr) =>
+    arr.findIndex(x => x.label.toLowerCase() === tc.label.toLowerCase()) === i
+  );
+  const currentLabel = dedupedTc.find(tc => tc.label.toLowerCase() === (s.tradeCommodity || "").toLowerCase())?.label
+    || dedupedTc.find(tc => tc.value === s.tradeCommodity)?.label
+    || (s.tradeCommodity || "");
   const [tcInput, setTcInput] = useState(currentLabel);
   const [tcFocused, setTcFocused] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
-    const lbl = tradeCommodities.find(tc => tc.value === s.tradeCommodity)?.label || "";
+    const lbl = dedupedTc.find(tc => tc.label.toLowerCase() === (s.tradeCommodity || "").toLowerCase())?.label
+      || dedupedTc.find(tc => tc.value === s.tradeCommodity)?.label
+      || (s.tradeCommodity || "");
     setTcInput(lbl);
-  }, [s.tradeCommodity, tradeCommodities]);
+  }, [s.tradeCommodity]);
 
-  // Dédupliquer par label (au cas où des doublons existent en config)
-  const dedupedTc = tradeCommodities.filter((tc, i, arr) =>
-    arr.findIndex(x => x.label.toLowerCase() === tc.label.toLowerCase()) === i
-  );
-  // Ne pas afficher le dropdown si l'input correspond exactement à la valeur déjà sélectionnée
-  const isExactMatch = s.tradeCommodity && tcInput === (tradeCommodities.find(tc => tc.value === s.tradeCommodity)?.label || "");
+  const isExactMatch = tcInput.trim() !== "" && dedupedTc.some(tc => tc.label.toLowerCase() === tcInput.trim().toLowerCase());
   const needle = tcInput.trim().toLowerCase();
   const suggestions = isExactMatch ? [] : dedupedTc.filter(tc =>
     needle === "" || tc.label.toLowerCase().startsWith(needle)
   );
 
   const selectTc = (tc) => {
-    mark(localItems.map((x, i) => i === idx ? { ...x, tradeCommodity: tc.value } : x));
+    // Stocker le label canonique (dédup) comme valeur de référence
+    mark(localItems.map((x, i) => i === idx ? { ...x, tradeCommodity: tc.label } : x));
     setTcInput(tc.label);
     setTcFocused(false);
   };
@@ -4778,8 +4782,8 @@ const TradeCommodityRow = ({ s, idx, localItems, tradeCommodities, mark }) => {
             onBlur={() => setTimeout(() => {
               setTcFocused(false);
               // Si l'input ne correspond pas à une valeur valide, on remet le label de la valeur actuelle
-              const cur = tradeCommodities.find(tc => tc.value === s.tradeCommodity);
-              setTcInput(cur?.label || "");
+              const cur = dedupedTc.find(tc => tc.label.toLowerCase() === (s.tradeCommodity || "").toLowerCase());
+              setTcInput(cur?.label || s.tradeCommodity || "");
             }, 150)}
             placeholder={tradeCommodities.length === 0 ? "Aucune Trade Commodity configurée…" : "Rechercher…"}
             disabled={tradeCommodities.length === 0}

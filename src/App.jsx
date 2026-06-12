@@ -4748,7 +4748,7 @@ const TradeCommodityRow = ({ s, idx, localItems, tradeCommodities, mark }) => {
   const isExactMatch = s.tradeCommodity && tcInput === (tradeCommodities.find(tc => tc.value === s.tradeCommodity)?.label || "");
   const needle = tcInput.trim().toLowerCase();
   const suggestions = isExactMatch ? [] : dedupedTc.filter(tc =>
-    needle === "" || tc.label.toLowerCase().includes(needle)
+    needle === "" || tc.label.toLowerCase().startsWith(needle)
   );
 
   const selectTc = (tc) => {

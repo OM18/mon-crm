@@ -19317,7 +19317,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
           <DRow label="Transformation">{c.transformation ? "YES" : "NO"}</DRow>
 
           <Sec label="Prix" />
-          <DRow label="Price Type">{c.priceType?.toUpperCase() || "—"}</DRow>
+          <DRow label="Price Type">{c.contractPriceType?.toUpperCase() || "—"}</DRow>
           {c.contractPriceType === "flat" && <>
             <DRow label="Contract Flat Price">{c.flatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>
             {c.analyticalFlatPrice && <DRow label="Analytical Flat Price">{c.analyticalFlatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}

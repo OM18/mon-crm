@@ -22720,67 +22720,23 @@ const TradeDetailPanel = ({ trade, onClose, onEdit, voyages, contracts }) => {
   const LegCard = ({ leg, type, idx }) => {
     const color = type === 'purchase' ? COLORS.red : COLORS.green;
     const contract = contracts.find(c => String(c.id) === String(leg.contractId));
-    // Resolve quantity: leg.quantity first, then fallback to contract.tradeLinks[trade].connectedQty
-    const contractLink = (contract?.tradeLinks || []).find(l => String(l.tradeId) === String(trade.id));
-    const resolvedQty = leg.quantity || contractLink?.connectedQty || null;
-    const qtyFromContract = !leg.quantity && contractLink?.connectedQty;
     return (
       <div style={{ background: COLORS.bg, border: `1px solid ${color}25`, borderRadius: 10, padding: '12px 14px', marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 8 }}>{type === 'purchase' ? 'Purchase' : 'Sale'} Contract {idx + 1}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <DRow label='Contrat' value={contract ? (contract.contractNumber || `#${contract.id}`) : (leg.contractId ? `#${leg.contractId}` : null)} accent={color} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textTransform: 'uppercase' }}>Connected Qty</span>
-            <span style={{ fontSize: 13, color: resolvedQty ? COLORS.text : COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>
-              {resolvedQty ? `${Number(resolvedQty).toLocaleString('fr')} T` : '—'}
-              {qtyFromContract && <span style={{ fontSize: 9, color: COLORS.textMuted, marginLeft: 5 }}>(contrat)</span>}
-            </span>
-          </div>
+          <DRow label='Quantity' value={leg.quantity ? `${Number(leg.quantity).toLocaleString('fr')} T` : null} mono />
           {contract?.commodity && <DRow label='Commodity' value={contract.commodity} />}
           {contract?.originCountry && <DRow label='Origine' value={contract.originCountry} />}
           {contract?.destinationCountry && <DRow label='Destination' value={contract.destinationCountry} />}
-          {contract?.qtyValue && <DRow label='Qty Contrat' value={`${contract.qtyValue} ${contract.qtyUnit || 'T'}`} mono />}
         </div>
       </div>
     );
   };
-  // Base legs from trade
-  const rawPurchaseLegs = (trade.purchaseLegs || []).filter(l => l.contractId);
-  const rawSaleLegs = (trade.saleLegs || []).filter(l => l.contractId);
-  // Also collect contracts that reference this trade via tradeLinks but have no leg yet
-  const linkedContracts = contracts.filter(c =>
-    (c.tradeLinks || []).some(lk => String(lk.tradeId) === String(trade.id))
-  );
-  const extraPurchase = linkedContracts
-    .filter(c => {
-      const ct = (c.contractType || '').toLowerCase();
-      return ct.includes('purchase') || ct.includes('achat');
-    })
-    .filter(c => !rawPurchaseLegs.some(l => String(l.contractId) === String(c.id)))
-    .map(c => {
-      const link = (c.tradeLinks || []).find(lk => String(lk.tradeId) === String(trade.id));
-      return { contractId: String(c.id), quantity: link?.connectedQty || '' };
-    });
-  const extraSale = linkedContracts
-    .filter(c => {
-      const ct = (c.contractType || '').toLowerCase();
-      return ct.includes('sale') || ct.includes('vente');
-    })
-    .filter(c => !rawSaleLegs.some(l => String(l.contractId) === String(c.id)))
-    .map(c => {
-      const link = (c.tradeLinks || []).find(lk => String(lk.tradeId) === String(trade.id));
-      return { contractId: String(c.id), quantity: link?.connectedQty || '' };
-    });
-  const purchaseLegs = [...rawPurchaseLegs, ...extraPurchase];
-  const saleLegs = [...rawSaleLegs, ...extraSale];
-  const resolveQty = (l) => {
-    if (l.quantity) return parseFloat(l.quantity) || 0;
-    const c = contracts.find(ct => String(ct.id) === String(l.contractId));
-    const link = (c?.tradeLinks || []).find(lk => String(lk.tradeId) === String(trade.id));
-    return parseFloat(link?.connectedQty) || 0;
-  };
-  const totalP = purchaseLegs.reduce((s,l) => s + resolveQty(l), 0);
-  const totalS = saleLegs.reduce((s,l) => s + resolveQty(l), 0);
+  const purchaseLegs = (trade.purchaseLegs || []).filter(l => l.contractId);
+  const saleLegs = (trade.saleLegs || []).filter(l => l.contractId);
+  const totalP = purchaseLegs.reduce((s,l) => s + (parseFloat(l.quantity)||0), 0);
+  const totalS = saleLegs.reduce((s,l) => s + (parseFloat(l.quantity)||0), 0);
   return (
     <div style={{ width: 360, flexShrink: 0, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 16, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
       <div style={{ padding: '18px 20px 14px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -22949,7 +22905,39 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const openNew = () => { setForm({ ...EMPTY_TRADE(), createdAt: new Date().toISOString() }); setEditId(null); setShowModal(true); };
-  const openEdit = (t) => { setForm({ ...t }); setEditId(t.id); setShowModal(true); };
+  const openEdit = (t) => {
+    // Enrich legs with contracts that reference this trade via tradeLinks but have no leg yet
+    const linkedContracts = contracts.filter(c =>
+      (c.tradeLinks || []).some(lk => String(lk.tradeId) === String(t.id))
+    );
+    const existingPurchaseIds = new Set((t.purchaseLegs || []).map(l => String(l.contractId)).filter(Boolean));
+    const existingSaleIds    = new Set((t.saleLegs    || []).map(l => String(l.contractId)).filter(Boolean));
+
+    const extraPurchase = linkedContracts
+      .filter(c => { const ct = (c.contractType||'').toLowerCase(); return ct.includes('purchase') || ct.includes('achat'); })
+      .filter(c => !existingPurchaseIds.has(String(c.id)))
+      .map(c => {
+        const link = (c.tradeLinks||[]).find(lk => String(lk.tradeId) === String(t.id));
+        return { contractId: c.id, quantity: link?.connectedQty || '' };
+      });
+
+    const extraSale = linkedContracts
+      .filter(c => { const ct = (c.contractType||'').toLowerCase(); return ct.includes('sale') || ct.includes('vente'); })
+      .filter(c => !existingSaleIds.has(String(c.id)))
+      .map(c => {
+        const link = (c.tradeLinks||[]).find(lk => String(lk.tradeId) === String(t.id));
+        return { contractId: c.id, quantity: link?.connectedQty || '' };
+      });
+
+    const enriched = {
+      ...t,
+      purchaseLegs: [...(t.purchaseLegs || []), ...extraPurchase],
+      saleLegs:     [...(t.saleLegs     || []), ...extraSale],
+    };
+    setForm(enriched);
+    setEditId(t.id);
+    setShowModal(true);
+  };
   const closeModal = () => { setShowModal(false); setForm(EMPTY_TRADE()); setEditId(null); };
   const nextId = () => trades.length > 0 ? Math.max(...trades.map(t => t.id || 0)) + 1 : 1;
   const save = () => {

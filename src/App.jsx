@@ -9318,14 +9318,42 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
       {adminTab === "batch" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <BatchCompaniesNewToOld />
-          <BatchCompaniesOldToNew />
-          <BatchDerivativesOldToNew />
-          <BatchFixingsOldToNew />
-          <BatchFixingsNewToOld />
-          <BatchContractsOldToNew />
-          <BatchVesselsOldToNew />
-          <BatchTradesOldToNew />
+
+          {/* ── SOMMAIRE ── */}
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 14, padding: "16px 20px" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: COLORS.textMuted, letterSpacing: 1, marginBottom: 12 }}>SOMMAIRE</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {[
+                { id: "batch-companies-new-to-old",    icon: "◆", label: "Companies — New to Old",    color: COLORS.purple },
+                { id: "batch-companies-old-to-new",    icon: "◆", label: "Companies — Old to New",    color: COLORS.blue   },
+                { id: "batch-derivatives-old-to-new",  icon: "◬", label: "Derivatives — Old to New",  color: COLORS.blue   },
+                { id: "batch-fixings-old-to-new",      icon: "📥", label: "Fixings — Old to New",      color: COLORS.purple },
+                { id: "batch-fixings-new-to-old",      icon: "📤", label: "Fixings — New to Old",      color: COLORS.purple },
+                { id: "batch-contracts-old-to-new",    icon: "📄", label: "Contracts — Old to New",    color: COLORS.green  },
+                { id: "batch-vessels-old-to-new",      icon: "🚢", label: "Vessels — Old to New",      color: COLORS.accent },
+                { id: "batch-trades-old-to-new",       icon: "🔀", label: "Trades — Old to New",       color: COLORS.accent },
+              ].map(({ id, icon, label, color }) => (
+                <div key={id}
+                  onClick={() => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+                  style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 7, padding: "6px 14px", borderRadius: 8, background: `${color}10`, border: `1px solid ${color}30`, color: COLORS.text, fontSize: 12, fontWeight: 600, transition: "background 0.15s" }}
+                  onMouseOver={e => e.currentTarget.style.background = `${color}22`}
+                  onMouseOut={e => e.currentTarget.style.background = `${color}10`}
+                >
+                  <span style={{ fontSize: 14 }}>{icon}</span>
+                  {label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div id="batch-companies-new-to-old"><BatchCompaniesNewToOld /></div>
+          <div id="batch-companies-old-to-new"><BatchCompaniesOldToNew /></div>
+          <div id="batch-derivatives-old-to-new"><BatchDerivativesOldToNew /></div>
+          <div id="batch-fixings-old-to-new"><BatchFixingsOldToNew /></div>
+          <div id="batch-fixings-new-to-old"><BatchFixingsNewToOld /></div>
+          <div id="batch-contracts-old-to-new"><BatchContractsOldToNew /></div>
+          <div id="batch-vessels-old-to-new"><BatchVesselsOldToNew /></div>
+          <div id="batch-trades-old-to-new"><BatchTradesOldToNew /></div>
         </div>
       )}
 

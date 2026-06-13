@@ -22086,9 +22086,10 @@ const TRADE_FIELD_ALIASES = {
   destinationCountry:  ["destination country", "destinationcountry", "pays destination", "destination"],
   tradeBusinessUnit:   ["trade business unit", "tradebusinessunit", "bu trade", "business unit trade", "trade bu"],
   additionalInfos:     ["additional infos", "additionalinfos", "info", "notes", "commentaire"],
+  executionResponsible: ["execution responsible", "executionresponsible", "responsable execution", "responsable", "trader responsible", "exec responsible"],
 };
-const TRADE_IMPORTABLE_FIELDS = ["tradeName","voyageId","businessMonth","logisticType","volume","originCountry","destinationCountry","tradeBusinessUnit","additionalInfos"];
-const TRADE_FIELD_LABELS = { tradeName:"Trade Name", voyageId:"Voyage", businessMonth:"Business Month", logisticType:"Logistic Type", volume:"Volume (T)", originCountry:"Origin Country", destinationCountry:"Destination Country", tradeBusinessUnit:"Trade Business Unit", additionalInfos:"Additional Infos" };
+const TRADE_IMPORTABLE_FIELDS = ["tradeName","voyageId","businessMonth","logisticType","volume","originCountry","destinationCountry","tradeBusinessUnit","additionalInfos","executionResponsible"];
+const TRADE_FIELD_LABELS = { tradeName:"Trade Name", voyageId:"Voyage", businessMonth:"Business Month", logisticType:"Logistic Type", volume:"Volume (T)", originCountry:"Origin Country", destinationCountry:"Destination Country", tradeBusinessUnit:"Trade Business Unit", additionalInfos:"Additional Infos", executionResponsible:"Execution Responsible" };
 const TRADE_IMPORT_GUIDE = [
   { field: "tradeName",          format: "Texte",         note: "Obligatoire" },
   { field: "voyageId",           format: "Texte",         note: "Nom exact du voyage" },
@@ -22099,6 +22100,7 @@ const TRADE_IMPORT_GUIDE = [
   { field: "destinationCountry", format: "Texte",         note: "Pays de destination" },
   { field: "tradeBusinessUnit",  format: "Texte",         note: "Business Unit du trade" },
   { field: "additionalInfos",    format: "Texte",         note: "" },
+  { field: "executionResponsible", format: "Texte",        note: "Responsable de l'exécution du trade" },
 ];
 
 const TradeImportModal = ({ onClose, onImport, voyages, config }) => {
@@ -22337,6 +22339,7 @@ const EMPTY_TRADE = () => ({
   commodities: [], volume: "", logisticType: "",
   originCountry: "", destinationCountry: "", tradeBusinessUnit: "",
   additionalInfos: "",
+  executionResponsible: "",
   purchaseLegs: [EMPTY_CONTRACT_LEG()],
   saleLegs: [EMPTY_CONTRACT_LEG()],
   createdAt: "",
@@ -22567,6 +22570,7 @@ const TradeDetailPanel = ({ trade, onClose, onEdit, voyages, contracts }) => {
           <DRow label='Origin' value={trade.originCountry} />
           <DRow label='Destination' value={trade.destinationCountry} />
           <div style={{ gridColumn: '1 / -1' }}><DRow label='Business Unit' value={trade.tradeBusinessUnit} accent={COLORS.purple} /></div>
+          {trade.executionResponsible && <div style={{ gridColumn: '1 / -1' }}><DRow label='Execution Responsible' value={trade.executionResponsible} accent={COLORS.accent} /></div>}
           {trade.additionalInfos && <div style={{ gridColumn: '1 / -1', background: COLORS.bg, borderRadius: 8, padding: '10px 14px', border: `1px solid ${COLORS.border}` }}><div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, marginBottom: 6 }}>ADDITIONAL INFOS</div><div style={{ fontSize: 12, color: COLORS.textSub, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{trade.additionalInfos}</div></div>}
         </div>
         {purchaseLegs.length > 0 && (<><Sec label={`Purchase (${purchaseLegs.length})`} color={COLORS.red} />{purchaseLegs.map((l,i) => <LegCard key={i} leg={l} type='purchase' idx={i} />)}</>)}
@@ -22825,7 +22829,7 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
         )}
         <XlButton onImport={() => setShowImport(true)} onExport={async () => {
           const XLSX = await import("xlsx");
-          const rows = trades.map(t => ({ tradeName:t.tradeName, voyageId:t.voyageId, businessMonth:t.businessMonth, logisticType:t.logisticType, volume:t.volume, additionalInfos:t.additionalInfos }));
+          const rows = trades.map(t => ({ tradeName:t.tradeName, voyageId:t.voyageId, businessMonth:t.businessMonth, logisticType:t.logisticType, volume:t.volume, originCountry:t.originCountry, destinationCountry:t.destinationCountry, tradeBusinessUnit:t.tradeBusinessUnit, executionResponsible:t.executionResponsible, additionalInfos:t.additionalInfos }));
           const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]);
           const wb = XLSX.utils.book_new();
           XLSX.utils.book_append_sheet(wb, ws, "Trades");
@@ -22952,6 +22956,13 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
                   <option value="">— Business Unit —</option>
                   {(config.businessUnit || []).map(b => <option key={b.value||b.label} value={b.value||b.label}>{b.label||b.value}</option>)}
                 </select>
+              </div>
+
+              {/* Execution Responsible */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <LBL>EXECUTION RESPONSIBLE</LBL>
+                <input value={form.executionResponsible || ""} onChange={e => f("executionResponsible", e.target.value)} placeholder="Responsable de l'exécution…"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
               </div>
 
               {/* ── PURCHASE CONTRACTS ── */}

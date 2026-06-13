@@ -6650,6 +6650,199 @@ const BatchContractsOldToNew = () => {
   );
 };
 
+
+// ─── BATCH TRADES — OLD TO NEW ─────────────────────────────────
+const BatchTradesOldToNew = () => {
+  const [state, setState] = useState("idle");
+  const [result, setResult] = useState(null);
+  const fileRef = useRef(null);
+
+  const normKey = k => k.trim().toLowerCase().replace(/[-_\s]+/g, "_");
+
+  // ── Colonne source → colonne cible ────────────────────────────
+  const COLUMN_MAP = {
+    "title":                    "tradeName",
+    "total_volume_plan":        "volume",
+    "date_of_execution_fact":   "businessMonth",
+    "responsible_full_name":    "executionResponsible",
+  };
+
+  // ── Conversion date yyyy/mm/dd → mm/yyyy ──────────────────────
+  const parseBusinessMonth = (val) => {
+    if (!val) return "";
+    const s = String(val).trim();
+    // yyyy/mm/dd  or  yyyy-mm-dd  or  yyyy.mm.dd
+    const m = s.match(/^(\d{4})[\/\-\.](\d{2})[\/\-\.](\d{2})$/);
+    if (m) return `${m[2]}/${m[1]}`;
+    // already mm/yyyy
+    if (/^\d{2}\/\d{4}$/.test(s)) return s;
+    // Excel serial (date stored as number)
+    if (/^\d{4,5}$/.test(s)) {
+      const dt = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+      return `${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`;
+    }
+    return s;
+  };
+
+  // ── processFile ───────────────────────────────────────────────
+  const processFile = async (file) => {
+    setState("processing"); setResult(null);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      const converted = rows.map(row => {
+        const out = {};
+        const rowNorm = Object.keys(row).reduce((acc, k) => { acc[normKey(k)] = k; return acc; }, {});
+
+        const get = (srcKey) => {
+          let raw = row[srcKey];
+          if (raw === undefined) { const ak = rowNorm[normKey(srcKey)]; raw = ak !== undefined ? row[ak] : ""; }
+          return raw !== undefined && raw !== null ? String(raw).trim() : "";
+        };
+
+        for (const [srcKey, destKey] of Object.entries(COLUMN_MAP)) {
+          let val = get(srcKey);
+          if (destKey === "businessMonth") val = parseBusinessMonth(val);
+          out[destKey] = val;
+        }
+
+        return out;
+      }).filter(r => r.tradeName);
+
+      if (converted.length === 0) { setResult({ error: "Aucune ligne valide (colonne 'title' vide ou absente)." }); setState("error"); return; }
+
+      const outWs = XLSX.utils.json_to_sheet(converted);
+      outWs["!cols"] = Object.keys(converted[0]).map(k => ({ wch: Math.max(k.length + 2, 22) }));
+      const outWb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(outWb, outWs, "Trades");
+      XLSX.writeFile(outWb, `trades_converted_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      setResult({ total: rows.length, converted: converted.length, dropped: rows.length - converted.length });
+      setState("done");
+    } catch(e) { setResult({ error: String(e) }); setState("error"); }
+  };
+
+  // ── Styles ────────────────────────────────────────────────────
+  const TH = { padding: "5px 10px", textAlign: "left", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bg, whiteSpace: "nowrap" };
+  const TD = { padding: "4px 10px", fontSize: 11, color: COLORS.text, borderBottom: `1px solid ${COLORS.border}40`, whiteSpace: "nowrap" };
+  const TAG = (c) => ({ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${c}18`, color: c, border: `1px solid ${c}40` });
+
+  const RENAME_ROWS = [
+    ["title",                  "tradeName"],
+    ["total_volume_plan",      "volume"],
+    ["date_of_execution_fact", "businessMonth"],
+    ["responsible_full_name",  "executionResponsible"],
+  ];
+
+  const DROP_ROWS_INFO = "Toutes les autres colonnes sont supprimées du fichier de sortie.";
+
+  const FORMAT_ROWS = [
+    ["date_of_execution_fact", "businessMonth", "yyyy/mm/dd", "mm/yyyy"],
+  ];
+
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ padding: "18px 24px", background: `${COLORS.accent}08`, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: `${COLORS.accent}20`, border: `1px solid ${COLORS.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔀</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>BATCH TRADES — OLD TO NEW</div>
+          <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Convertit un export trades ancien format vers le format d'import de l'app</div>
+        </div>
+      </div>
+
+      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
+
+        {/* ── 3 tables ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 0.8fr 1.2fr", gap: 14, alignItems: "start" }}>
+
+          {/* TABLE 1 — Colonnes renommées */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.blue}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.blue, letterSpacing: 0.8 }}>① COLONNES RENOMMÉES</div>
+            <div style={{ overflowY: "auto", maxHeight: 360 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={TH}>OLD</th><th style={TH}>NEW</th></tr></thead>
+                <tbody>
+                  {RENAME_ROWS.map(([o, n], i) => (
+                    <tr key={i}>
+                      <td style={{ ...TD, color: COLORS.accent, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{o}</td>
+                      <td style={{ ...TD, color: COLORS.green, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{n}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* TABLE 2 — Colonnes supprimées */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.orange}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.orange, letterSpacing: 0.8 }}>② COLONNES SUPPRIMÉES</div>
+            <div style={{ padding: "12px 14px" }}>
+              <div style={{ fontSize: 11, color: COLORS.textMuted, lineHeight: 1.6 }}>{DROP_ROWS_INFO}</div>
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                {["tradeName","volume","businessMonth","executionResponsible"].map(k => (
+                  <span key={k} style={TAG(COLORS.green)}>{k}</span>
+                ))}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 10, color: COLORS.textMuted, fontStyle: "italic" }}>← seules ces 4 colonnes sont conservées</div>
+            </div>
+          </div>
+
+          {/* TABLE 3 — Formats modifiés */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.gold}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.gold, letterSpacing: 0.8 }}>③ FORMATS MODIFIÉS</div>
+            <div style={{ overflowY: "auto", maxHeight: 360 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={TH}>SOURCE</th><th style={TH}>NOUVEAU</th><th style={TH}>ANCIEN FORMAT</th><th style={TH}>NOUVEAU FORMAT</th></tr></thead>
+                <tbody>
+                  {FORMAT_ROWS.map(([src, dst, oldF, newF], i) => (
+                    <tr key={i}>
+                      <td style={{ ...TD, color: COLORS.accent, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{src}</td>
+                      <td style={{ ...TD, color: COLORS.green, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{dst}</td>
+                      <td style={{ ...TD, color: COLORS.textMuted, fontSize: 10, fontStyle: "italic" }}>{oldF}</td>
+                      <td style={{ ...TD, fontSize: 10 }}><span style={TAG(COLORS.gold)}>{newF}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Note */}
+        <div style={{ background: `${COLORS.orange}10`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "10px 14px" }}>
+          {[
+            "⚠ Seules les lignes ayant une valeur dans 'title' sont conservées (titre = tradeName obligatoire).",
+            "⚠ date_of_execution_fact : formats acceptés yyyy/mm/dd, yyyy-mm-dd, yyyy.mm.dd et numéros de série Excel.",
+            "⚠ Toutes les colonnes non listées dans ① sont supprimées du fichier de sortie.",
+          ].map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
+        </div>
+
+        {/* Action */}
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
+          onChange={e => { if (e.target.files[0]) processFile(e.target.files[0]); e.target.value = ""; }} />
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <Btn onClick={() => { setState("idle"); setResult(null); fileRef.current?.click(); }}
+            disabled={state === "processing"} style={{ background: COLORS.accent, borderColor: COLORS.accent }}>
+            {state === "processing" ? "⟳ Traitement…" : "📂 Charger fichier Excel / CSV"}
+          </Btn>
+          {state === "done" && result && (
+            <span style={{ fontSize: 12, color: COLORS.green, fontWeight: 700 }}>
+              ✓ {result.converted} trade{result.converted !== 1 ? "s" : ""} convertis sur {result.total}
+              {result.dropped > 0 && <span style={{ color: COLORS.orange }}> — {result.dropped} ligne{result.dropped !== 1 ? "s" : ""} ignorée{result.dropped !== 1 ? "s" : ""} (title vide)</span>}
+               — fichier téléchargé
+            </span>
+          )}
+          {state === "error" && <span style={{ fontSize: 12, color: COLORS.red }}>❌ {result?.error}</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── BATCH COMPANIES — OLD TO NEW ────────────────────────────
 
 const BatchCompaniesNewToOld = () => {
@@ -9132,6 +9325,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <BatchFixingsNewToOld />
           <BatchContractsOldToNew />
           <BatchVesselsOldToNew />
+          <BatchTradesOldToNew />
         </div>
       )}
 

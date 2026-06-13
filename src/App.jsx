@@ -9318,42 +9318,14 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
 
       {adminTab === "batch" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-          {/* ── SOMMAIRE ── */}
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 14, padding: "16px 20px" }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: COLORS.textMuted, letterSpacing: 1, marginBottom: 12 }}>SOMMAIRE</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {[
-                { id: "batch-companies-new-to-old",    icon: "◆", label: "Companies — New to Old",    color: COLORS.purple },
-                { id: "batch-companies-old-to-new",    icon: "◆", label: "Companies — Old to New",    color: COLORS.blue   },
-                { id: "batch-derivatives-old-to-new",  icon: "◬", label: "Derivatives — Old to New",  color: COLORS.blue   },
-                { id: "batch-fixings-old-to-new",      icon: "📥", label: "Fixings — Old to New",      color: COLORS.purple },
-                { id: "batch-fixings-new-to-old",      icon: "📤", label: "Fixings — New to Old",      color: COLORS.purple },
-                { id: "batch-contracts-old-to-new",    icon: "📄", label: "Contracts — Old to New",    color: COLORS.green  },
-                { id: "batch-vessels-old-to-new",      icon: "🚢", label: "Vessels — Old to New",      color: COLORS.accent },
-                { id: "batch-trades-old-to-new",       icon: "🔀", label: "Trades — Old to New",       color: COLORS.accent },
-              ].map(({ id, icon, label, color }) => (
-                <div key={id}
-                  onClick={() => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }}
-                  style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 7, padding: "6px 14px", borderRadius: 8, background: `${color}10`, border: `1px solid ${color}30`, color: COLORS.text, fontSize: 12, fontWeight: 600, transition: "background 0.15s" }}
-                  onMouseOver={e => e.currentTarget.style.background = `${color}22`}
-                  onMouseOut={e => e.currentTarget.style.background = `${color}10`}
-                >
-                  <span style={{ fontSize: 14 }}>{icon}</span>
-                  {label}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div id="batch-companies-new-to-old"><BatchCompaniesNewToOld /></div>
-          <div id="batch-companies-old-to-new"><BatchCompaniesOldToNew /></div>
-          <div id="batch-derivatives-old-to-new"><BatchDerivativesOldToNew /></div>
-          <div id="batch-fixings-old-to-new"><BatchFixingsOldToNew /></div>
-          <div id="batch-fixings-new-to-old"><BatchFixingsNewToOld /></div>
-          <div id="batch-contracts-old-to-new"><BatchContractsOldToNew /></div>
-          <div id="batch-vessels-old-to-new"><BatchVesselsOldToNew /></div>
-          <div id="batch-trades-old-to-new"><BatchTradesOldToNew /></div>
+          <BatchCompaniesNewToOld />
+          <BatchCompaniesOldToNew />
+          <BatchDerivativesOldToNew />
+          <BatchFixingsOldToNew />
+          <BatchFixingsNewToOld />
+          <BatchContractsOldToNew />
+          <BatchVesselsOldToNew />
+          <BatchTradesOldToNew />
         </div>
       )}
 
@@ -22748,23 +22720,67 @@ const TradeDetailPanel = ({ trade, onClose, onEdit, voyages, contracts }) => {
   const LegCard = ({ leg, type, idx }) => {
     const color = type === 'purchase' ? COLORS.red : COLORS.green;
     const contract = contracts.find(c => String(c.id) === String(leg.contractId));
+    // Resolve quantity: leg.quantity first, then fallback to contract.tradeLinks[trade].connectedQty
+    const contractLink = (contract?.tradeLinks || []).find(l => String(l.tradeId) === String(trade.id));
+    const resolvedQty = leg.quantity || contractLink?.connectedQty || null;
+    const qtyFromContract = !leg.quantity && contractLink?.connectedQty;
     return (
       <div style={{ background: COLORS.bg, border: `1px solid ${color}25`, borderRadius: 10, padding: '12px 14px', marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 8 }}>{type === 'purchase' ? 'Purchase' : 'Sale'} Contract {idx + 1}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <DRow label='Contrat' value={contract ? (contract.contractNumber || `#${contract.id}`) : (leg.contractId ? `#${leg.contractId}` : null)} accent={color} />
-          <DRow label='Quantity' value={leg.quantity ? `${Number(leg.quantity).toLocaleString('fr')} T` : null} mono />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.8, textTransform: 'uppercase' }}>Connected Qty</span>
+            <span style={{ fontSize: 13, color: resolvedQty ? COLORS.text : COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>
+              {resolvedQty ? `${Number(resolvedQty).toLocaleString('fr')} T` : '—'}
+              {qtyFromContract && <span style={{ fontSize: 9, color: COLORS.textMuted, marginLeft: 5 }}>(contrat)</span>}
+            </span>
+          </div>
           {contract?.commodity && <DRow label='Commodity' value={contract.commodity} />}
           {contract?.originCountry && <DRow label='Origine' value={contract.originCountry} />}
           {contract?.destinationCountry && <DRow label='Destination' value={contract.destinationCountry} />}
+          {contract?.qtyValue && <DRow label='Qty Contrat' value={`${contract.qtyValue} ${contract.qtyUnit || 'T'}`} mono />}
         </div>
       </div>
     );
   };
-  const purchaseLegs = (trade.purchaseLegs || []).filter(l => l.contractId);
-  const saleLegs = (trade.saleLegs || []).filter(l => l.contractId);
-  const totalP = purchaseLegs.reduce((s,l) => s + (parseFloat(l.quantity)||0), 0);
-  const totalS = saleLegs.reduce((s,l) => s + (parseFloat(l.quantity)||0), 0);
+  // Base legs from trade
+  const rawPurchaseLegs = (trade.purchaseLegs || []).filter(l => l.contractId);
+  const rawSaleLegs = (trade.saleLegs || []).filter(l => l.contractId);
+  // Also collect contracts that reference this trade via tradeLinks but have no leg yet
+  const linkedContracts = contracts.filter(c =>
+    (c.tradeLinks || []).some(lk => String(lk.tradeId) === String(trade.id))
+  );
+  const extraPurchase = linkedContracts
+    .filter(c => {
+      const ct = (c.contractType || '').toLowerCase();
+      return ct.includes('purchase') || ct.includes('achat');
+    })
+    .filter(c => !rawPurchaseLegs.some(l => String(l.contractId) === String(c.id)))
+    .map(c => {
+      const link = (c.tradeLinks || []).find(lk => String(lk.tradeId) === String(trade.id));
+      return { contractId: String(c.id), quantity: link?.connectedQty || '' };
+    });
+  const extraSale = linkedContracts
+    .filter(c => {
+      const ct = (c.contractType || '').toLowerCase();
+      return ct.includes('sale') || ct.includes('vente');
+    })
+    .filter(c => !rawSaleLegs.some(l => String(l.contractId) === String(c.id)))
+    .map(c => {
+      const link = (c.tradeLinks || []).find(lk => String(lk.tradeId) === String(trade.id));
+      return { contractId: String(c.id), quantity: link?.connectedQty || '' };
+    });
+  const purchaseLegs = [...rawPurchaseLegs, ...extraPurchase];
+  const saleLegs = [...rawSaleLegs, ...extraSale];
+  const resolveQty = (l) => {
+    if (l.quantity) return parseFloat(l.quantity) || 0;
+    const c = contracts.find(ct => String(ct.id) === String(l.contractId));
+    const link = (c?.tradeLinks || []).find(lk => String(lk.tradeId) === String(trade.id));
+    return parseFloat(link?.connectedQty) || 0;
+  };
+  const totalP = purchaseLegs.reduce((s,l) => s + resolveQty(l), 0);
+  const totalS = saleLegs.reduce((s,l) => s + resolveQty(l), 0);
   return (
     <div style={{ width: 360, flexShrink: 0, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 16, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
       <div style={{ padding: '18px 20px 14px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'flex-start', gap: 10 }}>

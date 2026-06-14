@@ -6665,6 +6665,14 @@ const BatchTradesOldToNew = () => {
     "total_volume_plan":        "volume",
     "date_of_execution_fact":   "businessMonth",
     "responsible_full_name":    "executionResponsible",
+    "business_unit_title":        "tradeBusinessUnit",
+  };
+
+  const BU_MAP = {
+    "MOROCCO BU": "MOROCCO",
+    "UKRAINE BU": "UKRAINE",
+    "RUSSIA BU":  "RUSSIA",
+    "TURKEY BU":  "TURKEY",
   };
 
   // ── Conversion date yyyy/mm/dd → mm/yyyy ──────────────────────
@@ -6707,6 +6715,7 @@ const BatchTradesOldToNew = () => {
         for (const [srcKey, destKey] of Object.entries(COLUMN_MAP)) {
           let val = get(srcKey);
           if (destKey === "businessMonth") val = parseBusinessMonth(val);
+          if (destKey === "tradeBusinessUnit") val = BU_MAP[val] ?? val;
           out[destKey] = val;
         }
 
@@ -6735,12 +6744,14 @@ const BatchTradesOldToNew = () => {
     ["total_volume_plan",      "volume"],
     ["date_of_execution_fact", "businessMonth"],
     ["responsible_full_name",  "executionResponsible"],
+    ["business_unit_title",    "tradeBusinessUnit"],
   ];
 
   const DROP_ROWS_INFO = "Toutes les autres colonnes sont supprimées du fichier de sortie.";
 
   const FORMAT_ROWS = [
     ["date_of_execution_fact", "businessMonth", "yyyy/mm/dd", "mm/yyyy"],
+    ["business_unit_title", "tradeBusinessUnit", "MOROCCO BU / UKRAINE BU / RUSSIA BU / TURKEY BU", "MOROCCO / UKRAINE / RUSSIA / TURKEY"],
   ];
 
   return (

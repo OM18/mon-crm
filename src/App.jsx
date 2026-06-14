@@ -22544,11 +22544,20 @@ const OVERSCAN_TRADE = 8;
 
 const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, contracts, config }) => {
   const voyage = voyages.find(v => v.id === t.voyageId || String(v.id) === String(t.voyageId));
-  const purchaseContracts = Array.isArray(t.purchaseLegs) ? t.purchaseLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
-  const saleContracts = Array.isArray(t.saleLegs) ? t.saleLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
-  // Derive origin/destination from first purchase/sale contract
-  const originContract = purchaseContracts[0];
-  const destContract = saleContracts[0];
+  // Collect purchase/sale contracts from legs + bidirectional tradeLinks
+  const legPurchase = (Array.isArray(t.purchaseLegs) ? t.purchaseLegs : []).map(l => contracts.find(c => String(c.id)===String(l.contractId))).filter(Boolean);
+  const legSale     = (Array.isArray(t.saleLegs)     ? t.saleLegs     : []).map(l => contracts.find(c => String(c.id)===String(l.contractId))).filter(Boolean);
+  const lpIds = new Set(legPurchase.map(c=>String(c.id)));
+  const lsIds = new Set(legSale.map(c=>String(c.id)));
+  contracts.forEach(c => {
+    if (!(c.tradeLinks||[]).some(lk=>String(lk.tradeId)===String(t.id))) return;
+    const ct=(c.contractType||"").toLowerCase();
+    if ((ct.includes("purchase")||ct.includes("achat")) && !lpIds.has(String(c.id))) { legPurchase.push(c); lpIds.add(String(c.id)); }
+    else if ((ct.includes("sale")||ct.includes("vente")) && !lsIds.has(String(c.id))) { legSale.push(c); lsIds.add(String(c.id)); }
+  });
+  const pickVal = (list, field) => list.find(c=>c?.[field])?.[field] || "";
+  const derivedOrigin = t.originCountry || pickVal(legPurchase, "originCountry") || pickVal(legSale, "originCountry");
+  const derivedDest   = t.destinationCountry || pickVal(legSale, "destinationCountry") || pickVal(legPurchase, "destinationCountry");
 
   return (
     <div onClick={() => onSelect(t)}
@@ -22577,12 +22586,28 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
         ))}
       </div>
       {/* ORIGIN COUNTRY */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
-        {(() => { const val = t.originCountry || originContract?.originCountry || originContract?.port || ""; const code = val ? getCountryCode(val) : null; return (<><span style={{ fontSize: 11, color: val ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val || "—"}</span></>); })()}
+      <div style={{ padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {derivedOrigin ? (() => {
+          const label = (config?.country || []).find(c => c.value === derivedOrigin || c.label === derivedOrigin)?.label || derivedOrigin;
+          return (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+              <CountryFlag country={derivedOrigin} size={28} />
+              <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.text, whiteSpace: "nowrap", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
+            </div>
+          );
+        })() : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>}
       </div>
       {/* DESTINATION COUNTRY */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
-        {(() => { const val = t.destinationCountry || destContract?.destinationCountry || destContract?.port || ""; return (<span style={{ fontSize: 11, color: val ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val || "—"}</span>); })()}
+      <div style={{ padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {derivedDest ? (() => {
+          const label = (config?.country || []).find(c => c.value === derivedDest || c.label === derivedDest)?.label || derivedDest;
+          return (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+              <CountryFlag country={derivedDest} size={28} />
+              <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.text, whiteSpace: "nowrap", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
+            </div>
+          );
+        })() : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>}
       </div>
       {/* TRADE BUSINESS UNIT */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
@@ -22604,8 +22629,7 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
       </div>
     </div>
   );
-});
-
+})
 const ExpandContractField = ({ label, value, mono }) => value ? (
   <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
     <span style={{ fontSize:9, fontWeight:700, color:COLORS.textMuted, letterSpacing:0.7, textTransform:'uppercase' }}>{label}</span>
@@ -22684,22 +22708,53 @@ const TradeExpandRow = ({ trade, contracts, onEdit, onClose }) => {
   );
 };
 const VirtualTradeList = ({ filtered, selected, onSelect, onEdit, onRemove, voyages, contracts, config }) => {
+  const [scrollTop, setScrollTop] = useState(0);
   const containerRef = useRef(null);
+  const [containerH, setContainerH] = useState(600);
+  const [expandH, setExpandH] = useState(0);
+  const expandRef = useRef(null);
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(e => setContainerH(e[0].contentRect.height));
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!expandRef.current) { setExpandH(0); return; }
+    const ro = new ResizeObserver(e => setExpandH(e[0].contentRect.height));
+    ro.observe(expandRef.current);
+    return () => ro.disconnect();
+  }, [selected?.id]);
+  const selIdx = selected ? filtered.findIndex(t => t.id === selected.id) : -1;
+  // Build virtual items: each trade row has height ROW_H_TRADE; after selIdx insert expand block
+  const getOffset = (i) => i * ROW_H_TRADE + (selIdx >= 0 && i > selIdx ? expandH : 0);
+  const totalH = filtered.length * ROW_H_TRADE + (selIdx >= 0 ? expandH : 0);
+  const startIdx = Math.max(0, (() => { let i=0; while(i<filtered.length && getOffset(i)+ROW_H_TRADE < scrollTop - OVERSCAN_TRADE*ROW_H_TRADE) i++; return i; })());
+  const endIdx   = Math.min(filtered.length, (() => { let i=startIdx; while(i<filtered.length && getOffset(i) < scrollTop + containerH + OVERSCAN_TRADE*ROW_H_TRADE) i++; return i; })());
   return (
-    <div ref={containerRef} style={{ overflowY: "auto", flex: 1, overflowX: "auto" }}>
+    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)} style={{ overflowY: 'auto', flex: 1, overflowX: 'auto' }}>
       {filtered.length === 0
-        ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "56px 0", fontSize: 14 }}>Aucun trade — cliquez sur « + Ajouter »</div>
-        : <div style={{ minWidth: 'max-content' }}>
-            {filtered.map((t, vi) => (
-              <React.Fragment key={t.id}>
-                <TradeRow t={t} idx={vi} isSel={selected?.id === t.id}
-                  onSelect={onSelect} onEdit={onEdit} onRemove={onRemove}
-                  voyages={voyages} contracts={contracts} config={config} />
-                {selected?.id === t.id && (
-                  <TradeExpandRow trade={selected} contracts={contracts} onEdit={onEdit} onClose={() => onSelect(selected)} />
-                )}
-              </React.Fragment>
-            ))}
+        ? <div style={{ textAlign: 'center', color: COLORS.textMuted, padding: '56px 0', fontSize: 14 }}>Aucun trade — cliquez sur « + Ajouter »</div>
+        : <div style={{ height: totalH, position: 'relative', minWidth: 'max-content' }}>
+            {filtered.slice(startIdx, endIdx).map((t, vi) => {
+              const i = startIdx + vi;
+              const top = getOffset(i);
+              const isSel = selected?.id === t.id;
+              return (
+                <React.Fragment key={t.id}>
+                  <div style={{ position: 'absolute', top, left: 0, right: 0, height: ROW_H_TRADE }}>
+                    <TradeRow t={t} idx={i} isSel={isSel}
+                      onSelect={onSelect} onEdit={onEdit} onRemove={onRemove}
+                      voyages={voyages} contracts={contracts} config={config} />
+                  </div>
+                  {isSel && (
+                    <div ref={expandRef} style={{ position: 'absolute', top: top + ROW_H_TRADE, left: 0, right: 0 }}>
+                      <TradeExpandRow trade={selected} contracts={contracts} onEdit={onEdit} onClose={() => onSelect(selected)} />
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
       }
     </div>

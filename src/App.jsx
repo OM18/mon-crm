@@ -22606,6 +22606,33 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
   );
 });
 
+const ExpandContractField = ({ label, value, mono }) => value ? (
+  <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+    <span style={{ fontSize:9, fontWeight:700, color:COLORS.textMuted, letterSpacing:0.7, textTransform:'uppercase' }}>{label}</span>
+    <span style={{ fontSize:11, color:COLORS.text, fontFamily: mono ? "'DM Mono',monospace" : 'inherit' }}>{value}</span>
+  </div>
+) : null;
+
+const ExpandContractCard = ({ contract, type, purchaseLegs, saleLegs }) => {
+  const col = type === 'purchase' ? COLORS.red : COLORS.green;
+  const legs = type === 'purchase' ? (purchaseLegs||[]) : (saleLegs||[]);
+  const leg = legs.find(l => String(l.contractId)===String(contract.id));
+  return (
+    <div style={{ background:COLORS.bg, border:`1px solid ${col}30`, borderRadius:8, padding:'10px 12px', display:'flex', flexDirection:'column', gap:8, marginBottom:8 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <span style={{ fontSize:12, fontWeight:800, color:col }}>{contract.contractNumber || `#${contract.id}`}</span>
+        {leg?.quantity && <span style={{ fontSize:11, fontWeight:700, color:col, fontFamily:"'DM Mono',monospace" }}>{Number(leg.quantity).toLocaleString('fr')} T</span>}
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+        <ExpandContractField label='Commodity' value={contract.commodity} />
+        <ExpandContractField label='Conclusion' value={contract.conclusionDate} mono />
+        <ExpandContractField label='Origin' value={contract.originCountry} />
+        <ExpandContractField label='Destination' value={contract.destinationCountry} />
+      </div>
+    </div>
+  );
+};
+
 const TradeExpandRow = ({ trade, contracts, onEdit, onClose }) => {
   const legPurchase = (trade.purchaseLegs||[]).map(l => contracts.find(c => String(c.id)===String(l.contractId))).filter(Boolean);
   const legSale     = (trade.saleLegs||[]).map(l => contracts.find(c => String(c.id)===String(l.contractId))).filter(Boolean);
@@ -22616,58 +22643,29 @@ const TradeExpandRow = ({ trade, contracts, onEdit, onClose }) => {
     if((ct.includes("purchase")||ct.includes("achat"))&&!legPIds.has(String(c.id))) legPurchase.push(c);
     else if((ct.includes("sale")||ct.includes("vente"))&&!legSIds.has(String(c.id))) legSale.push(c);
   });
-  const ContractCard = ({ contract, type }) => {
-    const col = type === 'purchase' ? COLORS.red : COLORS.green;
-    const legs = type === 'purchase' ? (trade.purchaseLegs||[]) : (trade.saleLegs||[]);
-    const leg = legs.find(l => String(l.contractId)===String(contract.id));
-    const F = ({ label, value, mono }) => value ? (
-      <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-        <span style={{ fontSize:9, fontWeight:700, color:COLORS.textMuted, letterSpacing:0.7, textTransform:'uppercase' }}>{label}</span>
-        <span style={{ fontSize:11, color:COLORS.text, fontFamily: mono ? "'DM Mono',monospace" : 'inherit' }}>{value}</span>
-      </div>
-    ) : null;
-    return (
-      <div style={{ background:COLORS.bg, border:`1px solid ${col}30`, borderRadius:8, padding:'10px 12px', display:'flex', flexDirection:'column', gap:8, marginBottom:8 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <span style={{ fontSize:12, fontWeight:800, color:col }}>{contract.contractNumber || `#${contract.id}`}</span>
-          {leg?.quantity && <span style={{ fontSize:11, fontWeight:700, color:col, fontFamily:"'DM Mono',monospace" }}>{Number(leg.quantity).toLocaleString('fr')} T</span>}
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-          <F label='Commodity' value={contract.commodity} />
-          <F label='Conclusion' value={contract.conclusionDate} mono />
-          <F label='Origin' value={contract.originCountry} />
-          <F label='Destination' value={contract.destinationCountry} />
-        </div>
-      </div>
-    );
-  };
   const totalP = (trade.purchaseLegs||[]).reduce((s,l)=>s+(parseFloat(l.quantity)||0),0);
   const totalS = (trade.saleLegs||[]).reduce((s,l)=>s+(parseFloat(l.quantity)||0),0);
   const solde = totalS - totalP;
   return (
     <div style={{ borderBottom:`2px solid ${COLORS.accent}30`, background:COLORS.surface }}>
       <div style={{ padding:'14px 16px', display:'flex', gap:16, alignItems:'flex-start', minWidth:'max-content' }}>
-        {/* LEFT: Purchase */}
         <div style={{ flex:1, minWidth:260, maxWidth:360 }}>
           <div style={{ fontSize:10, fontWeight:800, color:COLORS.red, letterSpacing:0.8, marginBottom:8 }}>
             🟥 PURCHASE ({legPurchase.length}){totalP>0 && <span style={{marginLeft:6,fontFamily:"'DM Mono',monospace"}}>{totalP.toLocaleString('fr')} T</span>}
           </div>
           {legPurchase.length===0
             ? <div style={{fontSize:11,color:COLORS.textMuted}}>Aucun contrat d’achat</div>
-            : legPurchase.map((c,i)=><ContractCard key={c.id||i} contract={c} type='purchase' />)}
+            : legPurchase.map((c,i)=><ExpandContractCard key={c.id||i} contract={c} type='purchase' purchaseLegs={trade.purchaseLegs} saleLegs={trade.saleLegs} />)}
         </div>
-        {/* DIVIDER */}
         <div style={{ width:1, alignSelf:'stretch', background:COLORS.border, flexShrink:0 }} />
-        {/* RIGHT: Sale */}
         <div style={{ flex:1, minWidth:260, maxWidth:360 }}>
           <div style={{ fontSize:10, fontWeight:800, color:COLORS.green, letterSpacing:0.8, marginBottom:8 }}>
             🟢 SALE ({legSale.length}){totalS>0 && <span style={{marginLeft:6,fontFamily:"'DM Mono',monospace"}}>{totalS.toLocaleString('fr')} T</span>}
           </div>
           {legSale.length===0
             ? <div style={{fontSize:11,color:COLORS.textMuted}}>Aucun contrat de vente</div>
-            : legSale.map((c,i)=><ContractCard key={c.id||i} contract={c} type='sale' />)}
+            : legSale.map((c,i)=><ExpandContractCard key={c.id||i} contract={c} type='sale' purchaseLegs={trade.purchaseLegs} saleLegs={trade.saleLegs} />)}
         </div>
-        {/* SUMMARY + ACTIONS */}
         <div style={{ display:'flex', flexDirection:'column', gap:8, alignItems:'flex-end', flexShrink:0 }}>
           {(totalP>0||totalS>0) && (
             <div style={{ background:COLORS.bg, border:`1px solid ${COLORS.border}`, borderRadius:8, padding:'8px 12px', display:'grid', gridTemplateColumns:'repeat(3,64px)', gap:6, textAlign:'center' }}>
@@ -22685,7 +22683,6 @@ const TradeExpandRow = ({ trade, contracts, onEdit, onClose }) => {
     </div>
   );
 };
-
 const VirtualTradeList = ({ filtered, selected, onSelect, onEdit, onRemove, voyages, contracts, config }) => {
   const containerRef = useRef(null);
   return (

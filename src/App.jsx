@@ -22557,9 +22557,10 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
   const voyage = voyages.find(v => v.id === t.voyageId || String(v.id) === String(t.voyageId));
   const purchaseContracts = Array.isArray(t.purchaseLegs) ? t.purchaseLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
   const saleContracts = Array.isArray(t.saleLegs) ? t.saleLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
-  // Derive origin/destination from first purchase/sale contract
-  const originContract = purchaseContracts[0];
-  const destContract = saleContracts[0];
+  // Derive origin from purchase contracts (fallback: sale), destination from sale contracts (fallback: purchase)
+  const pickCountry = (list, field) => { const hit = list.find(c => c?.[field]); return hit?.[field] || ""; };
+  const derivedOrigin = t.originCountry || pickCountry(purchaseContracts, "originCountry") || pickCountry(saleContracts, "originCountry");
+  const derivedDest   = t.destinationCountry || pickCountry(saleContracts, "destinationCountry") || pickCountry(purchaseContracts, "destinationCountry");
 
   return (
     <div onClick={() => onSelect(t)}
@@ -22588,12 +22589,36 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
         ))}
       </div>
       {/* ORIGIN COUNTRY */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
-        {(() => { const val = t.originCountry || originContract?.originCountry || originContract?.port || ""; const code = val ? getCountryCode(val) : null; return (<><span style={{ fontSize: 11, color: val ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val || "—"}</span></>); })()}
+      <div style={{ padding: "0 8px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        {(() => {
+          const val = derivedOrigin;
+          const code = val ? getCountryCode(val) : null;
+          if (!val) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>;
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden", minWidth: 0 }}>
+              <div style={{ width: 30, height: 20, borderRadius: 3, overflow: "hidden", flexShrink: 0, border: `1px solid ${COLORS.border}`, background: COLORS.border }}>
+                {code && <img src={`https://flagcdn.com/${code.toLowerCase()}.svg`} alt={val} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.onerror = null; e.target.src = `https://flagcdn.com/w40/${code.toLowerCase()}.png`; }} />}
+              </div>
+              <span style={{ fontSize: 10, color: COLORS.textSub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val}</span>
+            </div>
+          );
+        })()}
       </div>
       {/* DESTINATION COUNTRY */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
-        {(() => { const val = t.destinationCountry || destContract?.destinationCountry || destContract?.port || ""; return (<span style={{ fontSize: 11, color: val ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val || "—"}</span>); })()}
+      <div style={{ padding: "0 8px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        {(() => {
+          const val = derivedDest;
+          const code = val ? getCountryCode(val) : null;
+          if (!val) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>;
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden", minWidth: 0 }}>
+              <div style={{ width: 30, height: 20, borderRadius: 3, overflow: "hidden", flexShrink: 0, border: `1px solid ${COLORS.border}`, background: COLORS.border }}>
+                {code && <img src={`https://flagcdn.com/${code.toLowerCase()}.svg`} alt={val} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.onerror = null; e.target.src = `https://flagcdn.com/w40/${code.toLowerCase()}.png`; }} />}
+              </div>
+              <span style={{ fontSize: 10, color: COLORS.textSub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val}</span>
+            </div>
+          );
+        })()}
       </div>
       {/* TRADE BUSINESS UNIT */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>

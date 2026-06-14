@@ -22558,6 +22558,19 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
   const pickVal = (list, field) => list.find(c=>c?.[field])?.[field] || "";
   const derivedOrigin = t.originCountry || pickVal(legPurchase, "originCountry") || pickVal(legSale, "originCountry");
   const derivedDest   = t.destinationCountry || pickVal(legSale, "destinationCountry") || pickVal(legPurchase, "destinationCountry");
+  // Dériver les commodities depuis les contrats d'achat → tradeCommodity configuré dans l'admin
+  const derivedCommodities = (() => {
+    const contractComms = config?.contractCommodities || [];
+    const seen = new Set();
+    const result = [];
+    legPurchase.forEach(c => {
+      if (!c?.commodity) return;
+      const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
+      const tc = cfg?.tradeCommodity;
+      if (tc && !seen.has(tc)) { seen.add(tc); result.push(tc); }
+    });
+    return result;
+  })();
 
   return (
     <div onClick={() => onSelect(t)}
@@ -22581,7 +22594,10 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
       </div>
       {/* COMMODITY */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center", gap: 4, overflow: "hidden" }}>
-        {(t.commodities || []).slice(0, 2).map((c, i) => (
+        {derivedCommodities.slice(0, 2).map((c, i) => (
+          <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4, background: `${COLORS.gold}18`, color: COLORS.gold, border: `1px solid ${COLORS.gold}30`, whiteSpace: "nowrap" }}>{c}</span>
+        ))}
+        {derivedCommodities.length === 0 && (t.commodities || []).slice(0, 2).map((c, i) => (
           <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4, background: `${COLORS.gold}18`, color: COLORS.gold, border: `1px solid ${COLORS.gold}30`, whiteSpace: "nowrap" }}>{c}</span>
         ))}
       </div>
@@ -22657,7 +22673,7 @@ const ExpandContractCard = ({ contract, type, purchaseLegs, saleLegs }) => {
   );
 };
 
-const TradeExpandRow = ({ trade, contracts, onEdit, onClose }) => {
+const TradeExpandRow = ({ trade, contracts, onEdit, onClose, config }) => {
   const legPurchase = (trade.purchaseLegs||[]).map(l => contracts.find(c => String(c.id)===String(l.contractId))).filter(Boolean);
   const legSale     = (trade.saleLegs||[]).map(l => contracts.find(c => String(c.id)===String(l.contractId))).filter(Boolean);
   const legPIds = new Set(legPurchase.map(c=>String(c.id)));
@@ -22670,6 +22686,16 @@ const TradeExpandRow = ({ trade, contracts, onEdit, onClose }) => {
   const totalP = (trade.purchaseLegs||[]).reduce((s,l)=>s+(parseFloat(l.quantity)||0),0);
   const totalS = (trade.saleLegs||[]).reduce((s,l)=>s+(parseFloat(l.quantity)||0),0);
   const solde = totalS - totalP;
+  // Commodities dérivées depuis contrats d'achat
+  const contractComms = config?.contractCommodities || [];
+  const seenTcExp = new Set();
+  const derivedCommsExp = [];
+  legPurchase.forEach(c => {
+    if (!c?.commodity) return;
+    const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
+    const tc = cfg?.tradeCommodity;
+    if (tc && !seenTcExp.has(tc)) { seenTcExp.add(tc); derivedCommsExp.push(tc); }
+  });
   return (
     <div style={{ borderBottom:`2px solid ${COLORS.accent}30`, background:COLORS.surface }}>
       <div style={{ padding:'14px 16px', display:'flex', gap:16, alignItems:'flex-start', minWidth:'max-content' }}>
@@ -22702,6 +22728,13 @@ const TradeExpandRow = ({ trade, contracts, onEdit, onClose }) => {
             <button onClick={()=>onEdit(trade)} style={{background:`${COLORS.accent}18`,border:`1px solid ${COLORS.accent}40`,borderRadius:7,padding:'5px 12px',color:COLORS.accent,cursor:'pointer',fontSize:12,fontFamily:'inherit'}}>✏️ Edit</button>
             <button onClick={onClose} style={{background:'none',border:`1px solid ${COLORS.border}`,borderRadius:7,padding:'5px 10px',color:COLORS.textMuted,cursor:'pointer',fontSize:18,lineHeight:1}}>×</button>
           </div>
+          {derivedCommsExp.length > 0 && (
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap', justifyContent:'flex-end' }}>
+              {derivedCommsExp.map((tc,i) => (
+                <span key={i} style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:12, background:`${COLORS.gold}20`, color:COLORS.gold, border:`1px solid ${COLORS.gold}40` }}>{tc}</span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -22749,7 +22782,7 @@ const VirtualTradeList = ({ filtered, selected, onSelect, onEdit, onRemove, voya
                   </div>
                   {isSel && (
                     <div ref={expandRef} style={{ position: 'absolute', top: top + ROW_H_TRADE, left: 0, right: 0 }}>
-                      <TradeExpandRow trade={selected} contracts={contracts} onEdit={onEdit} onClose={() => onSelect(selected)} />
+                      <TradeExpandRow trade={selected} contracts={contracts} onEdit={onEdit} onClose={() => onSelect(selected)} config={config} />
                     </div>
                   )}
                 </Fragment>
@@ -23073,6 +23106,25 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
       purchaseLegs: [...(t.purchaseLegs || []), ...extraPurchase],
       saleLegs:     [...(t.saleLegs     || []), ...extraSale],
     };
+    // Dériver les commodities depuis les contrats d'achat → tradeCommodity
+    const allPurchaseContracts = [
+      ...(enriched.purchaseLegs || []).map(l => contracts.find(c => String(c.id) === String(l.contractId))).filter(Boolean),
+      ...contracts.filter(c => {
+        if (!(c.tradeLinks||[]).some(lk => String(lk.tradeId) === String(t.id))) return false;
+        const ct = (c.contractType||'').toLowerCase();
+        return ct.includes('purchase') || ct.includes('achat');
+      })
+    ];
+    const contractComms = (config || {}).contractCommodities || [];
+    const seenTc = new Set();
+    const autoCommodities = [];
+    allPurchaseContracts.forEach(c => {
+      if (!c?.commodity) return;
+      const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
+      const tc = cfg?.tradeCommodity;
+      if (tc && !seenTc.has(tc)) { seenTc.add(tc); autoCommodities.push(tc); }
+    });
+    if (autoCommodities.length > 0) enriched.commodities = autoCommodities;
     setForm(enriched);
     setEditId(t.id);
     setShowModal(true);
@@ -23276,23 +23328,56 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
 
               {/* Commodities multi-select */}
               <div style={{ gridColumn: "1 / -1" }}>
-                <LBL>COMMODITY (choix multiple)</LBL>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {(config.tradeCommodities || []).map(c => {
-                    const val = c.value || c.label;
-                    const active = (form.commodities || []).includes(val);
-                    return (
-                      <div key={val} onClick={() => toggleCommodity(val)}
-                        style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
-                          background: active ? `${COLORS.gold}25` : COLORS.bg,
-                          color: active ? COLORS.gold : COLORS.textMuted,
-                          border: `1.5px solid ${active ? COLORS.gold : COLORS.border}` }}>
-                        {c.label || c.value}
-                      </div>
-                    );
-                  })}
-                  {(config.tradeCommodities || []).length === 0 && <span style={{ fontSize: 12, color: COLORS.textMuted }}>Aucune commodité configurée dans l'Admin Panel</span>}
-                </div>
+                <LBL>COMMODITY (depuis contrats d'achat)</LBL>
+                {(() => {
+                  // Calculer les commodities auto-dérivées depuis les purchaseLegs du form
+                  const contractComms = config?.contractCommodities || [];
+                  const purchaseContracts = (form.purchaseLegs || [])
+                    .map(l => contracts.find(c => String(c.id) === String(l.contractId)))
+                    .filter(Boolean);
+                  const seenAuto = new Set();
+                  const autoDerived = [];
+                  purchaseContracts.forEach(c => {
+                    if (!c?.commodity) return;
+                    const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
+                    const tc = cfg?.tradeCommodity;
+                    if (tc && !seenAuto.has(tc)) { seenAuto.add(tc); autoDerived.push(tc); }
+                  });
+                  const hasAuto = autoDerived.length > 0;
+                  return (
+                    <>
+                      {hasAuto && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, padding: "6px 12px", background: `${COLORS.gold}10`, border: `1px solid ${COLORS.gold}30`, borderRadius: 8 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.gold, letterSpacing: 0.5 }}>⚡ AUTO</span>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {autoDerived.map((tc, i) => (
+                              <span key={i} style={{ fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20, background: `${COLORS.gold}22`, color: COLORS.gold, border: `1px solid ${COLORS.gold}50` }}>{tc}</span>
+                            ))}
+                          </div>
+                          <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: "auto" }}>depuis contrats d'achat</span>
+                        </div>
+                      )}
+                      {!hasAuto && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {(config.tradeCommodities || []).map(c => {
+                            const val = c.value || c.label;
+                            const active = (form.commodities || []).includes(val);
+                            return (
+                              <div key={val} onClick={() => toggleCommodity(val)}
+                                style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+                                  background: active ? `${COLORS.gold}25` : COLORS.bg,
+                                  color: active ? COLORS.gold : COLORS.textMuted,
+                                  border: `1.5px solid ${active ? COLORS.gold : COLORS.border}` }}>
+                                {c.label || c.value}
+                              </div>
+                            );
+                          })}
+                          {(config.tradeCommodities || []).length === 0 && <span style={{ fontSize: 12, color: COLORS.textMuted }}>Aucune commodité configurée dans l'Admin Panel</span>}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Additional Infos */}

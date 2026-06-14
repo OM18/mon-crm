@@ -22998,6 +22998,20 @@ const TradeLegBlock = ({ type, leg, idx, total, contracts, updateLeg, removeLeg 
   );
 };
 
+class TradesErrorBoundary extends React.Component {
+  constructor(p) { super(p); this.state = { error: null }; }
+  static getDerivedStateFromError(e) { return { error: e }; }
+  componentDidCatch(e, info) { console.error('[TradesErrorBoundary]', e, info); }
+  render() {
+    if (this.state.error) return (
+      <div style={{ padding: 40, color: 'red', fontFamily: 'monospace', whiteSpace: 'pre-wrap', fontSize: 13 }}>
+        <strong>TRADES ERROR:</strong>\n{String(this.state.error)}\n{this.state.error?.stack}
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTrades }) => {
   const { config } = useConfig();
   const [search, setSearch] = useState("");
@@ -23594,7 +23608,7 @@ export default function CRM() {
           {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} />}
           {page === "vessels" && <Vessels companies={companies} vessels={vessels} setVessels={setVessels} />}
           {page === "voyages" && <Voyages companies={companies} vessels={vessels} voyages={voyages} setVoyages={setVoyages} />}
-          {page === "trades" && <Trades voyages={voyages} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} />}
+          {page === "trades" && <TradesErrorBoundary><Trades voyages={voyages} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} /></TradesErrorBoundary>}
           {page === "admin" && <AdminPanel companies={companies} />}
         </div>
       </div>

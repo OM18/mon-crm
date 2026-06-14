@@ -23004,8 +23004,10 @@ class TradesErrorBoundary extends React.Component {
   componentDidCatch(e, info) { console.error('[TradesErrorBoundary]', e, info); }
   render() {
     if (this.state.error) return (
-      <div style={{ padding: 40, color: 'red', fontFamily: 'monospace', whiteSpace: 'pre-wrap', fontSize: 13 }}>
-        <strong>TRADES ERROR:</strong>\n{String(this.state.error)}\n{this.state.error?.stack}
+      <div style={{ padding: 40, color: 'red', fontFamily: 'monospace', fontSize: 13 }}>
+        <div><strong>TRADES ERROR:</strong></div>
+        <div>{String(this.state.error)}</div>
+        <pre>{this.state.error && this.state.error.stack}</pre>
       </div>
     );
     return this.props.children;

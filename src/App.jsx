@@ -6665,14 +6665,6 @@ const BatchTradesOldToNew = () => {
     "total_volume_plan":        "volume",
     "date_of_execution_fact":   "businessMonth",
     "responsible_full_name":    "executionResponsible",
-    "business_unit_title":        "tradeBusinessUnit",
-  };
-
-  const BU_MAP = {
-    "MOROCCO BU": "MOROCCO",
-    "UKRAINE BU": "UKRAINE",
-    "RUSSIA BU":  "RUSSIA",
-    "TURKEY BU":  "TURKEY",
   };
 
   // ── Conversion date yyyy/mm/dd → mm/yyyy ──────────────────────
@@ -6715,7 +6707,6 @@ const BatchTradesOldToNew = () => {
         for (const [srcKey, destKey] of Object.entries(COLUMN_MAP)) {
           let val = get(srcKey);
           if (destKey === "businessMonth") val = parseBusinessMonth(val);
-          if (destKey === "tradeBusinessUnit") val = BU_MAP[val] ?? val;
           out[destKey] = val;
         }
 
@@ -6744,14 +6735,12 @@ const BatchTradesOldToNew = () => {
     ["total_volume_plan",      "volume"],
     ["date_of_execution_fact", "businessMonth"],
     ["responsible_full_name",  "executionResponsible"],
-    ["business_unit_title",    "tradeBusinessUnit"],
   ];
 
   const DROP_ROWS_INFO = "Toutes les autres colonnes sont supprimées du fichier de sortie.";
 
   const FORMAT_ROWS = [
     ["date_of_execution_fact", "businessMonth", "yyyy/mm/dd", "mm/yyyy"],
-    ["business_unit_title", "tradeBusinessUnit", "MOROCCO BU / UKRAINE BU / RUSSIA BU / TURKEY BU", "MOROCCO / UKRAINE / RUSSIA / TURKEY"],
   ];
 
   return (
@@ -22555,23 +22544,11 @@ const OVERSCAN_TRADE = 8;
 
 const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, contracts, config }) => {
   const voyage = voyages.find(v => v.id === t.voyageId || String(v.id) === String(t.voyageId));
-  // Legs from trade's own purchaseLegs/saleLegs
-  const legPurchase = Array.isArray(t.purchaseLegs) ? t.purchaseLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
-  const legSale     = Array.isArray(t.saleLegs)     ? t.saleLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
-  // Also include contracts that reference this trade via tradeLinks (bidirectional)
-  const legPurchaseIds = new Set(legPurchase.map(c => String(c.id)));
-  const legSaleIds     = new Set(legSale.map(c => String(c.id)));
-  contracts.filter(c => (c.tradeLinks||[]).some(lk => String(lk.tradeId) === String(t.id))).forEach(c => {
-    const ct = (c.contractType||"").toLowerCase();
-    if ((ct.includes("purchase")||ct.includes("achat")) && !legPurchaseIds.has(String(c.id))) legPurchase.push(c);
-    else if ((ct.includes("sale")||ct.includes("vente")) && !legSaleIds.has(String(c.id))) legSale.push(c);
-  });
-  const purchaseContracts = legPurchase;
-  const saleContracts     = legSale;
-  // Derive origin from purchase contracts (fallback: sale), destination from sale contracts (fallback: purchase)
-  const pickCountry = (list, field) => { const hit = list.find(c => c?.[field]); return hit?.[field] || ""; };
-  const derivedOrigin = t.originCountry || pickCountry(purchaseContracts, "originCountry") || pickCountry(saleContracts, "originCountry");
-  const derivedDest   = t.destinationCountry || pickCountry(saleContracts, "destinationCountry") || pickCountry(purchaseContracts, "destinationCountry");
+  const purchaseContracts = Array.isArray(t.purchaseLegs) ? t.purchaseLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
+  const saleContracts = Array.isArray(t.saleLegs) ? t.saleLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
+  // Derive origin/destination from first purchase/sale contract
+  const originContract = purchaseContracts[0];
+  const destContract = saleContracts[0];
 
   return (
     <div onClick={() => onSelect(t)}
@@ -22600,28 +22577,12 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
         ))}
       </div>
       {/* ORIGIN COUNTRY */}
-      <div style={{ padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {derivedOrigin ? (() => {
-          const label = (config?.country || []).find(c => c.value === derivedOrigin || c.label === derivedOrigin)?.label || derivedOrigin;
-          return (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
-              <CountryFlag country={derivedOrigin} size={28} />
-              <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.text, whiteSpace: "nowrap", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
-            </div>
-          );
-        })() : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
+        {(() => { const val = t.originCountry || originContract?.originCountry || originContract?.port || ""; const code = val ? getCountryCode(val) : null; return (<><span style={{ fontSize: 11, color: val ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val || "—"}</span></>); })()}
       </div>
       {/* DESTINATION COUNTRY */}
-      <div style={{ padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {derivedDest ? (() => {
-          const label = (config?.country || []).find(c => c.value === derivedDest || c.label === derivedDest)?.label || derivedDest;
-          return (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
-              <CountryFlag country={derivedDest} size={28} />
-              <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.text, whiteSpace: "nowrap", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
-            </div>
-          );
-        })() : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
+        {(() => { const val = t.destinationCountry || destContract?.destinationCountry || destContract?.port || ""; return (<span style={{ fontSize: 11, color: val ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val || "—"}</span>); })()}
       </div>
       {/* TRADE BUSINESS UNIT */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
@@ -22645,32 +22606,103 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
   );
 });
 
-const VirtualTradeList = ({ filtered, selected, onSelect, onEdit, onRemove, voyages, contracts, config }) => {
-  const safeFiltered = (filtered||[]).filter(t => t && typeof t === 'object' && t.id != null);
-  const [scrollTop, setScrollTop] = useState(0);
-  const containerRef = useRef(null);
-  const [containerH, setContainerH] = useState(600);
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const ro = new ResizeObserver(e => setContainerH(e[0].contentRect.height));
-    ro.observe(containerRef.current);
-    return () => ro.disconnect();
-  }, []);
-  const totalH = filtered.length * ROW_H_TRADE;
-  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H_TRADE) - OVERSCAN_TRADE);
-  const endIdx = Math.min(filtered.length, Math.ceil((scrollTop + containerH) / ROW_H_TRADE) + OVERSCAN_TRADE);
+const TradeExpandRow = ({ trade, contracts, onEdit, onClose }) => {
+  const legPurchase = (trade.purchaseLegs||[]).map(l => contracts.find(c => String(c.id)===String(l.contractId))).filter(Boolean);
+  const legSale     = (trade.saleLegs||[]).map(l => contracts.find(c => String(c.id)===String(l.contractId))).filter(Boolean);
+  const legPIds = new Set(legPurchase.map(c=>String(c.id)));
+  const legSIds = new Set(legSale.map(c=>String(c.id)));
+  contracts.filter(c=>(c.tradeLinks||[]).some(lk=>String(lk.tradeId)===String(trade.id))).forEach(c=>{
+    const ct=(c.contractType||"").toLowerCase();
+    if((ct.includes("purchase")||ct.includes("achat"))&&!legPIds.has(String(c.id))) legPurchase.push(c);
+    else if((ct.includes("sale")||ct.includes("vente"))&&!legSIds.has(String(c.id))) legSale.push(c);
+  });
+  const ContractCard = ({ contract, type }) => {
+    const col = type === 'purchase' ? COLORS.red : COLORS.green;
+    const legs = type === 'purchase' ? (trade.purchaseLegs||[]) : (trade.saleLegs||[]);
+    const leg = legs.find(l => String(l.contractId)===String(contract.id));
+    const F = ({ label, value, mono }) => value ? (
+      <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+        <span style={{ fontSize:9, fontWeight:700, color:COLORS.textMuted, letterSpacing:0.7, textTransform:'uppercase' }}>{label}</span>
+        <span style={{ fontSize:11, color:COLORS.text, fontFamily: mono ? "'DM Mono',monospace" : 'inherit' }}>{value}</span>
+      </div>
+    ) : null;
+    return (
+      <div style={{ background:COLORS.bg, border:`1px solid ${col}30`, borderRadius:8, padding:'10px 12px', display:'flex', flexDirection:'column', gap:8, marginBottom:8 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span style={{ fontSize:12, fontWeight:800, color:col }}>{contract.contractNumber || `#${contract.id}`}</span>
+          {leg?.quantity && <span style={{ fontSize:11, fontWeight:700, color:col, fontFamily:"'DM Mono',monospace" }}>{Number(leg.quantity).toLocaleString('fr')} T</span>}
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+          <F label='Commodity' value={contract.commodity} />
+          <F label='Conclusion' value={contract.conclusionDate} mono />
+          <F label='Origin' value={contract.originCountry} />
+          <F label='Destination' value={contract.destinationCountry} />
+        </div>
+      </div>
+    );
+  };
+  const totalP = (trade.purchaseLegs||[]).reduce((s,l)=>s+(parseFloat(l.quantity)||0),0);
+  const totalS = (trade.saleLegs||[]).reduce((s,l)=>s+(parseFloat(l.quantity)||0),0);
+  const solde = totalS - totalP;
   return (
-    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)} style={{ overflowY: "auto", flex: 1 }}>
+    <div style={{ borderBottom:`2px solid ${COLORS.accent}30`, background:COLORS.surface }}>
+      <div style={{ padding:'14px 16px', display:'flex', gap:16, alignItems:'flex-start', minWidth:'max-content' }}>
+        {/* LEFT: Purchase */}
+        <div style={{ flex:1, minWidth:260, maxWidth:360 }}>
+          <div style={{ fontSize:10, fontWeight:800, color:COLORS.red, letterSpacing:0.8, marginBottom:8 }}>
+            🟥 PURCHASE ({legPurchase.length}){totalP>0 && <span style={{marginLeft:6,fontFamily:"'DM Mono',monospace"}}>{totalP.toLocaleString('fr')} T</span>}
+          </div>
+          {legPurchase.length===0
+            ? <div style={{fontSize:11,color:COLORS.textMuted}}>Aucun contrat d’achat</div>
+            : legPurchase.map((c,i)=><ContractCard key={c.id||i} contract={c} type='purchase' />)}
+        </div>
+        {/* DIVIDER */}
+        <div style={{ width:1, alignSelf:'stretch', background:COLORS.border, flexShrink:0 }} />
+        {/* RIGHT: Sale */}
+        <div style={{ flex:1, minWidth:260, maxWidth:360 }}>
+          <div style={{ fontSize:10, fontWeight:800, color:COLORS.green, letterSpacing:0.8, marginBottom:8 }}>
+            🟢 SALE ({legSale.length}){totalS>0 && <span style={{marginLeft:6,fontFamily:"'DM Mono',monospace"}}>{totalS.toLocaleString('fr')} T</span>}
+          </div>
+          {legSale.length===0
+            ? <div style={{fontSize:11,color:COLORS.textMuted}}>Aucun contrat de vente</div>
+            : legSale.map((c,i)=><ContractCard key={c.id||i} contract={c} type='sale' />)}
+        </div>
+        {/* SUMMARY + ACTIONS */}
+        <div style={{ display:'flex', flexDirection:'column', gap:8, alignItems:'flex-end', flexShrink:0 }}>
+          {(totalP>0||totalS>0) && (
+            <div style={{ background:COLORS.bg, border:`1px solid ${COLORS.border}`, borderRadius:8, padding:'8px 12px', display:'grid', gridTemplateColumns:'repeat(3,64px)', gap:6, textAlign:'center' }}>
+              <div><div style={{fontSize:9,color:COLORS.red,fontWeight:700,marginBottom:2}}>ACHAT</div><div style={{fontSize:12,fontWeight:800,color:COLORS.red,fontFamily:"'DM Mono',monospace"}}>{totalP.toLocaleString('fr')}</div></div>
+              <div><div style={{fontSize:9,color:COLORS.green,fontWeight:700,marginBottom:2}}>VENTE</div><div style={{fontSize:12,fontWeight:800,color:COLORS.green,fontFamily:"'DM Mono',monospace"}}>{totalS.toLocaleString('fr')}</div></div>
+              <div><div style={{fontSize:9,color:COLORS.textMuted,fontWeight:700,marginBottom:2}}>SOLDE</div><div style={{fontSize:12,fontWeight:800,fontFamily:"'DM Mono',monospace",color:solde===0?COLORS.green:solde>0?COLORS.accent:COLORS.red}}>{solde>0?'+':''}{solde.toLocaleString('fr')}</div></div>
+            </div>
+          )}
+          <div style={{display:'flex',gap:6}}>
+            <button onClick={()=>onEdit(trade)} style={{background:`${COLORS.accent}18`,border:`1px solid ${COLORS.accent}40`,borderRadius:7,padding:'5px 12px',color:COLORS.accent,cursor:'pointer',fontSize:12,fontFamily:'inherit'}}>✏️ Edit</button>
+            <button onClick={onClose} style={{background:'none',border:`1px solid ${COLORS.border}`,borderRadius:7,padding:'5px 10px',color:COLORS.textMuted,cursor:'pointer',fontSize:18,lineHeight:1}}>×</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const VirtualTradeList = ({ filtered, selected, onSelect, onEdit, onRemove, voyages, contracts, config }) => {
+  const containerRef = useRef(null);
+  return (
+    <div ref={containerRef} style={{ overflowY: "auto", flex: 1, overflowX: "auto" }}>
       {filtered.length === 0
-        ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "56px 0", fontSize: 14 }}>Aucun trade — cliquez sur « + Ajouter »</div>
-        : <div style={{ height: totalH, position: "relative" }}>
-            <div style={{ position: "absolute", top: startIdx * ROW_H_TRADE, left: 0, right: 0 }}>
-              {filtered.slice(startIdx, endIdx).map((t, vi) => (
-                <TradeRow key={t.id} t={t} idx={startIdx + vi} isSel={selected?.id === t.id}
+        ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "56px 0", fontSize: 14 }}>Aucun trade — cliquez sur « + Ajouter »</div>
+        : <div style={{ minWidth: 'max-content' }}>
+            {filtered.map((t, vi) => (
+              <React.Fragment key={t.id}>
+                <TradeRow t={t} idx={vi} isSel={selected?.id === t.id}
                   onSelect={onSelect} onEdit={onEdit} onRemove={onRemove}
                   voyages={voyages} contracts={contracts} config={config} />
-              ))}
-            </div>
+                {selected?.id === t.id && (
+                  <TradeExpandRow trade={selected} contracts={contracts} onEdit={onEdit} onClose={() => onSelect(selected)} />
+                )}
+              </React.Fragment>
+            ))}
           </div>
       }
     </div>
@@ -23120,7 +23152,6 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
             onEdit={openEdit} onRemove={remove}
             voyages={voyages} contracts={contracts} config={config} />
         </div>
-        {selected && <TradeDetailPanel trade={selected} onClose={() => setSelected(null)} onEdit={openEdit} voyages={voyages} contracts={contracts} />}
       </div>
 
       {/* Modal */}

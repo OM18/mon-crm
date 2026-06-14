@@ -22593,12 +22593,9 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
         <span style={{ fontSize: 11, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{t.businessMonth || "—"}</span>
       </div>
       {/* COMMODITY */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", gap: 4, overflow: "hidden" }}>
-        {derivedCommodities.slice(0, 2).map((c, i) => (
-          <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4, background: `${COLORS.gold}18`, color: COLORS.gold, border: `1px solid ${COLORS.gold}30`, whiteSpace: "nowrap" }}>{c}</span>
-        ))}
-        {derivedCommodities.length === 0 && (t.commodities || []).slice(0, 2).map((c, i) => (
-          <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4, background: `${COLORS.gold}18`, color: COLORS.gold, border: `1px solid ${COLORS.gold}30`, whiteSpace: "nowrap" }}>{c}</span>
+      <div style={{ padding: "0 12px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, overflow: "hidden" }}>
+        {(derivedCommodities.length > 0 ? derivedCommodities : (t.commodities || [])).map((c, i) => (
+          <span key={i} style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: `${COLORS.gold}18`, color: COLORS.gold, border: `1px solid ${COLORS.gold}30`, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 0.4, display: "block" }}>{c}</span>
         ))}
       </div>
       {/* ORIGIN COUNTRY */}
@@ -22731,7 +22728,7 @@ const TradeExpandRow = ({ trade, contracts, onEdit, onClose, config }) => {
           {derivedCommsExp.length > 0 && (
             <div style={{ display:'flex', gap:4, flexWrap:'wrap', justifyContent:'flex-end' }}>
               {derivedCommsExp.map((tc,i) => (
-                <span key={i} style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:12, background:`${COLORS.gold}20`, color:COLORS.gold, border:`1px solid ${COLORS.gold}40` }}>{tc}</span>
+                <span key={i} style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:12, background:`${COLORS.gold}20`, color:COLORS.gold, border:`1px solid ${COLORS.gold}40`, textTransform:'uppercase', letterSpacing:0.4 }}>{tc}</span>
               ))}
             </div>
           )}
@@ -23351,7 +23348,7 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
                           <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.gold, letterSpacing: 0.5 }}>⚡ AUTO</span>
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                             {autoDerived.map((tc, i) => (
-                              <span key={i} style={{ fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20, background: `${COLORS.gold}22`, color: COLORS.gold, border: `1px solid ${COLORS.gold}50` }}>{tc}</span>
+                              <span key={i} style={{ fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20, background: `${COLORS.gold}22`, color: COLORS.gold, border: `1px solid ${COLORS.gold}50`, textTransform: "uppercase", letterSpacing: 0.4 }}>{tc}</span>
                             ))}
                           </div>
                           <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: "auto" }}>depuis contrats d'achat</span>

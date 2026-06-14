@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, createContext, useContext, useMemo, memo, useCallback, Component } from "react";
+﻿import { useState, useEffect, useRef, createContext, useContext, useMemo, memo, useCallback, Component, Fragment } from "react";
 import { supabase } from './supabase';
 
 // ─── SAFE SUPABASE SAVE ───────────────────────────────────────
@@ -22741,7 +22741,7 @@ const VirtualTradeList = ({ filtered, selected, onSelect, onEdit, onRemove, voya
               const top = getOffset(i);
               const isSel = selected?.id === t.id;
               return (
-                <React.Fragment key={t.id}>
+                <Fragment key={t.id}>
                   <div style={{ position: 'absolute', top, left: 0, right: 0, height: ROW_H_TRADE }}>
                     <TradeRow t={t} idx={i} isSel={isSel}
                       onSelect={onSelect} onEdit={onEdit} onRemove={onRemove}
@@ -22752,7 +22752,7 @@ const VirtualTradeList = ({ filtered, selected, onSelect, onEdit, onRemove, voya
                       <TradeExpandRow trade={selected} contracts={contracts} onEdit={onEdit} onClose={() => onSelect(selected)} />
                     </div>
                   )}
-                </React.Fragment>
+                </Fragment>
               );
             })}
           </div>

@@ -22555,8 +22555,19 @@ const OVERSCAN_TRADE = 8;
 
 const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, contracts, config }) => {
   const voyage = voyages.find(v => v.id === t.voyageId || String(v.id) === String(t.voyageId));
-  const purchaseContracts = Array.isArray(t.purchaseLegs) ? t.purchaseLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
-  const saleContracts = Array.isArray(t.saleLegs) ? t.saleLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
+  // Legs from trade's own purchaseLegs/saleLegs
+  const legPurchase = Array.isArray(t.purchaseLegs) ? t.purchaseLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
+  const legSale     = Array.isArray(t.saleLegs)     ? t.saleLegs.map(l => contracts.find(c => c.id === l.contractId || String(c.id) === String(l.contractId))).filter(Boolean) : [];
+  // Also include contracts that reference this trade via tradeLinks (bidirectional)
+  const legPurchaseIds = new Set(legPurchase.map(c => String(c.id)));
+  const legSaleIds     = new Set(legSale.map(c => String(c.id)));
+  contracts.filter(c => (c.tradeLinks||[]).some(lk => String(lk.tradeId) === String(t.id))).forEach(c => {
+    const ct = (c.contractType||"").toLowerCase();
+    if ((ct.includes("purchase")||ct.includes("achat")) && !legPurchaseIds.has(String(c.id))) legPurchase.push(c);
+    else if ((ct.includes("sale")||ct.includes("vente")) && !legSaleIds.has(String(c.id))) legSale.push(c);
+  });
+  const purchaseContracts = legPurchase;
+  const saleContracts     = legSale;
   // Derive origin from purchase contracts (fallback: sale), destination from sale contracts (fallback: purchase)
   const pickCountry = (list, field) => { const hit = list.find(c => c?.[field]); return hit?.[field] || ""; };
   const derivedOrigin = t.originCountry || pickCountry(purchaseContracts, "originCountry") || pickCountry(saleContracts, "originCountry");

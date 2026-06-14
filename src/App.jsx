@@ -22558,7 +22558,6 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
   const pickVal = (list, field) => list.find(c=>c?.[field])?.[field] || "";
   const derivedOrigin = t.originCountry || pickVal(legPurchase, "originCountry") || pickVal(legSale, "originCountry");
   const derivedDest   = t.destinationCountry || pickVal(legSale, "destinationCountry") || pickVal(legPurchase, "destinationCountry");
-  // Dériver les commodities depuis les contrats d'achat → tradeCommodity configuré dans l'admin
   const derivedCommodities = (() => {
     const contractComms = config?.contractCommodities || [];
     const tradeCommodities = config?.tradeCommodities || [];
@@ -22645,34 +22644,121 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
     </div>
   );
 })
-const ExpandContractField = ({ label, value, mono }) => value ? (
-  <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-    <span style={{ fontSize:9, fontWeight:700, color:COLORS.textMuted, letterSpacing:0.7, textTransform:'uppercase' }}>{label}</span>
-    <span style={{ fontSize:11, color:COLORS.text, fontFamily: mono ? "'DM Mono',monospace" : 'inherit' }}>{value}</span>
-  </div>
-) : null;
+// ─── TRADE EXPAND ROW ──────────────────────────────────────────────────────
+const resolveTradeCommodityLabel = (commodity, contractComms, tradeCommodities) => {
+  const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (commodity||"").toLowerCase());
+  const tc = cfg?.tradeCommodity;
+  if (!tc) return null;
+  return tradeCommodities.find(x => (x.value||"") === tc || (x.label||"").toLowerCase() === (tc||"").toLowerCase())?.label || tc;
+};
+const fmtPeriod = (c) => {
+  if (!c.executionDateFrom && !c.executionDateTo) return null;
+  const type = c.executionPeriodType ? c.executionPeriodType + " " : "";
+  if (c.executionDateFrom && c.executionDateTo) return type + c.executionDateFrom + " → " + c.executionDateTo;
+  return type + (c.executionDateFrom || c.executionDateTo);
+};
+const fmtPrice = (c) => {
+  const cur = c.flatCurrency || "";
+  if (c.contractPriceType === "PREMIUM" || c.contractPriceType === "BASIS") {
+    return c.premium ? (parseFloat(c.premium) > 0 ? "+" : "") + c.premium + (cur ? " " + cur : "") : null;
+  }
+  return c.flatPrice ? c.flatPrice + (cur ? " " + cur : "") : null;
+};
+const fmtTol = (c) => {
+  if (c.qtyTolerance === undefined || c.qtyTolerance === "") return null;
+  const tol = c.qtyTolerance === "0" ? "=0%" : "±" + c.qtyTolerance + "%";
+  const opt = c.qtyToleranceOption === "BUYER OPTION" ? " B.O." : c.qtyToleranceOption === "SELLER OPTION" ? " S.O." : "";
+  return tol + opt;
+};
+const fmtPorts = (c) => {
+  const parts = [];
+  if (c.loadport) parts.push(c.loadport);
+  if (c.disport) parts.push(c.disport);
+  const portArr = Array.isArray(c.port) ? c.port : (c.port ? [c.port] : []);
+  portArr.forEach(p => { if (!parts.includes(p)) parts.push(p); });
+  return parts.length > 0 ? parts.join(" · ") : null;
+};
 
-const ExpandContractCard = ({ contract, type, purchaseLegs, saleLegs }) => {
-  const col = type === 'purchase' ? COLORS.red : COLORS.green;
-  const legs = type === 'purchase' ? (purchaseLegs||[]) : (saleLegs||[]);
-  const leg = legs.find(l => String(l.contractId)===String(contract.id));
+const ExpandContractTable = ({ contracts: list, legs, type, contractComms, tradeCommodities }) => {
+  const col = type === "purchase" ? COLORS.red : COLORS.green;
+  const TH = { fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.6, textTransform: "uppercase", padding: "4px 8px", textAlign: "left", whiteSpace: "nowrap", borderBottom: "1px solid " + COLORS.border };
+  const TD = { fontSize: 11, color: COLORS.text, padding: "5px 8px", verticalAlign: "middle", borderBottom: "1px solid " + COLORS.border + "20" };
+  const TDmono = { ...TD, fontFamily: "'DM Mono',monospace" };
+  const groups = {};
+  list.forEach(c => {
+    const tcLabel = resolveTradeCommodityLabel(c.commodity, contractComms, tradeCommodities) || c.commodity || "—";
+    if (!groups[tcLabel]) groups[tcLabel] = [];
+    groups[tcLabel].push(c);
+  });
+  const tcKeys = Object.keys(groups);
+  if (list.length === 0) return <div style={{fontSize:11,color:COLORS.textMuted,padding:"8px 0"}}>Aucun contrat</div>;
   return (
-    <div style={{ background:COLORS.bg, border:`1px solid ${col}30`, borderRadius:8, padding:'10px 12px', display:'flex', flexDirection:'column', gap:8, marginBottom:8 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <span style={{ fontSize:12, fontWeight:800, color:col }}>{contract.contractNumber || `#${contract.id}`}</span>
-        {leg?.quantity && <span style={{ fontSize:11, fontWeight:700, color:col, fontFamily:"'DM Mono',monospace" }}>{Number(leg.quantity).toLocaleString('fr')} T</span>}
-      </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-        <ExpandContractField label='Commodity' value={contract.commodity} />
-        <ExpandContractField label='Conclusion' value={contract.conclusionDate} mono />
-        <ExpandContractField label='Origin' value={contract.originCountry} />
-        <ExpandContractField label='Destination' value={contract.destinationCountry} />
-      </div>
+    <div style={{ overflowX: "auto" }}>
+      {tcKeys.map(tcLabel => {
+        const groupContracts = groups[tcLabel];
+        const groupQty = groupContracts.reduce((s, c) => {
+          const leg = (legs||[]).find(l => String(l.contractId)===String(c.id));
+          return s + (parseFloat(leg?.quantity)||0);
+        }, 0);
+        return (
+          <div key={tcLabel} style={{ marginBottom: 14 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:4 }}>
+              <span style={{ fontSize:10, fontWeight:800, color:col, letterSpacing:0.8, textTransform:"uppercase" }}>{tcLabel}</span>
+              {groupQty > 0 && <span style={{ fontSize:10, fontWeight:700, color:col, fontFamily:"'DM Mono',monospace", background:col+"12", padding:"1px 7px", borderRadius:10 }}>{groupQty.toLocaleString("fr")} T</span>}
+              <div style={{ flex:1, height:1, background:col+"25" }} />
+            </div>
+            <table style={{ width:"100%", borderCollapse:"collapse", minWidth: 640 }}>
+              <thead>
+                <tr style={{ background:col+"08" }}>
+                  <th style={TH}>Date conc.</th>
+                  <th style={TH}>N° Contrat</th>
+                  <th style={TH}>{type === "purchase" ? "Fournisseur" : "Client"}</th>
+                  <th style={TH}>Commodity</th>
+                  <th style={{ ...TH, textAlign:"right" }}>Qté liée</th>
+                  <th style={TH}>Prix · Tol.</th>
+                  <th style={TH}>Période exec.</th>
+                  <th style={TH}>Ports</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupContracts.map((c, i) => {
+                  const leg = (legs||[]).find(l => String(l.contractId)===String(c.id));
+                  const counterparty = type === "purchase" ? c.sellerId : c.buyerId;
+                  const price = fmtPrice(c);
+                  const tol = fmtTol(c);
+                  const period = fmtPeriod(c);
+                  const ports = fmtPorts(c);
+                  return (
+                    <tr key={c.id||i} style={{ background: i%2===0 ? "transparent" : COLORS.surface+"80" }}>
+                      <td style={{ ...TDmono, color:COLORS.textMuted, fontSize:10 }}>{c.conclusionDate || "—"}</td>
+                      <td style={{ ...TD, fontWeight:700, color:col }}>{c.contractNumber || "#"+c.id}</td>
+                      <td style={{ ...TD, maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{counterparty || "—"}</td>
+                      <td style={{ ...TD, color:COLORS.gold, fontWeight:600, fontSize:10, textTransform:"uppercase" }}>{c.commodity || "—"}</td>
+                      <td style={{ ...TDmono, textAlign:"right", fontWeight:700, color:col }}>
+                        {leg?.quantity ? Number(leg.quantity).toLocaleString("fr")+" T" : <span style={{color:COLORS.textMuted}}>—</span>}
+                      </td>
+                      <td style={{ ...TD, whiteSpace:"nowrap" }}>
+                        {price && <span style={{ fontFamily:"'DM Mono',monospace", fontSize:11 }}>{price}</span>}
+                        {tol && <span style={{ fontSize:9, color:COLORS.textMuted, marginLeft:4 }}>{tol}</span>}
+                        {!price && !tol && <span style={{color:COLORS.textMuted}}>—</span>}
+                      </td>
+                      <td style={{ ...TD, fontSize:10, whiteSpace:"nowrap", color:COLORS.textMuted }}>{period || "—"}</td>
+                      <td style={{ ...TD, fontSize:10, color:COLORS.textMuted, maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{ports || "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
     </div>
   );
 };
 
 const TradeExpandRow = ({ trade, contracts, onEdit, onClose, config }) => {
+  const contractComms = config?.contractCommodities || [];
+  const tradeCommodities = config?.tradeCommodities || [];
   const legPurchase = (trade.purchaseLegs||[]).map(l => contracts.find(c => String(c.id)===String(l.contractId))).filter(Boolean);
   const legSale     = (trade.saleLegs||[]).map(l => contracts.find(c => String(c.id)===String(l.contractId))).filter(Boolean);
   const legPIds = new Set(legPurchase.map(c=>String(c.id)));
@@ -22685,58 +22771,93 @@ const TradeExpandRow = ({ trade, contracts, onEdit, onClose, config }) => {
   const totalP = (trade.purchaseLegs||[]).reduce((s,l)=>s+(parseFloat(l.quantity)||0),0);
   const totalS = (trade.saleLegs||[]).reduce((s,l)=>s+(parseFloat(l.quantity)||0),0);
   const solde = totalS - totalP;
-  // Commodities dérivées depuis contrats d'achat
-  const contractComms = config?.contractCommodities || [];
-  const tradeCommoditiesExp = config?.tradeCommodities || [];
-  const resolveTcLabelExp = (tc) => tradeCommoditiesExp.find(x => (x.value||"") === tc || (x.label||"").toLowerCase() === (tc||"").toLowerCase())?.label || tc;
-  const seenTcExp = new Set();
-  const derivedCommsExp = [];
+  const subTotalsP = {};
   legPurchase.forEach(c => {
-    if (!c?.commodity) return;
-    const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
-    const tc = cfg?.tradeCommodity;
-    if (tc && !seenTcExp.has(tc)) { seenTcExp.add(tc); derivedCommsExp.push(resolveTcLabelExp(tc)); }
+    const tcLabel = resolveTradeCommodityLabel(c.commodity, contractComms, tradeCommodities) || c.commodity || "—";
+    const leg = (trade.purchaseLegs||[]).find(l => String(l.contractId)===String(c.id));
+    subTotalsP[tcLabel] = (subTotalsP[tcLabel]||0) + (parseFloat(leg?.quantity)||0);
   });
+  const subTotalsS = {};
+  legSale.forEach(c => {
+    const tcLabel = resolveTradeCommodityLabel(c.commodity, contractComms, tradeCommodities) || c.commodity || "—";
+    const leg = (trade.saleLegs||[]).find(l => String(l.contractId)===String(c.id));
+    subTotalsS[tcLabel] = (subTotalsS[tcLabel]||0) + (parseFloat(leg?.quantity)||0);
+  });
+  const allTc = [...new Set([...Object.keys(subTotalsP), ...Object.keys(subTotalsS)])];
   return (
-    <div style={{ borderBottom:`2px solid ${COLORS.accent}30`, background:COLORS.surface }}>
-      <div style={{ padding:'14px 16px', display:'flex', gap:16, alignItems:'flex-start', minWidth:'max-content' }}>
-        <div style={{ flex:1, minWidth:260, maxWidth:360 }}>
-          <div style={{ fontSize:10, fontWeight:800, color:COLORS.red, letterSpacing:0.8, marginBottom:8 }}>
-            🟥 PURCHASE ({legPurchase.length}){totalP>0 && <span style={{marginLeft:6,fontFamily:"'DM Mono',monospace"}}>{totalP.toLocaleString('fr')} T</span>}
-          </div>
-          {legPurchase.length===0
-            ? <div style={{fontSize:11,color:COLORS.textMuted}}>Aucun contrat d’achat</div>
-            : legPurchase.map((c,i)=><ExpandContractCard key={c.id||i} contract={c} type='purchase' purchaseLegs={trade.purchaseLegs} saleLegs={trade.saleLegs} />)}
-        </div>
-        <div style={{ width:1, alignSelf:'stretch', background:COLORS.border, flexShrink:0 }} />
-        <div style={{ flex:1, minWidth:260, maxWidth:360 }}>
-          <div style={{ fontSize:10, fontWeight:800, color:COLORS.green, letterSpacing:0.8, marginBottom:8 }}>
-            🟢 SALE ({legSale.length}){totalS>0 && <span style={{marginLeft:6,fontFamily:"'DM Mono',monospace"}}>{totalS.toLocaleString('fr')} T</span>}
-          </div>
-          {legSale.length===0
-            ? <div style={{fontSize:11,color:COLORS.textMuted}}>Aucun contrat de vente</div>
-            : legSale.map((c,i)=><ExpandContractCard key={c.id||i} contract={c} type='sale' purchaseLegs={trade.purchaseLegs} saleLegs={trade.saleLegs} />)}
-        </div>
-        <div style={{ display:'flex', flexDirection:'column', gap:8, alignItems:'flex-end', flexShrink:0 }}>
-          {(totalP>0||totalS>0) && (
-            <div style={{ background:COLORS.bg, border:`1px solid ${COLORS.border}`, borderRadius:8, padding:'8px 12px', display:'grid', gridTemplateColumns:'repeat(3,64px)', gap:6, textAlign:'center' }}>
-              <div><div style={{fontSize:9,color:COLORS.red,fontWeight:700,marginBottom:2}}>ACHAT</div><div style={{fontSize:12,fontWeight:800,color:COLORS.red,fontFamily:"'DM Mono',monospace"}}>{totalP.toLocaleString('fr')}</div></div>
-              <div><div style={{fontSize:9,color:COLORS.green,fontWeight:700,marginBottom:2}}>VENTE</div><div style={{fontSize:12,fontWeight:800,color:COLORS.green,fontFamily:"'DM Mono',monospace"}}>{totalS.toLocaleString('fr')}</div></div>
-              <div><div style={{fontSize:9,color:COLORS.textMuted,fontWeight:700,marginBottom:2}}>SOLDE</div><div style={{fontSize:12,fontWeight:800,fontFamily:"'DM Mono',monospace",color:solde===0?COLORS.green:solde>0?COLORS.accent:COLORS.red}}>{solde>0?'+':''}{solde.toLocaleString('fr')}</div></div>
+    <div style={{ borderBottom:"2px solid "+COLORS.accent+"30", background:COLORS.surface }}>
+      <div style={{ padding:"14px 20px 18px" }}>
+        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:16, gap:16 }}>
+          <div style={{ display:"flex", gap:16, alignItems:"flex-start", flexWrap:"wrap" }}>
+            <div>
+              <div style={{ fontSize:10, fontWeight:800, color:COLORS.red, letterSpacing:0.8, marginBottom:6 }}>ACHATS · {legPurchase.length} contrat{legPurchase.length>1?"s":""}</div>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                {Object.entries(subTotalsP).map(([tc, qty]) => (
+                  <div key={tc} style={{ background:COLORS.red+"10", border:"1px solid "+COLORS.red+"30", borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.red, textTransform:"uppercase", letterSpacing:0.5, marginBottom:1 }}>{tc}</div>
+                    <div style={{ fontSize:12, fontWeight:800, color:COLORS.red, fontFamily:"'DM Mono',monospace" }}>{qty.toLocaleString("fr")} T</div>
+                  </div>
+                ))}
+                {Object.keys(subTotalsP).length > 1 && totalP > 0 && (
+                  <div style={{ background:COLORS.red+"18", border:"1px solid "+COLORS.red+"50", borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.red, letterSpacing:0.5, marginBottom:1 }}>TOTAL</div>
+                    <div style={{ fontSize:12, fontWeight:800, color:COLORS.red, fontFamily:"'DM Mono',monospace" }}>{totalP.toLocaleString("fr")} T</div>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-          <div style={{display:'flex',gap:6}}>
-            <button onClick={()=>onEdit(trade)} style={{background:`${COLORS.accent}18`,border:`1px solid ${COLORS.accent}40`,borderRadius:7,padding:'5px 12px',color:COLORS.accent,cursor:'pointer',fontSize:12,fontFamily:'inherit'}}>✏️ Edit</button>
-            <button onClick={onClose} style={{background:'none',border:`1px solid ${COLORS.border}`,borderRadius:7,padding:'5px 10px',color:COLORS.textMuted,cursor:'pointer',fontSize:18,lineHeight:1}}>×</button>
-          </div>
-          {derivedCommsExp.length > 0 && (
-            <div style={{ display:'flex', gap:4, flexWrap:'wrap', justifyContent:'flex-end' }}>
-              {derivedCommsExp.map((tc,i) => (
-                <span key={i} style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:12, background:`${COLORS.gold}20`, color:COLORS.gold, border:`1px solid ${COLORS.gold}40`, textTransform:'uppercase', letterSpacing:0.4 }}>{tc}</span>
-              ))}
+            <div style={{ width:1, alignSelf:"stretch", background:COLORS.border, flexShrink:0 }} />
+            <div>
+              <div style={{ fontSize:10, fontWeight:800, color:COLORS.green, letterSpacing:0.8, marginBottom:6 }}>VENTES · {legSale.length} contrat{legSale.length>1?"s":""}</div>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                {Object.entries(subTotalsS).map(([tc, qty]) => (
+                  <div key={tc} style={{ background:COLORS.green+"10", border:"1px solid "+COLORS.green+"30", borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.green, textTransform:"uppercase", letterSpacing:0.5, marginBottom:1 }}>{tc}</div>
+                    <div style={{ fontSize:12, fontWeight:800, color:COLORS.green, fontFamily:"'DM Mono',monospace" }}>{qty.toLocaleString("fr")} T</div>
+                  </div>
+                ))}
+                {Object.keys(subTotalsS).length > 1 && totalS > 0 && (
+                  <div style={{ background:COLORS.green+"18", border:"1px solid "+COLORS.green+"50", borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.green, letterSpacing:0.5, marginBottom:1 }}>TOTAL</div>
+                    <div style={{ fontSize:12, fontWeight:800, color:COLORS.green, fontFamily:"'DM Mono',monospace" }}>{totalS.toLocaleString("fr")} T</div>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+            <div style={{ width:1, alignSelf:"stretch", background:COLORS.border, flexShrink:0 }} />
+            <div>
+              <div style={{ fontSize:10, fontWeight:800, color:COLORS.textMuted, letterSpacing:0.8, marginBottom:6 }}>SOLDE</div>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                {allTc.map(tc => {
+                  const s = (subTotalsS[tc]||0) - (subTotalsP[tc]||0);
+                  return (
+                    <div key={tc} style={{ background:COLORS.bg, border:"1px solid "+COLORS.border, borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:COLORS.textMuted, textTransform:"uppercase", letterSpacing:0.5, marginBottom:1 }}>{tc}</div>
+                      <div style={{ fontSize:12, fontWeight:800, fontFamily:"'DM Mono',monospace", color:s===0?COLORS.green:s>0?COLORS.accent:COLORS.red }}>{s>0?"+":""}{s.toLocaleString("fr")}</div>
+                    </div>
+                  );
+                })}
+                {allTc.length > 1 && (
+                  <div style={{ background:COLORS.bg, border:"1px solid "+COLORS.border, borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.textMuted, letterSpacing:0.5, marginBottom:1 }}>TOTAL</div>
+                    <div style={{ fontSize:12, fontWeight:800, fontFamily:"'DM Mono',monospace", color:solde===0?COLORS.green:solde>0?COLORS.accent:COLORS.red }}>{solde>0?"+":""}{solde.toLocaleString("fr")}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:6,flexShrink:0}}>
+            <button onClick={()=>onEdit(trade)} style={{background:COLORS.accent+"18",border:"1px solid "+COLORS.accent+"40",borderRadius:7,padding:"5px 12px",color:COLORS.accent,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>✏️ Edit</button>
+            <button onClick={onClose} style={{background:"none",border:"1px solid "+COLORS.border,borderRadius:7,padding:"5px 10px",color:COLORS.textMuted,cursor:"pointer",fontSize:18,lineHeight:1}}>×</button>
+          </div>
         </div>
+        <div style={{ marginBottom: 16 }}>
+          <ExpandContractTable contracts={legPurchase} legs={trade.purchaseLegs} type="purchase" contractComms={contractComms} tradeCommodities={tradeCommodities} />
+        </div>
+        {legSale.length > 0 && <div style={{ height:1, background:COLORS.border, marginBottom:14 }} />}
+        {legSale.length > 0 && (
+          <ExpandContractTable contracts={legSale} legs={trade.saleLegs} type="sale" contractComms={contractComms} tradeCommodities={tradeCommodities} />
+        )}
       </div>
     </div>
   );
@@ -23107,23 +23228,22 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
       purchaseLegs: [...(t.purchaseLegs || []), ...extraPurchase],
       saleLegs:     [...(t.saleLegs     || []), ...extraSale],
     };
-    // Dériver les commodities depuis les contrats d'achat → tradeCommodity
     const allPurchaseContracts = [
       ...(enriched.purchaseLegs || []).map(l => contracts.find(c => String(c.id) === String(l.contractId))).filter(Boolean),
       ...contracts.filter(c => {
         if (!(c.tradeLinks||[]).some(lk => String(lk.tradeId) === String(t.id))) return false;
-        const ct = (c.contractType||'').toLowerCase();
-        return ct.includes('purchase') || ct.includes('achat');
+        const ct = (c.contractType||"").toLowerCase();
+        return ct.includes("purchase") || ct.includes("achat");
       })
     ];
-    const contractComms = (config || {}).contractCommodities || [];
+    const contractCommsEdit = (config || {}).contractCommodities || [];
     const tradeCommoditiesEdit = (config || {}).tradeCommodities || [];
     const resolveTcLabelEdit = (tc) => tradeCommoditiesEdit.find(x => (x.value||"") === tc || (x.label||"").toLowerCase() === (tc||"").toLowerCase())?.label || tc;
     const seenTc = new Set();
     const autoCommodities = [];
     allPurchaseContracts.forEach(c => {
       if (!c?.commodity) return;
-      const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
+      const cfg = contractCommsEdit.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
       const tc = cfg?.tradeCommodity;
       if (tc && !seenTc.has(tc)) { seenTc.add(tc); autoCommodities.push(resolveTcLabelEdit(tc)); }
     });
@@ -23333,8 +23453,7 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
               <div style={{ gridColumn: "1 / -1" }}>
                 <LBL>COMMODITY (depuis contrats d'achat)</LBL>
                 {(() => {
-                  // Calculer les commodities auto-dérivées depuis les purchaseLegs du form
-                  const contractComms = config?.contractCommodities || [];
+                  const contractCommsForm = config?.contractCommodities || [];
                   const tradeCommoditiesForm = config?.tradeCommodities || [];
                   const resolveTcForm = (tc) => tradeCommoditiesForm.find(x => (x.value||"") === tc || (x.label||"").toLowerCase() === (tc||"").toLowerCase())?.label || tc;
                   const purchaseContracts = (form.purchaseLegs || [])
@@ -23344,7 +23463,7 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
                   const autoDerived = [];
                   purchaseContracts.forEach(c => {
                     if (!c?.commodity) return;
-                    const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
+                    const cfg = contractCommsForm.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
                     const tc = cfg?.tradeCommodity;
                     if (tc && !seenAuto.has(tc)) { seenAuto.add(tc); autoDerived.push(resolveTcForm(tc)); }
                   });

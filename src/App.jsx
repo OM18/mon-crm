@@ -22600,36 +22600,28 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
         ))}
       </div>
       {/* ORIGIN COUNTRY */}
-      <div style={{ padding: "0 8px", display: "flex", alignItems: "center", overflow: "hidden" }}>
-        {(() => {
-          const val = derivedOrigin;
-          const code = val ? getCountryCode(val) : null;
-          if (!val) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>;
+      <div style={{ padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {derivedOrigin ? (() => {
+          const label = (config?.country || []).find(c => c.value === derivedOrigin || c.label === derivedOrigin)?.label || derivedOrigin;
           return (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden", minWidth: 0 }}>
-              <div style={{ width: 30, height: 20, borderRadius: 3, overflow: "hidden", flexShrink: 0, border: `1px solid ${COLORS.border}`, background: COLORS.border }}>
-                {code && <img src={`https://flagcdn.com/${code.toLowerCase()}.svg`} alt={val} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.onerror = null; e.target.src = `https://flagcdn.com/w40/${code.toLowerCase()}.png`; }} />}
-              </div>
-              <span style={{ fontSize: 10, color: COLORS.textSub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val}</span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+              <CountryFlag country={derivedOrigin} size={28} />
+              <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.text, whiteSpace: "nowrap", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
             </div>
           );
-        })()}
+        })() : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>}
       </div>
       {/* DESTINATION COUNTRY */}
-      <div style={{ padding: "0 8px", display: "flex", alignItems: "center", overflow: "hidden" }}>
-        {(() => {
-          const val = derivedDest;
-          const code = val ? getCountryCode(val) : null;
-          if (!val) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>;
+      <div style={{ padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {derivedDest ? (() => {
+          const label = (config?.country || []).find(c => c.value === derivedDest || c.label === derivedDest)?.label || derivedDest;
           return (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden", minWidth: 0 }}>
-              <div style={{ width: 30, height: 20, borderRadius: 3, overflow: "hidden", flexShrink: 0, border: `1px solid ${COLORS.border}`, background: COLORS.border }}>
-                {code && <img src={`https://flagcdn.com/${code.toLowerCase()}.svg`} alt={val} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.onerror = null; e.target.src = `https://flagcdn.com/w40/${code.toLowerCase()}.png`; }} />}
-              </div>
-              <span style={{ fontSize: 10, color: COLORS.textSub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val}</span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+              <CountryFlag country={derivedDest} size={28} />
+              <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.text, whiteSpace: "nowrap", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
             </div>
           );
-        })()}
+        })() : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>}
       </div>
       {/* TRADE BUSINESS UNIT */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>

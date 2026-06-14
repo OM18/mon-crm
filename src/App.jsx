@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, createContext, useContext, useMemo, memo, useCallback } from "react";
+﻿import { useState, useEffect, useRef, createContext, useContext, useMemo, memo, useCallback, Component } from "react";
 import { supabase } from './supabase';
 
 // ─── SAFE SUPABASE SAVE ───────────────────────────────────────
@@ -22998,7 +22998,7 @@ const TradeLegBlock = ({ type, leg, idx, total, contracts, updateLeg, removeLeg 
   );
 };
 
-class TradesErrorBoundary extends React.Component {
+class TradesErrorBoundary extends Component {
   constructor(p) { super(p); this.state = { error: null }; }
   static getDerivedStateFromError(e) { return { error: e }; }
   componentDidCatch(e, info) { console.error('[TradesErrorBoundary]', e, info); }

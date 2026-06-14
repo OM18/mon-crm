@@ -22561,13 +22561,15 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
   // Dériver les commodities depuis les contrats d'achat → tradeCommodity configuré dans l'admin
   const derivedCommodities = (() => {
     const contractComms = config?.contractCommodities || [];
+    const tradeCommodities = config?.tradeCommodities || [];
+    const resolveTcLabel = (tc) => tradeCommodities.find(x => (x.value||"") === tc || (x.label||"").toLowerCase() === (tc||"").toLowerCase())?.label || tc;
     const seen = new Set();
     const result = [];
     legPurchase.forEach(c => {
       if (!c?.commodity) return;
       const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
       const tc = cfg?.tradeCommodity;
-      if (tc && !seen.has(tc)) { seen.add(tc); result.push(tc); }
+      if (tc && !seen.has(tc)) { seen.add(tc); result.push(resolveTcLabel(tc)); }
     });
     return result;
   })();
@@ -22595,7 +22597,7 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
       {/* COMMODITY */}
       <div style={{ padding: "0 12px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, overflow: "hidden" }}>
         {(derivedCommodities.length > 0 ? derivedCommodities : (t.commodities || [])).map((c, i) => (
-          <span key={i} style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: `${COLORS.gold}18`, color: COLORS.gold, border: `1px solid ${COLORS.gold}30`, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 0.4, display: "block" }}>{c}</span>
+          <span key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.gold, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 0.4, display: "block" }}>{c}</span>
         ))}
       </div>
       {/* ORIGIN COUNTRY */}
@@ -22685,13 +22687,15 @@ const TradeExpandRow = ({ trade, contracts, onEdit, onClose, config }) => {
   const solde = totalS - totalP;
   // Commodities dérivées depuis contrats d'achat
   const contractComms = config?.contractCommodities || [];
+  const tradeCommoditiesExp = config?.tradeCommodities || [];
+  const resolveTcLabelExp = (tc) => tradeCommoditiesExp.find(x => (x.value||"") === tc || (x.label||"").toLowerCase() === (tc||"").toLowerCase())?.label || tc;
   const seenTcExp = new Set();
   const derivedCommsExp = [];
   legPurchase.forEach(c => {
     if (!c?.commodity) return;
     const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
     const tc = cfg?.tradeCommodity;
-    if (tc && !seenTcExp.has(tc)) { seenTcExp.add(tc); derivedCommsExp.push(tc); }
+    if (tc && !seenTcExp.has(tc)) { seenTcExp.add(tc); derivedCommsExp.push(resolveTcLabelExp(tc)); }
   });
   return (
     <div style={{ borderBottom:`2px solid ${COLORS.accent}30`, background:COLORS.surface }}>
@@ -23113,13 +23117,15 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
       })
     ];
     const contractComms = (config || {}).contractCommodities || [];
+    const tradeCommoditiesEdit = (config || {}).tradeCommodities || [];
+    const resolveTcLabelEdit = (tc) => tradeCommoditiesEdit.find(x => (x.value||"") === tc || (x.label||"").toLowerCase() === (tc||"").toLowerCase())?.label || tc;
     const seenTc = new Set();
     const autoCommodities = [];
     allPurchaseContracts.forEach(c => {
       if (!c?.commodity) return;
       const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
       const tc = cfg?.tradeCommodity;
-      if (tc && !seenTc.has(tc)) { seenTc.add(tc); autoCommodities.push(tc); }
+      if (tc && !seenTc.has(tc)) { seenTc.add(tc); autoCommodities.push(resolveTcLabelEdit(tc)); }
     });
     if (autoCommodities.length > 0) enriched.commodities = autoCommodities;
     setForm(enriched);
@@ -23329,6 +23335,8 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
                 {(() => {
                   // Calculer les commodities auto-dérivées depuis les purchaseLegs du form
                   const contractComms = config?.contractCommodities || [];
+                  const tradeCommoditiesForm = config?.tradeCommodities || [];
+                  const resolveTcForm = (tc) => tradeCommoditiesForm.find(x => (x.value||"") === tc || (x.label||"").toLowerCase() === (tc||"").toLowerCase())?.label || tc;
                   const purchaseContracts = (form.purchaseLegs || [])
                     .map(l => contracts.find(c => String(c.id) === String(l.contractId)))
                     .filter(Boolean);
@@ -23338,7 +23346,7 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
                     if (!c?.commodity) return;
                     const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
                     const tc = cfg?.tradeCommodity;
-                    if (tc && !seenAuto.has(tc)) { seenAuto.add(tc); autoDerived.push(tc); }
+                    if (tc && !seenAuto.has(tc)) { seenAuto.add(tc); autoDerived.push(resolveTcForm(tc)); }
                   });
                   const hasAuto = autoDerived.length > 0;
                   return (

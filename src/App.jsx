@@ -19103,7 +19103,7 @@ const VirtualContractList = ({ filtered, selected, onSelect, onEdit, onRemove, C
 // ── ContractDetailPanel — top-level to avoid hooks-rules violations ──
 const ContractDetailPanel = ({ c, config, instruments, trades, onEdit, onRemove }) => {
   if (!c) return null;
-  const si = statusItem(c.status);
+  const si = (config.contractStatuses || []).find(x => (x.label || x.value) === c.status);
   const col = si?.color || COLORS.textMuted;
   const instrument = c.derivativeId ? (instruments||[]).find(p => String(p.id) === String(c.derivativeId)) : null;
   const DRow = ({ label, children }) => (

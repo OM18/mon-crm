@@ -23597,52 +23597,60 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
           onClose={() => setShowImport(false)}
           voyages={voyages}
           config={config}
-          onImport={(items) => {
+          onImport={async (items) => {
             const nextId = trades.length > 0 ? Math.max(...trades.map(t => t.id || 0)) + 1 : 1;
             const enriched = items.map((item, i) => ({ ...EMPTY_TRADE(), ...item, id: nextId + i, createdAt: new Date().toISOString() }));
             const allTrades = [...trades, ...enriched];
-            persist(allTrades);
+            await persist(allTrades);
 
-            // Resolve pending tradeLinks in contracts that still hold a trade name instead of a real ID
-            if (contracts.length > 0 && enriched.length > 0) {
+            // Read contracts fresh from Supabase to avoid stale closure
+            const { data: freshRows } = await supabase.from('contracts').select('data');
+            const freshContracts = (freshRows || []).map(r => r.data).filter(Boolean);
+
+            if (freshContracts.length > 0) {
               const norm = s => String(s||"").replace(/[\u00a0\u200b]/g," ").trim();
               let contractsChanged = false;
-              let updatedContracts = contracts.map(c => {
+              let updatedAllTrades = [...allTrades];
+              let tradesNeedUpdate = false;
+
+              const updatedContracts = freshContracts.map(c => {
                 if (!(c.tradeLinks||[]).length) return c;
                 let changed = false;
                 const newLinks = c.tradeLinks.map(link => {
                   const v = norm(link.tradeId);
+                  // Already resolved to a numeric trade ID
                   if (allTrades.find(t => String(t.id) === v)) return link;
+                  // Resolve by exact trade name
                   const byName = enriched.find(t => norm(t.tradeName).toLowerCase() === v.toLowerCase());
                   if (byName) { changed = true; return { ...link, tradeId: byName.id }; }
                   return link;
                 });
-                if (changed) { contractsChanged = true; return { ...c, tradeLinks: newLinks }; }
-                return c;
+                if (!changed) return c;
+                contractsChanged = true;
+
+                // Sync purchaseLegs/saleLegs on the matched trades
+                const ct = (c.contractType||"").toLowerCase();
+                const legKey = (ct.includes("purchase")||ct.includes("achat")) ? "purchaseLegs" : "saleLegs";
+                newLinks.forEach(link => {
+                  const ti = updatedAllTrades.findIndex(t => String(t.id) === String(link.tradeId));
+                  if (ti < 0) return;
+                  const legs = (updatedAllTrades[ti][legKey]||[]).filter(l => l.contractId);
+                  const li = legs.findIndex(l => String(l.contractId) === String(c.id));
+                  if (li >= 0) legs[li] = { ...legs[li], quantity: link.connectedQty };
+                  else legs.push({ contractId: String(c.id), quantity: link.connectedQty });
+                  updatedAllTrades[ti] = { ...updatedAllTrades[ti], [legKey]: legs };
+                  tradesNeedUpdate = true;
+                });
+
+                return { ...c, tradeLinks: newLinks };
               });
 
               if (contractsChanged) {
-                let updatedAllTrades = [...allTrades];
-                let tradesNeedUpdate = false;
-                updatedContracts.forEach(contract => {
-                  if (!(contract.tradeLinks||[]).length) return;
-                  const ct = (contract.contractType||"").toLowerCase();
-                  const legKey = (ct.includes("purchase")||ct.includes("achat")) ? "purchaseLegs" : "saleLegs";
-                  contract.tradeLinks.forEach(link => {
-                    const ti = updatedAllTrades.findIndex(t => String(t.id) === String(link.tradeId));
-                    if (ti < 0) return;
-                    const legs = (updatedAllTrades[ti][legKey]||[]).filter(l => l.contractId);
-                    const li = legs.findIndex(l => String(l.contractId) === String(contract.id));
-                    if (li >= 0) legs[li] = { ...legs[li], quantity: link.connectedQty };
-                    else legs.push({ contractId: String(contract.id), quantity: link.connectedQty });
-                    updatedAllTrades[ti] = { ...updatedAllTrades[ti], [legKey]: legs };
-                    tradesNeedUpdate = true;
-                  });
-                });
-
                 setContracts(updatedContracts);
                 saveLargeTable("contracts", updatedContracts);
-                if (tradesNeedUpdate) persist(updatedAllTrades);
+              }
+              if (tradesNeedUpdate) {
+                await persist(updatedAllTrades);
               }
             }
 

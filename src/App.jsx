@@ -20680,6 +20680,55 @@ const VirtualVesselList = ({ filtered, selected, onSelect, onEdit, onRemove, com
   );
 };
 
+// ── VesselDetailPanel — top-level to avoid hooks-rules violations ──
+const VesselDetailPanel = ({ v, companies, config, onEdit, onClose }) => {
+  if (!v) return null;
+  const owner = companies.find(c => c.id === v.ownerId);
+  const manager = companies.find(c => c.id === v.managingCompanyId);
+  const DRow = ({ label, children }) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 10 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 13, color: COLORS.text }}>{children || "—"}</div>
+    </div>
+  );
+  return (
+    <div style={{ width: 320, flexShrink: 0, background: COLORS.card, borderLeft: `1px solid ${COLORS.border}`, padding: 24, overflowY: "auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: COLORS.text }}>{v.name}</div>
+          <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>IMO {v.imo || "—"}</div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => onEdit(v)} style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, color: COLORS.accent, cursor: "pointer", fontSize: 12, fontWeight: 700, padding: "6px 10px" }}>✏</button>
+          <button onClick={onClose} style={{ background: COLORS.border, border: "none", borderRadius: 8, color: COLORS.textMuted, cursor: "pointer", fontSize: 14, padding: "6px 10px" }}>×</button>
+        </div>
+      </div>
+      {v.blackListed && <div style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}40`, borderRadius: 8, padding: "8px 12px", color: COLORS.red, fontSize: 12, fontWeight: 700, marginBottom: 16 }}>⛔ BLACKLISTED</div>}
+      {v.vesselId && <DRow label="Vessel ID">{v.vesselId}</DRow>}
+      <DRow label="Year">{v.year}</DRow>
+      {v.flag && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>Flag</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <img src={`https://flagcdn.com/20x15/${(getCountryCode(v.flag) || v.flag).toLowerCase()}.png`} style={{ width: 20, height: 15, borderRadius: 2 }} onError={e => e.target.style.display='none'} />
+            <span style={{ fontSize: 13, color: COLORS.text }}>{(config.country || []).find(c => c.value.toUpperCase() === (getCountryCode(v.flag) || v.flag).toUpperCase())?.label || getCountryCode(v.flag) || v.flag}</span>
+          </div>
+        </div>
+      )}
+      <DRow label="Vessel Size">{v.vesselSize}</DRow>
+      <DRow label="Owner">{owner?.name}</DRow>
+      <DRow label="Managing Company">{manager?.name}</DRow>
+      {v.marineTrafficLink && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Marine Traffic</div>
+          <a href={v.marineTrafficLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: COLORS.accent }}>🔗 Ouvrir le lien</a>
+        </div>
+      )}
+      {v.additionalInfos && <DRow label="Additional Infos">{v.additionalInfos}</DRow>}
+    </div>
+  );
+};
+
 const Vessels = ({ companies = [], vessels = [], setVessels }) => {
   const { config } = useConfig();
   const [search, setSearch] = useState("");
@@ -20758,53 +20807,9 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
   });
 
   // Detail panel
-  const DetailPanel = ({ v }) => {
-    if (!v) return null;
-    const owner = companies.find(c => c.id === v.ownerId);
-    const manager = companies.find(c => c.id === v.managingCompanyId);
-    const DRow = ({ label, children }) => (
-      <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 10 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
-        <div style={{ fontSize: 13, color: COLORS.text }}>{children || "—"}</div>
-      </div>
-    );
-    return (
-      <div style={{ width: 320, flexShrink: 0, background: COLORS.card, borderLeft: `1px solid ${COLORS.border}`, padding: 24, overflowY: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: COLORS.text }}>{v.name}</div>
-            <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>IMO {v.imo || "—"}</div>
-          </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => openEdit(v)} style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, color: COLORS.accent, cursor: "pointer", fontSize: 12, fontWeight: 700, padding: "6px 10px" }}>✏</button>
-            <button onClick={() => setSelected(null)} style={{ background: COLORS.border, border: "none", borderRadius: 8, color: COLORS.textMuted, cursor: "pointer", fontSize: 14, padding: "6px 10px" }}>×</button>
-          </div>
-        </div>
-        {v.blackListed && <div style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}40`, borderRadius: 8, padding: "8px 12px", color: COLORS.red, fontSize: 12, fontWeight: 700, marginBottom: 16 }}>⛔ BLACKLISTED</div>}
-        {v.vesselId && <DRow label="Vessel ID">{v.vesselId}</DRow>}
-        <DRow label="Year">{v.year}</DRow>
-        {v.flag && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>Flag</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <img src={`https://flagcdn.com/20x15/${(getCountryCode(v.flag) || v.flag).toLowerCase()}.png`} style={{ width: 20, height: 15, borderRadius: 2 }} onError={e => e.target.style.display='none'} />
-              <span style={{ fontSize: 13, color: COLORS.text }}>{(config.country || []).find(c => c.value.toUpperCase() === (getCountryCode(v.flag) || v.flag).toUpperCase())?.label || getCountryCode(v.flag) || v.flag}</span>
-            </div>
-          </div>
-        )}
-        <DRow label="Vessel Size">{v.vesselSize}</DRow>
-        <DRow label="Owner">{owner?.name}</DRow>
-        <DRow label="Managing Company">{manager?.name}</DRow>
-        {v.marineTrafficLink && (
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Marine Traffic</div>
-            <a href={v.marineTrafficLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: COLORS.accent }}>🔗 Ouvrir le lien</a>
-          </div>
-        )}
-        {v.additionalInfos && <DRow label="Additional Infos">{v.additionalInfos}</DRow>}
-      </div>
-    );
-  };
+  const DetailPanel = ({ v }) => (
+    <VesselDetailPanel v={v} companies={companies} config={config} onEdit={openEdit} onClose={() => setSelected(null)} />
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 0 }}>

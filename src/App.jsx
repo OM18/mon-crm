@@ -19798,9 +19798,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
                   if (byId) return { ...link, tradeId: byId.id };
                   const byExact = trades.find(t => norm(t.tradeName).toLowerCase()===v.toLowerCase());
                   if (byExact) return { ...link, tradeId: byExact.id };
-                  const byPartial = trades.find(t => norm(t.tradeName).toLowerCase().includes(v.toLowerCase()) || v.toLowerCase().includes(norm(t.tradeName).toLowerCase()));
-                  if (byPartial) return { ...link, tradeId: byPartial.id };
-                  return link;
+                  return link; // No partial match — avoids connecting to a wrong trade
                 });
               }
               return base;

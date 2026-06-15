@@ -9415,6 +9415,15 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             updateField={updateField}
             hasColor={false}
           />
+          <DerivPillsEditor
+            configKey="contractPremiumOptions"
+            label="Premium Contract Options"
+            icon="⭐"
+            description="Options premium disponibles dans les contrats à prime (ex : EURONEXT MATIF, CBOT…)"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+          />
         </div>
       )}
 
@@ -20222,6 +20231,18 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
                     {instruments.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
                   </select>
                 </div>
+                {(config.contractPremiumOptions || []).length > 0 && (
+                  <div>
+                    <CFL>Premium Option</CFL>
+                    <select value={form.premiumOption || ""} onChange={e => f("premiumOption", e.target.value)}
+                      style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px", color: form.premiumOption ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                      <option value="">— Sélectionner une option —</option>
+                      {(config.contractPremiumOptions || []).map(o => (
+                        <option key={o.label || o.value || o} value={o.label || o.value || o}>{o.label || o.value || o}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </>}
 
               <div>

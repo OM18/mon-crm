@@ -22612,7 +22612,7 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
 
   return (
     <div onClick={() => onSelect(t)}
-      style={{ display: "grid", gridTemplateColumns: "180px 160px 120px 100px 80px 140px 140px 110px 60px", borderBottom: `1px solid ${COLORS.border}`,
+      style={{ display: "grid", gridTemplateColumns: "180px 130px 160px 120px 100px 80px 140px 140px 110px 60px", borderBottom: `1px solid ${COLORS.border}`,
         height: ROW_H_TRADE, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
         background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
         cursor: "pointer", transition: "background 0.1s" }}
@@ -22622,6 +22622,26 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
         <span title={t.tradeName} style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.tradeName || "—"}</span>
       </div>
+      {/* EXEC PERIOD — from purchase contracts */}
+      {(() => {
+        const purchaseContracts = legPurchase.filter(c => !isCancelledC(c));
+        const dates = purchaseContracts.map(c => ({ from: c.executionDateFrom, to: c.executionDateTo })).filter(d => d.from || d.to);
+        if (!dates.length) return <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}><span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span></div>;
+        // Show earliest from → latest to
+        const parse = d => { if (!d) return null; const p = d.split("/"); return p.length===3 ? new Date(p[2], p[1]-1, p[0]) : null; };
+        const froms = dates.map(d => parse(d.from)).filter(Boolean);
+        const tos   = dates.map(d => parse(d.to)).filter(Boolean);
+        const minFrom = froms.length ? new Date(Math.min(...froms)) : null;
+        const maxTo   = tos.length   ? new Date(Math.max(...tos))   : null;
+        const fmt = d => d ? `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}` : null;
+        const fromStr = fmt(minFrom), toStr = fmt(maxTo);
+        return (
+          <div style={{ padding: "0 12px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
+            {fromStr && <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>{fromStr}</span>}
+            {toStr && fromStr !== toStr && <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>→ {toStr}</span>}
+          </div>
+        );
+      })()}
       {/* VOYAGE */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
         <span style={{ fontSize: 11, color: voyage ? COLORS.accent : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{voyage?.voyageName || "—"}</span>
@@ -23381,6 +23401,27 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
     const q = String(search||"").toLowerCase().trim();
     if (!q) return true;
     return String(t.tradeName||"").toLowerCase().includes(q);
+  }).sort((a, b) => {
+    // Sort by earliest executionDateFrom among purchase contracts (DD/MM/YYYY)
+    const getExecDate = (t) => {
+      const legs = (t.purchaseLegs||[]).filter(l => l.contractId);
+      const dates = legs.map(l => {
+        const c = contracts.find(c => String(c.id) === String(l.contractId));
+        return c?.executionDateFrom || "";
+      }).filter(Boolean);
+      if (!dates.length) return null;
+      // Also check tradeLinks-connected purchase contracts
+      contracts.filter(c => (c.tradeLinks||[]).some(lk => String(lk.tradeId)===String(t.id)) && /purchase|achat/i.test(c.contractType||""))
+        .forEach(c => { if (c.executionDateFrom) dates.push(c.executionDateFrom); });
+      // Parse DD/MM/YYYY → sortable YYYYMMDD
+      const parse = d => { const p = d.split("/"); return p.length===3 ? `${p[2]}${p[1]}${p[0]}` : d; };
+      return dates.map(parse).sort()[0];
+    };
+    const da = getExecDate(a), db = getExecDate(b);
+    if (!da && !db) return 0;
+    if (!da) return 1;
+    if (!db) return -1;
+    return da < db ? -1 : da > db ? 1 : 0;
   });
 
   // Commodities multi-select
@@ -23438,8 +23479,8 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
       {/* Blotter + Detail Panel */}
       <div style={{ flex: 1, display: 'flex', gap: 16, minHeight: 0 }}>
         <div style={{ flex: 1, display: 'flex', background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: 'hidden', minHeight: 0, flexDirection: 'column', minWidth: 0 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '180px 160px 120px 100px 80px 140px 140px 110px 60px', background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: 'max-content' }}>
-            {['TRADE NAME','VOYAGE','COMMODITY','OPEN POS.','VOLUME','ORIGIN','DESTINATION','BU',''].map((h,i) => (
+          <div style={{ display: 'grid', gridTemplateColumns: '180px 130px 160px 120px 100px 80px 140px 140px 110px 60px', background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: 'max-content' }}>
+            {['TRADE NAME','EXEC PERIOD','VOYAGE','COMMODITY','OPEN POS.','VOLUME','ORIGIN','DESTINATION','BU',''].map((h,i) => (
               <div key={i} style={{ padding: '10px 12px', fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: 'nowrap' }}>{h}</div>
             ))}
           </div>

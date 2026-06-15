@@ -22580,6 +22580,7 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
     const seen = new Set();
     const result = [];
     const byTc = {};
+    const isCancelledC = c => (c?.status||"").toLowerCase() === "cancelled";
     legPurchase.forEach(c => {
       if (!c?.commodity) return;
       const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
@@ -22588,8 +22589,10 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
       const label = resolveTcLabel(tc);
       if (!seen.has(label)) { seen.add(label); result.push(label); }
       byTc[label] = byTc[label] || { p: 0, s: 0 };
-      const leg = (t.purchaseLegs||[]).find(l => String(l.contractId)===String(c.id));
-      byTc[label].p += parseFloat(leg?.quantity || c.qtyValue || 0) || 0;
+      if (!isCancelledC(c)) {
+        const leg = (t.purchaseLegs||[]).find(l => String(l.contractId)===String(c.id));
+        byTc[label].p += parseFloat(leg?.quantity || c.qtyValue || 0) || 0;
+      }
     });
     legSale.forEach(c => {
       if (!c?.commodity) return;
@@ -22599,8 +22602,10 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
       const label = resolveTcLabel(tc);
       if (!seen.has(label)) { seen.add(label); result.push(label); }
       byTc[label] = byTc[label] || { p: 0, s: 0 };
-      const leg = (t.saleLegs||[]).find(l => String(l.contractId)===String(c.id));
-      byTc[label].s += parseFloat(leg?.quantity || c.qtyValue || 0) || 0;
+      if (!isCancelledC(c)) {
+        const leg = (t.saleLegs||[]).find(l => String(l.contractId)===String(c.id));
+        byTc[label].s += parseFloat(leg?.quantity || c.qtyValue || 0) || 0;
+      }
     });
     return { derivedCommodities: result, openByTc: byTc };
   })();
@@ -22738,7 +22743,9 @@ const ExpandContractTable = ({ contracts: list, legs, type, contractComms, trade
     <div style={{ overflowX: "auto" }}>
       {tcKeys.map(tcLabel => {
         const groupContracts = groups[tcLabel];
+        const isCancelled = c => (c.status||"").toLowerCase() === "cancelled";
         const groupQty = groupContracts.reduce((s, c) => {
+          if (isCancelled(c)) return s;
           const leg = (legs||[]).find(l => String(l.contractId)===String(c.id));
           return s + (parseFloat(leg?.quantity)||0);
         }, 0);
@@ -22771,12 +22778,15 @@ const ExpandContractTable = ({ contracts: list, legs, type, contractComms, trade
                   const period = fmtPeriod(c);
                   const ports = fmtPorts(c);
                   return (
-                    <tr key={c.id||i} style={{ background: i%2===0 ? "transparent" : COLORS.surface+"80" }}>
-                      <td style={{ ...TDmono, color:COLORS.textMuted, fontSize:10 }}>{c.conclusionDate || "—"}</td>
-                      <td style={{ ...TD, fontWeight:700, color:col }}>{c.contractNumber || "#"+c.id}</td>
-                      <td style={{ ...TD, maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{counterparty || "—"}</td>
-                      <td style={{ ...TD, color:COLORS.gold, fontWeight:600, fontSize:10, textTransform:"uppercase" }}>{c.commodity || "—"}</td>
-                      <td style={{ ...TDmono, textAlign:"right", fontWeight:700, color:col }}>
+                    <tr key={c.id||i} style={{ background: isCancelled(c) ? COLORS.red+"08" : i%2===0 ? "transparent" : COLORS.surface+"80", opacity: isCancelled(c) ? 0.65 : 1 }}>
+                      <td style={{ ...TDmono, color:COLORS.textMuted, fontSize:10, textDecoration: isCancelled(c) ? "line-through" : "none" }}>{c.conclusionDate || "—"}</td>
+                      <td style={{ ...TD, fontWeight:700, color: isCancelled(c) ? COLORS.textMuted : col, textDecoration: isCancelled(c) ? "line-through" : "none" }}>
+                        {c.contractNumber || "#"+c.id}
+                        {isCancelled(c) && <span style={{ marginLeft:6, fontSize:9, fontWeight:700, color:COLORS.red, background:COLORS.red+"15", padding:"1px 5px", borderRadius:3, textDecoration:"none", display:"inline-block" }}>CANCELLED</span>}
+                      </td>
+                      <td style={{ ...TD, maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", textDecoration: isCancelled(c) ? "line-through" : "none" }}>{counterparty || "—"}</td>
+                      <td style={{ ...TD, color:COLORS.gold, fontWeight:600, fontSize:10, textTransform:"uppercase", textDecoration: isCancelled(c) ? "line-through" : "none" }}>{c.commodity || "—"}</td>
+                      <td style={{ ...TDmono, textAlign:"right", fontWeight:700, color: isCancelled(c) ? COLORS.textMuted : col, textDecoration: isCancelled(c) ? "line-through" : "none" }}>
                         {leg?.quantity ? Number(leg.quantity).toLocaleString("fr")+" T" : <span style={{color:COLORS.textMuted}}>—</span>}
                       </td>
                       <td style={{ ...TD, whiteSpace:"nowrap" }}>

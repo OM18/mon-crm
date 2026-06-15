@@ -18950,9 +18950,23 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                             <input value={opt.port || ""} onChange={e => { const o = [...sec.options]; o[idx] = { ...o[idx], port: e.target.value }; patchMp("optPort", { options: o }); }} placeholder="Nom du port…"
                               style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
                           </div>
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 4 }}>TYPE DE PRIX</div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              {[{ v: "flat", l: "FLAT" }, { v: "prime", l: "PREMIUM" }].map(({ v, l }) => (
+                                <div key={v} onClick={() => { const o = [...sec.options]; o[idx] = { ...o[idx], priceType: v }; patchMp("optPort", { options: o }); }}
+                                  style={{ padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                                    border: `1px solid ${(opt.priceType || priceType) === v ? COLORS.accent+"80" : COLORS.border}`,
+                                    background: (opt.priceType || priceType) === v ? `${COLORS.accent}18` : "transparent",
+                                    color: (opt.priceType || priceType) === v ? COLORS.accent : COLORS.textMuted }}>
+                                  {l}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                           <PriceFields pos={opt}
                             onChange={(field, val) => { const o = [...sec.options]; o[idx] = { ...o[idx], [field]: val }; patchMp("optPort", { options: o }); }}
-                            showQty={false} showDate={false} showLabel={false} />
+                            showQty={false} showDate={false} showLabel={false} forcePriceType={opt.priceType || priceType} />
                         </PosCard>
                       ))}
                     </div>
@@ -19006,9 +19020,23 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                                 style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
                             </div>
                           </div>
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 4 }}>TYPE DE PRIX</div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              {[{ v: "flat", l: "FLAT" }, { v: "prime", l: "PREMIUM" }].map(({ v, l }) => (
+                                <div key={v} onClick={() => { const o = [...sec.options]; o[idx] = { ...o[idx], priceType: v }; patchMp("optPeriod", { options: o }); }}
+                                  style={{ padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                                    border: `1px solid ${(opt.priceType || priceType) === v ? COLORS.accent+"80" : COLORS.border}`,
+                                    background: (opt.priceType || priceType) === v ? `${COLORS.accent}18` : "transparent",
+                                    color: (opt.priceType || priceType) === v ? COLORS.accent : COLORS.textMuted }}>
+                                  {l}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                           <PriceFields pos={opt}
                             onChange={(field, val) => { const o = [...sec.options]; o[idx] = { ...o[idx], [field]: val }; patchMp("optPeriod", { options: o }); }}
-                            showQty={false} showDate={false} showLabel={false} />
+                            showQty={false} showDate={false} showLabel={false} forcePriceType={opt.priceType || priceType} />
                         </PosCard>
                       ))}
                     </div>

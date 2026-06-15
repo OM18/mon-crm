@@ -22727,7 +22727,7 @@ const fmtPorts = (c) => {
 };
 
 const ExpandContractTable = ({ contracts: list, legs, type, contractComms, tradeCommodities }) => {
-  const col = type === "purchase" ? COLORS.red : COLORS.green;
+  const col = type === "purchase" ? COLORS.green : COLORS.red;
   const TH = { fontSize: 9, fontWeight: 700, color: COLORS.textMuted, letterSpacing: 0.6, textTransform: "uppercase", padding: "4px 8px", textAlign: "left", whiteSpace: "nowrap", borderBottom: "1px solid " + COLORS.border };
   const TD = { fontSize: 11, color: COLORS.text, padding: "5px 8px", verticalAlign: "middle", borderBottom: "1px solid " + COLORS.border + "20" };
   const TDmono = { ...TD, fontFamily: "'DM Mono',monospace" };
@@ -22842,36 +22842,36 @@ const TradeExpandRow = ({ trade, contracts, onEdit, onClose, config }) => {
         <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:16, gap:16 }}>
           <div style={{ display:"flex", gap:16, alignItems:"flex-start", flexWrap:"wrap" }}>
             <div>
-              <div style={{ fontSize:10, fontWeight:800, color:COLORS.red, letterSpacing:0.8, marginBottom:6 }}>ACHATS · {legPurchase.length} contrat{legPurchase.length>1?"s":""}</div>
+              <div style={{ fontSize:10, fontWeight:800, color:COLORS.green, letterSpacing:0.8, marginBottom:6 }}>ACHATS · {legPurchase.length} contrat{legPurchase.length>1?"s":""}</div>
               <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                 {Object.entries(subTotalsP).map(([tc, qty]) => (
-                  <div key={tc} style={{ background:COLORS.red+"10", border:"1px solid "+COLORS.red+"30", borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.red, textTransform:"uppercase", letterSpacing:0.5, marginBottom:1 }}>{tc}</div>
-                    <div style={{ fontSize:12, fontWeight:800, color:COLORS.red, fontFamily:"'DM Mono',monospace" }}>{qty.toLocaleString("fr")} T</div>
+                  <div key={tc} style={{ background:COLORS.green+"10", border:"1px solid "+COLORS.green+"30", borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.green, textTransform:"uppercase", letterSpacing:0.5, marginBottom:1 }}>{tc}</div>
+                    <div style={{ fontSize:12, fontWeight:800, color:COLORS.green, fontFamily:"'DM Mono',monospace" }}>{qty.toLocaleString("fr")} T</div>
                   </div>
                 ))}
                 {Object.keys(subTotalsP).length > 1 && totalP > 0 && (
-                  <div style={{ background:COLORS.red+"18", border:"1px solid "+COLORS.red+"50", borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.red, letterSpacing:0.5, marginBottom:1 }}>TOTAL</div>
-                    <div style={{ fontSize:12, fontWeight:800, color:COLORS.red, fontFamily:"'DM Mono',monospace" }}>{totalP.toLocaleString("fr")} T</div>
+                  <div style={{ background:COLORS.green+"18", border:"1px solid "+COLORS.green+"50", borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.green, letterSpacing:0.5, marginBottom:1 }}>TOTAL</div>
+                    <div style={{ fontSize:12, fontWeight:800, color:COLORS.green, fontFamily:"'DM Mono',monospace" }}>{totalP.toLocaleString("fr")} T</div>
                   </div>
                 )}
               </div>
             </div>
             <div style={{ width:1, alignSelf:"stretch", background:COLORS.border, flexShrink:0 }} />
             <div>
-              <div style={{ fontSize:10, fontWeight:800, color:COLORS.green, letterSpacing:0.8, marginBottom:6 }}>VENTES · {legSale.length} contrat{legSale.length>1?"s":""}</div>
+              <div style={{ fontSize:10, fontWeight:800, color:COLORS.red, letterSpacing:0.8, marginBottom:6 }}>VENTES · {legSale.length} contrat{legSale.length>1?"s":""}</div>
               <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                 {Object.entries(subTotalsS).map(([tc, qty]) => (
-                  <div key={tc} style={{ background:COLORS.green+"10", border:"1px solid "+COLORS.green+"30", borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.green, textTransform:"uppercase", letterSpacing:0.5, marginBottom:1 }}>{tc}</div>
-                    <div style={{ fontSize:12, fontWeight:800, color:COLORS.green, fontFamily:"'DM Mono',monospace" }}>{qty.toLocaleString("fr")} T</div>
+                  <div key={tc} style={{ background:COLORS.red+"10", border:"1px solid "+COLORS.red+"30", borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.red, textTransform:"uppercase", letterSpacing:0.5, marginBottom:1 }}>{tc}</div>
+                    <div style={{ fontSize:12, fontWeight:800, color:COLORS.red, fontFamily:"'DM Mono',monospace" }}>{qty.toLocaleString("fr")} T</div>
                   </div>
                 ))}
                 {Object.keys(subTotalsS).length > 1 && totalS > 0 && (
-                  <div style={{ background:COLORS.green+"18", border:"1px solid "+COLORS.green+"50", borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.green, letterSpacing:0.5, marginBottom:1 }}>TOTAL</div>
-                    <div style={{ fontSize:12, fontWeight:800, color:COLORS.green, fontFamily:"'DM Mono',monospace" }}>{totalS.toLocaleString("fr")} T</div>
+                  <div style={{ background:COLORS.red+"18", border:"1px solid "+COLORS.red+"50", borderRadius:8, padding:"4px 10px", textAlign:"center" }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:COLORS.red, letterSpacing:0.5, marginBottom:1 }}>TOTAL</div>
+                    <div style={{ fontSize:12, fontWeight:800, color:COLORS.red, fontFamily:"'DM Mono',monospace" }}>{totalS.toLocaleString("fr")} T</div>
                   </div>
                 )}
               </div>

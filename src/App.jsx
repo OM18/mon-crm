@@ -18569,6 +18569,7 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
     if (form.multiPrice?.multiNego?.enabled) return "multiNego";
     if (form.multiPrice?.optPort?.enabled) return "optPort";
     if (form.multiPrice?.optPeriod?.enabled) return "optPeriod";
+    if (form.multiPrice?.optOrigin?.enabled) return "optOrigin";
     return "multiNego";
   });
 
@@ -18588,6 +18589,7 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
     rolling:   { enabled: false, positions: [pos0FromForm()] },
     optPort:   { enabled: false, defaultIdx: 0, options: [] },
     optPeriod: { enabled: false, defaultIdx: 0, options: [] },
+    optOrigin:  { enabled: false, defaultIdx: 0, options: [] },
   };
 
   const [mp, setMp] = useState(initMultiPrice);
@@ -18736,6 +18738,7 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
     { key: "rolling",   label: "Rolling",           icon: "🔄" },
     { key: "optPort",   label: "Port optionnel",    icon: "⚓" },
     { key: "optPeriod", label: "Période optionnelle", icon: "📅" },
+    { key: "optOrigin",  label: "Origine optionnelle",  icon: "🌍" },
   ];
 
   const movePos = (arr, idx, dir) => {
@@ -18754,13 +18757,13 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
 
   const removePos = (section, idx) => {
     const positions = mp[section].positions.filter((_, i) => i !== idx);
-    const extra = section === "optPort" || section === "optPeriod"
+    const extra = section === "optPort" || section === "optPeriod" || section === "optOrigin"
       ? { defaultIdx: Math.min(mp[section].defaultIdx, Math.max(0, positions.length - 1)) }
       : {};
     patchMp(section, { positions, ...extra });
   };
 
-  const addPos = (section) => patchMp(section, { positions: [...mp[section].positions, section === "optPort" || section === "optPeriod" ? newOptPos() : newPos()] });
+  const addPos = (section) => patchMp(section, { positions: [...mp[section].positions, section === "optPort" || section === "optPeriod" || section === "optOrigin" ? newOptPos() : newPos()] });
 
   const onSave = () => {
     f("multiPrice", mp);
@@ -18772,7 +18775,7 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
     onClose();
   };
 
-  const tabColor = { multiNego: COLORS.blue, rolling: COLORS.purple, optPort: COLORS.green, optPeriod: COLORS.orange };
+  const tabColor = { multiNego: COLORS.blue, rolling: COLORS.purple, optPort: COLORS.green, optPeriod: COLORS.orange, optOrigin: "#E97451" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#00000099", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1300, padding: 20 }}>
@@ -19044,6 +19047,69 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                       style={{ marginTop: 12, width: "100%", padding: "9px 0", background: `${COLORS.orange}12`, border: `1px dashed ${COLORS.orange}60`, borderRadius: 8, color: COLORS.orange, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                       + Ajouter une période
                     </button>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── OPT ORIGIN ── */}
+          {activeTab === "optOrigin" && (() => {
+            const sec = mp.optOrigin || { enabled: false, defaultIdx: 0, options: [] };
+            return (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: "12px 14px", background: sec.enabled ? `${"#E97451"}10` : COLORS.bg, border: `1px solid ${sec.enabled ? "#E97451"+"40" : COLORS.border}`, borderRadius: 10 }}>
+                  <div onClick={() => patchMp("optOrigin", { enabled: !sec.enabled })} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${sec.enabled ? "#E97451" : COLORS.border}`, background: sec.enabled ? "#E97451" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {sec.enabled && <span style={{ color: "#fff", fontSize: 11, fontWeight: 900 }}>✓</span>}
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: sec.enabled ? "#E97451" : COLORS.textMuted }}>Activer les origines optionnelles</span>
+                  </div>
+                </div>
+                {sec.enabled && (
+                  <>
+                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 12, fontStyle: "italic" }}>
+                      Prix différent par origine. La quantité du contrat s’applique à toutes les options. Définir une option par défaut (obligatoire).
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {sec.options.map((opt, idx) => (
+                        <PosCard key={opt.id} idx={idx} total={sec.options.length}
+                          isDefault={sec.defaultIdx === idx} onSetDefault={() => patchMp("optOrigin", { defaultIdx: idx })}
+                          onMoveUp={() => patchMp("optOrigin", { options: movePos(sec.options, idx, -1) })}
+                          onMoveDown={() => patchMp("optOrigin", { options: movePos(sec.options, idx, 1) })}
+                          onRemove={() => removePos("optOrigin", idx)}>
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>ORIGIN *</div>
+                            <input value={opt.origin || ""} onChange={e => { const o = [...sec.options]; o[idx] = { ...o[idx], origin: e.target.value }; patchMp("optOrigin", { options: o }); }} placeholder="Pays ou zone d’origine…"
+                              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                          </div>
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 4 }}>TYPE DE PRIX</div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              {[{ v: "flat", l: "FLAT" }, { v: "prime", l: "PREMIUM" }].map(({ v, l }) => (
+                                <div key={v} onClick={() => { const o = [...sec.options]; o[idx] = { ...o[idx], priceType: v }; patchMp("optOrigin", { options: o }); }}
+                                  style={{ padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                                    border: `1px solid ${(opt.priceType || priceType) === v ? COLORS.accent+"80" : COLORS.border}`,
+                                    background: (opt.priceType || priceType) === v ? `${COLORS.accent}18` : "transparent",
+                                    color: (opt.priceType || priceType) === v ? COLORS.accent : COLORS.textMuted }}>
+                                  {l}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <PriceFields pos={opt}
+                            onChange={(field, val) => { const o = [...sec.options]; o[idx] = { ...o[idx], [field]: val }; patchMp("optOrigin", { options: o }); }}
+                            showQty={false} showDate={false} showLabel={false} forcePriceType={opt.priceType || priceType} />
+                        </PosCard>
+                      ))}
+                    </div>
+                    <button onClick={() => patchMp("optOrigin", { options: [...sec.options, newOptPos()] })}
+                      style={{ marginTop: 12, width: "100%", padding: "9px 0", background: `${"#E97451"}12`, border: `1px dashed ${"#E97451"}60`, borderRadius: 8, color: "#E97451", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      + Ajouter une origine
+                    </button>
+                    {sec.options.length > 0 && !sec.options[sec.defaultIdx] && (
+                      <div style={{ fontSize: 11, color: COLORS.orange, marginTop: 8 }}>⚠ Aucune option par défaut sélectionnée</div>
+                    )}
                   </>
                 )}
               </div>
@@ -20085,7 +20151,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
                     ].filter(b => form.multiPrice[b.key]?.enabled);
                     return badges.map(b => (
                       <span key={b.key} style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 5, background: `${b.color}18`, color: b.color, border: `1px solid ${b.color}40` }}>
-                        {b.label} {b.key === "multiNego" ? `(${form.multiPrice.multiNego.positions.length} pos.)` : b.key === "rolling" ? `(${form.multiPrice.rolling.positions.length} pos.)` : b.key === "optPort" ? `(${form.multiPrice.optPort.options.length} opt.)` : `(${form.multiPrice.optPeriod.options.length} opt.)`}
+                        {b.label} {b.key === "multiNego" ? `(${form.multiPrice.multiNego.positions.length} pos.)` : b.key === "rolling" ? `(${form.multiPrice.rolling.positions.length} pos.)` : b.key === "optPort" ? `(${form.multiPrice.optPort.options.length} opt.)` : b.key === "optPeriod" ? `(${form.multiPrice.optPeriod.options.length} opt.)` : `(${(form.multiPrice.optOrigin || {options:[]}).options.length} opt.)`}
                       </span>
                     ));
                   })()}

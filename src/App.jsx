@@ -22573,24 +22573,41 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
   const pickVal = (list, field) => list.find(c=>c?.[field])?.[field] || "";
   const derivedOrigin = t.originCountry || pickVal(legPurchase, "originCountry") || pickVal(legSale, "originCountry");
   const derivedDest   = t.destinationCountry || pickVal(legSale, "destinationCountry") || pickVal(legPurchase, "destinationCountry");
-  const derivedCommodities = (() => {
+  const { derivedCommodities, openByTc } = (() => {
     const contractComms = config?.contractCommodities || [];
     const tradeCommodities = config?.tradeCommodities || [];
     const resolveTcLabel = (tc) => tradeCommodities.find(x => (x.value||"") === tc || (x.label||"").toLowerCase() === (tc||"").toLowerCase())?.label || tc;
     const seen = new Set();
     const result = [];
+    const byTc = {};
     legPurchase.forEach(c => {
       if (!c?.commodity) return;
       const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
       const tc = cfg?.tradeCommodity;
-      if (tc && !seen.has(tc)) { seen.add(tc); result.push(resolveTcLabel(tc)); }
+      if (!tc) return;
+      const label = resolveTcLabel(tc);
+      if (!seen.has(label)) { seen.add(label); result.push(label); }
+      byTc[label] = byTc[label] || { p: 0, s: 0 };
+      const leg = (t.purchaseLegs||[]).find(l => String(l.contractId)===String(c.id));
+      byTc[label].p += parseFloat(leg?.quantity || c.qtyValue || 0) || 0;
     });
-    return result;
+    legSale.forEach(c => {
+      if (!c?.commodity) return;
+      const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());
+      const tc = cfg?.tradeCommodity;
+      if (!tc) return;
+      const label = resolveTcLabel(tc);
+      if (!seen.has(label)) { seen.add(label); result.push(label); }
+      byTc[label] = byTc[label] || { p: 0, s: 0 };
+      const leg = (t.saleLegs||[]).find(l => String(l.contractId)===String(c.id));
+      byTc[label].s += parseFloat(leg?.quantity || c.qtyValue || 0) || 0;
+    });
+    return { derivedCommodities: result, openByTc: byTc };
   })();
 
   return (
     <div onClick={() => onSelect(t)}
-      style={{ display: "grid", gridTemplateColumns: "180px 160px 120px 80px 130px 140px 140px 110px 60px", borderBottom: `1px solid ${COLORS.border}`,
+      style={{ display: "grid", gridTemplateColumns: "180px 160px 120px 100px 80px 140px 140px 110px 60px", borderBottom: `1px solid ${COLORS.border}`,
         height: ROW_H_TRADE, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
         background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
         cursor: "pointer", transition: "background 0.1s" }}
@@ -22610,49 +22627,24 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
           <span key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.gold, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 0.4, display: "block" }}>{c}</span>
         ))}
       </div>
+      {/* OPEN POSITION — one row per commodity, aligned with COMMODITY column */}
+      <div style={{ padding: "0 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
+        {(derivedCommodities.length > 0 ? derivedCommodities : (t.commodities || [])).map((tc, i) => {
+          const { p = 0, s = 0 } = openByTc[tc] || {};
+          const diff = p - s;
+          if (diff === 0) return <span key={i} style={{ fontSize: 11, display: "block", lineHeight: "16px" }}>&nbsp;</span>;
+          const isPos = diff > 0;
+          return (
+            <span key={i} style={{ fontSize: 11, fontWeight: 800, color: isPos ? COLORS.green : COLORS.red, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap", display: "block" }}>
+              {isPos ? "+" : "-"}{Number(Math.abs(diff)).toLocaleString("fr")} T
+            </span>
+          );
+        })}
+      </div>
       {/* VOLUME */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
         <span style={{ fontSize: 11, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{t.volume ? `${Number(t.volume).toLocaleString("fr")} T` : "—"}</span>
       </div>
-      {/* OPEN POSITION */}
-      {(() => {
-        const contractComms = config?.contractCommodities || [];
-        const tradeCommodities = config?.tradeCommodities || [];
-        const byTc = {};
-        legPurchase.forEach(c => {
-          const tc = resolveTradeCommodityLabel(c.commodity, contractComms, tradeCommodities) || c.commodity;
-          if (!tc) return;
-          const leg = (t.purchaseLegs||[]).find(l => String(l.contractId)===String(c.id));
-          byTc[tc] = byTc[tc] || { p: 0, s: 0 };
-          byTc[tc].p += parseFloat(leg?.quantity || c.qtyValue || 0) || 0;
-        });
-        legSale.forEach(c => {
-          const tc = resolveTradeCommodityLabel(c.commodity, contractComms, tradeCommodities) || c.commodity;
-          if (!tc) return;
-          const leg = (t.saleLegs||[]).find(l => String(l.contractId)===String(c.id));
-          byTc[tc] = byTc[tc] || { p: 0, s: 0 };
-          byTc[tc].s += parseFloat(leg?.quantity || c.qtyValue || 0) || 0;
-        });
-        const entries = Object.entries(byTc).filter(([, { p, s }]) => p - s !== 0);
-        if (entries.length === 0) return <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}><span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span></div>;
-        return (
-          <div style={{ padding: "0 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
-            {entries.map(([tc, { p, s }]) => {
-              const diff = p - s;
-              const isPos = diff > 0;
-              const col = isPos ? COLORS.green : COLORS.red;
-              return (
-                <div key={tc} style={{ display: "grid", gridTemplateColumns: "40px 1fr", alignItems: "center", gap: 4 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tc}</span>
-                  <span style={{ fontSize: 11, fontWeight: 800, color: col, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>
-                    {isPos ? "+" : "-"}{Number(Math.abs(diff)).toLocaleString("fr")} T
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
       {/* ORIGIN COUNTRY */}
       <div style={{ padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {derivedOrigin ? (() => {
@@ -23436,8 +23428,8 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
       {/* Blotter + Detail Panel */}
       <div style={{ flex: 1, display: 'flex', gap: 16, minHeight: 0 }}>
         <div style={{ flex: 1, display: 'flex', background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: 'hidden', minHeight: 0, flexDirection: 'column', minWidth: 0 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '180px 160px 120px 80px 130px 140px 140px 110px 60px', background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: 'max-content' }}>
-            {['TRADE NAME','VOYAGE','COMMODITY','VOLUME','OPEN POSITION','ORIGIN','DESTINATION','BU',''].map((h,i) => (
+          <div style={{ display: 'grid', gridTemplateColumns: '180px 160px 120px 100px 80px 140px 140px 110px 60px', background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: 'max-content' }}>
+            {['TRADE NAME','VOYAGE','COMMODITY','OPEN POS.','VOLUME','ORIGIN','DESTINATION','BU',''].map((h,i) => (
               <div key={i} style={{ padding: '10px 12px', fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: 'nowrap' }}>{h}</div>
             ))}
           </div>

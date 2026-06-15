@@ -19100,6 +19100,168 @@ const VirtualContractList = ({ filtered, selected, onSelect, onEdit, onRemove, C
   );
 };
 
+// ── ContractDetailPanel — top-level to avoid hooks-rules violations ──
+const ContractDetailPanel = ({ c, config, instruments, trades, onEdit, onRemove }) => {
+  if (!c) return null;
+  const si = statusItem(c.status);
+  const col = si?.color || COLORS.textMuted;
+  const instrument = c.derivativeId ? (instruments||[]).find(p => String(p.id) === String(c.derivativeId)) : null;
+  const DRow = ({ label, children }) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 13, color: COLORS.text }}>{children || <span style={{ color: COLORS.textMuted }}>—</span>}</div>
+    </div>
+  );
+  const Sec = ({ label }) => (
+    <div style={{ gridColumn: "1 / -1", fontSize: 10, fontWeight: 700, color: COLORS.accent, letterSpacing: 1, textTransform: "uppercase", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 4, marginTop: 4 }}>{label}</div>
+  );
+  return (
+    <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 14, margin: "12px 0 0", padding: "20px 24px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>{c.contractNumber || `Contrat #${c.id}`}</div>
+          <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+            {c.contractType && (() => { const t = (config.contractTypes || []).find(x => x.label === c.contractType); const tc = t?.color || COLORS.accent; return <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${tc}20`, color: tc, border: `1px solid ${tc}40` }}>{c.contractType}</span>; })()}
+            {c.status && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}22`, color: col, border: `1px solid ${col}40` }}>{c.status}</span>}
+            {c.businessUnit && (() => { const bu = (config.businessUnit || []).find(b => b.value === c.businessUnit); const bc = bu?.color || COLORS.accent; return <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${bc}20`, color: bc, border: `1px solid ${bc}40` }}>◈ {bu?.label || c.businessUnit}</span>; })()}
+            {c.transformation && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${COLORS.blue}20`, color: COLORS.blue, border: `1px solid ${COLORS.blue}40` }}>TRANSFORMATION</span>}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn variant="secondary" onClick={() => onEdit(c)} style={{ padding: "7px 14px", fontSize: 12 }}>✏ Modifier</Btn>
+          <button onClick={() => onRemove(c.id)} style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}30`, color: COLORS.red, borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>🗑</button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px 20px" }}>
+        <Sec label="Identification" />
+        <DRow label="Contract #">{c.contractNumber}</DRow>
+        <DRow label="Conclusion Date">{c.conclusionDate}</DRow>
+        <DRow label="Contract Type">{c.contractType}</DRow>
+        <DRow label="Status">{c.status}</DRow>
+        {c.info && <div style={{ gridColumn: "1 / -1" }}><DRow label="Info"><span style={{ fontStyle: "italic", color: COLORS.textSub }}>{c.info}</span></DRow></div>}
+        {c.businessUnit && (() => {
+          const buDef = (config.businessUnit || []).find(b => b.value === c.businessUnit);
+          const buColor = buDef?.color || COLORS.accent;
+          return (
+            <DRow label="Business Unit">
+              <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${buColor}20`, color: buColor, border: `1px solid ${buColor}40` }}>
+                {buDef?.label || c.businessUnit}
+              </span>
+            </DRow>
+          );
+        })()}
+
+        <Sec label="Parties" />
+        <DRow label="Buyer">{c.buyerId}</DRow>
+        <DRow label="Seller">{c.sellerId}</DRow>
+        <DRow label="Broker">{c.brokerId}</DRow>
+
+        <Sec label="Produit" />
+        <DRow label="Commodity">{c.commodity}</DRow>
+        <DRow label="Transformation">{c.transformation ? "YES" : "NO"}</DRow>
+
+        <Sec label="Prix" />
+        <DRow label="Price Type">{c.priceType?.toUpperCase() || "—"}</DRow>
+        {c.contractPriceType === "flat" && <>
+          <DRow label="Contract Flat Price">{c.flatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>
+          {c.analyticalFlatPrice && <DRow label="Analytical Flat Price">{c.analyticalFlatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
+          {c.vat && <>
+            <DRow label="VAT">{c.vatRate ? `${c.vatRate}%` : "Oui"}</DRow>
+            {c.flatPriceVatIncluded && <DRow label="Flat Price (VAT Excl.)">{c.flatPriceVatIncluded}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
+            {c.analyticalFlatPriceVatIncluded && <DRow label="Analytical Flat Price (VAT Excl.)">{c.analyticalFlatPriceVatIncluded}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
+          </>}
+        </>}
+        {c.contractPriceType === "prime" && <>
+          <DRow label="Premium">{c.premium ? `+${c.premium}` : "—"}</DRow>
+          {c.analyticalPremium && <DRow label="Analytical Premium">{`+${c.analyticalPremium}`}</DRow>}
+          {c.numberOfLots && <DRow label="Number of Lots">{c.numberOfLots}</DRow>}
+          <DRow label="Instrument">{instrument?.label || c.derivativeId || "—"}</DRow>
+          {c.vat && <DRow label="VAT">{c.vatRate ? `${c.vatRate}%` : "Oui"}</DRow>}
+        </>}
+        <DRow label="Payment Terms">{c.paymentTerms}</DRow>
+
+        <Sec label="Quantité" />
+        <DRow label="Quantity">
+          {(c.qtyValue || c.qtyMin || c.qtyMax) ? (
+            <span style={{ fontFamily: "'DM Mono', monospace" }}>
+              {(() => { const fq = v => v ? Number(v).toLocaleString('fr-FR') : '…'; return c.qtyType === "range" ? `${fq(c.qtyMin)} – ${fq(c.qtyMax)}` : fq(c.qtyValue); })()}
+              {c.qtyUnit ? ` ${c.qtyUnit}` : ""}
+            </span>
+          ) : null}
+        </DRow>
+        <DRow label="Tolérance">
+          {c.qtyTolerance !== undefined && c.qtyTolerance !== ""
+            ? <span>{c.qtyTolerance === "0" ? "=0%" : `±${c.qtyTolerance}%`}{c.qtyTolerance !== "0" && c.qtyToleranceOption ? ` · ${c.qtyToleranceOption}` : ""}</span>
+            : null}
+        </DRow>
+        {(c.qtyEstimated || c.qtyFinal) && <>
+          <DRow label="Estimated Qty">{c.qtyEstimated ? `${parseFloat(c.qtyEstimated).toFixed(2)}${c.qtyUnit ? " " + c.qtyUnit : ""}` : "—"}</DRow>
+          <DRow label="Final Qty">{c.qtyFinal ? `${parseFloat(c.qtyFinal).toFixed(2)}${c.qtyUnit ? " " + c.qtyUnit : ""}` : "—"}</DRow>
+        </>}
+
+        <Sec label="Exécution" />
+        <div style={{ gridColumn: "1 / 3" }}>
+          <DRow label="Execution Period">
+            {(c.executionDateFrom || c.executionDateTo)
+              ? <span style={{ fontFamily: "'DM Mono', monospace" }}>{c.executionDateFrom || "…"} → {c.executionDateTo || "…"}{c.executionPeriodType ? ` · ${c.executionPeriodType}` : ""}{c.withoutExtension ? " · W/O EXT" : ""}</span>
+              : null}
+          </DRow>
+        </div>
+
+        <Sec label="Logistique" />
+        <DRow label="Incoterm">{c.incoterm}</DRow>
+        <DRow label="Port">{Array.isArray(c.port) ? c.port.join(", ") : c.port}</DRow>
+        <DRow label="Loadport">{c.loadport}</DRow>
+        <DRow label="Disport">{c.disport}</DRow>
+        <DRow label="Delivery Conditions">{c.deliveryConditions}</DRow>
+        <DRow label="Warehouse">{c.warehouse}</DRow>
+        <DRow label="Shipment Terminal">{c.shipmentTerminal}</DRow>
+
+        <Sec label="Géographie" />
+        <DRow label="Origin">
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {c.originCountry && getCountryCode(c.originCountry) && <img src={`https://flagcdn.com/20x15/${getCountryCode(c.originCountry).toLowerCase()}.png`} style={{ width: 20, height: 15, objectFit: "cover", borderRadius: 2, border: `1px solid ${COLORS.border}` }} />}
+            {(config.country || []).find(x => x.value === c.originCountry)?.label || c.originCountry || "—"}
+          </div>
+        </DRow>
+        <DRow label="Destination">
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {c.destinationCountry && getCountryCode(c.destinationCountry) && <img src={`https://flagcdn.com/20x15/${getCountryCode(c.destinationCountry).toLowerCase()}.png`} style={{ width: 20, height: 15, objectFit: "cover", borderRadius: 2, border: `1px solid ${COLORS.border}` }} />}
+            {(config.country || []).find(x => x.value === c.destinationCountry)?.label || c.destinationCountry || "—"}
+          </div>
+        </DRow>
+        {(c.tradeLinks || []).length > 0 && (
+          <>
+            <Sec label="Trades liés" />
+            <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 8 }}>
+              {(c.tradeLinks || []).map((link, idx) => {
+                const tradeIdStr = String(link.tradeId||"").replace(/[\u00a0\u200b]/g," ").trim();
+                const trade = (trades||[]).find(t => String(t.id)===tradeIdStr) || (trades||[]).find(t => (t.tradeName||"").toLowerCase()===tradeIdStr.toLowerCase());
+                return (
+                  <div key={idx} style={{ display: "flex", alignItems: "center", gap: 14, background: COLORS.bg, border: `1px solid ${COLORS.accent}25`, borderRadius: 10, padding: "10px 14px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, minWidth: 50 }}>TRADE {idx+1}</div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: trade ? COLORS.accent : COLORS.textMuted }}>
+                        {trade ? trade.tradeName : <span style={{ fontStyle: "italic", fontSize: 12 }}>ID {tradeIdStr} (non trouvé)</span>}
+                      </span>
+                      {trade?.businessMonth && <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono',monospace", marginLeft: 8 }}>{trade.businessMonth}</span>}
+                    </div>
+                    <div style={{ flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, color: COLORS.textMuted }}>QTÉ </span>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: COLORS.text, fontFamily: "'DM Mono',monospace" }}>{link.connectedQty ? `${Number(link.connectedQty).toLocaleString("fr")} T` : "—"}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], setTrades }) => {
   const { config } = useConfig();
   const setContractsRaw = setContracts; // alias for compatibility
@@ -19543,167 +19705,17 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
   });
 
   // ── Detail panel ──
-  const DetailPanel = ({ c }) => {
-    if (!c) return null;
-    const si = statusItem(c.status);
-    const col = si?.color || COLORS.textMuted;
-    const instrument = c.derivativeId ? instruments.find(p => String(p.id) === String(c.derivativeId)) : null;
-    const DRow = ({ label, children }) => (
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
-        <div style={{ fontSize: 13, color: COLORS.text }}>{children || <span style={{ color: COLORS.textMuted }}>—</span>}</div>
-      </div>
-    );
-    const Sec = ({ label }) => (
-      <div style={{ gridColumn: "1 / -1", fontSize: 10, fontWeight: 700, color: COLORS.accent, letterSpacing: 1, textTransform: "uppercase", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 4, marginTop: 4 }}>{label}</div>
-    );
-    return (
-      <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 14, margin: "12px 0 0", padding: "20px 24px" }}>
-        {/* Detail header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>{c.contractNumber || `Contrat #${c.id}`}</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-              {c.contractType && (() => { const t = (config.contractTypes || []).find(x => x.label === c.contractType); const tc = t?.color || COLORS.accent; return <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${tc}20`, color: tc, border: `1px solid ${tc}40` }}>{c.contractType}</span>; })()}
-              {c.status && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${col}22`, color: col, border: `1px solid ${col}40` }}>{c.status}</span>}
-              {c.businessUnit && (() => { const bu = (config.businessUnit || []).find(b => b.value === c.businessUnit); const bc = bu?.color || COLORS.accent; return <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${bc}20`, color: bc, border: `1px solid ${bc}40` }}>◈ {bu?.label || c.businessUnit}</span>; })()}
-              {c.transformation && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${COLORS.blue}20`, color: COLORS.blue, border: `1px solid ${COLORS.blue}40` }}>TRANSFORMATION</span>}
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <Btn variant="secondary" onClick={() => openEdit(c)} style={{ padding: "7px 14px", fontSize: 12 }}>✏ Modifier</Btn>
-            <button onClick={() => { remove(c.id); setSelected(null); }} style={{ background: `${COLORS.red}15`, border: `1px solid ${COLORS.red}30`, color: COLORS.red, borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>🗑</button>
-          </div>
-        </div>
+  const DetailPanel = ({ c }) => (
+    <ContractDetailPanel
+      c={c}
+      config={config}
+      instruments={instruments}
+      trades={trades}
+      onEdit={openEdit}
+      onRemove={(id) => { remove(id); setSelected(null); }}
+    />
+  );
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px 20px" }}>
-          <Sec label="Identification" />
-          <DRow label="Contract #">{c.contractNumber}</DRow>
-          <DRow label="Conclusion Date">{c.conclusionDate}</DRow>
-          <DRow label="Contract Type">{c.contractType}</DRow>
-          <DRow label="Status">{c.status}</DRow>
-          {c.info && <div style={{ gridColumn: "1 / -1" }}><DRow label="Info"><span style={{ fontStyle: "italic", color: COLORS.textSub }}>{c.info}</span></DRow></div>}
-          {c.businessUnit && (() => {
-            const buDef = (config.businessUnit || []).find(b => b.value === c.businessUnit);
-            const buColor = buDef?.color || COLORS.accent;
-            return (
-              <DRow label="Business Unit">
-                <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: `${buColor}20`, color: buColor, border: `1px solid ${buColor}40` }}>
-                  {buDef?.label || c.businessUnit}
-                </span>
-              </DRow>
-            );
-          })()}
-
-          <Sec label="Parties" />
-          <DRow label="Buyer">{c.buyerId}</DRow>
-          <DRow label="Seller">{c.sellerId}</DRow>
-          <DRow label="Broker">{c.brokerId}</DRow>
-
-          <Sec label="Produit" />
-          <DRow label="Commodity">{c.commodity}</DRow>
-          <DRow label="Transformation">{c.transformation ? "YES" : "NO"}</DRow>
-
-          <Sec label="Prix" />
-          <DRow label="Price Type">{c.priceType?.toUpperCase() || "—"}</DRow>
-          {c.contractPriceType === "flat" && <>
-            <DRow label="Contract Flat Price">{c.flatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>
-            {c.analyticalFlatPrice && <DRow label="Analytical Flat Price">{c.analyticalFlatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
-            {c.vat && <>
-              <DRow label="VAT">{c.vatRate ? `${c.vatRate}%` : "Oui"}</DRow>
-              {c.flatPriceVatIncluded && <DRow label="Flat Price (VAT Excl.)">{c.flatPriceVatIncluded}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
-              {c.analyticalFlatPriceVatIncluded && <DRow label="Analytical Flat Price (VAT Excl.)">{c.analyticalFlatPriceVatIncluded}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}
-            </>}
-          </>}
-          {c.contractPriceType === "prime" && <>
-            <DRow label="Premium">{c.premium ? `+${c.premium}` : "—"}</DRow>
-            {c.analyticalPremium && <DRow label="Analytical Premium">{`+${c.analyticalPremium}`}</DRow>}
-            {c.numberOfLots && <DRow label="Number of Lots">{c.numberOfLots}</DRow>}
-            <DRow label="Instrument">{instrument?.label || c.derivativeId || "—"}</DRow>
-            {c.vat && <DRow label="VAT">{c.vatRate ? `${c.vatRate}%` : "Oui"}</DRow>}
-          </>}
-          <DRow label="Payment Terms">{c.paymentTerms}</DRow>
-
-          <Sec label="Quantité" />
-          <DRow label="Quantity">
-            {(c.qtyValue || c.qtyMin || c.qtyMax) ? (
-              <span style={{ fontFamily: "'DM Mono', monospace" }}>
-                {(() => { const fq = v => v ? Number(v).toLocaleString('fr-FR') : '…'; return c.qtyType === "range" ? `${fq(c.qtyMin)} – ${fq(c.qtyMax)}` : fq(c.qtyValue); })()}
-                {c.qtyUnit ? ` ${c.qtyUnit}` : ""}
-              </span>
-            ) : null}
-          </DRow>
-          <DRow label="Tolérance">
-            {c.qtyTolerance !== undefined && c.qtyTolerance !== ""
-              ? <span>{c.qtyTolerance === "0" ? "=0%" : `±${c.qtyTolerance}%`}{c.qtyTolerance !== "0" && c.qtyToleranceOption ? ` · ${c.qtyToleranceOption}` : ""}</span>
-              : null}
-          </DRow>
-          {(c.qtyEstimated || c.qtyFinal) && <>
-            <DRow label="Estimated Qty">{c.qtyEstimated ? `${parseFloat(c.qtyEstimated).toFixed(2)}${c.qtyUnit ? " " + c.qtyUnit : ""}` : "—"}</DRow>
-            <DRow label="Final Qty">{c.qtyFinal ? `${parseFloat(c.qtyFinal).toFixed(2)}${c.qtyUnit ? " " + c.qtyUnit : ""}` : "—"}</DRow>
-          </>}
-
-          <Sec label="Exécution" />
-          <div style={{ gridColumn: "1 / 3" }}>
-            <DRow label="Execution Period">
-              {(c.executionDateFrom || c.executionDateTo)
-                ? <span style={{ fontFamily: "'DM Mono', monospace" }}>{c.executionDateFrom || "…"} → {c.executionDateTo || "…"}{c.executionPeriodType ? ` · ${c.executionPeriodType}` : ""}{c.withoutExtension ? " · W/O EXT" : ""}</span>
-                : null}
-            </DRow>
-          </div>
-
-          <Sec label="Logistique" />
-          <DRow label="Incoterm">{c.incoterm}</DRow>
-          <DRow label="Port">{Array.isArray(c.port) ? c.port.join(", ") : c.port}</DRow>
-          <DRow label="Loadport">{c.loadport}</DRow>
-          <DRow label="Disport">{c.disport}</DRow>
-          <DRow label="Delivery Conditions">{c.deliveryConditions}</DRow>
-          <DRow label="Warehouse">{c.warehouse}</DRow>
-          <DRow label="Shipment Terminal">{c.shipmentTerminal}</DRow>
-
-          <Sec label="Géographie" />
-          <DRow label="Origin">
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {c.originCountry && getCountryCode(c.originCountry) && <img src={`https://flagcdn.com/20x15/${getCountryCode(c.originCountry).toLowerCase()}.png`} style={{ width: 20, height: 15, objectFit: "cover", borderRadius: 2, border: `1px solid ${COLORS.border}` }} />}
-              {(config.country || []).find(x => x.value === c.originCountry)?.label || c.originCountry || "—"}
-            </div>
-          </DRow>
-          <DRow label="Destination">
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {c.destinationCountry && getCountryCode(c.destinationCountry) && <img src={`https://flagcdn.com/20x15/${getCountryCode(c.destinationCountry).toLowerCase()}.png`} style={{ width: 20, height: 15, objectFit: "cover", borderRadius: 2, border: `1px solid ${COLORS.border}` }} />}
-              {(config.country || []).find(x => x.value === c.destinationCountry)?.label || c.destinationCountry || "—"}
-            </div>
-          </DRow>
-          {(c.tradeLinks || []).length > 0 && (
-            <>
-              <Sec label="Trades liés" />
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 8 }}>
-                {(c.tradeLinks || []).map((link, idx) => {
-                  const tradeIdStr = String(link.tradeId||"").replace(/[\u00a0\u200b]/g," ").trim();
-                  const trade = (trades||[]).find(t => String(t.id)===tradeIdStr) || (trades||[]).find(t => (t.tradeName||"").toLowerCase()===tradeIdStr.toLowerCase());
-                  return (
-                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: 14, background: COLORS.bg, border: `1px solid ${COLORS.accent}25`, borderRadius: 10, padding: "10px 14px" }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, minWidth: 50 }}>TRADE {idx+1}</div>
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: trade ? COLORS.accent : COLORS.textMuted }}>
-                          {trade ? trade.tradeName : <span style={{ fontStyle: "italic", fontSize: 12 }}>ID {lv} (non trouvé)</span>}
-                        </span>
-                        {trade?.businessMonth && <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono',monospace", marginLeft: 8 }}>{trade.businessMonth}</span>}
-                      </div>
-                      <div style={{ flexShrink: 0 }}>
-                        <span style={{ fontSize: 10, color: COLORS.textMuted }}>QTÉ </span>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: COLORS.text, fontFamily: "'DM Mono',monospace" }}>{link.connectedQty ? `${Number(link.connectedQty).toLocaleString("fr")} T` : "—"}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 0 }}>

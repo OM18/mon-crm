@@ -18607,7 +18607,7 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
     conclusionDate: "",
     flatPrice: "", analyticalFlatPrice: "", flatCurrency: form.flatCurrency || "",
     premium: "", analyticalPremium: "", derivativeId: form.derivativeId || "",
-    qtyValue: "", qtyUnit: form.qtyUnit || "",
+    qtyValue: "", qtyUnit: form.qtyUnit || "", lots: "",
     label: "",
   });
 
@@ -18891,9 +18891,22 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                           onMoveUp={() => patchMp("rolling", { positions: movePos(sec.positions, idx, -1) })}
                           onMoveDown={() => patchMp("rolling", { positions: movePos(sec.positions, idx, 1) })}
                           onRemove={() => removePos("rolling", idx)}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.purple, marginBottom: 8, letterSpacing: 0.5 }}>POSITION #{idx + 1}</div>
                           <PriceFields pos={pos}
                             onChange={(field, val) => updatePos("rolling", idx, field, val)}
-                            showQty={true} showDate={false} showLabel={false} forcePriceType="prime" />
+                            showQty={false} showDate={false} showLabel={false} forcePriceType="prime" />
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                            <div>
+                              <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>QUANTITY</div>
+                              <input type="number" step="0.01" value={pos.qtyValue || ""} onChange={e => updatePos("rolling", idx, "qtyValue", e.target.value)} placeholder="0"
+                                style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}># LOTS</div>
+                              <input type="number" step="1" min="0" value={pos.lots || ""} onChange={e => updatePos("rolling", idx, "lots", e.target.value)} placeholder="0"
+                                style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                            </div>
+                          </div>
                         </PosCard>
                       ))}
                     </div>

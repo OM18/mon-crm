@@ -22573,6 +22573,7 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
   const pickVal = (list, field) => list.find(c=>c?.[field])?.[field] || "";
   const derivedOrigin = t.originCountry || pickVal(legPurchase, "originCountry") || pickVal(legSale, "originCountry");
   const derivedDest   = t.destinationCountry || pickVal(legSale, "destinationCountry") || pickVal(legPurchase, "destinationCountry");
+  const isCancelledC = c => (c?.status||"").toLowerCase() === "cancelled";
   const { derivedCommodities, openByTc } = (() => {
     const contractComms = config?.contractCommodities || [];
     const tradeCommodities = config?.tradeCommodities || [];
@@ -22580,7 +22581,6 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
     const seen = new Set();
     const result = [];
     const byTc = {};
-    const isCancelledC = c => (c?.status||"").toLowerCase() === "cancelled";
     legPurchase.forEach(c => {
       if (!c?.commodity) return;
       const cfg = contractComms.find(x => (x.label||"").toLowerCase() === (c.commodity||"").toLowerCase() || (x.value||"").toLowerCase() === (c.commodity||"").toLowerCase());

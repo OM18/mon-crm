@@ -22590,7 +22590,7 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
 
   return (
     <div onClick={() => onSelect(t)}
-      style={{ display: "grid", gridTemplateColumns: "180px 160px 100px 120px 140px 140px 110px 80px 60px", borderBottom: `1px solid ${COLORS.border}`,
+      style={{ display: "grid", gridTemplateColumns: "180px 160px 120px 80px 130px 140px 140px 110px 60px", borderBottom: `1px solid ${COLORS.border}`,
         height: ROW_H_TRADE, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
         background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
         cursor: "pointer", transition: "background 0.1s" }}
@@ -22604,16 +22604,55 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
         <span style={{ fontSize: 11, color: voyage ? COLORS.accent : COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{voyage?.voyageName || "—"}</span>
       </div>
-      {/* BUSINESS MONTH */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
-        <span style={{ fontSize: 11, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{t.businessMonth || "—"}</span>
-      </div>
       {/* COMMODITY */}
       <div style={{ padding: "0 12px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, overflow: "hidden" }}>
         {(derivedCommodities.length > 0 ? derivedCommodities : (t.commodities || [])).map((c, i) => (
           <span key={i} style={{ fontSize: 10, fontWeight: 700, color: COLORS.gold, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 0.4, display: "block" }}>{c}</span>
         ))}
       </div>
+      {/* VOLUME */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
+        <span style={{ fontSize: 11, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{t.volume ? `${Number(t.volume).toLocaleString("fr")} T` : "—"}</span>
+      </div>
+      {/* OPEN POSITION */}
+      {(() => {
+        const contractComms = config?.contractCommodities || [];
+        const tradeCommodities = config?.tradeCommodities || [];
+        const byTc = {};
+        legPurchase.forEach(c => {
+          const tc = resolveTradeCommodityLabel(c.commodity, contractComms, tradeCommodities) || c.commodity;
+          if (!tc) return;
+          const leg = (t.purchaseLegs||[]).find(l => String(l.contractId)===String(c.id));
+          byTc[tc] = byTc[tc] || { p: 0, s: 0 };
+          byTc[tc].p += parseFloat(leg?.quantity || c.qtyValue || 0) || 0;
+        });
+        legSale.forEach(c => {
+          const tc = resolveTradeCommodityLabel(c.commodity, contractComms, tradeCommodities) || c.commodity;
+          if (!tc) return;
+          const leg = (t.saleLegs||[]).find(l => String(l.contractId)===String(c.id));
+          byTc[tc] = byTc[tc] || { p: 0, s: 0 };
+          byTc[tc].s += parseFloat(leg?.quantity || c.qtyValue || 0) || 0;
+        });
+        const entries = Object.entries(byTc);
+        if (entries.length === 0) return <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}><span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span></div>;
+        return (
+          <div style={{ padding: "0 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
+            {entries.map(([tc, { p, s }]) => {
+              const diff = p - s;
+              const isPos = diff >= 0;
+              const col = isPos ? COLORS.green : COLORS.red;
+              return (
+                <div key={tc} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.3, minWidth: 28 }}>{tc}</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: col, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>
+                    {isPos ? "+" : ""}{diff !== 0 ? Number(Math.abs(diff)).toLocaleString("fr") : "0"} T
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
       {/* ORIGIN COUNTRY */}
       <div style={{ padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {derivedOrigin ? (() => {
@@ -22643,10 +22682,6 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
         {t.tradeBusinessUnit
           ? <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: `${COLORS.purple}20`, color: COLORS.purple, border: `1px solid ${COLORS.purple}40`, whiteSpace: "nowrap" }}>{t.tradeBusinessUnit}</span>
           : <span style={{ color: COLORS.textMuted, fontSize: 11 }}>—</span>}
-      </div>
-      {/* VOLUME */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
-        <span style={{ fontSize: 11, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{t.volume ? `${Number(t.volume).toLocaleString("fr")} T` : "—"}</span>
       </div>
       {/* ACTIONS */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, borderLeft: `1px solid ${COLORS.border}`, padding: "0 8px" }}
@@ -23401,8 +23436,8 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
       {/* Blotter + Detail Panel */}
       <div style={{ flex: 1, display: 'flex', gap: 16, minHeight: 0 }}>
         <div style={{ flex: 1, display: 'flex', background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: 'hidden', minHeight: 0, flexDirection: 'column', minWidth: 0 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '180px 160px 100px 120px 140px 140px 110px 80px 60px', background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: 'max-content' }}>
-            {['TRADE NAME','VOYAGE','MONTH','COMMODITY','ORIGIN','DESTINATION','BU','VOLUME',''].map((h,i) => (
+          <div style={{ display: 'grid', gridTemplateColumns: '180px 160px 120px 80px 130px 140px 140px 110px 60px', background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: 'max-content' }}>
+            {['TRADE NAME','VOYAGE','COMMODITY','VOLUME','OPEN POSITION','ORIGIN','DESTINATION','BU',''].map((h,i) => (
               <div key={i} style={{ padding: '10px 12px', fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: 'nowrap' }}>{h}</div>
             ))}
           </div>

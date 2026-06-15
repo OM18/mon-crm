@@ -22642,8 +22642,8 @@ const TradeRow = memo(({ t, idx, isSel, onSelect, onEdit, onRemove, voyages, con
               const isPos = diff > 0;
               const col = isPos ? COLORS.green : COLORS.red;
               return (
-                <div key={tc} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.3, minWidth: 28 }}>{tc}</span>
+                <div key={tc} style={{ display: "grid", gridTemplateColumns: "40px 1fr", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tc}</span>
                   <span style={{ fontSize: 11, fontWeight: 800, color: col, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>
                     {isPos ? "+" : "-"}{Number(Math.abs(diff)).toLocaleString("fr")} T
                   </span>

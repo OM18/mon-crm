@@ -23223,10 +23223,15 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
         return { contractId: c.id, quantity: link?.connectedQty || '' };
       });
 
+    // Strip empty placeholder legs before merging (avoid leading blank entry)
+    const cleanPurchaseLegs = (t.purchaseLegs || []).filter(l => l.contractId);
+    const cleanSaleLegs     = (t.saleLegs     || []).filter(l => l.contractId);
+    const mergedPurchase = [...cleanPurchaseLegs, ...extraPurchase];
+    const mergedSale     = [...cleanSaleLegs,     ...extraSale];
     const enriched = {
       ...t,
-      purchaseLegs: [...(t.purchaseLegs || []), ...extraPurchase],
-      saleLegs:     [...(t.saleLegs     || []), ...extraSale],
+      purchaseLegs: mergedPurchase.length > 0 ? mergedPurchase : [EMPTY_CONTRACT_LEG()],
+      saleLegs:     mergedSale.length     > 0 ? mergedSale     : [EMPTY_CONTRACT_LEG()],
     };
     const allPurchaseContracts = [
       ...(enriched.purchaseLegs || []).map(l => contracts.find(c => String(c.id) === String(l.contractId))).filter(Boolean),

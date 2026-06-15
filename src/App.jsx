@@ -23640,9 +23640,17 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
             const allTrades = [...trades, ...enriched];
             await persist(allTrades);
 
-            // Read contracts fresh from Supabase to avoid stale closure
-            const { data: freshRows } = await supabase.from('contracts').select('data');
-            const freshContracts = (freshRows || []).map(r => r.data).filter(Boolean);
+            // Read contracts fresh from Supabase to avoid stale closure (paginated — no 1000-row cap)
+            const freshContracts = [];
+            { let from = 0; const PAGE = 1000;
+              while (true) {
+                const { data: chunk } = await supabase.from('contracts').select('data').range(from, from + PAGE - 1);
+                if (!chunk || chunk.length === 0) break;
+                for (const r of chunk) { if (r.data) freshContracts.push(r.data); }
+                if (chunk.length < PAGE) break;
+                from += PAGE;
+              }
+            }
 
             if (freshContracts.length > 0) {
               const norm = s => String(s||"").replace(/[\u00a0\u200b]/g," ").trim();

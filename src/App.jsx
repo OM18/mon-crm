@@ -19253,6 +19253,7 @@ const ContractDetailPanel = ({ c, config, instruments, trades, onEdit, onRemove 
         <Sec label="Identification" />
         <DRow label="Contract #">{c.contractNumber}</DRow>
         <DRow label="Conclusion Date">{c.conclusionDate}</DRow>
+        <DRow label="Last Update">{c.lastUpdateDate ? c.lastUpdateDate.replace("T", " ") : “—”}</DRow>
         <DRow label="Contract Type">{c.contractType}</DRow>
         <DRow label="Status">{c.status}</DRow>
         {c.info && <div style={{ gridColumn: "1 / -1" }}><DRow label="Info"><span style={{ fontStyle: "italic", color: COLORS.textSub }}>{c.info}</span></DRow></div>}
@@ -19524,9 +19525,10 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
       analyticalFlatPriceVatIncluded: form.vat ? computeVatExcluded(form.analyticalFlatPrice, form.vatRate) : "",
     };
     const contractId = editId !== null ? editId : nextId();
+    const _contractTz = config.companyTimezone || 'Europe/Paris';
     const savedContract = editId !== null
-      ? { ...enriched, id: editId }
-      : { ...enriched, id: contractId, createdAt: new Date().toISOString() };
+      ? { ...enriched, id: editId, lastUpdateDate: nowInTz(_contractTz) }
+      : { ...enriched, id: contractId, createdAt: new Date().toISOString(), lastUpdateDate: nowInTz(_contractTz) };
 
     // ── Sync trade legs bidirectionally ──
     if (setTrades && trades.length > 0 && (enriched.tradeLinks || []).length > 0) {

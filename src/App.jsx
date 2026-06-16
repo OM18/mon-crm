@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, createContext, useContext, useMemo, memo, useCallback, Component, Fragment } from "react";
+﻿import { useState, useEffect, useRef, createContext, useContext, useMemo, memo, useCallback, Component, Fragment, useDeferredValue, useTransition } from "react";
 import { supabase } from './supabase';
 
 // ─── SAFE SUPABASE SAVE ───────────────────────────────────────
@@ -19394,6 +19394,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
   const [search, setSearch] = useState("");
   const [tradeFilter, setTradeFilter] = useState("");
   const dataLoaded = useRef(true); // already loaded by parent
+  const [, startTransition] = useTransition();
 
   // ── Load instruments ──
   useEffect(() => {
@@ -19581,35 +19582,39 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
   const statusItem = (s) => (config.contractStatuses || []).find(x => (x.label || x.value) === s);
 
   // ── Search filter ──
-  const q = search.toLowerCase();
-  const tq = tradeFilter.toLowerCase().trim();
-  const filtered = contracts.filter(c => {
-    if (q && !(
-      String(c.id).includes(q) ||
-      (c.contractNumber || "").toLowerCase().includes(q) ||
-      companyName(c.buyerId).toLowerCase().includes(q) ||
-      companyName(c.sellerId).toLowerCase().includes(q) ||
-      (c.commodity || "").toLowerCase().includes(q) ||
-      (c.status || "").toLowerCase().includes(q)
-    )) return false;
-    if (tq) {
-      const normTrade = s => String(s||"").replace(/[\u00a0\u200b]/g," ").trim().toLowerCase();
-      const linked = (c.tradeLinks||[]).some(link => {
-        const trade = trades.find(t => String(t.id)===String(link.tradeId));
-        return (trade && normTrade(trade.tradeName).includes(tq)) || normTrade(String(link.tradeId||"")).includes(tq);
-      });
-      if (!linked) return false;
-    }
-    return true;
-  }).sort((a, b) => {
-    // Parse dd/mm/yyyy → comparable string yyyymmdd
-    const toYMD = d => { if (!d) return ""; const p = d.split("/"); return p.length === 3 ? p[2]+p[1]+p[0] : ""; };
-    const da = toYMD(a.conclusionDate), db = toYMD(b.conclusionDate);
-    if (db && da) return db.localeCompare(da);
-    if (db) return 1;
-    if (da) return -1;
-    return (b.id || 0) - (a.id || 0); // fallback by id
-  });
+  const deferredSearch = useDeferredValue(search);
+  const deferredTradeFilter = useDeferredValue(tradeFilter);
+  const filtered = useMemo(() => {
+    const q = deferredSearch.toLowerCase();
+    const tq = deferredTradeFilter.toLowerCase().trim();
+    return contracts.filter(c => {
+      if (q && !(
+        String(c.id).includes(q) ||
+        (c.contractNumber || "").toLowerCase().includes(q) ||
+        companyName(c.buyerId).toLowerCase().includes(q) ||
+        companyName(c.sellerId).toLowerCase().includes(q) ||
+        (c.commodity || "").toLowerCase().includes(q) ||
+        (c.status || "").toLowerCase().includes(q)
+      )) return false;
+      if (tq) {
+        const normTrade = s => String(s||"").replace(/[\u00a0\u200b]/g," ").trim().toLowerCase();
+        const linked = (c.tradeLinks||[]).some(link => {
+          const trade = trades.find(t => String(t.id)===String(link.tradeId));
+          return (trade && normTrade(trade.tradeName).includes(tq)) || normTrade(String(link.tradeId||"")).includes(tq);
+        });
+        if (!linked) return false;
+      }
+      return true;
+    }).sort((a, b) => {
+      // Parse dd/mm/yyyy → comparable string yyyymmdd
+      const toYMD = d => { if (!d) return ""; const p = d.split("/"); return p.length === 3 ? p[2]+p[1]+p[0] : ""; };
+      const da = toYMD(a.conclusionDate), db = toYMD(b.conclusionDate);
+      if (db && da) return db.localeCompare(da);
+      if (db) return 1;
+      if (da) return -1;
+      return (b.id || 0) - (a.id || 0); // fallback by id
+    });
+  }, [contracts, deferredSearch, deferredTradeFilter, trades, companies]);
 
   // ── Table columns ──
   const COLS = [
@@ -19875,7 +19880,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
           <VirtualContractList
             filtered={filtered}
             selected={selected}
-            onSelect={(c) => setSelected(selected?.id === c.id ? null : c)}
+            onSelect={(c) => startTransition(() => setSelected(selected?.id === c.id ? null : c))}
             onEdit={openEdit}
             onRemove={remove}
             COLS={COLS}

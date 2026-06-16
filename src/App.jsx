@@ -17809,7 +17809,7 @@ const CONTRACT_IMPORT_GUIDE = [
   { field: "sellerId",       format: "Texte", note: "* Obligatoire — Nom de société",  configKey: null },
   { field: "brokerId",       format: "Texte", note: "Nom de société",                  configKey: null },
   { field: "commodity",      format: "Texte", note: "* Obligatoire",                   configKey: "contractCommodities" },
-  { field: "contractPriceType", format: "Texte", note: "ex: FLAT / PREMIUM",           configKey: null },
+  { field: "contractPriceType", format: "Texte", note: "* Obligatoire",                configKey: "contractPriceTypes" },
   { field: "flatPrice",      format: "Nombre", note: "",                               configKey: null },
   { field: "flatCurrency",   format: "Texte", note: "",                                configKey: "contractCurrencies" },
   { field: "premium",        format: "Nombre", note: "",                               configKey: null },

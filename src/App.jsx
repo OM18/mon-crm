@@ -19379,7 +19379,7 @@ const ContractDetailPanel = ({ c, config, instruments, trades, onEdit, onRemove 
   );
 };
 
-const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], setTrades }) => {
+const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], setTrades, contractsLoaded = true }) => {
   const { config } = useConfig();
   const setContractsRaw = setContracts; // alias for compatibility
   const [instruments, setInstruments] = useState([]);       // active only — for modal form
@@ -19842,7 +19842,18 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: COLORS.text }}>📄 Contracts</div>
-          <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>{contracts.length} contrat{contracts.length !== 1 ? "s" : ""}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+            <span style={{ fontSize: 12, color: COLORS.textMuted }}>{contracts.length} contrat{contracts.length !== 1 ? "s" : ""}</span>
+            {!contractsLoaded && (
+              <>
+                <div style={{ width: 120, height: 3, borderRadius: 2, background: COLORS.border, overflow: "hidden", position: "relative" }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: "40%", borderRadius: 2, background: COLORS.accent,
+                    animation: "contractLoadingBar 1.2s ease-in-out infinite" }} />
+                </div>
+                <span style={{ fontSize: 11, color: COLORS.accent, fontWeight: 600, letterSpacing: 0.3 }}>Chargement…</span>
+              </>
+            )}
+          </div>
         </div>
         <input placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ width: 220, background: COLORS.card, border: `1px solid ${search ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
@@ -23885,6 +23896,7 @@ export default function CRM() {
   const [companies, setCompanies] = useState([]);
   const [tasks, setTasks] = useState(initialTasks);
   const [contracts, setContracts] = useState([]);
+  const [contractsLoaded, setContractsLoaded] = useState(false);
   const [vessels, setVessels] = useState([]);
   const [voyages, setVoyages] = useState([]);
   const [trades, setTrades] = useState([]);
@@ -23962,6 +23974,7 @@ export default function CRM() {
       if (derivOps.length) setDerivativesCache(derivOps);
       if (fixingOps.length) setFixingsCache(fixingOps);
       if (contractsData.length) setContracts(contractsData);
+      setContractsLoaded(true);
       if (vesselsData.length) setVessels(vesselsData);
       if (voyagesData.length) setVoyages(voyagesData);
       if (tradesData.length) setTrades(tradesData);
@@ -24025,6 +24038,7 @@ export default function CRM() {
           ::-webkit-scrollbar-track { background: transparent; }
           ::-webkit-scrollbar-thumb { background: ${COLORS.border}; border-radius: 3px; }
           option { background: ${COLORS.card}; }
+          @keyframes contractLoadingBar { 0%{left:-40%;} 60%{left:100%;} 100%{left:100%;} }
         `}</style>
 
         {/* Sidebar */}
@@ -24105,7 +24119,7 @@ export default function CRM() {
           {page === "derivatives" && <Derivatives companies={companies} initialOps={derivativesCache} initialFixings={fixingsCache} />}
           {page === "derivatives-dashboard" && <DerivativesDashboard />}
           {page === "derivatives-statistics" && <DerivStatistics />}
-          {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} />}
+          {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} contractsLoaded={contractsLoaded} />}
           {page === "vessels" && <Vessels companies={companies} vessels={vessels} setVessels={setVessels} />}
           {page === "voyages" && <Voyages companies={companies} vessels={vessels} voyages={voyages} setVoyages={setVoyages} />}
           {page === "trades" && <TradesErrorBoundary><Trades voyages={voyages} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} /></TradesErrorBoundary>}

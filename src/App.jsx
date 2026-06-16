@@ -887,7 +887,7 @@ const CountryFlag = ({ country, size = 36 }) => {
   return (
     <div style={{ width: size * 1.5, height: size, borderRadius: 8, overflow: "hidden", flexShrink: 0, border: `1px solid ${COLORS.border}`, background: COLORS.border, display: "flex", alignItems: "center", justifyContent: "center" }}>
       {code
-        ? <img src={`https://flagcdn.com/${code.toLowerCase()}.svg`} alt={country} style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        ? <img src={`https://flagcdn.com/${code.toLowerCase()}.svg`} alt={country} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }}
             onError={e => { e.target.onerror = null; e.target.src = `https://flagcdn.com/w80/${code.toLowerCase()}.png`; }} />
         : <span style={{ fontSize: size * 0.3, color: COLORS.textMuted }}>{country?.slice(0, 2).toUpperCase() || "?"}</span>
       }
@@ -19842,18 +19842,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: COLORS.text }}>📄 Contracts</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-            <span style={{ fontSize: 12, color: COLORS.textMuted }}>{contracts.length} contrat{contracts.length !== 1 ? "s" : ""}</span>
-            {!contractsLoaded && (
-              <>
-                <div style={{ width: 120, height: 3, borderRadius: 2, background: COLORS.border, overflow: "hidden", position: "relative" }}>
-                  <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: "40%", borderRadius: 2, background: COLORS.accent,
-                    animation: "contractLoadingBar 1.2s ease-in-out infinite" }} />
-                </div>
-                <span style={{ fontSize: 11, color: COLORS.accent, fontWeight: 600, letterSpacing: 0.3 }}>Chargement…</span>
-              </>
-            )}
-          </div>
+          <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>{contracts.length} contrat{contracts.length !== 1 ? "s" : ""}</div>
         </div>
         <input placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ width: 220, background: COLORS.card, border: `1px solid ${search ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "10px 16px", color: COLORS.text, fontSize: 14, outline: "none", fontFamily: "inherit" }} />

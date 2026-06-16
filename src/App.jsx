@@ -18303,16 +18303,16 @@ const ContractImportModal = ({ onClose, onImport, companies = [], instruments = 
                       <td style={{ padding: "7px 12px", color: COLORS.text, borderBottom: `1px solid ${COLORS.border}`, whiteSpace: "nowrap" }}>{row.format}</td>
                       <td style={{ padding: "7px 12px", color: COLORS.textSub, borderBottom: `1px solid ${COLORS.border}` }}>{row.note}</td>
                       <td style={{ padding: "7px 12px", borderBottom: `1px solid ${COLORS.border}` }}>
-                        {row.configKey && config[row.configKey]?.length > 0 ? (
+                        {row.configKey ? (() => { const vals = (config[row.configKey]?.length > 0 ? config[row.configKey] : row.configKey === "contractPriceTypes" ? [{ value: "flat", label: "FLAT" }, { value: "prime", label: "PREMIUM" }] : []); return vals.length > 0 ? (
                           <details>
-                            <summary style={{ cursor: "pointer", fontSize: 11, color: COLORS.accent, fontWeight: 600 }}>{config[row.configKey].length} valeurs</summary>
+                            <summary style={{ cursor: "pointer", fontSize: 11, color: COLORS.accent, fontWeight: 600 }}>{vals.length} valeurs</summary>
                             <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                              {config[row.configKey].map((v, vi) => (
+                              {vals.map((v, vi) => (
                                 <span key={vi} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 6, background: v.color ? `${v.color}22` : COLORS.bg, color: v.color || COLORS.text, border: `1px solid ${v.color ? v.color + "55" : COLORS.border}`, fontWeight: 600 }}>{v.label || v.value || v}</span>
                               ))}
                             </div>
                           </details>
-                        ) : <span style={{ color: COLORS.textMuted, fontSize: 11 }}>—</span>}
+                        ) : <span style={{ color: COLORS.textMuted, fontSize: 11 }}>—</span>; })() : <span style={{ color: COLORS.textMuted, fontSize: 11 }}>—</span>}
                       </td>
                     </tr>
                   ))}

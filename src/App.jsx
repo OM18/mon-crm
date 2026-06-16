@@ -19792,9 +19792,9 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <span style={{ fontSize: 12, color: COLORS.text }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.purple, background: `${COLORS.purple}15`, padding: "1px 6px", borderRadius: 4, marginRight: 4 }}>PREMIUM</span>
-              {c.premium ? `+${c.premium}` : "—"}
+              {c.premium ? `${Number(c.premium) >= 0 ? "+" : ""}${c.premium}` : "—"}
             </span>
-            {c.analyticalPremium && <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Anal. +{c.analyticalPremium}</span>}
+            {c.analyticalPremium && <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Anal. {Number(c.analyticalPremium) >= 0 ? "+" : ""}{c.analyticalPremium}</span>}
             {instrumentShort && <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130 }}>{instrumentShort}</span>}
             <MultiBadge />
           </div>

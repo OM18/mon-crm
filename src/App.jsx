@@ -19279,7 +19279,7 @@ const ContractDetailPanel = ({ c, config, instruments, trades, onEdit, onRemove 
         <DRow label="Transformation">{c.transformation ? "YES" : "NO"}</DRow>
 
         <Sec label="Prix" />
-        <DRow label="Price Type">{c.contractPriceType?.toUpperCase() || "—"}</DRow>
+        <DRow label="Price Type">{c.contractPriceType ? ((config.contractPriceTypes || []).find(x => x.value === c.contractPriceType)?.label || c.contractPriceType).toUpperCase() : "—"}</DRow>
         {c.contractPriceType === "flat" && <>
           <DRow label="Contract Flat Price">{c.flatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>
           {c.analyticalFlatPrice && <DRow label="Analytical Flat Price">{c.analyticalFlatPrice}{c.flatCurrency ? ` ${c.flatCurrency}` : ""}</DRow>}

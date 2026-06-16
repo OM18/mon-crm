@@ -646,6 +646,8 @@ const COUNTRY_TO_CODE = {
   "bermuda": "BM", "bermudes": "BM",
   "isle of man": "IM", "ile de man": "IM",
   "gibraltar": "GI",
+  "malta": "MT",
+  "cyprus": "CY", "chypre": "CY",
   "barbados": "BB", "barbade": "BB",
   "antigua and barbuda": "AG", "antigua": "AG",
   "saint vincent": "VC", "st vincent": "VC",
@@ -656,9 +658,11 @@ const COUNTRY_TO_CODE = {
   "cook islands": "CK", "îles cook": "CK",
   "niue": "NU",
   "belize": "BZ",
+  "cambodia": "KH", "cambodge": "KH",
   "equatorial guinea": "GQ", "guinée équatoriale": "GQ",
   "sao tome": "ST", "são tomé": "ST",
   "maldives": "MV",
+  "comoros": "KM", "comores": "KM",
   // ── Shipping registry cities / ports (flag state by port of registration) ──
   "majuro": "MH",            // Marshall Islands capital
   "ebeye": "MH",             // Marshall Islands
@@ -9415,7 +9419,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             configKey="contractPremiumOptions"
             label="Premium Contract Options"
             icon="⭐"
-            description="Options premium disponibles dans les contrats à prime (ex : EURONEXT MATIF, CBOT…)"
+            description="Options premium disponibles dans les contrats à prime (ex : EURONEXT MATIF, CBOT…)"
             config={config}
             updateField={updateField}
             hasColor={false}
@@ -19584,35 +19588,39 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
   const statusItem = (s) => (config.contractStatuses || []).find(x => (x.label || x.value) === s);
 
   // ── Search filter ──
-  const q = search.toLowerCase();
-  const tq = tradeFilter.toLowerCase().trim();
-  const filtered = contracts.filter(c => {
-    if (q && !(
-      String(c.id).includes(q) ||
-      (c.contractNumber || "").toLowerCase().includes(q) ||
-      companyName(c.buyerId).toLowerCase().includes(q) ||
-      companyName(c.sellerId).toLowerCase().includes(q) ||
-      (c.commodity || "").toLowerCase().includes(q) ||
-      (c.status || "").toLowerCase().includes(q)
-    )) return false;
-    if (tq) {
-      const normTrade = s => String(s||"").replace(/[\u00a0\u200b]/g," ").trim().toLowerCase();
-      const linked = (c.tradeLinks||[]).some(link => {
-        const trade = trades.find(t => String(t.id)===String(link.tradeId));
-        return (trade && normTrade(trade.tradeName).includes(tq)) || normTrade(String(link.tradeId||"")).includes(tq);
-      });
-      if (!linked) return false;
-    }
-    return true;
-  }).sort((a, b) => {
-    // Parse dd/mm/yyyy → comparable string yyyymmdd
-    const toYMD = d => { if (!d) return ""; const p = d.split("/"); return p.length === 3 ? p[2]+p[1]+p[0] : ""; };
-    const da = toYMD(a.conclusionDate), db = toYMD(b.conclusionDate);
-    if (db && da) return db.localeCompare(da);
-    if (db) return 1;
-    if (da) return -1;
-    return (b.id || 0) - (a.id || 0); // fallback by id
-  });
+  const deferredSearch = useDeferredValue(search);
+  const deferredTradeFilter = useDeferredValue(tradeFilter);
+  const filtered = useMemo(() => {
+    const q = deferredSearch.toLowerCase();
+    const tq = deferredTradeFilter.toLowerCase().trim();
+    return contracts.filter(c => {
+      if (q && !(
+        String(c.id).includes(q) ||
+        (c.contractNumber || "").toLowerCase().includes(q) ||
+        companyName(c.buyerId).toLowerCase().includes(q) ||
+        companyName(c.sellerId).toLowerCase().includes(q) ||
+        (c.commodity || "").toLowerCase().includes(q) ||
+        (c.status || "").toLowerCase().includes(q)
+      )) return false;
+      if (tq) {
+        const normTrade = s => String(s||"").replace(/[\u00a0\u200b]/g," ").trim().toLowerCase();
+        const linked = (c.tradeLinks||[]).some(link => {
+          const trade = trades.find(t => String(t.id)===String(link.tradeId));
+          return (trade && normTrade(trade.tradeName).includes(tq)) || normTrade(String(link.tradeId||"")).includes(tq);
+        });
+        if (!linked) return false;
+      }
+      return true;
+    }).sort((a, b) => {
+      // Parse dd/mm/yyyy → comparable string yyyymmdd
+      const toYMD = d => { if (!d) return ""; const p = d.split("/"); return p.length === 3 ? p[2]+p[1]+p[0] : ""; };
+      const da = toYMD(a.conclusionDate), db = toYMD(b.conclusionDate);
+      if (db && da) return db.localeCompare(da);
+      if (db) return 1;
+      if (da) return -1;
+      return (b.id || 0) - (a.id || 0); // fallback by id
+    });
+  }, [contracts, deferredSearch, deferredTradeFilter, trades, companies]);
 
   // ── Table columns ──
   const COLS = [
@@ -19878,7 +19886,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
           <VirtualContractList
             filtered={filtered}
             selected={selected}
-            onSelect={(c) => startTransition(() => setSelected(prev => prev?.id === c.id ? null : c))}
+            onSelect={(c) => startTransition(() => setSelected(selected?.id === c.id ? null : c))}
             onEdit={openEdit}
             onRemove={remove}
             COLS={COLS}
@@ -23094,7 +23102,7 @@ const VirtualTradeList = ({ filtered, selected, onSelect, onEdit, onRemove, voya
   return (
     <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)} style={{ overflowY: 'auto', flex: 1, overflowX: 'auto' }}>
       {filtered.length === 0
-        ? <div style={{ textAlign: 'center', color: COLORS.textMuted, padding: '56px 0', fontSize: 14 }}>Aucun trade — cliquez sur « + Ajouter »</div>
+        ? <div style={{ textAlign: 'center', color: COLORS.textMuted, padding: '56px 0', fontSize: 14 }}>Aucun trade — cliquez sur « + Ajouter »</div>
         : <div style={{ height: totalH, position: 'relative', minWidth: 'max-content' }}>
             {filtered.slice(startIdx, endIdx).map((t, vi) => {
               const i = startIdx + vi;
@@ -23888,6 +23896,7 @@ export default function CRM() {
   const [companies, setCompanies] = useState([]);
   const [tasks, setTasks] = useState(initialTasks);
   const [contracts, setContracts] = useState([]);
+  const [contractsLoaded, setContractsLoaded] = useState(false);
   const [vessels, setVessels] = useState([]);
   const [voyages, setVoyages] = useState([]);
   const [trades, setTrades] = useState([]);
@@ -23965,6 +23974,7 @@ export default function CRM() {
       if (derivOps.length) setDerivativesCache(derivOps);
       if (fixingOps.length) setFixingsCache(fixingOps);
       if (contractsData.length) setContracts(contractsData);
+      setContractsLoaded(true);
       if (vesselsData.length) setVessels(vesselsData);
       if (voyagesData.length) setVoyages(voyagesData);
       if (tradesData.length) setTrades(tradesData);
@@ -24028,6 +24038,7 @@ export default function CRM() {
           ::-webkit-scrollbar-track { background: transparent; }
           ::-webkit-scrollbar-thumb { background: ${COLORS.border}; border-radius: 3px; }
           option { background: ${COLORS.card}; }
+          @keyframes contractLoadingBar { 0%{left:-40%;} 60%{left:100%;} 100%{left:100%;} }
         `}</style>
 
         {/* Sidebar */}
@@ -24108,7 +24119,7 @@ export default function CRM() {
           {page === "derivatives" && <Derivatives companies={companies} initialOps={derivativesCache} initialFixings={fixingsCache} />}
           {page === "derivatives-dashboard" && <DerivativesDashboard />}
           {page === "derivatives-statistics" && <DerivStatistics />}
-          {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} />}
+          {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} contractsLoaded={contractsLoaded} />}
           {page === "vessels" && <Vessels companies={companies} vessels={vessels} setVessels={setVessels} />}
           {page === "voyages" && <Voyages companies={companies} vessels={vessels} voyages={voyages} setVoyages={setVoyages} />}
           {page === "trades" && <TradesErrorBoundary><Trades voyages={voyages} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} /></TradesErrorBoundary>}
@@ -24124,3 +24135,4 @@ export default function CRM() {
       )}
     </ConfigProvider>
   );
+}

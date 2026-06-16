@@ -18567,6 +18567,112 @@ const EMPTY_CONTRACT = (cfg = {}) => ({
 });
 
 // ─── MULTI-PRICE MODAL ───────────────────────────────────────────────────────
+// ── MultiPrice sub-components (top-level to avoid focus-loss bug) ──
+const MpPosCard = ({ idx, total, onMoveUp, onMoveDown, onRemove, isDefault, onSetDefault, children }) => (
+  <div style={{ background: COLORS.bg, border: `1px solid ${isDefault ? COLORS.accent+"60" : COLORS.border}`, borderRadius: 10, padding: "12px 14px", position: "relative" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub }}>#{idx + 1}</span>
+      {isDefault !== undefined && (
+        <button onClick={onSetDefault}
+          style={{ fontSize: 10, padding: "2px 8px", borderRadius: 5, border: `1px solid ${isDefault ? COLORS.accent+"60" : COLORS.border}`, background: isDefault ? `${COLORS.accent}15` : "transparent", color: isDefault ? COLORS.accent : COLORS.textMuted, cursor: "pointer", fontWeight: 700 }}>
+          {isDefault ? "✓ DEFAULT" : "SET DEFAULT"}
+        </button>
+      )}
+      <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+        {idx > 0 && <button onClick={onMoveUp} style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.textMuted, cursor: "pointer", padding: "2px 6px", fontSize: 11 }}>↑</button>}
+        {idx < total - 1 && <button onClick={onMoveDown} style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.textMuted, cursor: "pointer", padding: "2px 6px", fontSize: 11 }}>↓</button>}
+        <button onClick={onRemove} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "2px 4px" }}
+          onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
+      </div>
+    </div>
+    {children}
+  </div>
+);
+
+const MpPriceFields = ({ pos, onChange, config, instruments, fmtDate, priceType: outerPriceType,
+  showQty = true, showDate = true, showLabel = false, forcePriceType }) => {
+  const effectivePriceType = forcePriceType || pos.priceType || outerPriceType;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {showLabel && (
+        <div>
+          <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>LABEL *</div>
+          <input value={pos.label || ""} onChange={e => onChange("label", e.target.value)} placeholder="Nom de l'option…"
+            style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+        </div>
+      )}
+      {showDate && (
+        <div>
+          <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>CONCLUSION DATE</div>
+          <input value={pos.conclusionDate || ""} onChange={e => onChange("conclusionDate", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
+            style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+        </div>
+      )}
+      {(effectivePriceType === "flat" || effectivePriceType === "mixed") && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>FLAT PRICE</div>
+            <input type="number" step="0.01" value={pos.flatPrice || ""} onChange={e => onChange("flatPrice", e.target.value)} placeholder="0.00"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>ANALYTICAL FLAT</div>
+            <input type="number" step="0.01" value={pos.analyticalFlatPrice || ""} onChange={e => onChange("analyticalFlatPrice", e.target.value)} placeholder="0.00"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>CURRENCY</div>
+            <select value={pos.flatCurrency || ""} onChange={e => onChange("flatCurrency", e.target.value)}
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: pos.flatCurrency ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+              <option value="">—</option>
+              {(config.contractCurrencies || []).map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+      {(effectivePriceType === "prime" || effectivePriceType === "mixed") && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>PREMIUM</div>
+            <input type="number" step="1" value={pos.premium || ""} onChange={e => onChange("premium", e.target.value)} placeholder="ex: 25"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>ANALYTICAL PREMIUM</div>
+            <input type="number" step="1" value={pos.analyticalPremium || ""} onChange={e => onChange("analyticalPremium", e.target.value)} placeholder="ex: 25"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>DERIVATIVE INSTRUMENT</div>
+            <datalist id="mp-instruments-list">{instruments.map(p => <option key={p.id} value={p.label} />)}</datalist>
+            <input list="mp-instruments-list" value={pos.derivativeInstrument || ""}
+              onChange={e => onChange("derivativeInstrument", e.target.value)}
+              placeholder="Saisir ou choisir un instrument…"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+        </div>
+      )}
+      {showQty && (
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>QUANTITY</div>
+            <input type="number" step="0.01" value={pos.qtyValue || ""} onChange={e => onChange("qtyValue", e.target.value)} placeholder="0"
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>UNIT</div>
+            <select value={pos.qtyUnit || ""} onChange={e => onChange("qtyUnit", e.target.value)}
+              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: pos.qtyUnit ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+              <option value="">—</option>
+              {(config.contractVolumeUnits || []).map(u => <option key={u.label || u.value} value={u.label || u.value}>{u.label || u.value}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Handles 4 combinable modes: multi-negotiated, rolling, optional port, optional period
 
 const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
@@ -18636,111 +18742,6 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
   // ── Sub-components ──
 
   // Shared price fields
-  const PriceFields = ({ pos, onChange, showQty = true, showDate = true, showLabel = false, forcePriceType }) => {
-    const effectivePriceType = forcePriceType || pos.priceType || priceType;
-    return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {showLabel && (
-        <div>
-          <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>LABEL *</div>
-          <input value={pos.label || ""} onChange={e => onChange("label", e.target.value)} placeholder="Nom de l'option…"
-            style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-        </div>
-      )}
-      {showDate && (
-        <div>
-          <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>CONCLUSION DATE</div>
-          <input value={pos.conclusionDate || ""} onChange={e => onChange("conclusionDate", fmtDate(e.target.value))} placeholder="dd/mm/yyyy" maxLength={10}
-            style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-        </div>
-      )}
-      {(effectivePriceType === "flat" || effectivePriceType === "mixed") && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <div>
-            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>FLAT PRICE</div>
-            <input type="number" step="0.01" value={pos.flatPrice || ""} onChange={e => onChange("flatPrice", e.target.value)} placeholder="0.00"
-              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>ANALYTICAL FLAT</div>
-            <input type="number" step="0.01" value={pos.analyticalFlatPrice || ""} onChange={e => onChange("analyticalFlatPrice", e.target.value)} placeholder="0.00"
-              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>CURRENCY</div>
-            <select value={pos.flatCurrency || ""} onChange={e => onChange("flatCurrency", e.target.value)}
-              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: pos.flatCurrency ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
-              <option value="">—</option>
-              {(config.contractCurrencies || []).map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
-            </select>
-          </div>
-        </div>
-      )}
-      {(effectivePriceType === "prime" || effectivePriceType === "mixed") && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <div>
-            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>PREMIUM</div>
-            <input type="number" step="1" value={pos.premium || ""} onChange={e => onChange("premium", e.target.value)} placeholder="ex: 25"
-              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>ANALYTICAL PREMIUM</div>
-            <input type="number" step="1" value={pos.analyticalPremium || ""} onChange={e => onChange("analyticalPremium", e.target.value)} placeholder="ex: 25"
-              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-          </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>DERIVATIVE INSTRUMENT</div>
-            <select value={pos.derivativeId || ""} onChange={e => onChange("derivativeId", e.target.value)}
-              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: pos.derivativeId ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
-              <option value="">— Instrument —</option>
-              {instruments.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-            </select>
-          </div>
-        </div>
-      )}
-      {showQty && (
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8 }}>
-          <div>
-            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>QUANTITY</div>
-            <input type="number" step="0.01" value={pos.qtyValue || ""} onChange={e => onChange("qtyValue", e.target.value)} placeholder="0"
-              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: COLORS.textSub, fontWeight: 600, marginBottom: 3 }}>UNIT</div>
-            <select value={pos.qtyUnit || ""} onChange={e => onChange("qtyUnit", e.target.value)}
-              style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: pos.qtyUnit ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
-              <option value="">—</option>
-              {(config.contractVolumeUnits || []).map(u => <option key={u.label || u.value} value={u.label || u.value}>{u.label || u.value}</option>)}
-            </select>
-          </div>
-        </div>
-      )}
-    </div>
-    );
-  };
-
-  // Position card wrapper
-  const PosCard = ({ idx, total, onMoveUp, onMoveDown, onRemove, isDefault, onSetDefault, children }) => (
-    <div style={{ background: COLORS.bg, border: `1px solid ${isDefault ? COLORS.accent+"60" : COLORS.border}`, borderRadius: 10, padding: "12px 14px", position: "relative" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub }}>#{idx + 1}</span>
-        {isDefault !== undefined && (
-          <button onClick={onSetDefault}
-            style={{ fontSize: 10, padding: "2px 8px", borderRadius: 5, border: `1px solid ${isDefault ? COLORS.accent+"60" : COLORS.border}`, background: isDefault ? `${COLORS.accent}15` : "transparent", color: isDefault ? COLORS.accent : COLORS.textMuted, cursor: "pointer", fontWeight: 700 }}>
-            {isDefault ? "✓ DEFAULT" : "SET DEFAULT"}
-          </button>
-        )}
-        <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-          {idx > 0 && <button onClick={onMoveUp} style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.textMuted, cursor: "pointer", padding: "2px 6px", fontSize: 11 }}>↑</button>}
-          {idx < total - 1 && <button onClick={onMoveDown} style={{ background: "none", border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.textMuted, cursor: "pointer", padding: "2px 6px", fontSize: 11 }}>↓</button>}
-          <button onClick={onRemove} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "2px 4px" }}
-            onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>×</button>
-        </div>
-      </div>
-      {children}
-    </div>
-  );
-
   // ── Tabs ──
   const TABS = [
     { key: "multiNego", label: "Multi-négocié",    icon: "📋" },
@@ -18844,7 +18845,7 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                       {sec.positions.map((pos, idx) => (
-                        <PosCard key={pos.id} idx={idx} total={sec.positions.length}
+                        <MpPosCard key={pos.id} idx={idx} total={sec.positions.length}
                           onMoveUp={() => patchMp("multiNego", { positions: movePos(sec.positions, idx, -1) })}
                           onMoveDown={() => patchMp("multiNego", { positions: movePos(sec.positions, idx, 1) })}
                           onRemove={() => removePos("multiNego", idx)}>
@@ -18863,10 +18864,11 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                               ))}
                             </div>
                           </div>
-                          <PriceFields pos={pos}
+                          <MpPriceFields pos={pos}
                             onChange={(field, val) => updatePos("multiNego", idx, field, val)}
+                            config={config} instruments={instruments} fmtDate={fmtDate} priceType={priceType}
                             showQty={true} showDate={true} showLabel={false} />
-                        </PosCard>
+                        </MpPosCard>
                       ))}
                     </div>
                     <button onClick={() => addPos("multiNego")}
@@ -18899,13 +18901,14 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                       {sec.positions.map((pos, idx) => (
-                        <PosCard key={pos.id} idx={idx} total={sec.positions.length}
+                        <MpPosCard key={pos.id} idx={idx} total={sec.positions.length}
                           onMoveUp={() => patchMp("rolling", { positions: movePos(sec.positions, idx, -1) })}
                           onMoveDown={() => patchMp("rolling", { positions: movePos(sec.positions, idx, 1) })}
                           onRemove={() => removePos("rolling", idx)}>
                           <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.purple, marginBottom: 8, letterSpacing: 0.5 }}>POSITION #{idx + 1}</div>
-                          <PriceFields pos={pos}
+                          <MpPriceFields pos={pos}
                             onChange={(field, val) => updatePos("rolling", idx, field, val)}
+                            config={config} instruments={instruments} fmtDate={fmtDate} priceType={priceType}
                             showQty={false} showDate={false} showLabel={false} forcePriceType="prime" />
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
                             <div>
@@ -18919,7 +18922,7 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                                 style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
                             </div>
                           </div>
-                        </PosCard>
+                        </MpPosCard>
                       ))}
                     </div>
                     <button onClick={() => addPos("rolling")}
@@ -18952,7 +18955,7 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                       {sec.options.map((opt, idx) => (
-                        <PosCard key={opt.id} idx={idx} total={sec.options.length}
+                        <MpPosCard key={opt.id} idx={idx} total={sec.options.length}
                           isDefault={sec.defaultIdx === idx} onSetDefault={() => patchMp("optPort", { defaultIdx: idx })}
                           onMoveUp={() => patchMp("optPort", { options: movePos(sec.options, idx, -1) })}
                           onMoveDown={() => patchMp("optPort", { options: movePos(sec.options, idx, 1) })}
@@ -18976,10 +18979,11 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                               ))}
                             </div>
                           </div>
-                          <PriceFields pos={opt}
+                          <MpPriceFields pos={opt}
+                            config={config} instruments={instruments} fmtDate={fmtDate} priceType={priceType}
                             onChange={(field, val) => { const o = [...sec.options]; o[idx] = { ...o[idx], [field]: val }; patchMp("optPort", { options: o }); }}
                             showQty={false} showDate={false} showLabel={false} forcePriceType={opt.priceType || priceType} />
-                        </PosCard>
+                        </MpPosCard>
                       ))}
                     </div>
                     <button onClick={() => patchMp("optPort", { options: [...sec.options, newOptPos()] })}
@@ -19015,7 +19019,7 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                       {sec.options.map((opt, idx) => (
-                        <PosCard key={opt.id} idx={idx} total={sec.options.length}
+                        <MpPosCard key={opt.id} idx={idx} total={sec.options.length}
                           isDefault={sec.defaultIdx === idx} onSetDefault={() => patchMp("optPeriod", { defaultIdx: idx })}
                           onMoveUp={() => patchMp("optPeriod", { options: movePos(sec.options, idx, -1) })}
                           onMoveDown={() => patchMp("optPeriod", { options: movePos(sec.options, idx, 1) })}
@@ -19046,10 +19050,11 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                               ))}
                             </div>
                           </div>
-                          <PriceFields pos={opt}
+                          <MpPriceFields pos={opt}
+                            config={config} instruments={instruments} fmtDate={fmtDate} priceType={priceType}
                             onChange={(field, val) => { const o = [...sec.options]; o[idx] = { ...o[idx], [field]: val }; patchMp("optPeriod", { options: o }); }}
                             showQty={false} showDate={false} showLabel={false} forcePriceType={opt.priceType || priceType} />
-                        </PosCard>
+                        </MpPosCard>
                       ))}
                     </div>
                     <button onClick={() => patchMp("optPeriod", { options: [...sec.options, newOptPos()] })}
@@ -19082,7 +19087,7 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                       {sec.options.map((opt, idx) => (
-                        <PosCard key={opt.id} idx={idx} total={sec.options.length}
+                        <MpPosCard key={opt.id} idx={idx} total={sec.options.length}
                           isDefault={sec.defaultIdx === idx} onSetDefault={() => patchMp("optOrigin", { defaultIdx: idx })}
                           onMoveUp={() => patchMp("optOrigin", { options: movePos(sec.options, idx, -1) })}
                           onMoveDown={() => patchMp("optOrigin", { options: movePos(sec.options, idx, 1) })}
@@ -19106,10 +19111,11 @@ const MultiPriceModal = ({ form, f, config, instruments, onClose }) => {
                               ))}
                             </div>
                           </div>
-                          <PriceFields pos={opt}
+                          <MpPriceFields pos={opt}
+                            config={config} instruments={instruments} fmtDate={fmtDate} priceType={priceType}
                             onChange={(field, val) => { const o = [...sec.options]; o[idx] = { ...o[idx], [field]: val }; patchMp("optOrigin", { options: o }); }}
                             showQty={false} showDate={false} showLabel={false} forcePriceType={opt.priceType || priceType} />
-                        </PosCard>
+                        </MpPosCard>
                       ))}
                     </div>
                     <button onClick={() => patchMp("optOrigin", { options: [...sec.options, newOptPos()] })}

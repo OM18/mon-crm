@@ -646,8 +646,6 @@ const COUNTRY_TO_CODE = {
   "bermuda": "BM", "bermudes": "BM",
   "isle of man": "IM", "ile de man": "IM",
   "gibraltar": "GI",
-  "malta": "MT",
-  "cyprus": "CY", "chypre": "CY",
   "barbados": "BB", "barbade": "BB",
   "antigua and barbuda": "AG", "antigua": "AG",
   "saint vincent": "VC", "st vincent": "VC",
@@ -658,11 +656,9 @@ const COUNTRY_TO_CODE = {
   "cook islands": "CK", "îles cook": "CK",
   "niue": "NU",
   "belize": "BZ",
-  "cambodia": "KH", "cambodge": "KH",
   "equatorial guinea": "GQ", "guinée équatoriale": "GQ",
   "sao tome": "ST", "são tomé": "ST",
   "maldives": "MV",
-  "comoros": "KM", "comores": "KM",
   // ── Shipping registry cities / ports (flag state by port of registration) ──
   "majuro": "MH",            // Marshall Islands capital
   "ebeye": "MH",             // Marshall Islands
@@ -23884,3 +23880,247 @@ const Trades = ({ voyages = [], contracts = [], setContracts, trades = [], setTr
     </div>
   );
 };
+
+export default function CRM() {
+  const [currentUser, setCurrentUser] = useState(() => { try { return JSON.parse(localStorage.getItem("crm_current_user") || "null"); } catch { return null; } });
+  const logoSize = 50;
+  const [contacts, setContacts] = useState(initialContacts);
+  const [companies, setCompanies] = useState([]);
+  const [tasks, setTasks] = useState(initialTasks);
+  const [contracts, setContracts] = useState([]);
+  const [vessels, setVessels] = useState([]);
+  const [voyages, setVoyages] = useState([]);
+  const [trades, setTrades] = useState([]);
+  const [derivativesCache, setDerivativesCache] = useState(null);
+  const [fixingsCache, setFixingsCache] = useState(null);
+  const [page, setPage] = useState(() => localStorage.getItem("crm_page") || "dashboard");
+  useEffect(() => { localStorage.setItem("crm_page", page); }, [page]);
+  const dataLoaded = useRef(false);
+
+  useEffect(() => {
+  async function initEmployees() {
+    const { data: e } = await supabase.from('employees').select('data');
+    if (!e || e.length === 0) {
+      const defaultAdmin = { id: 1, firstName: "Admin", name: "", email: "admin@orbit.com", password: "admin123", role: "admin", status: "active" };
+      await supabase.from('employees').insert({ data: defaultAdmin });
+    }
+  }
+  initEmployees();
+}, []);
+
+  const handleLogin = (emp) => { setCurrentUser(emp); localStorage.setItem("crm_current_user", JSON.stringify(emp)); };
+  const handleLogout = () => { setCurrentUser(null); localStorage.removeItem("crm_current_user"); };
+
+  // On mount, refresh currentUser from Supabase to pick up any role changes made since last login
+  useEffect(() => {
+    if (!currentUser?.email) return;
+    (async () => {
+      const { data } = await supabase.from('employees').select('data');
+      const employees = data ? data.map(r => r.data) : [];
+      const fresh = employees.find(e => e.email === currentUser.email && e.status === "active");
+      if (fresh) {
+        setCurrentUser(fresh);
+        localStorage.setItem("crm_current_user", JSON.stringify(fresh));
+      } else {
+        // Employee deactivated or deleted — force logout
+        handleLogout();
+      }
+    })();
+  }, []);
+
+  const { showWarning, secondsLeft, resetTimer } = useAutoLogout(currentUser, handleLogout);
+
+
+
+  useEffect(() => {
+    async function loadAllPages(table) {
+      const PAGE = 1000;
+      const all = [];  // push() au lieu de spread — évite les allocations mémoire à chaque page
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase.from(table).select('data').range(from, from + PAGE - 1);
+        if (error || !data || data.length === 0) break;
+        for (const r of data) all.push(r.data ?? r);
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      return all;
+    }
+
+    async function loadData() {
+      const [contacts, companies, tasks, derivOps, fixingOps, contractsData, vesselsData, voyagesData, tradesData] = await Promise.all([
+        loadAllPages('contacts'),
+        loadAllPages('companies'),
+        loadAllPages('tasks'),
+        loadAllPages('derivatives'),
+        loadAllPages('fixings'),
+        loadAllPages('contracts'),
+        loadAllPages('vessels'),
+        loadAllPages('voyages'),
+        loadAllPages('trades'),
+      ]);
+      if (contacts.length) setContacts(contacts);
+      if (companies.length) setCompanies(companies);
+      if (tasks.length) setTasks(tasks);
+      if (derivOps.length) setDerivativesCache(derivOps);
+      if (fixingOps.length) setFixingsCache(fixingOps);
+      if (contractsData.length) setContracts(contractsData);
+      if (vesselsData.length) setVessels(vesselsData);
+      if (voyagesData.length) setVoyages(voyagesData);
+      if (tradesData.length) setTrades(tradesData);
+      dataLoaded.current = true;
+    }
+    loadData();
+
+    // When batch updates derivatives in Supabase, reload the cache in the parent too
+    // so re-mounting Derivatives always gets fresh data
+    const reloadDerivCache = async () => {
+      const fresh = await loadAllPages('derivatives');
+      if (fresh.length) setDerivativesCache(fresh);
+    };
+    window.addEventListener('derivatives:reload', reloadDerivCache);
+    return () => window.removeEventListener('derivatives:reload', reloadDerivCache);
+  }, []);
+
+  // Companies and contacts are saved explicitly on each action (no auto-save to avoid overwrite issues with large datasets)
+
+  // Ne sauvegarder les tasks que sur les vrais changements utilisateur, pas au chargement initial
+  const tasksInitialized = useRef(false);
+  useEffect(() => {
+    if (!tasksInitialized.current) {
+      tasksInitialized.current = true;
+      return; // skip le premier render (données venant de Supabase)
+    }
+    async function saveTasks() {
+      await supabase.from('tasks').delete().neq('id', 0);
+      if (tasks.length > 0) {
+        const CHUNK = 100;
+        for (let i = 0; i < tasks.length; i += CHUNK) {
+          const chunk = tasks.slice(i, i + CHUNK).map(t => ({ data: t }));
+          await supabase.from('tasks').insert(chunk);
+        }
+      }
+    }
+    saveTasks();
+  }, [tasks]);
+
+  const NavItem = useCallback(({ n, isAdmin = false }) => (
+    <div onClick={() => setPage(n.id)} style={{
+      display: "flex", alignItems: "center", gap: 12, padding: "11px 24px", cursor: "pointer", transition: "all 0.15s",
+      background: page === n.id ? (isAdmin ? `${COLORS.gold}18` : `${COLORS.accent}18`) : "transparent",
+      borderRight: page === n.id ? `3px solid ${isAdmin ? COLORS.gold : COLORS.accent}` : "3px solid transparent",
+      color: page === n.id ? "#FFFFFF" : "#D4AF37",
+    }}>
+      <span style={{ fontSize: 14 }}>{n.icon}</span>
+      <span style={{ fontSize: 14, fontWeight: page === n.id ? 700 : 500 }}>{n.label.toUpperCase()}</span>
+    </div>
+  ), [page]);
+
+    if (!currentUser) return <LoginPage onLogin={handleLogin} />;
+
+  return (
+    <ConfigProvider>
+      <div style={{ display: "flex", minHeight: "100vh", width: "100vw", overflow: "hidden", background: COLORS.bg, fontFamily: "'Inter', 'Segoe UI', sans-serif", color: COLORS.text }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&family=DM+Mono:wght@400;600&display=swap');
+          * { box-sizing: border-box; }
+          ::-webkit-scrollbar { width: 6px; }
+          ::-webkit-scrollbar-track { background: transparent; }
+          ::-webkit-scrollbar-thumb { background: ${COLORS.border}; border-radius: 3px; }
+          option { background: ${COLORS.card}; }
+        `}</style>
+
+        {/* Sidebar */}
+        <div style={{ width: 220, background: COLORS.surface, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", padding: "28px 0", flexShrink: 0 }}>
+          <div style={{ padding: "0 24px 28px" }}>
+            <div style={{ fontSize: 22, fontFamily: "'Inter', sans-serif", color: COLORS.text, lineHeight: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <img src="/xagrilogo.png" style={{ width: logoSize, height: logoSize, objectFit: "contain" }} />
+                <span style={{ color: "#D4AF37", fontSize: 22 }}>X-AGRI</span>
+              </div>
+
+            </div>
+            
+          </div>
+          <nav style={{ flex: 1 }}>
+            
+            <NavItem n={{ id: "companies", label: "Companies", icon: "◆" }} />
+            <div onClick={() => setPage("companies-dashboard")} style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "7px 24px 7px 46px", cursor: "pointer", transition: "all 0.15s",
+              background: page === "companies-dashboard" ? `${COLORS.accent}18` : "transparent",
+              borderRight: page === "companies-dashboard" ? `3px solid ${COLORS.accent}` : "3px solid transparent",
+              color: page === "companies-dashboard" ? "#FFFFFF" : "#D4AF37",
+            }}>
+              <span style={{ fontSize: 10 }}>◇</span>
+              <span style={{ fontSize: 12, fontWeight: page === "companies-dashboard" ? 700 : 400 }}>Dashboard</span>
+            </div>
+            <NavItem n={{ id: "contacts", label: "Contacts", icon: "◉" }} />
+            <NavItem n={{ id: "derivatives", label: "Derivatives", icon: "◬" }} />
+            <div onClick={() => setPage("derivatives-dashboard")} style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "7px 24px 7px 46px", cursor: "pointer", transition: "all 0.15s",
+              background: page === "derivatives-dashboard" ? `${COLORS.accent}18` : "transparent",
+              borderRight: page === "derivatives-dashboard" ? `3px solid ${COLORS.accent}` : "3px solid transparent",
+              color: page === "derivatives-dashboard" ? "#FFFFFF" : "#D4AF37",
+            }}>
+              <span style={{ fontSize: 10 }}>◇</span>
+              <span style={{ fontSize: 12, fontWeight: page === "derivatives-dashboard" ? 700 : 400 }}>Dashboard</span>
+            </div>
+            <div onClick={() => setPage("derivatives-statistics")} style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "7px 24px 7px 46px", cursor: "pointer", transition: "all 0.15s",
+              background: page === "derivatives-statistics" ? `${COLORS.accent}18` : "transparent",
+              borderRight: page === "derivatives-statistics" ? `3px solid ${COLORS.accent}` : "3px solid transparent",
+              color: page === "derivatives-statistics" ? "#FFFFFF" : "#D4AF37",
+            }}>
+              <span style={{ fontSize: 10 }}>◇</span>
+              <span style={{ fontSize: 12, fontWeight: page === "derivatives-statistics" ? 700 : 400 }}>Statistics</span>
+            </div>
+            <NavItem n={{ id: "contracts", label: "Contracts", icon: "📄" }} />
+            <NavItem n={{ id: "vessels", label: "Vessels", icon: "🚢" }} />
+            <NavItem n={{ id: "voyages", label: "Voyages", icon: "⚓" }} />
+            <NavItem n={{ id: "trades", label: "Trades", icon: "🔀" }} />
+            <div style={{ height: 1, background: COLORS.border, margin: "16px 24px" }} />
+            <div style={{ padding: "0 24px 10px", fontSize: 14, color: "#D4AF37", fontWeight: 700, letterSpacing: 1 }}>ACTIVITÉ</div>
+            {[{ id: "dashboard", label: "Dashboard", icon: "◇" }, { id: "tasks", label: "Tâches", icon: "◎" }, { id: "pipeline", label: "Pipeline", icon: "◈" }].map(n => <NavItem key={n.id} n={n} />)}
+            <div style={{ height: 1, background: COLORS.border, margin: "16px 24px" }} />
+            <div style={{ padding: "0 24px 10px", fontSize: 14, color: "#D4AF37", fontWeight: 700, letterSpacing: 1 }}>ADMINISTRATION</div>
+           {currentUser?.role === "admin" && <NavItem n={{ id: "admin", label: "Admin Panel", icon: "⚙" }} isAdmin />}
+          </nav>
+          <div style={{ padding: "16px 24px", borderTop: `1px solid ${COLORS.border}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Avatar initials={(currentUser?.firstName?.[0] || "") + (currentUser?.name?.[0] || "")} size={32} color={COLORS.gold} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{currentUser?.firstName} {currentUser?.name}</div>
+                
+              </div>
+              <button onClick={handleLogout} title="Se déconnecter" style={{ background: "none", border: "none", color: "#D4AF37", cursor: "pointer", fontSize: 22 }}>⏻</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Main */}
+        <div style={{ flex: 1, padding: "32px 40px", overflowY: "auto", background: COLORS.bg }}>
+          {page === "dashboard" && <Dashboard contacts={contacts} companies={companies} tasks={tasks} />}
+          {page === "companies" && <Companies companies={companies} setCompanies={setCompanies} contacts={contacts} />}
+          {page === "contacts" && <Contacts contacts={contacts} setContacts={setContacts} companies={companies} />}
+          {page === "tasks" && <Tasks tasks={tasks} setTasks={setTasks} contacts={contacts} companies={companies} />}
+          {page === "pipeline" && <Pipeline contacts={contacts} setContacts={setContacts} companies={companies} setCompanies={setCompanies} />}
+          {page === "companies-dashboard" && <CompaniesDashboard companies={companies} setCompanies={setCompanies} />}
+          {page === "derivatives" && <Derivatives companies={companies} initialOps={derivativesCache} initialFixings={fixingsCache} />}
+          {page === "derivatives-dashboard" && <DerivativesDashboard />}
+          {page === "derivatives-statistics" && <DerivStatistics />}
+          {page === "contracts" && <Contracts companies={companies} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} />}
+          {page === "vessels" && <Vessels companies={companies} vessels={vessels} setVessels={setVessels} />}
+          {page === "voyages" && <Voyages companies={companies} vessels={vessels} voyages={voyages} setVoyages={setVoyages} />}
+          {page === "trades" && <TradesErrorBoundary><Trades voyages={voyages} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} /></TradesErrorBoundary>}
+          {page === "admin" && <AdminPanel companies={companies} />}
+        </div>
+      </div>
+      {showWarning && (
+        <AutoLogoutWarning
+          secondsLeft={secondsLeft}
+          onStay={resetTimer}
+          onLogout={handleLogout}
+        />
+      )}
+    </ConfigProvider>
+  );

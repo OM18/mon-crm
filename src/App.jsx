@@ -19465,7 +19465,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
   };
 
   const openNew  = () => { setForm({ ...EMPTY_CONTRACT(config), conclusionDate: todayDDMMYYYY() }); setEditId(null); setShowModal(true); };
-  const openEdit = (c) => {
+  const openEdit = useCallback((c) => {
     const norm = s => String(s||"").replace(/[\u00a0\u200b]/g," ").trim();
     const normalizedLinks = (c.tradeLinks||[]).map(link => {
       const v = norm(link.tradeId);
@@ -19479,7 +19479,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
     setForm({ ...c, tradeLinks: normalizedLinks });
     setEditId(c.id);
     setShowModal(true);
-  };
+  }, [trades]);
   const closeModal = () => { setShowModal(false); setForm(EMPTY_CONTRACT(config)); setEditId(null); setFormErrors({}); };
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -19569,11 +19569,16 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
     closeModal();
   };
 
-  const remove = (id) => {
+  const remove = useCallback((id) => {
     if (!window.confirm("Supprimer ce contrat ?")) return;
     persist(contracts.filter(c => c.id !== id));
     if (selected?.id === id) setSelected(null);
-  };
+  }, [contracts, selected]);
+
+  // Stable identity (functional update avoids depending on `selected`) so VirtualContractList's memo isn't busted on every render
+  const handleSelectContract = useCallback((c) => {
+    setSelected(prev => (prev?.id === c.id ? null : c));
+  }, []);
 
   // ── Company helpers ──
   const companyName = (id) => companies.find(c => c.id === id)?.name || id || "—";
@@ -19622,8 +19627,8 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
     });
   }, [contracts, deferredSearch, deferredTradeFilter, trades, companies]);
 
-  // ── Table columns ──
-  const COLS = [
+  // ── Table columns ── (static — memoized once so identity never changes across renders)
+  const COLS = useMemo(() => [
     { key: "contractRef",         label: "Contract #",        w: 100 },
     { key: "contractType",        label: "Type",              w: 70  },
     { key: "buyerSeller",         label: "Buyer / Seller",    w: 210 },
@@ -19636,9 +19641,9 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
     { key: "originCountry",       label: "Origin",            w: 110 },
     { key: "destinationCountry",  label: "Destination",       w: 110 },
     { key: "transformation",      label: "Transform.",        w: 85  },
-  ];
+  ], []);
 
-  const gridTpl = COLS.map(c => `${c.w}px`).join(" ") + " 56px";
+  const gridTpl = useMemo(() => COLS.map(c => `${c.w}px`).join(" ") + " 56px", [COLS]);
 
   const FlagCell = ({ countryVal }) => {
     if (!countryVal) return <span style={{ color: COLORS.textMuted }}>—</span>;
@@ -19651,7 +19656,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
     );
   };
 
-  const cellContent = (c, key) => {
+  const cellContent = useCallback((c, key) => {
     // CONTRACT REF — ID + Contract # on 2 lines + BU badge
     if (key === "contractRef") {
       const buVal = c.businessUnit;
@@ -19825,7 +19830,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
     }
     const val = c[key] || "";
     return <span style={{ color: val ? COLORS.text : COLORS.textMuted, whiteSpace: "nowrap" }}>{val || "—"}</span>;
-  };
+  }, [config, companies, instruments]);
 
   // ── Country opts helper ──
   const countryOpts = (list) => (list || []).map(v => {
@@ -19886,7 +19891,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
           <VirtualContractList
             filtered={filtered}
             selected={selected}
-            onSelect={(c) => startTransition(() => setSelected(selected?.id === c.id ? null : c))}
+            onSelect={handleSelectContract}
             onEdit={openEdit}
             onRemove={remove}
             COLS={COLS}

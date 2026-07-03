@@ -7351,6 +7351,223 @@ const BatchVesselsOldToNew = () => {
   );
 };
 
+const BatchCostsOldToNew = () => {
+  const [state, setState] = useState("idle");
+  const [result, setResult] = useState(null);
+  const fileRef = useRef(null);
+
+  const normKey = k => k.trim().toLowerCase().replace(/[-_\s]+/g, "_");
+
+  // ── Column rename map ─────────────────────────────────────────
+  const COLUMN_MAP = {
+    "contract_number":     "CONTRACT NUMBER",
+    "charge_title":        "COST NAME",
+    "price_per_deal":      "EXECUTION AMOUNT",
+    "currency_symbol":     "CURRENCY",
+    "price_t":             "UNIT PRICE",
+    "volume":              "VOLUME",
+    "finances":            "INVOICE REFERENCE",
+    "vat_option":          "VAT OPTION",
+    "vat":                 "VAT LEVEL",
+    "counterparty_amount": "COUNTERPARTY AMOUNT",
+    "additional_info":     "COMMENTS",
+    "our_amount":          "OUR AMOUNT",
+    "analytical_amount":   "ANALYTICAL AMOUNT",
+    "status":              "STATUS",
+    "clientrole_name":     "COST COUNTERPARTY",
+  };
+
+  // ── processFile ───────────────────────────────────────────────
+  const processFile = async (file) => {
+    setState("processing"); setResult(null);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      const converted = rows.map(row => {
+        const out = {};
+        const rowNorm = Object.keys(row).reduce((acc, k) => { acc[normKey(k)] = k; return acc; }, {});
+
+        const get = (srcKey) => {
+          let raw = row[srcKey];
+          if (raw === undefined) { const ak = rowNorm[normKey(srcKey)]; raw = ak !== undefined ? row[ak] : ""; }
+          return raw !== undefined && raw !== null ? String(raw).trim() : "";
+        };
+
+        for (const [srcKey, destKey] of Object.entries(COLUMN_MAP)) {
+          let val = get(srcKey);
+
+          // ── Transforms ──
+          if (destKey === "VAT OPTION") {
+            const u = val.toUpperCase();
+            val = (u === "TRUE" || u === "VRAI" || u === "OUI" || u === "1") ? "TRUE"
+                : (u === "FALSE" || u === "FAUX" || u === "NON" || u === "0") ? "FALSE" : val;
+
+          } else if (destKey === "VAT LEVEL") {
+            val = val.replace("%", "").trim();
+
+          } else if (destKey === "EXECUTION AMOUNT" || destKey === "OUR AMOUNT" || destKey === "COUNTERPARTY AMOUNT" || destKey === "ANALYTICAL AMOUNT" || destKey === "UNIT PRICE" || destKey === "VOLUME") {
+            val = val.replace(",", ".").trim();
+
+          } else if (destKey === "CURRENCY") {
+            val = val.toUpperCase();
+          }
+
+          out[destKey] = val;
+        }
+
+        return out;
+      });
+
+      if (converted.length === 0) { setResult({ error: "Aucune ligne valide." }); setState("error"); return; }
+
+      const outWs = XLSX.utils.json_to_sheet(converted);
+      outWs["!cols"] = Object.keys(converted[0]).map(k => ({ wch: Math.max(k.length + 2, 18) }));
+      const outWb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(outWb, outWs, "Costs");
+      XLSX.writeFile(outWb, `costs_converted_${new Date().toISOString().slice(0,10)}.xlsx`);
+      setResult({ total: rows.length, converted: converted.length });
+      setState("done");
+    } catch(e) { setResult({ error: String(e) }); setState("error"); }
+  };
+
+  // ── Table styles ──────────────────────────────────────────────
+  const TH = { padding: "5px 10px", textAlign: "left", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bg, whiteSpace: "nowrap" };
+  const TD = { padding: "4px 10px", fontSize: 11, color: COLORS.text, borderBottom: `1px solid ${COLORS.border}40`, whiteSpace: "nowrap" };
+  const TDm = { ...TD, color: COLORS.textMuted, fontStyle: "italic" };
+  const TAG = (c) => ({ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${c}18`, color: c, border: `1px solid ${c}40` });
+
+  const RENAME_ROWS = [
+    ["contract_number", "CONTRACT NUMBER"],
+    ["charge_title", "COST NAME"],
+    ["price_per_deal", "EXECUTION AMOUNT"],
+    ["currency_symbol", "CURRENCY"],
+    ["price_t", "UNIT PRICE"],
+    ["volume", "VOLUME"],
+    ["finances", "INVOICE REFERENCE"],
+    ["vat_option", "VAT OPTION"],
+    ["vat", "VAT LEVEL"],
+    ["counterparty_amount", "COUNTERPARTY AMOUNT"],
+    ["additional_info", "COMMENTS"],
+    ["our_amount", "OUR AMOUNT"],
+    ["analytical_amount", "ANALYTICAL AMOUNT"],
+    ["status", "STATUS"],
+    ["clientrole_name", "COST COUNTERPARTY"],
+  ];
+
+  const FORMAT_ROWS = [
+    ["vat_option", "VAT OPTION", "TRUE/VRAI/OUI/1", "TRUE / FALSE"],
+    ["vat", "VAT LEVEL", "ex: 20%", "20 (sans %)"],
+    ["currency_symbol", "CURRENCY", "ex: eur, Usd", "EUR, USD (majuscules)"],
+  ];
+
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ padding: "18px 24px", background: `${COLORS.accent}08`, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: `${COLORS.accent}20`, border: `1px solid ${COLORS.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>💰</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>BATCH COSTS — OLD TO NEW</div>
+          <div style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Convertit un export coûts ancien format vers le format d'import de l'app</div>
+        </div>
+      </div>
+
+      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
+
+        {/* ── 3 tables ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 0.8fr 1.2fr", gap: 14, alignItems: "start" }}>
+
+          {/* TABLE 1 — Colonnes renommées */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.blue}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.blue, letterSpacing: 0.8 }}>① COLONNES RENOMMÉES</div>
+            <div style={{ overflowY: "auto", maxHeight: 400 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={TH}>OLD</th><th style={TH}>NEW</th></tr></thead>
+                <tbody>
+                  {RENAME_ROWS.map(([o, n], i) => (
+                    <tr key={i}>
+                      <td style={{ ...TD, color: COLORS.accent, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{o}</td>
+                      <td style={{ ...TD, color: COLORS.green, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{n}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* TABLE 2 — Valeurs à modifier */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.orange}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.orange, letterSpacing: 0.8 }}>② VALEURS MODIFIÉES</div>
+            <div style={{ padding: "12px 14px" }}>
+              {[
+                ["vat_option", "VAT OPTION", "TRUE/VRAI/OUI/1", "TRUE"],
+                ["", "", "FALSE/FAUX/NON/0", "FALSE"],
+              ].map(([src, col, ov, nv], i) => (
+                <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                  {src && <span style={{ fontSize: 10, color: COLORS.accent, fontFamily: "'DM Mono',monospace", minWidth: 80 }}>{src}</span>}
+                  {!src && <span style={{ minWidth: 80 }} />}
+                  <span style={{ fontSize: 10, color: COLORS.textMuted }}>{ov}</span>
+                  <span style={{ fontSize: 10, color: COLORS.textMuted }}>→</span>
+                  <span style={TAG(COLORS.green)}>{nv}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* TABLE 3 — Formats */}
+          <div style={{ background: COLORS.bg, borderRadius: 10, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: `${COLORS.gold}15`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 800, color: COLORS.gold, letterSpacing: 0.8 }}>③ FORMATS MODIFIÉS</div>
+            <div style={{ overflowY: "auto", maxHeight: 400 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={TH}>SOURCE</th><th style={TH}>NOUVEAU</th><th style={TH}>ANCIEN</th><th style={TH}>NOUVEAU</th></tr></thead>
+                <tbody>
+                  {FORMAT_ROWS.map(([src, dst, oldF, newF], i) => (
+                    <tr key={i}>
+                      <td style={{ ...TD, color: COLORS.accent, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{src}</td>
+                      <td style={{ ...TD, color: COLORS.green, fontFamily: "'DM Mono',monospace", fontSize: 10 }}>{dst}</td>
+                      <td style={{ ...TDm, fontSize: 10 }}>{oldF}</td>
+                      <td style={{ ...TD, fontSize: 10 }}><span style={TAG(COLORS.gold)}>{newF}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Note */}
+        <div style={{ background: `${COLORS.orange}10`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "10px 14px" }}>
+          {[
+            "⚠ clientrole_name (COST COUNTERPARTY) : le nom de société est conservé tel quel — résolu par nom au moment de l'import Costs.",
+            "⚠ vat_option : normalisé en TRUE / FALSE.",
+            "⚠ vat (VAT LEVEL) : le symbole % est retiré si présent.",
+            "⚠ Le fichier de sortie est prêt à être chargé via « 📂 Import Excel » dans le menu Costs.",
+          ].map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
+        </div>
+
+        {/* Action */}
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
+          onChange={e => { if (e.target.files[0]) processFile(e.target.files[0]); e.target.value = ""; }} />
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <Btn onClick={() => { setState("idle"); setResult(null); fileRef.current?.click(); }}
+            disabled={state === "processing"} style={{ background: COLORS.accent, borderColor: COLORS.accent }}>
+            {state === "processing" ? "⟳ Traitement…" : "📂 Charger fichier Excel / CSV"}
+          </Btn>
+          {state === "done" && result && (
+            <span style={{ fontSize: 12, color: COLORS.green, fontWeight: 700 }}>
+              ✓ {result.converted} coûts convertis sur {result.total} — fichier téléchargé
+            </span>
+          )}
+          {state === "error" && <span style={{ fontSize: 12, color: COLORS.red }}>❌ {result?.error}</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const BatchCompaniesOldToNew = () => {
   const [state, setState] = useState("idle");
   const [result, setResult] = useState(null);
@@ -9328,6 +9545,7 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
           <BatchFixingsNewToOld />
           <BatchContractsOldToNew />
           <BatchVesselsOldToNew />
+          <BatchCostsOldToNew />
           <BatchTradesOldToNew />
         </div>
       )}
@@ -21197,6 +21415,7 @@ const EMPTY_COST = () => ({
   counterpartyAmount: "",
   pnlAmount: "",
   financialAmount: "",
+  analyticalAmount: "",
   currency: "",
   unitPrice: "",
   volume: "",
@@ -21204,6 +21423,7 @@ const EMPTY_COST = () => ({
   vatOption: false,
   vatLevel: "",
   status: "",
+  comments: "",
   createdAt: "",
 });
 
@@ -21313,10 +21533,12 @@ const CostDetailPanel = ({ c, companies, onEdit, onClose }) => {
       <DRow label="Counterparty Amount">{c.counterpartyAmount !== "" ? `${fmtCostAmount(c.counterpartyAmount)} ${c.currency || ""}` : null}</DRow>
       <DRow label="P&L Amount">{c.pnlAmount !== "" ? `${fmtCostAmount(c.pnlAmount)} ${c.currency || ""}` : null}</DRow>
       <DRow label="Financial Amount">{c.financialAmount !== "" ? `${fmtCostAmount(c.financialAmount)} ${c.currency || ""}` : null}</DRow>
+      <DRow label="Analytical Amount">{c.analyticalAmount !== "" ? `${fmtCostAmount(c.analyticalAmount)} ${c.currency || ""}` : null}</DRow>
       <DRow label="Unit Price">{c.unitPrice}</DRow>
       <DRow label="Volume">{c.volume}</DRow>
       <DRow label="Invoice Reference">{c.invoiceReference}</DRow>
       <DRow label="VAT">{c.vatOption ? `Oui — ${c.vatLevel || 0}%` : "Non"}</DRow>
+      {c.comments && <DRow label="Comments">{c.comments}</DRow>}
     </div>
   );
 };
@@ -21421,7 +21643,7 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
           {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <button onClick={() => setShowImport(true)} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 12px", color: COLORS.textMuted, fontSize: 13, cursor: "pointer" }}>
-          📂 Import Excel
+          <img src="/logoxl.png" style={{ width: 18, height: 18, verticalAlign: "middle" }} /> Import
         </button>
         {costs.length > 0 && (
           <button onClick={async () => {
@@ -21499,6 +21721,7 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
               {numField("counterpartyAmount", "COUNTERPARTY AMOUNT")}
               {numField("pnlAmount", "P&L AMOUNT")}
               {numField("financialAmount", "FINANCIAL AMOUNT")}
+              {numField("analyticalAmount", "ANALYTICAL AMOUNT")}
               {/* CURRENCY */}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>CURRENCY</label>
@@ -21530,6 +21753,12 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
                 <label style={{ fontSize: 11, fontWeight: 700, color: form.vatOption ? COLORS.textSub : COLORS.textMuted, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>VAT LEVEL (%)</label>
                 <input type="number" step="any" disabled={!form.vatOption} value={form.vatLevel ?? ""} onChange={e => f("vatLevel", e.target.value)} placeholder="ex: 20"
                   style={{ width: "100%", background: form.vatOption ? COLORS.bg : `${COLORS.bg}80`, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.vatOption ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", cursor: form.vatOption ? "text" : "not-allowed" }} />
+              </div>
+              {/* COMMENTS */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>COMMENTS</label>
+                <textarea value={form.comments || ""} onChange={e => f("comments", e.target.value)} rows={3} placeholder="Commentaires…"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}>
@@ -21568,17 +21797,19 @@ const COST_FIELD_ALIASES = {
   counterpartyAmount:  ["counterparty amount", "counterpartyamount", "montant contrepartie"],
   pnlAmount:           ["p&l amount", "pnl amount", "pnlamount", "p&l", "pnl"],
   financialAmount:     ["financial amount", "financialamount", "montant financier"],
+  analyticalAmount:    ["analytical amount", "analyticalamount", "montant analytique"],
   currency:            ["currency", "devise", "monnaie", "ccy"],
   unitPrice:           ["unit price", "unitprice", "prix unitaire"],
   volume:              ["volume", "quantite", "quantité", "qty"],
   invoiceReference:    ["invoice reference", "invoicereference", "reference facture", "référence facture", "invoice ref"],
-  vatOption:           ["vat option", "vatoption", "tva applicable", "vat"],
-  vatLevel:            ["vat level", "vatlevel", "taux tva", "vat %", "tva %"],
+  vatOption:           ["vat option", "vatoption", "tva applicable"],
+  vatLevel:            ["vat level", "vatlevel", "taux tva", "vat %", "tva %", "vat"],
   status:              ["status", "statut"],
+  comments:            ["comments", "comment", "commentaires", "commentaire", "additional info", "additionalinfo"],
 };
 
-const COST_IMPORTABLE_FIELDS = ["costName","costCounterpartyId","contractNumber","executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","currency","unitPrice","volume","invoiceReference","vatOption","vatLevel","status"];
-const COST_FIELD_LABELS = { costName:"Cost Name", costCounterpartyId:"Cost Counterparty", contractNumber:"Contract Number", executionAmount:"Execution Amount", ourAmount:"Our Amount", counterpartyAmount:"Counterparty Amount", pnlAmount:"P&L Amount", financialAmount:"Financial Amount", currency:"Currency", unitPrice:"Unit Price", volume:"Volume", invoiceReference:"Invoice Reference", vatOption:"VAT Option", vatLevel:"VAT Level (%)", status:"Status" };
+const COST_IMPORTABLE_FIELDS = ["costName","costCounterpartyId","contractNumber","executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","analyticalAmount","currency","unitPrice","volume","invoiceReference","vatOption","vatLevel","status","comments"];
+const COST_FIELD_LABELS = { costName:"Cost Name", costCounterpartyId:"Cost Counterparty", contractNumber:"Contract Number", executionAmount:"Execution Amount", ourAmount:"Our Amount", counterpartyAmount:"Counterparty Amount", pnlAmount:"P&L Amount", financialAmount:"Financial Amount", analyticalAmount:"Analytical Amount", currency:"Currency", unitPrice:"Unit Price", volume:"Volume", invoiceReference:"Invoice Reference", vatOption:"VAT Option", vatLevel:"VAT Level (%)", status:"Status", comments:"Comments" };
 
 const CostImportModal = ({ onClose, onImport, companies, config }) => {
   const [step, setStep] = useState("guide");
@@ -21660,7 +21891,7 @@ const CostImportModal = ({ onClose, onImport, companies, config }) => {
         // Normalize vatOption
         obj.vatOption = ["true","yes","oui","1"].includes(String(obj.vatOption || "").toLowerCase().trim());
         // Normalize numeric fields
-        ["executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","unitPrice","volume","vatLevel"].forEach(k => {
+        ["executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","analyticalAmount","unitPrice","volume","vatLevel"].forEach(k => {
           if (obj[k] !== undefined && obj[k] !== "") {
             const n = parseFloat(String(obj[k]).replace(",", "."));
             obj[k] = isNaN(n) ? "" : n;
@@ -21675,7 +21906,7 @@ const CostImportModal = ({ onClose, onImport, companies, config }) => {
 
   const doExport = async () => {
     const XLSX = await import("xlsx");
-    const hdrs = [["costName","costCounterparty (name)","contractNumber","executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","currency","unitPrice","volume","invoiceReference","vatOption","vatLevel","status"]];
+    const hdrs = [["costName","costCounterparty (name)","contractNumber","executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","analyticalAmount","currency","unitPrice","volume","invoiceReference","vatOption","vatLevel","status","comments"]];
     const ws = XLSX.utils.aoa_to_sheet(hdrs);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Costs");
@@ -21718,6 +21949,7 @@ const CostImportModal = ({ onClose, onImport, companies, config }) => {
                   { f: "counterpartyAmount",  l: "Counterparty Amount" },
                   { f: "pnlAmount",           l: "P&L Amount" },
                   { f: "financialAmount",     l: "Financial Amount" },
+                  { f: "analyticalAmount",    l: "Analytical Amount" },
                   { f: "currency",            l: "Currency" },
                   { f: "unitPrice",           l: "Unit Price" },
                   { f: "volume",              l: "Volume" },
@@ -21725,6 +21957,7 @@ const CostImportModal = ({ onClose, onImport, companies, config }) => {
                   { f: "vatOption",           l: "VAT Option" },
                   { f: "vatLevel",            l: "VAT Level (%)" },
                   { f: "status",              l: "Status" },
+                  { f: "comments",            l: "Comments" },
                 ].map(({ f, l, req }) => (
                   <span key={f} style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 5,
                     background: req ? `${COLORS.red}15` : `${COLORS.accent}10`,

@@ -21134,6 +21134,356 @@ const Vessels = ({ companies = [], vessels = [], setVessels }) => {
   );
 };
 
+// ═══════════════════════════════════════════════════════════════
+// ─── COSTS ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+const COST_STATUS_OPTIONS = ["Draft", "Pending", "Approved", "Invoiced", "Paid", "Disputed", "Cancelled"];
+
+const COST_STATUS_COLOR = (status) => {
+  switch (status) {
+    case "Paid": return COLORS.green;
+    case "Approved":
+    case "Invoiced": return COLORS.blue;
+    case "Disputed": return COLORS.red;
+    case "Cancelled": return COLORS.textMuted;
+    case "Pending": return COLORS.orange;
+    default: return COLORS.textMuted; // Draft / empty
+  }
+};
+
+const EMPTY_COST = () => ({
+  id: null,
+  costName: "",
+  costCounterpartyId: "",
+  contractNumber: "",
+  executionAmount: "",
+  ourAmount: "",
+  counterpartyAmount: "",
+  pnlAmount: "",
+  financialAmount: "",
+  currency: "",
+  unitPrice: "",
+  volume: "",
+  invoiceReference: "",
+  vatOption: false,
+  vatLevel: "",
+  status: "",
+  createdAt: "",
+});
+
+const fmtCostAmount = (n) => (n === "" || n === null || n === undefined || isNaN(Number(n))) ? "—" : Number(n).toLocaleString("fr");
+
+const ROW_H_COST = 60;
+const OVERSCAN_COST = 8;
+
+const CostRow = memo(({ c, idx, isSel, onSelect, onEdit, onRemove, companies }) => {
+  const counterparty = companies.find(co => co.id === c.costCounterpartyId);
+  return (
+    <div onClick={() => onSelect(c)}
+      style={{ display: "grid", gridTemplateColumns: "180px 170px 130px 90px 130px 130px 120px 60px", borderBottom: `1px solid ${COLORS.border}`,
+        height: ROW_H_COST, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
+        background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
+        cursor: "pointer", transition: "background 0.1s" }}
+      onMouseOver={e => { if (!isSel) e.currentTarget.style.background = COLORS.hover; }}
+      onMouseOut={e => { if (!isSel) e.currentTarget.style.background = idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`; }}>
+      {/* COST NAME */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={c.costName} style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.costName || "—"}</span>
+      </div>
+      {/* COUNTERPARTY */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <span title={counterparty?.name} style={{ fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: counterparty ? COLORS.text : COLORS.textMuted }}>{counterparty?.name || "—"}</span>
+      </div>
+      {/* CONTRACT NUMBER */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.contractNumber || "—"}</div>
+      {/* CURRENCY */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 11, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{c.currency || "—"}</div>
+      {/* OUR AMOUNT */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 12, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{fmtCostAmount(c.ourAmount)}</div>
+      {/* P&L AMOUNT */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 12, fontFamily: "'DM Mono', monospace", color: Number(c.pnlAmount) > 0 ? COLORS.green : Number(c.pnlAmount) < 0 ? COLORS.red : COLORS.text }}>{fmtCostAmount(c.pnlAmount)}</div>
+      {/* STATUS */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
+        {c.status ? <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 6, background: `${COST_STATUS_COLOR(c.status)}18`, color: COST_STATUS_COLOR(c.status), border: `1px solid ${COST_STATUS_COLOR(c.status)}40`, whiteSpace: "nowrap" }}>{c.status.toUpperCase()}</span> : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>}
+      </div>
+      {/* ACTIONS */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, borderLeft: `1px solid ${COLORS.border}`, padding: "0 8px" }}
+        onClick={e => e.stopPropagation()}>
+        <button onClick={() => onEdit(c)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+          onMouseOver={e => e.currentTarget.style.color = COLORS.accent} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>✏</button>
+        <button onClick={() => onRemove(c.id)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, padding: "4px 5px", borderRadius: 5 }}
+          onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>🗑</button>
+      </div>
+    </div>
+  );
+});
+
+const VirtualCostList = ({ filtered, selected, onSelect, onEdit, onRemove, companies }) => {
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef(null);
+  const [containerH, setContainerH] = useState(600);
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(e => setContainerH(e[0].contentRect.height));
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+  const totalH = filtered.length * ROW_H_COST;
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H_COST) - OVERSCAN_COST);
+  const endIdx = Math.min(filtered.length, Math.ceil((scrollTop + containerH) / ROW_H_COST) + OVERSCAN_COST);
+  return (
+    <div ref={containerRef} onScroll={e => setScrollTop(e.currentTarget.scrollTop)} style={{ overflowY: "auto", flex: 1 }}>
+      {filtered.length === 0
+        ? <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "56px 0", fontSize: 14 }}>Aucun coût — cliquez sur « + Ajouter »</div>
+        : <div style={{ height: totalH, position: "relative" }}>
+            <div style={{ position: "absolute", top: startIdx * ROW_H_COST, left: 0, right: 0 }}>
+              {filtered.slice(startIdx, endIdx).map((c, ci) => (
+                <CostRow key={c.id} c={c} idx={startIdx + ci} isSel={selected?.id === c.id}
+                  onSelect={onSelect} onEdit={onEdit} onRemove={onRemove} companies={companies} />
+              ))}
+            </div>
+          </div>
+      }
+    </div>
+  );
+};
+
+// ── CostDetailPanel — top-level to avoid hooks-rules violations ──
+const CostDetailPanel = ({ c, companies, onEdit, onClose }) => {
+  if (!c) return null;
+  const counterparty = companies.find(co => co.id === c.costCounterpartyId);
+  const DRow = ({ label, children }) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 10 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 13, color: COLORS.text }}>{children ?? "—"}</div>
+    </div>
+  );
+  return (
+    <div style={{ width: 320, flexShrink: 0, background: COLORS.card, borderLeft: `1px solid ${COLORS.border}`, padding: 24, overflowY: "auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: COLORS.text }}>{c.costName}</div>
+          <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>{c.contractNumber ? `Contrat n° ${c.contractNumber}` : "Sans contrat"}</div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => onEdit(c)} style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}40`, borderRadius: 8, color: COLORS.accent, cursor: "pointer", fontSize: 12, fontWeight: 700, padding: "6px 10px" }}>✏</button>
+          <button onClick={onClose} style={{ background: COLORS.border, border: "none", borderRadius: 8, color: COLORS.textMuted, cursor: "pointer", fontSize: 14, padding: "6px 10px" }}>×</button>
+        </div>
+      </div>
+      {c.status && <div style={{ display: "inline-block", background: `${COST_STATUS_COLOR(c.status)}15`, border: `1px solid ${COST_STATUS_COLOR(c.status)}40`, borderRadius: 8, padding: "5px 12px", color: COST_STATUS_COLOR(c.status), fontSize: 11, fontWeight: 700, marginBottom: 16 }}>{c.status.toUpperCase()}</div>}
+      <DRow label="Counterparty">{counterparty?.name}</DRow>
+      <DRow label="Execution Amount">{c.executionAmount !== "" ? `${fmtCostAmount(c.executionAmount)} ${c.currency || ""}` : null}</DRow>
+      <DRow label="Our Amount">{c.ourAmount !== "" ? `${fmtCostAmount(c.ourAmount)} ${c.currency || ""}` : null}</DRow>
+      <DRow label="Counterparty Amount">{c.counterpartyAmount !== "" ? `${fmtCostAmount(c.counterpartyAmount)} ${c.currency || ""}` : null}</DRow>
+      <DRow label="P&L Amount">{c.pnlAmount !== "" ? `${fmtCostAmount(c.pnlAmount)} ${c.currency || ""}` : null}</DRow>
+      <DRow label="Financial Amount">{c.financialAmount !== "" ? `${fmtCostAmount(c.financialAmount)} ${c.currency || ""}` : null}</DRow>
+      <DRow label="Unit Price">{c.unitPrice}</DRow>
+      <DRow label="Volume">{c.volume}</DRow>
+      <DRow label="Invoice Reference">{c.invoiceReference}</DRow>
+      <DRow label="VAT">{c.vatOption ? `Oui — ${c.vatLevel || 0}%` : "Non"}</DRow>
+    </div>
+  );
+};
+
+const Costs = ({ companies = [], costs = [], setCosts }) => {
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState(EMPTY_COST());
+  const [filterStatus, setFilterStatus] = useState("");
+
+  const persist = async (updated) => {
+    setCosts(updated);
+    try {
+      await supabase.from('costs').delete().gt('id', 0);
+      const CHUNK = 50;
+      for (let i = 0; i < updated.length; i += CHUNK) {
+        const chunk = updated.slice(i, i + CHUNK).map(c => ({ data: c }));
+        const { error } = await supabase.from('costs').insert(chunk);
+        if (error) console.error('[Costs] insert error:', error);
+      }
+    } catch (e) { console.error('[Costs] persist error:', e); }
+  };
+
+  useEffect(() => {
+    const h = (e) => {
+      if (e.key !== "Escape") return;
+      if (showModal) { setShowModal(false); return; }
+      setSelected(null);
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [showModal]);
+
+  const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const openNew = () => { setForm({ ...EMPTY_COST(), createdAt: new Date().toISOString() }); setEditId(null); setShowModal(true); };
+  const openEdit = (c) => { setForm({ ...EMPTY_COST(), ...c }); setEditId(c.id); setShowModal(true); };
+  const closeModal = () => { setShowModal(false); setForm(EMPTY_COST()); setEditId(null); };
+
+  const nextId = () => costs.length > 0 ? Math.max(...costs.map(c => c.id || 0)) + 1 : 1;
+
+  const save = () => {
+    if (!form.costName?.trim()) return;
+    if (editId !== null) {
+      persist(costs.map(c => c.id === editId ? { ...form, id: editId } : c));
+    } else {
+      persist([...costs, { ...form, id: nextId(), createdAt: new Date().toISOString() }]);
+    }
+    closeModal();
+  };
+
+  const remove = (id) => {
+    if (!window.confirm("Supprimer ce coût ?")) return;
+    persist(costs.filter(c => c.id !== id));
+    if (selected?.id === id) setSelected(null);
+  };
+
+  const filtered = costs.filter(c => {
+    const q = search.toLowerCase().trim();
+    if (q && !c.costName?.toLowerCase().includes(q) && !String(c.contractNumber || "").toLowerCase().includes(q) && !String(c.invoiceReference || "").toLowerCase().includes(q)) return false;
+    if (filterStatus && c.status !== filterStatus) return false;
+    return true;
+  });
+
+  const DetailPanel = ({ c }) => (
+    <CostDetailPanel c={c} companies={companies} onEdit={openEdit} onClose={() => setSelected(null)} />
+  );
+
+  const numField = (key, label, opts = {}) => (
+    <div>
+      <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>{label}</label>
+      <input type="number" step="any" value={form[key] ?? ""} onChange={e => f(key, e.target.value)} placeholder={opts.placeholder || "0"}
+        style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+    </div>
+  );
+
+  const txtField = (key, label, opts = {}) => (
+    <div style={opts.full ? { gridColumn: "1 / -1" } : {}}>
+      <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>{label}</label>
+      <input value={form[key] ?? ""} onChange={e => f(key, opts.upper ? e.target.value.toUpperCase() : e.target.value)} placeholder={opts.placeholder || ""}
+        style={{ width: "100%", background: COLORS.bg, border: `1px solid ${opts.required && !form[key]?.trim() ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 0 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.text }}>💰 Costs</div>
+        <div style={{ flex: 1 }} />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher nom, contrat, facture…"
+          style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 14px", color: COLORS.text, fontSize: 13, outline: "none", width: 240 }} />
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 12px", color: filterStatus ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none" }}>
+          <option value="">Tous statuts</option>
+          {COST_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        {costs.length > 0 && (
+          <button onClick={async () => {
+            if (window.confirm(`⚠️ Supprimer les ${costs.length} coûts ? Cette action est irréversible.`)) {
+              await supabase.from('costs').delete().gt('id', 0);
+              setCosts([]);
+              setSelected(null);
+            }
+          }} style={{ background: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: "8px 14px" }}>
+            🗑 Effacer tout ({costs.length})
+          </button>
+        )}
+        <Btn onClick={openNew}>+ Ajouter</Btn>
+      </div>
+
+      {/* Blotter */}
+      <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "180px 170px 130px 90px 130px 130px 120px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
+            {["COST NAME", "COUNTERPARTY", "CONTRACT N°", "CCY", "OUR AMOUNT", "P&L AMOUNT", "STATUS", ""].map((h, i) => (
+              <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, padding: "4px 12px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
+            {filtered.length} coût{filtered.length !== 1 ? "s" : ""}
+          </div>
+          <VirtualCostList filtered={filtered} selected={selected} onSelect={c => setSelected(selected?.id === c.id ? null : c)}
+            onEdit={openEdit} onRemove={remove} companies={companies} />
+        </div>
+        {selected && <DetailPanel c={selected} />}
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 680, maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>{editId !== null ? "Modifier le coût" : "Nouveau coût"}</div>
+              <button onClick={closeModal} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {txtField("costName", "COST NAME *", { placeholder: "ex: Freight surcharge Q3", required: true })}
+              {/* COST COUNTERPARTY */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>COST COUNTERPARTY</label>
+                <select value={form.costCounterpartyId || ""} onChange={e => f("costCounterpartyId", e.target.value ? parseInt(e.target.value) : "")}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.costCounterpartyId ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                  <option value="">— Sélectionner —</option>
+                  {companies.map(co => <option key={co.id} value={co.id}>{co.name}</option>)}
+                </select>
+              </div>
+              {txtField("contractNumber", "CONTRACT NUMBER", { placeholder: "ex: CT-2026-045" })}
+              {/* STATUS */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>STATUS</label>
+                <select value={form.status || ""} onChange={e => f("status", e.target.value)}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.status ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                  <option value="">— Sélectionner —</option>
+                  {COST_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              <div style={{ gridColumn: "1 / -1", height: 1, background: COLORS.border, margin: "4px 0" }} />
+
+              {numField("executionAmount", "EXECUTION AMOUNT")}
+              {numField("ourAmount", "OUR AMOUNT")}
+              {numField("counterpartyAmount", "COUNTERPARTY AMOUNT")}
+              {numField("pnlAmount", "P&L AMOUNT")}
+              {numField("financialAmount", "FINANCIAL AMOUNT")}
+              {txtField("currency", "CURRENCY", { placeholder: "ex: EUR, USD", upper: true })}
+              {numField("unitPrice", "UNIT PRICE")}
+              {numField("volume", "VOLUME")}
+
+              <div style={{ gridColumn: "1 / -1", height: 1, background: COLORS.border, margin: "4px 0" }} />
+
+              {txtField("invoiceReference", "INVOICE REFERENCE", { placeholder: "ex: INV-2026-0456", full: true })}
+
+              {/* VAT OPTION */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div onClick={() => f("vatOption", !form.vatOption)}
+                  style={{ width: 44, height: 24, borderRadius: 12, background: form.vatOption ? COLORS.accent : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+                  <div style={{ position: "absolute", top: 2, left: form.vatOption ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
+                </div>
+                <label style={{ fontSize: 13, color: form.vatOption ? COLORS.text : COLORS.textMuted, fontWeight: form.vatOption ? 700 : 400, cursor: "pointer" }} onClick={() => f("vatOption", !form.vatOption)}>
+                  VAT OPTION {form.vatOption ? "(True)" : "(False)"}
+                </label>
+              </div>
+              {/* VAT LEVEL */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: form.vatOption ? COLORS.textSub : COLORS.textMuted, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>VAT LEVEL (%)</label>
+                <input type="number" step="any" disabled={!form.vatOption} value={form.vatLevel ?? ""} onChange={e => f("vatLevel", e.target.value)} placeholder="ex: 20"
+                  style={{ width: "100%", background: form.vatOption ? COLORS.bg : `${COLORS.bg}80`, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.vatOption ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", cursor: form.vatOption ? "text" : "not-allowed" }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}>
+              <button onClick={closeModal} style={{ padding: "10px 20px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+              <Btn onClick={save} disabled={!form.costName?.trim()}>{editId !== null ? "✓ Enregistrer" : "✓ Créer"}</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── VESSEL IMPORT MODAL ───────────────────────────────────────
 const VESSEL_FIELD_ALIASES = {
   vesselId:           ["vessel id", "vesselid", "id navire", "id", "vessel ref", "ref"],
@@ -23905,6 +24255,7 @@ export default function CRM() {
   const [vessels, setVessels] = useState([]);
   const [voyages, setVoyages] = useState([]);
   const [trades, setTrades] = useState([]);
+  const [costs, setCosts] = useState([]);
   const [derivativesCache, setDerivativesCache] = useState(null);
   const [fixingsCache, setFixingsCache] = useState(null);
   const [page, setPage] = useState(() => localStorage.getItem("crm_page") || "dashboard");
@@ -23962,7 +24313,7 @@ export default function CRM() {
     }
 
     async function loadData() {
-      const [contacts, companies, tasks, derivOps, fixingOps, contractsData, vesselsData, voyagesData, tradesData] = await Promise.all([
+      const [contacts, companies, tasks, derivOps, fixingOps, contractsData, vesselsData, voyagesData, tradesData, costsData] = await Promise.all([
         loadAllPages('contacts'),
         loadAllPages('companies'),
         loadAllPages('tasks'),
@@ -23972,6 +24323,7 @@ export default function CRM() {
         loadAllPages('vessels'),
         loadAllPages('voyages'),
         loadAllPages('trades'),
+        loadAllPages('costs'),
       ]);
       if (contacts.length) setContacts(contacts);
       if (companies.length) setCompanies(companies);
@@ -23983,6 +24335,7 @@ export default function CRM() {
       if (vesselsData.length) setVessels(vesselsData);
       if (voyagesData.length) setVoyages(voyagesData);
       if (tradesData.length) setTrades(tradesData);
+      if (costsData.length) setCosts(costsData);
       dataLoaded.current = true;
     }
     loadData();
@@ -24094,6 +24447,7 @@ export default function CRM() {
             <NavItem n={{ id: "vessels", label: "Vessels", icon: "🚢" }} />
             <NavItem n={{ id: "voyages", label: "Voyages", icon: "⚓" }} />
             <NavItem n={{ id: "trades", label: "Trades", icon: "🔀" }} />
+            <NavItem n={{ id: "costs", label: "Costs", icon: "💰" }} />
             <div style={{ height: 1, background: COLORS.border, margin: "16px 24px" }} />
             <div style={{ padding: "0 24px 10px", fontSize: 14, color: "#D4AF37", fontWeight: 700, letterSpacing: 1 }}>ACTIVITÉ</div>
             {[{ id: "dashboard", label: "Dashboard", icon: "◇" }, { id: "tasks", label: "Tâches", icon: "◎" }, { id: "pipeline", label: "Pipeline", icon: "◈" }].map(n => <NavItem key={n.id} n={n} />)}
@@ -24128,6 +24482,7 @@ export default function CRM() {
           {page === "vessels" && <Vessels companies={companies} vessels={vessels} setVessels={setVessels} />}
           {page === "voyages" && <Voyages companies={companies} vessels={vessels} voyages={voyages} setVoyages={setVoyages} />}
           {page === "trades" && <TradesErrorBoundary><Trades voyages={voyages} contracts={contracts} setContracts={setContracts} trades={trades} setTrades={setTrades} /></TradesErrorBoundary>}
+          {page === "costs" && <Costs companies={companies} costs={costs} setCosts={setCosts} />}
           {page === "admin" && <AdminPanel companies={companies} />}
         </div>
       </div>

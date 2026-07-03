@@ -492,6 +492,9 @@ const DEFAULT_CONFIG = {
   documentTypes: [],
   documents: [],
   vesselSize: [],
+  costNames: [],
+  costStatuses: [],
+  costCurrencies: [],
   tradeCommodities: [],
   tradeLogisticTypes: [],
   derivInstrumentTypeDefault: "",
@@ -8308,8 +8311,8 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        {[["fields", "📋 Champs CRM"], ["derivatives", "◬ Derivatives"], ["contracts", "📄 Contracts"], ["documents", "🗂 Documents"], ["company", "🏢 Company"], ["batch", "⚙ Batch"]].map(([t, l]) => (
-          <span key={t} onClick={() => setAdminTab(t)} style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, padding: "6px 18px", borderRadius: 10, background: adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : t === "contracts" ? COLORS.green : t === "documents" ? COLORS.orange : COLORS.accent) : COLORS.bg, color: adminTab === t ? "#fff" : COLORS.textMuted, border: `1px solid ${adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : t === "contracts" ? COLORS.green : t === "documents" ? COLORS.orange : COLORS.accent) : COLORS.border}` }}>{l}</span>
+        {[["fields", "📋 Champs CRM"], ["derivatives", "◬ Derivatives"], ["contracts", "📄 Contracts"], ["costs", "💰 Costs"], ["documents", "🗂 Documents"], ["company", "🏢 Company"], ["batch", "⚙ Batch"]].map(([t, l]) => (
+          <span key={t} onClick={() => setAdminTab(t)} style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, padding: "6px 18px", borderRadius: 10, background: adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : t === "contracts" ? COLORS.green : t === "costs" ? COLORS.gold : t === "documents" ? COLORS.orange : COLORS.accent) : COLORS.bg, color: adminTab === t ? "#fff" : COLORS.textMuted, border: `1px solid ${adminTab === t ? (t === "derivatives" ? COLORS.blue : t === "batch" ? COLORS.purple : t === "contracts" ? COLORS.green : t === "costs" ? COLORS.gold : t === "documents" ? COLORS.orange : COLORS.accent) : COLORS.border}` }}>{l}</span>
         ))}
       </div>
 
@@ -9420,6 +9423,39 @@ for (const e of updated) await supabase.from('employees').insert({ data: e });
             label="Premium Contract Options"
             icon="⭐"
             description="Options premium disponibles dans les contrats à prime (ex : EURONEXT MATIF, CBOT…)"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+          />
+        </div>
+      )}
+
+      {adminTab === "costs" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <DerivPillsEditor
+            configKey="costNames"
+            label="Cost Names"
+            icon="💰"
+            description="Noms / catégories de coûts disponibles (ex : Freight, Demurrage, Storage…)"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+            sortAlpha={true}
+          />
+          <DerivPillsEditor
+            configKey="costStatuses"
+            label="Cost Statuses"
+            icon="🔖"
+            description="Statuts disponibles pour les coûts (ex : Pending, Invoiced, Paid…)"
+            config={config}
+            updateField={updateField}
+            hasColor={false}
+          />
+          <DerivPillsEditor
+            configKey="costCurrencies"
+            label="Cost Currencies"
+            icon="💱"
+            description="Devises utilisées pour les coûts (ex : EUR, USD, MAD…)"
             config={config}
             updateField={updateField}
             hasColor={false}
@@ -21286,12 +21322,16 @@ const CostDetailPanel = ({ c, companies, onEdit, onClose }) => {
 };
 
 const Costs = ({ companies = [], costs = [], setCosts }) => {
+  const { config } = useConfig();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(EMPTY_COST());
   const [filterStatus, setFilterStatus] = useState("");
+
+  const statusOptions = (config.costStatuses || []).length > 0 ? config.costStatuses.map(s => s.label || s.value) : COST_STATUS_OPTIONS;
 
   const persist = async (updated) => {
     setCosts(updated);
@@ -21378,8 +21418,11 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
           style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 12px", color: filterStatus ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none" }}>
           <option value="">Tous statuts</option>
-          {COST_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+          {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+        <button onClick={() => setShowImport(true)} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 12px", color: COLORS.textMuted, fontSize: 13, cursor: "pointer" }}>
+          📂 Import Excel
+        </button>
         {costs.length > 0 && (
           <button onClick={async () => {
             if (window.confirm(`⚠️ Supprimer les ${costs.length} coûts ? Cette action est irréversible.`)) {
@@ -21420,7 +21463,15 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
               <button onClick={closeModal} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              {txtField("costName", "COST NAME *", { placeholder: "ex: Freight surcharge Q3", required: true })}
+              {/* COST NAME */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>COST NAME *</label>
+                <input value={form.costName || ""} onChange={e => f("costName", e.target.value)} placeholder="ex: Freight surcharge Q3" list="cost-name-suggestions"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${!form.costName?.trim() ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                <datalist id="cost-name-suggestions">
+                  {(config.costNames || []).map(s => <option key={s.value} value={s.label || s.value} />)}
+                </datalist>
+              </div>
               {/* COST COUNTERPARTY */}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>COST COUNTERPARTY</label>
@@ -21437,7 +21488,7 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
                 <select value={form.status || ""} onChange={e => f("status", e.target.value)}
                   style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.status ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
                   <option value="">— Sélectionner —</option>
-                  {COST_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                  {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
 
@@ -21448,7 +21499,15 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
               {numField("counterpartyAmount", "COUNTERPARTY AMOUNT")}
               {numField("pnlAmount", "P&L AMOUNT")}
               {numField("financialAmount", "FINANCIAL AMOUNT")}
-              {txtField("currency", "CURRENCY", { placeholder: "ex: EUR, USD", upper: true })}
+              {/* CURRENCY */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>CURRENCY</label>
+                <input value={form.currency || ""} onChange={e => f("currency", e.target.value.toUpperCase())} placeholder="ex: EUR, USD" list="cost-currency-suggestions"
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                <datalist id="cost-currency-suggestions">
+                  {(config.costCurrencies || []).map(s => <option key={s.value} value={s.label || s.value} />)}
+                </datalist>
+              </div>
               {numField("unitPrice", "UNIT PRICE")}
               {numField("volume", "VOLUME")}
 
@@ -21480,6 +21539,309 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
           </div>
         </div>
       )}
+
+      {/* Import Modal */}
+      {showImport && (
+        <CostImportModal
+          onClose={() => setShowImport(false)}
+          companies={companies}
+          config={config}
+          onImport={(items) => {
+            const startId = costs.length > 0 ? Math.max(...costs.map(c => c.id || 0)) + 1 : 1;
+            const enriched = items.map((item, i) => ({ ...EMPTY_COST(), ...item, id: startId + i, createdAt: new Date().toISOString() }));
+            persist([...costs, ...enriched]);
+            setShowImport(false);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// ─── COST IMPORT MODAL ─────────────────────────────────────────
+const COST_FIELD_ALIASES = {
+  costName:            ["cost name", "costname", "nom", "nom du cout", "name"],
+  costCounterpartyId:  ["cost counterparty", "counterparty", "contrepartie", "société", "societe"],
+  contractNumber:      ["contract number", "contractnumber", "numero contrat", "numéro contrat", "n° contrat", "contract n°"],
+  executionAmount:     ["execution amount", "executionamount", "montant execution"],
+  ourAmount:           ["our amount", "ouramount", "notre montant"],
+  counterpartyAmount:  ["counterparty amount", "counterpartyamount", "montant contrepartie"],
+  pnlAmount:           ["p&l amount", "pnl amount", "pnlamount", "p&l", "pnl"],
+  financialAmount:     ["financial amount", "financialamount", "montant financier"],
+  currency:            ["currency", "devise", "monnaie", "ccy"],
+  unitPrice:           ["unit price", "unitprice", "prix unitaire"],
+  volume:              ["volume", "quantite", "quantité", "qty"],
+  invoiceReference:    ["invoice reference", "invoicereference", "reference facture", "référence facture", "invoice ref"],
+  vatOption:           ["vat option", "vatoption", "tva applicable", "vat"],
+  vatLevel:            ["vat level", "vatlevel", "taux tva", "vat %", "tva %"],
+  status:              ["status", "statut"],
+};
+
+const COST_IMPORTABLE_FIELDS = ["costName","costCounterpartyId","contractNumber","executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","currency","unitPrice","volume","invoiceReference","vatOption","vatLevel","status"];
+const COST_FIELD_LABELS = { costName:"Cost Name", costCounterpartyId:"Cost Counterparty", contractNumber:"Contract Number", executionAmount:"Execution Amount", ourAmount:"Our Amount", counterpartyAmount:"Counterparty Amount", pnlAmount:"P&L Amount", financialAmount:"Financial Amount", currency:"Currency", unitPrice:"Unit Price", volume:"Volume", invoiceReference:"Invoice Reference", vatOption:"VAT Option", vatLevel:"VAT Level (%)", status:"Status" };
+
+const CostImportModal = ({ onClose, onImport, companies, config }) => {
+  const [step, setStep] = useState("guide");
+  const [rawRows, setRawRows] = useState([]);
+  const [headers, setHeaders] = useState([]);
+  const [mapping, setMapping] = useState({});
+  const [preview, setPreview] = useState([]);
+  const [error, setError] = useState("");
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef(null);
+
+  const normH = h => {
+    if (!h) return "";
+    const s = h.toString().trim();
+    const spaced = s.replace(/([a-z])([A-Z])/g, '$1 $2');
+    return spaced.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+  };
+
+  const guessField = (header) => {
+    const n = normH(header);
+    for (const [field, aliases] of Object.entries(COST_FIELD_ALIASES)) {
+      if (aliases.some(a => normH(a) === n || n === normH(a))) return field;
+    }
+    for (const [field, aliases] of Object.entries(COST_FIELD_ALIASES)) {
+      if (aliases.some(a => n.includes(normH(a)) || normH(a).includes(n))) return field;
+    }
+    return null;
+  };
+
+  const handleFile = async (file) => {
+    setError("");
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      if (!rows.length) { setError("Fichier vide"); return; }
+      const hdrs = Object.keys(rows[0]);
+      setHeaders(hdrs);
+      setRawRows(rows);
+      const autoMap = {};
+      hdrs.forEach((h, i) => { const g = guessField(h); if (g && !Object.values(autoMap).includes(g)) autoMap[i] = g; });
+      setMapping(autoMap);
+      setStep("mapping");
+    } catch(e) { setError(String(e)); }
+  };
+
+  const buildPreview = () => {
+    const prev = rawRows.slice(0, 5).map(row => {
+      const obj = {};
+      Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[headers[ci]]?.toString().trim() || ""; });
+      return obj;
+    });
+    setPreview(prev);
+    setStep("preview");
+  };
+
+  const normComp = s => s?.toString().toLowerCase().trim() || "";
+
+  const doImport = () => {
+    setImporting(true);
+    setTimeout(() => {
+      const items = rawRows.map(row => {
+        const obj = {};
+        Object.entries(mapping).forEach(([ci, f]) => { if (f) obj[f] = row[headers[ci]]?.toString().trim() || ""; });
+        // Resolve counterparty (company name → id)
+        if (obj.costCounterpartyId) {
+          const found = companies.find(co => normComp(co.name) === normComp(obj.costCounterpartyId));
+          obj.costCounterpartyId = found ? found.id : "";
+        }
+        // Resolve status against admin list if available
+        if (obj.status && (config.costStatuses || []).length > 0) {
+          const found = config.costStatuses.find(s => normComp(s.label || s.value) === normComp(obj.status));
+          if (found) obj.status = found.label || found.value;
+        }
+        // Normalize currency
+        if (obj.currency) obj.currency = obj.currency.toUpperCase();
+        // Normalize vatOption
+        obj.vatOption = ["true","yes","oui","1"].includes(String(obj.vatOption || "").toLowerCase().trim());
+        // Normalize numeric fields
+        ["executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","unitPrice","volume","vatLevel"].forEach(k => {
+          if (obj[k] !== undefined && obj[k] !== "") {
+            const n = parseFloat(String(obj[k]).replace(",", "."));
+            obj[k] = isNaN(n) ? "" : n;
+          }
+        });
+        return obj;
+      }).filter(obj => obj.costName);
+      onImport(items);
+      setImporting(false);
+    }, 50);
+  };
+
+  const doExport = async () => {
+    const XLSX = await import("xlsx");
+    const hdrs = [["costName","costCounterparty (name)","contractNumber","executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","currency","unitPrice","volume","invoiceReference","vatOption","vatLevel","status"]];
+    const ws = XLSX.utils.aoa_to_sheet(hdrs);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Costs");
+    XLSX.writeFile(wb, `costs_template_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
+  const mappedCount = Object.values(mapping).filter(Boolean).length;
+  const ignoredCount = headers.filter((h, i) => !mapping[i]).length;
+  const allMapped = ignoredCount === 0;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 700, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>💰 Import Costs</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
+        </div>
+
+        {/* Step indicators */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 22 }}>
+          {[["guide","① Guide"],["mapping","② Mapping"],["preview","③ Aperçu"]].map(([s, l]) => (
+            <div key={s} style={{ padding: "4px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+              background: step === s ? COLORS.accent : COLORS.bg,
+              color: step === s ? "#fff" : COLORS.textMuted,
+              border: `1px solid ${step === s ? COLORS.accent : COLORS.border}` }}>{l}</div>
+          ))}
+        </div>
+        {step === "guide" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Field guide table */}
+            <div style={{ background: COLORS.bg, borderRadius: 12, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+              <div style={{ padding: "10px 16px", background: `${COLORS.accent}12`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 12, fontWeight: 700, color: COLORS.accent }}>COLONNES RECONNUES AUTOMATIQUEMENT</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "14px 16px" }}>
+                {[
+                  { f: "costName",            l: "Cost Name", req: true },
+                  { f: "costCounterpartyId",  l: "Cost Counterparty" },
+                  { f: "contractNumber",      l: "Contract Number" },
+                  { f: "executionAmount",     l: "Execution Amount" },
+                  { f: "ourAmount",           l: "Our Amount" },
+                  { f: "counterpartyAmount",  l: "Counterparty Amount" },
+                  { f: "pnlAmount",           l: "P&L Amount" },
+                  { f: "financialAmount",     l: "Financial Amount" },
+                  { f: "currency",            l: "Currency" },
+                  { f: "unitPrice",           l: "Unit Price" },
+                  { f: "volume",              l: "Volume" },
+                  { f: "invoiceReference",    l: "Invoice Reference" },
+                  { f: "vatOption",           l: "VAT Option" },
+                  { f: "vatLevel",            l: "VAT Level (%)" },
+                  { f: "status",              l: "Status" },
+                ].map(({ f, l, req }) => (
+                  <span key={f} style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 5,
+                    background: req ? `${COLORS.red}15` : `${COLORS.accent}10`,
+                    color: req ? COLORS.red : COLORS.textMuted,
+                    border: `1px solid ${req ? COLORS.red+"30" : COLORS.border}` }}>
+                    {l}{req ? " *" : ""}
+                  </span>
+                ))}
+              </div>
+              <div style={{ padding: "0 16px 12px", fontSize: 11, color: COLORS.textMuted }}>* Champ obligatoire</div>
+            </div>
+            {/* Notes */}
+            <div style={{ background: `${COLORS.orange}10`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "10px 14px" }}>
+              {[
+                "⚠ costCounterparty : saisir le nom exact de la société.",
+                "⚠ currency : code devise (ex: EUR, USD, MAD).",
+                "⚠ vatOption : TRUE/FALSE ou OUI/NON.",
+                "⚠ status : idéalement une valeur définie dans Admin Panel → Costs.",
+                "⚠ montants et volume : nombres (le point ou la virgule sont acceptés).",
+              ].map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
+            </div>
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={doExport} style={{ background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "9px 16px", color: COLORS.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                ⬇ Télécharger le modèle Excel
+              </button>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
+              <Btn onClick={() => fileRef.current?.click()}>📂 Choisir un fichier</Btn>
+            </div>
+            {error && <div style={{ color: COLORS.red, fontSize: 12, padding: "8px 12px", background: `${COLORS.red}10`, borderRadius: 8 }}>{error}</div>}
+          </div>
+        )}
+
+        {/* Mapping */}
+        {step === "mapping" && (
+          <div>
+            {/* Status bar */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, padding: "10px 16px", borderRadius: 10, background: allMapped ? `${COLORS.green}12` : `${COLORS.orange}12`, border: `1px solid ${allMapped ? COLORS.green : COLORS.orange}30` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: allMapped ? COLORS.green : COLORS.orange, boxShadow: `0 0 6px ${allMapped ? COLORS.green : COLORS.orange}` }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: allMapped ? COLORS.green : COLORS.orange }}>
+                  {allMapped ? "Toutes les colonnes sont mappées" : `${ignoredCount} colonne${ignoredCount > 1 ? "s" : ""} ignorée${ignoredCount > 1 ? "s" : ""}`}
+                </span>
+              </div>
+              <span style={{ fontSize: 12, color: COLORS.textSub }}>{mappedCount} / {headers.length} mappées</span>
+            </div>
+            <p style={{ color: COLORS.textSub, fontSize: 13, margin: "0 0 14px" }}>{rawRows.length} lignes détectées — vérifiez le mapping :</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxHeight: 380, overflowY: "auto", paddingRight: 4 }}>
+              {headers.map((h, i) => {
+                const isMapped = !!mapping[i];
+                const dotColor = isMapped ? COLORS.green : COLORS.red;
+                const borderColor = isMapped ? COLORS.green + "50" : COLORS.red + "40";
+                return (
+                  <div key={i} style={{ background: COLORS.bg, borderRadius: 10, padding: "10px 14px", border: `1px solid ${borderColor}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, background: dotColor, boxShadow: `0 0 4px ${dotColor}` }} />
+                      <div style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h || `Colonne ${i + 1}`}</div>
+                    </div>
+                    <select value={mapping[i] || ""} onChange={e => {
+                      const m = { ...mapping };
+                      if (e.target.value) { Object.keys(m).forEach(k => { if (m[k] === e.target.value) delete m[k]; }); m[i] = e.target.value; }
+                      else delete m[i];
+                      setMapping(m);
+                    }} style={{ width: "100%", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 10px", color: mapping[i] ? COLORS.text : COLORS.textMuted, fontSize: 12, outline: "none", fontFamily: "inherit" }}>
+                      <option value="">— Ignorer —</option>
+                      {COST_IMPORTABLE_FIELDS.map(f => <option key={f} value={f}>{COST_FIELD_LABELS[f]}</option>)}
+                    </select>
+                    <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      Ex: {rawRows[0]?.[h]?.toString().slice(0, 35) || "—"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
+              <button onClick={() => setStep("guide")} style={{ padding: "10px 18px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Retour</button>
+              <Btn onClick={buildPreview}>Aperçu →</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* Preview */}
+        {step === "preview" && (
+          <div>
+            <p style={{ color: COLORS.textSub, fontSize: 13, margin: "0 0 14px" }}>Aperçu des 5 premières lignes sur {rawRows.length} :</p>
+            <div style={{ overflowX: "auto", borderRadius: 10, border: `1px solid ${COLORS.border}`, marginBottom: 14 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: COLORS.bg }}>
+                    {Object.entries(mapping).filter(([,v]) => v).map(([,f]) => (
+                      <th key={f} style={{ padding: "9px 12px", color: COLORS.textSub, fontWeight: 700, textAlign: "left", borderBottom: `1px solid ${COLORS.border}`, whiteSpace: "nowrap" }}>{COST_FIELD_LABELS[f] || f}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.map((row, i) => (
+                    <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+                      {Object.entries(mapping).filter(([,v]) => v).map(([,f]) => (
+                        <td key={f} style={{ padding: "8px 12px", color: row[f] ? COLORS.text : COLORS.textMuted, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {row[f] || "—"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding: "10px 14px", background: `${COLORS.green}12`, border: `1px solid ${COLORS.green}30`, borderRadius: 8, fontSize: 13, color: COLORS.green, marginBottom: 16 }}>
+              ✓ {rawRows.length} coûts prêts à l'import
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => setStep("mapping")} style={{ padding: "10px 18px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Modifier</button>
+              <Btn onClick={doImport} style={{ background: COLORS.green }}>{importing ? "Import…" : `✓ Importer ${rawRows.length} coûts`}</Btn>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

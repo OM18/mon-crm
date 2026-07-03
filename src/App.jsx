@@ -7385,7 +7385,8 @@ const BatchCostsOldToNew = () => {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      // Les en-têtes de colonnes sont sur la 2e ligne du fichier source (la 1ère est ignorée)
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "", range: 1 });
 
       const converted = rows.map(row => {
         const out = {};
@@ -7541,9 +7542,11 @@ const BatchCostsOldToNew = () => {
         {/* Note */}
         <div style={{ background: `${COLORS.orange}10`, border: `1px solid ${COLORS.orange}40`, borderRadius: 8, padding: "10px 14px" }}>
           {[
+            "⚠ Les noms de colonnes du fichier source se trouvent sur la 2e ligne (la 1ère ligne est ignorée).",
             "⚠ clientrole_name (COST COUNTERPARTY) : le nom de société est conservé tel quel — résolu par nom au moment de l'import Costs.",
             "⚠ vat_option : normalisé en TRUE / FALSE.",
             "⚠ vat (VAT LEVEL) : le symbole % est retiré si présent.",
+            "⚠ VALIDITY DATE n'existe pas dans l'ancien format — ajoutez cette colonne manuellement dans le fichier converti avant import (sinon la date du jour sera utilisée).",
             "⚠ Le fichier de sortie est prêt à être chargé via « 📂 Import Excel » dans le menu Costs.",
           ].map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
         </div>
@@ -21405,38 +21408,91 @@ const COST_STATUS_COLOR = (status) => {
   }
 };
 
-const EMPTY_COST = () => ({
+// ── Cost occurrence — a dated snapshot of amounts for a Cost (costs move over time) ──
+const EMPTY_COST_OCCURRENCE = () => ({
   id: null,
-  costName: "",
-  costCounterpartyId: "",
-  contractNumber: "",
+  validityDate: "",
   executionAmount: "",
   ourAmount: "",
   counterpartyAmount: "",
   pnlAmount: "",
   financialAmount: "",
   analyticalAmount: "",
-  currency: "",
   unitPrice: "",
   volume: "",
   invoiceReference: "",
   vatOption: false,
   vatLevel: "",
-  status: "",
   comments: "",
+});
+
+const EMPTY_COST = () => ({
+  id: null,
+  costName: "",
+  costCounterpartyId: "",
+  contractNumber: "",
+  currency: "",
+  status: "",
+  occurrences: [],
   createdAt: "",
 });
 
+// Migrates a legacy flat cost record (pre-occurrences) into the new shape, wrapping
+// its old amount fields into a single dated occurrence so no data is lost.
+const COST_OCC_FIELDS = ["executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","analyticalAmount","unitPrice","volume","invoiceReference","vatOption","vatLevel","comments"];
+const normalizeCost = (c) => {
+  if (Array.isArray(c.occurrences)) return c;
+  const hasLegacyData = COST_OCC_FIELDS.some(k => c[k] !== undefined && c[k] !== "" && c[k] !== false && c[k] !== null);
+  const occurrences = hasLegacyData ? [{
+    id: 1,
+    validityDate: c.createdAt ? String(c.createdAt).slice(0, 10) : "",
+    executionAmount: c.executionAmount ?? "",
+    ourAmount: c.ourAmount ?? "",
+    counterpartyAmount: c.counterpartyAmount ?? "",
+    pnlAmount: c.pnlAmount ?? "",
+    financialAmount: c.financialAmount ?? "",
+    analyticalAmount: c.analyticalAmount ?? "",
+    unitPrice: c.unitPrice ?? "",
+    volume: c.volume ?? "",
+    invoiceReference: c.invoiceReference ?? "",
+    vatOption: c.vatOption ?? false,
+    vatLevel: c.vatLevel ?? "",
+    comments: c.comments ?? "",
+  }] : [];
+  return {
+    id: c.id,
+    costName: c.costName || "",
+    costCounterpartyId: c.costCounterpartyId || "",
+    contractNumber: c.contractNumber || "",
+    currency: c.currency || "",
+    status: c.status || "",
+    occurrences,
+    createdAt: c.createdAt || "",
+  };
+};
+
 const fmtCostAmount = (n) => (n === "" || n === null || n === undefined || isNaN(Number(n))) ? "—" : Number(n).toLocaleString("fr");
+const fmtCostDate = (d) => { if (!d) return "—"; const parts = String(d).slice(0, 10).split("-"); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : d; };
+
+// Latest-first sort of occurrences by validity date (undated occurrences sink to the bottom)
+const sortOccurrences = (occs) => [...(occs || [])].sort((a, b) => {
+  const da = a.validityDate || "0000-00-00";
+  const db = b.validityDate || "0000-00-00";
+  if (da !== db) return da < db ? 1 : -1;
+  return (b.id || 0) - (a.id || 0);
+});
+const getLatestOcc = (cost) => sortOccurrences(cost.occurrences)[0] || null;
 
 const ROW_H_COST = 60;
 const OVERSCAN_COST = 8;
 
 const CostRow = memo(({ c, idx, isSel, onSelect, onEdit, onRemove, companies }) => {
   const counterparty = companies.find(co => co.id === c.costCounterpartyId);
+  const latest = getLatestOcc(c);
+  const occCount = (c.occurrences || []).length;
   return (
     <div onClick={() => onSelect(c)}
-      style={{ display: "grid", gridTemplateColumns: "180px 170px 130px 90px 130px 130px 120px 60px", borderBottom: `1px solid ${COLORS.border}`,
+      style={{ display: "grid", gridTemplateColumns: "170px 150px 110px 60px 100px 120px 110px 70px 60px", borderBottom: `1px solid ${COLORS.border}`,
         height: ROW_H_COST, boxSizing: "border-box", overflow: "hidden", minWidth: "max-content",
         background: isSel ? COLORS.rowSelected : idx % 2 === 0 ? "transparent" : `${COLORS.surface}60`,
         cursor: "pointer", transition: "background 0.1s" }}
@@ -21454,13 +21510,17 @@ const CostRow = memo(({ c, idx, isSel, onSelect, onEdit, onRemove, companies }) 
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.contractNumber || "—"}</div>
       {/* CURRENCY */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 11, color: COLORS.textSub, fontFamily: "'DM Mono', monospace" }}>{c.currency || "—"}</div>
-      {/* OUR AMOUNT */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 12, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{fmtCostAmount(c.ourAmount)}</div>
-      {/* P&L AMOUNT */}
-      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 12, fontFamily: "'DM Mono', monospace", color: Number(c.pnlAmount) > 0 ? COLORS.green : Number(c.pnlAmount) < 0 ? COLORS.red : COLORS.text }}>{fmtCostAmount(c.pnlAmount)}</div>
+      {/* LATEST VALIDITY DATE */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>{latest ? fmtCostDate(latest.validityDate) : "—"}</div>
+      {/* OUR AMOUNT (latest occurrence) */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", fontSize: 12, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{latest ? fmtCostAmount(latest.ourAmount) : "—"}</div>
       {/* STATUS */}
       <div style={{ padding: "0 12px", display: "flex", alignItems: "center" }}>
         {c.status ? <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 6, background: `${COST_STATUS_COLOR(c.status)}18`, color: COST_STATUS_COLOR(c.status), border: `1px solid ${COST_STATUS_COLOR(c.status)}40`, whiteSpace: "nowrap" }}>{c.status.toUpperCase()}</span> : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>}
+      </div>
+      {/* OCCURRENCES COUNT */}
+      <div style={{ padding: "0 12px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span title={`${occCount} occurrence${occCount !== 1 ? "s" : ""}`} style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: occCount > 0 ? `${COLORS.accent}18` : COLORS.border, color: occCount > 0 ? COLORS.accent : COLORS.textMuted, border: `1px solid ${occCount > 0 ? COLORS.accent + "40" : COLORS.border}` }}>{occCount}</span>
       </div>
       {/* ACTIONS */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, borderLeft: `1px solid ${COLORS.border}`, padding: "0 8px" }}
@@ -21505,9 +21565,10 @@ const VirtualCostList = ({ filtered, selected, onSelect, onEdit, onRemove, compa
 };
 
 // ── CostDetailPanel — top-level to avoid hooks-rules violations ──
-const CostDetailPanel = ({ c, companies, onEdit, onClose }) => {
+const CostDetailPanel = ({ c, companies, onEdit, onClose, onAddOcc, onEditOcc, onRemoveOcc }) => {
   if (!c) return null;
   const counterparty = companies.find(co => co.id === c.costCounterpartyId);
+  const occurrences = sortOccurrences(c.occurrences);
   const DRow = ({ label, children }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 10 }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
@@ -21515,7 +21576,7 @@ const CostDetailPanel = ({ c, companies, onEdit, onClose }) => {
     </div>
   );
   return (
-    <div style={{ width: 320, flexShrink: 0, background: COLORS.card, borderLeft: `1px solid ${COLORS.border}`, padding: 24, overflowY: "auto" }}>
+    <div style={{ width: 400, flexShrink: 0, background: COLORS.card, borderLeft: `1px solid ${COLORS.border}`, padding: 24, overflowY: "auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 800, color: COLORS.text }}>{c.costName}</div>
@@ -21528,17 +21589,52 @@ const CostDetailPanel = ({ c, companies, onEdit, onClose }) => {
       </div>
       {c.status && <div style={{ display: "inline-block", background: `${COST_STATUS_COLOR(c.status)}15`, border: `1px solid ${COST_STATUS_COLOR(c.status)}40`, borderRadius: 8, padding: "5px 12px", color: COST_STATUS_COLOR(c.status), fontSize: 11, fontWeight: 700, marginBottom: 16 }}>{c.status.toUpperCase()}</div>}
       <DRow label="Counterparty">{counterparty?.name}</DRow>
-      <DRow label="Execution Amount">{c.executionAmount !== "" ? `${fmtCostAmount(c.executionAmount)} ${c.currency || ""}` : null}</DRow>
-      <DRow label="Our Amount">{c.ourAmount !== "" ? `${fmtCostAmount(c.ourAmount)} ${c.currency || ""}` : null}</DRow>
-      <DRow label="Counterparty Amount">{c.counterpartyAmount !== "" ? `${fmtCostAmount(c.counterpartyAmount)} ${c.currency || ""}` : null}</DRow>
-      <DRow label="P&L Amount">{c.pnlAmount !== "" ? `${fmtCostAmount(c.pnlAmount)} ${c.currency || ""}` : null}</DRow>
-      <DRow label="Financial Amount">{c.financialAmount !== "" ? `${fmtCostAmount(c.financialAmount)} ${c.currency || ""}` : null}</DRow>
-      <DRow label="Analytical Amount">{c.analyticalAmount !== "" ? `${fmtCostAmount(c.analyticalAmount)} ${c.currency || ""}` : null}</DRow>
-      <DRow label="Unit Price">{c.unitPrice}</DRow>
-      <DRow label="Volume">{c.volume}</DRow>
-      <DRow label="Invoice Reference">{c.invoiceReference}</DRow>
-      <DRow label="VAT">{c.vatOption ? `Oui — ${c.vatLevel || 0}%` : "Non"}</DRow>
-      {c.comments && <DRow label="Comments">{c.comments}</DRow>}
+      <DRow label="Currency">{c.currency}</DRow>
+
+      <div style={{ height: 1, background: COLORS.border, margin: "16px 0" }} />
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.text, textTransform: "uppercase", letterSpacing: 0.5 }}>Occurrences ({occurrences.length})</div>
+        <button onClick={() => onAddOcc(c.id)} style={{ background: `${COLORS.accent}15`, border: `1px solid ${COLORS.accent}40`, borderRadius: 7, color: COLORS.accent, cursor: "pointer", fontSize: 11, fontWeight: 700, padding: "5px 10px" }}>+ Ajouter</button>
+      </div>
+
+      {occurrences.length === 0 && (
+        <div style={{ textAlign: "center", color: COLORS.textMuted, padding: "20px 0", fontSize: 12, background: COLORS.bg, borderRadius: 10, border: `1px dashed ${COLORS.border}` }}>
+          Aucune occurrence — les coûts évoluent avec le temps, ajoutez-en une
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {occurrences.map((o, i) => (
+          <div key={o.id} style={{ background: COLORS.bg, border: `1px solid ${i === 0 ? COLORS.accent + "50" : COLORS.border}`, borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{fmtCostDate(o.validityDate)}</span>
+                {i === 0 && <span style={{ fontSize: 9, fontWeight: 800, color: COLORS.accent, background: `${COLORS.accent}18`, border: `1px solid ${COLORS.accent}40`, borderRadius: 5, padding: "1px 6px" }}>ACTUEL</span>}
+              </div>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button onClick={() => onEditOcc(c.id, o)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 12, padding: "2px 4px" }}
+                  onMouseOver={e => e.currentTarget.style.color = COLORS.accent} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>✏</button>
+                <button onClick={() => onRemoveOcc(c.id, o.id)} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", fontSize: 12, padding: "2px 4px" }}
+                  onMouseOver={e => e.currentTarget.style.color = COLORS.red} onMouseOut={e => e.currentTarget.style.color = COLORS.textMuted}>🗑</button>
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11 }}>
+              <div><span style={{ color: COLORS.textMuted }}>Execution: </span><span style={{ color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{fmtCostAmount(o.executionAmount)}</span></div>
+              <div><span style={{ color: COLORS.textMuted }}>Our: </span><span style={{ color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{fmtCostAmount(o.ourAmount)}</span></div>
+              <div><span style={{ color: COLORS.textMuted }}>Counterparty: </span><span style={{ color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{fmtCostAmount(o.counterpartyAmount)}</span></div>
+              <div><span style={{ color: COLORS.textMuted }}>P&L: </span><span style={{ color: Number(o.pnlAmount) > 0 ? COLORS.green : Number(o.pnlAmount) < 0 ? COLORS.red : COLORS.text, fontFamily: "'DM Mono', monospace" }}>{fmtCostAmount(o.pnlAmount)}</span></div>
+              <div><span style={{ color: COLORS.textMuted }}>Financial: </span><span style={{ color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{fmtCostAmount(o.financialAmount)}</span></div>
+              <div><span style={{ color: COLORS.textMuted }}>Analytical: </span><span style={{ color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{fmtCostAmount(o.analyticalAmount)}</span></div>
+              <div><span style={{ color: COLORS.textMuted }}>Unit Price: </span><span style={{ color: COLORS.text }}>{o.unitPrice || "—"}</span></div>
+              <div><span style={{ color: COLORS.textMuted }}>Volume: </span><span style={{ color: COLORS.text }}>{o.volume || "—"}</span></div>
+            </div>
+            {o.invoiceReference && <div style={{ fontSize: 11, marginTop: 4 }}><span style={{ color: COLORS.textMuted }}>Invoice: </span><span style={{ color: COLORS.text }}>{o.invoiceReference}</span></div>}
+            <div style={{ fontSize: 11, marginTop: 4 }}><span style={{ color: COLORS.textMuted }}>VAT: </span><span style={{ color: COLORS.text }}>{o.vatOption ? `Oui — ${o.vatLevel || 0}%` : "Non"}</span></div>
+            {o.comments && <div style={{ fontSize: 11, marginTop: 4, color: COLORS.textSub, fontStyle: "italic" }}>{o.comments}</div>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -21553,7 +21649,16 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
   const [form, setForm] = useState(EMPTY_COST());
   const [filterStatus, setFilterStatus] = useState("");
 
+  // ── Occurrence modal state ──
+  const [showOccModal, setShowOccModal] = useState(false);
+  const [occForm, setOccForm] = useState(EMPTY_COST_OCCURRENCE());
+  const [occCostId, setOccCostId] = useState(null);
+  const [occEditId, setOccEditId] = useState(null);
+
   const statusOptions = (config.costStatuses || []).length > 0 ? config.costStatuses.map(s => s.label || s.value) : COST_STATUS_OPTIONS;
+
+  // Migrate legacy flat records (no occurrences[]) transparently on read
+  const normalizedCosts = useMemo(() => costs.map(normalizeCost), [costs]);
 
   const persist = async (updated) => {
     setCosts(updated);
@@ -21571,54 +21676,82 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
   useEffect(() => {
     const h = (e) => {
       if (e.key !== "Escape") return;
+      if (showOccModal) { setShowOccModal(false); return; }
       if (showModal) { setShowModal(false); return; }
       setSelected(null);
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [showModal]);
+  }, [showModal, showOccModal]);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const fOcc = (k, v) => setOccForm(p => ({ ...p, [k]: v }));
 
   const openNew = () => { setForm({ ...EMPTY_COST(), createdAt: new Date().toISOString() }); setEditId(null); setShowModal(true); };
   const openEdit = (c) => { setForm({ ...EMPTY_COST(), ...c }); setEditId(c.id); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setForm(EMPTY_COST()); setEditId(null); };
 
-  const nextId = () => costs.length > 0 ? Math.max(...costs.map(c => c.id || 0)) + 1 : 1;
+  const nextId = () => normalizedCosts.length > 0 ? Math.max(...normalizedCosts.map(c => c.id || 0)) + 1 : 1;
 
   const save = () => {
     if (!form.costName?.trim()) return;
     if (editId !== null) {
-      persist(costs.map(c => c.id === editId ? { ...form, id: editId } : c));
+      const updated = normalizedCosts.map(c => c.id === editId ? { ...c, ...form, id: editId } : c);
+      persist(updated);
+      if (selected?.id === editId) setSelected(updated.find(c => c.id === editId));
     } else {
-      persist([...costs, { ...form, id: nextId(), createdAt: new Date().toISOString() }]);
+      persist([...normalizedCosts, { ...form, id: nextId(), occurrences: [], createdAt: new Date().toISOString() }]);
     }
     closeModal();
   };
 
   const remove = (id) => {
-    if (!window.confirm("Supprimer ce coût ?")) return;
-    persist(costs.filter(c => c.id !== id));
+    if (!window.confirm("Supprimer ce coût et toutes ses occurrences ?")) return;
+    persist(normalizedCosts.filter(c => c.id !== id));
     if (selected?.id === id) setSelected(null);
   };
 
-  const filtered = costs.filter(c => {
+  // ── Occurrence CRUD ──
+  const openNewOcc = (costId) => { setOccForm({ ...EMPTY_COST_OCCURRENCE(), validityDate: new Date().toISOString().slice(0, 10) }); setOccCostId(costId); setOccEditId(null); setShowOccModal(true); };
+  const openEditOcc = (costId, occ) => { setOccForm({ ...EMPTY_COST_OCCURRENCE(), ...occ }); setOccCostId(costId); setOccEditId(occ.id); setShowOccModal(true); };
+  const closeOccModal = () => { setShowOccModal(false); setOccForm(EMPTY_COST_OCCURRENCE()); setOccCostId(null); setOccEditId(null); };
+
+  const nextOccId = (cost) => { const occs = cost.occurrences || []; return occs.length > 0 ? Math.max(...occs.map(o => o.id || 0)) + 1 : 1; };
+
+  const saveOcc = () => {
+    if (!occForm.validityDate) return;
+    const updated = normalizedCosts.map(c => {
+      if (c.id !== occCostId) return c;
+      let occs;
+      if (occEditId !== null) occs = (c.occurrences || []).map(o => o.id === occEditId ? { ...occForm, id: occEditId } : o);
+      else occs = [...(c.occurrences || []), { ...occForm, id: nextOccId(c) }];
+      return { ...c, occurrences: occs };
+    });
+    persist(updated);
+    if (selected?.id === occCostId) setSelected(updated.find(c => c.id === occCostId));
+    closeOccModal();
+  };
+
+  const removeOcc = (costId, occId) => {
+    if (!window.confirm("Supprimer cette occurrence ?")) return;
+    const updated = normalizedCosts.map(c => c.id === costId ? { ...c, occurrences: (c.occurrences || []).filter(o => o.id !== occId) } : c);
+    persist(updated);
+    if (selected?.id === costId) setSelected(updated.find(c => c.id === costId));
+  };
+
+  const filtered = normalizedCosts.filter(c => {
     const q = search.toLowerCase().trim();
-    if (q && !c.costName?.toLowerCase().includes(q) && !String(c.contractNumber || "").toLowerCase().includes(q) && !String(c.invoiceReference || "").toLowerCase().includes(q)) return false;
+    if (q) {
+      const inOcc = (c.occurrences || []).some(o => String(o.invoiceReference || "").toLowerCase().includes(q));
+      if (!c.costName?.toLowerCase().includes(q) && !String(c.contractNumber || "").toLowerCase().includes(q) && !inOcc) return false;
+    }
     if (filterStatus && c.status !== filterStatus) return false;
     return true;
   });
 
   const DetailPanel = ({ c }) => (
-    <CostDetailPanel c={c} companies={companies} onEdit={openEdit} onClose={() => setSelected(null)} />
-  );
-
-  const numField = (key, label, opts = {}) => (
-    <div>
-      <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>{label}</label>
-      <input type="number" step="any" value={form[key] ?? ""} onChange={e => f(key, e.target.value)} placeholder={opts.placeholder || "0"}
-        style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-    </div>
+    <CostDetailPanel c={c} companies={companies} onEdit={openEdit} onClose={() => setSelected(null)}
+      onAddOcc={openNewOcc} onEditOcc={openEditOcc} onRemoveOcc={removeOcc} />
   );
 
   const txtField = (key, label, opts = {}) => (
@@ -21626,6 +21759,22 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
       <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>{label}</label>
       <input value={form[key] ?? ""} onChange={e => f(key, opts.upper ? e.target.value.toUpperCase() : e.target.value)} placeholder={opts.placeholder || ""}
         style={{ width: "100%", background: COLORS.bg, border: `1px solid ${opts.required && !form[key]?.trim() ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+    </div>
+  );
+
+  const occNumField = (key, label) => (
+    <div>
+      <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>{label}</label>
+      <input type="number" step="any" value={occForm[key] ?? ""} onChange={e => fOcc(key, e.target.value)} placeholder="0"
+        style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+    </div>
+  );
+
+  const occTxtField = (key, label, opts = {}) => (
+    <div style={opts.full ? { gridColumn: "1 / -1" } : {}}>
+      <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>{label}</label>
+      <input value={occForm[key] ?? ""} onChange={e => fOcc(key, e.target.value)} placeholder={opts.placeholder || ""}
+        style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
     </div>
   );
 
@@ -21645,15 +21794,15 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
         <button onClick={() => setShowImport(true)} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "8px 12px", color: COLORS.textMuted, fontSize: 13, cursor: "pointer" }}>
           <img src="/logoxl.png" style={{ width: 18, height: 18, verticalAlign: "middle" }} /> Import
         </button>
-        {costs.length > 0 && (
+        {normalizedCosts.length > 0 && (
           <button onClick={async () => {
-            if (window.confirm(`⚠️ Supprimer les ${costs.length} coûts ? Cette action est irréversible.`)) {
+            if (window.confirm(`⚠️ Supprimer les ${normalizedCosts.length} coûts ? Cette action est irréversible.`)) {
               await supabase.from('costs').delete().gt('id', 0);
               setCosts([]);
               setSelected(null);
             }
           }} style={{ background: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: "8px 14px" }}>
-            🗑 Effacer tout ({costs.length})
+            🗑 Effacer tout ({normalizedCosts.length})
           </button>
         )}
         <Btn onClick={openNew}>+ Ajouter</Btn>
@@ -21662,8 +21811,8 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
       {/* Blotter */}
       <div style={{ flex: 1, display: "flex", background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden", minHeight: 0 }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "180px 170px 130px 90px 130px 130px 120px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
-            {["COST NAME", "COUNTERPARTY", "CONTRACT N°", "CCY", "OUR AMOUNT", "P&L AMOUNT", "STATUS", ""].map((h, i) => (
+          <div style={{ display: "grid", gridTemplateColumns: "170px 150px 110px 60px 100px 120px 110px 70px 60px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, minWidth: "max-content" }}>
+            {["COST NAME", "COUNTERPARTY", "CONTRACT N°", "CCY", "LATEST DATE", "OUR AMOUNT", "STATUS", "OCC.", ""].map((h, i) => (
               <div key={i} style={{ padding: "10px 12px", fontSize: 10, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</div>
             ))}
           </div>
@@ -21676,17 +21825,17 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
         {selected && <DetailPanel c={selected} />}
       </div>
 
-      {/* Modal */}
+      {/* Cost identity Modal */}
       {showModal && (
         <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 680, maxHeight: "90vh", overflowY: "auto" }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
               <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>{editId !== null ? "Modifier le coût" : "Nouveau coût"}</div>
               <button onClick={closeModal} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {/* COST NAME */}
-              <div>
+              <div style={{ gridColumn: "1 / -1" }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>COST NAME *</label>
                 <input value={form.costName || ""} onChange={e => f("costName", e.target.value)} placeholder="ex: Freight surcharge Q3" list="cost-name-suggestions"
                   style={{ width: "100%", background: COLORS.bg, border: `1px solid ${!form.costName?.trim() ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
@@ -21704,24 +21853,6 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
                 </select>
               </div>
               {txtField("contractNumber", "CONTRACT NUMBER", { placeholder: "ex: CT-2026-045" })}
-              {/* STATUS */}
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>STATUS</label>
-                <select value={form.status || ""} onChange={e => f("status", e.target.value)}
-                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.status ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
-                  <option value="">— Sélectionner —</option>
-                  {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-
-              <div style={{ gridColumn: "1 / -1", height: 1, background: COLORS.border, margin: "4px 0" }} />
-
-              {numField("executionAmount", "EXECUTION AMOUNT")}
-              {numField("ourAmount", "OUR AMOUNT")}
-              {numField("counterpartyAmount", "COUNTERPARTY AMOUNT")}
-              {numField("pnlAmount", "P&L AMOUNT")}
-              {numField("financialAmount", "FINANCIAL AMOUNT")}
-              {numField("analyticalAmount", "ANALYTICAL AMOUNT")}
               {/* CURRENCY */}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>CURRENCY</label>
@@ -21731,39 +21862,86 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
                   {(config.costCurrencies || []).map(s => <option key={s.value} value={s.label || s.value} />)}
                 </datalist>
               </div>
-              {numField("unitPrice", "UNIT PRICE")}
-              {numField("volume", "VOLUME")}
+              {/* STATUS */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>STATUS</label>
+                <select value={form.status || ""} onChange={e => f("status", e.target.value)}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.status ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}>
+                  <option value="">— Sélectionner —</option>
+                  {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            {editId === null && (
+              <div style={{ marginTop: 16, padding: "10px 14px", background: `${COLORS.accent}10`, border: `1px dashed ${COLORS.accent}40`, borderRadius: 8, fontSize: 12, color: COLORS.textSub }}>
+                💡 Une fois le coût créé, ajoutez ses occurrences (montants datés) depuis le panneau de détail.
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}>
+              <button onClick={closeModal} style={{ padding: "10px 20px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+              <Btn onClick={save} disabled={!form.costName?.trim()}>{editId !== null ? "✓ Enregistrer" : "✓ Créer"}</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Occurrence Modal */}
+      {showOccModal && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000090", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1050, padding: 20 }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 30, width: "100%", maxWidth: 680, maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text }}>{occEditId !== null ? "Modifier l'occurrence" : "Nouvelle occurrence"}</div>
+              <button onClick={closeOccModal} style={{ background: "none", border: "none", color: COLORS.textSub, cursor: "pointer", fontSize: 22 }}>×</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* VALIDITY DATE */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>VALIDITY DATE *</label>
+                <input type="date" value={occForm.validityDate || ""} onChange={e => fOcc("validityDate", e.target.value)}
+                  style={{ width: "100%", background: COLORS.bg, border: `1px solid ${!occForm.validityDate ? COLORS.red + "60" : COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", colorScheme: "dark" }} />
+              </div>
 
               <div style={{ gridColumn: "1 / -1", height: 1, background: COLORS.border, margin: "4px 0" }} />
 
-              {txtField("invoiceReference", "INVOICE REFERENCE", { placeholder: "ex: INV-2026-0456", full: true })}
+              {occNumField("executionAmount", "EXECUTION AMOUNT")}
+              {occNumField("ourAmount", "OUR AMOUNT")}
+              {occNumField("counterpartyAmount", "COUNTERPARTY AMOUNT")}
+              {occNumField("pnlAmount", "P&L AMOUNT")}
+              {occNumField("financialAmount", "FINANCIAL AMOUNT")}
+              {occNumField("analyticalAmount", "ANALYTICAL AMOUNT")}
+              {occNumField("unitPrice", "UNIT PRICE")}
+              {occNumField("volume", "VOLUME")}
+
+              <div style={{ gridColumn: "1 / -1", height: 1, background: COLORS.border, margin: "4px 0" }} />
+
+              {occTxtField("invoiceReference", "INVOICE REFERENCE", { placeholder: "ex: INV-2026-0456", full: true })}
 
               {/* VAT OPTION */}
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div onClick={() => f("vatOption", !form.vatOption)}
-                  style={{ width: 44, height: 24, borderRadius: 12, background: form.vatOption ? COLORS.accent : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
-                  <div style={{ position: "absolute", top: 2, left: form.vatOption ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
+                <div onClick={() => fOcc("vatOption", !occForm.vatOption)}
+                  style={{ width: 44, height: 24, borderRadius: 12, background: occForm.vatOption ? COLORS.accent : COLORS.border, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+                  <div style={{ position: "absolute", top: 2, left: occForm.vatOption ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
                 </div>
-                <label style={{ fontSize: 13, color: form.vatOption ? COLORS.text : COLORS.textMuted, fontWeight: form.vatOption ? 700 : 400, cursor: "pointer" }} onClick={() => f("vatOption", !form.vatOption)}>
-                  VAT OPTION {form.vatOption ? "(True)" : "(False)"}
+                <label style={{ fontSize: 13, color: occForm.vatOption ? COLORS.text : COLORS.textMuted, fontWeight: occForm.vatOption ? 700 : 400, cursor: "pointer" }} onClick={() => fOcc("vatOption", !occForm.vatOption)}>
+                  VAT OPTION {occForm.vatOption ? "(True)" : "(False)"}
                 </label>
               </div>
               {/* VAT LEVEL */}
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: form.vatOption ? COLORS.textSub : COLORS.textMuted, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>VAT LEVEL (%)</label>
-                <input type="number" step="any" disabled={!form.vatOption} value={form.vatLevel ?? ""} onChange={e => f("vatLevel", e.target.value)} placeholder="ex: 20"
-                  style={{ width: "100%", background: form.vatOption ? COLORS.bg : `${COLORS.bg}80`, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: form.vatOption ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", cursor: form.vatOption ? "text" : "not-allowed" }} />
+                <label style={{ fontSize: 11, fontWeight: 700, color: occForm.vatOption ? COLORS.textSub : COLORS.textMuted, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>VAT LEVEL (%)</label>
+                <input type="number" step="any" disabled={!occForm.vatOption} value={occForm.vatLevel ?? ""} onChange={e => fOcc("vatLevel", e.target.value)} placeholder="ex: 20"
+                  style={{ width: "100%", background: occForm.vatOption ? COLORS.bg : `${COLORS.bg}80`, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: occForm.vatOption ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", cursor: occForm.vatOption ? "text" : "not-allowed" }} />
               </div>
               {/* COMMENTS */}
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSub, letterSpacing: 0.5, display: "block", marginBottom: 6 }}>COMMENTS</label>
-                <textarea value={form.comments || ""} onChange={e => f("comments", e.target.value)} rows={3} placeholder="Commentaires…"
+                <textarea value={occForm.comments || ""} onChange={e => fOcc("comments", e.target.value)} rows={3} placeholder="Commentaires…"
                   style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}>
-              <button onClick={closeModal} style={{ padding: "10px 20px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
-              <Btn onClick={save} disabled={!form.costName?.trim()}>{editId !== null ? "✓ Enregistrer" : "✓ Créer"}</Btn>
+              <button onClick={closeOccModal} style={{ padding: "10px 20px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, color: COLORS.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+              <Btn onClick={saveOcc} disabled={!occForm.validityDate}>{occEditId !== null ? "✓ Enregistrer" : "✓ Créer"}</Btn>
             </div>
           </div>
         </div>
@@ -21776,9 +21954,24 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
           companies={companies}
           config={config}
           onImport={(items) => {
-            const startId = costs.length > 0 ? Math.max(...costs.map(c => c.id || 0)) + 1 : 1;
-            const enriched = items.map((item, i) => ({ ...EMPTY_COST(), ...item, id: startId + i, createdAt: new Date().toISOString() }));
-            persist([...costs, ...enriched]);
+            const startId = normalizedCosts.length > 0 ? Math.max(...normalizedCosts.map(c => c.id || 0)) + 1 : 1;
+            const enriched = items.map((item, i) => {
+              const { validityDate, executionAmount, ourAmount, counterpartyAmount, pnlAmount, financialAmount, analyticalAmount, unitPrice, volume, invoiceReference, vatOption, vatLevel, comments, ...identity } = item;
+              return {
+                ...EMPTY_COST(),
+                ...identity,
+                id: startId + i,
+                createdAt: new Date().toISOString(),
+                occurrences: [{
+                  ...EMPTY_COST_OCCURRENCE(),
+                  id: 1,
+                  validityDate: validityDate || new Date().toISOString().slice(0, 10),
+                  executionAmount, ourAmount, counterpartyAmount, pnlAmount, financialAmount, analyticalAmount,
+                  unitPrice, volume, invoiceReference, vatOption, vatLevel, comments,
+                }],
+              };
+            });
+            persist([...normalizedCosts, ...enriched]);
             setShowImport(false);
           }}
         />
@@ -21787,11 +21980,13 @@ const Costs = ({ companies = [], costs = [], setCosts }) => {
   );
 };
 
+
 // ─── COST IMPORT MODAL ─────────────────────────────────────────
 const COST_FIELD_ALIASES = {
   costName:            ["cost name", "costname", "nom", "nom du cout", "name"],
   costCounterpartyId:  ["cost counterparty", "counterparty", "contrepartie", "société", "societe"],
   contractNumber:      ["contract number", "contractnumber", "numero contrat", "numéro contrat", "n° contrat", "contract n°"],
+  validityDate:        ["validity date", "validitydate", "date validite", "date de validité", "date"],
   executionAmount:     ["execution amount", "executionamount", "montant execution"],
   ourAmount:           ["our amount", "ouramount", "notre montant"],
   counterpartyAmount:  ["counterparty amount", "counterpartyamount", "montant contrepartie"],
@@ -21808,8 +22003,8 @@ const COST_FIELD_ALIASES = {
   comments:            ["comments", "comment", "commentaires", "commentaire", "additional info", "additionalinfo"],
 };
 
-const COST_IMPORTABLE_FIELDS = ["costName","costCounterpartyId","contractNumber","executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","analyticalAmount","currency","unitPrice","volume","invoiceReference","vatOption","vatLevel","status","comments"];
-const COST_FIELD_LABELS = { costName:"Cost Name", costCounterpartyId:"Cost Counterparty", contractNumber:"Contract Number", executionAmount:"Execution Amount", ourAmount:"Our Amount", counterpartyAmount:"Counterparty Amount", pnlAmount:"P&L Amount", financialAmount:"Financial Amount", analyticalAmount:"Analytical Amount", currency:"Currency", unitPrice:"Unit Price", volume:"Volume", invoiceReference:"Invoice Reference", vatOption:"VAT Option", vatLevel:"VAT Level (%)", status:"Status", comments:"Comments" };
+const COST_IMPORTABLE_FIELDS = ["costName","costCounterpartyId","contractNumber","validityDate","executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","analyticalAmount","currency","unitPrice","volume","invoiceReference","vatOption","vatLevel","status","comments"];
+const COST_FIELD_LABELS = { costName:"Cost Name", costCounterpartyId:"Cost Counterparty", contractNumber:"Contract Number", validityDate:"Validity Date", executionAmount:"Execution Amount", ourAmount:"Our Amount", counterpartyAmount:"Counterparty Amount", pnlAmount:"P&L Amount", financialAmount:"Financial Amount", analyticalAmount:"Analytical Amount", currency:"Currency", unitPrice:"Unit Price", volume:"Volume", invoiceReference:"Invoice Reference", vatOption:"VAT Option", vatLevel:"VAT Level (%)", status:"Status", comments:"Comments" };
 
 const CostImportModal = ({ onClose, onImport, companies, config }) => {
   const [step, setStep] = useState("guide");
@@ -21870,6 +22065,22 @@ const CostImportModal = ({ onClose, onImport, companies, config }) => {
 
   const normComp = s => s?.toString().toLowerCase().trim() || "";
 
+  const parseCostDate = (val) => {
+    if (!val) return "";
+    const s = String(val).trim();
+    // already yyyy-mm-dd
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    // dd/mm/yyyy or dd.mm.yyyy
+    const m1 = s.match(/^(\d{2})[\/.](\d{2})[\/.](\d{4})$/);
+    if (m1) return `${m1[3]}-${m1[2]}-${m1[1]}`;
+    // Excel serial date
+    if (/^\d{4,6}$/.test(s)) {
+      const dt = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+      if (!isNaN(dt.getTime())) return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+    }
+    return s;
+  };
+
   const doImport = () => {
     setImporting(true);
     setTimeout(() => {
@@ -21888,6 +22099,8 @@ const CostImportModal = ({ onClose, onImport, companies, config }) => {
         }
         // Normalize currency
         if (obj.currency) obj.currency = obj.currency.toUpperCase();
+        // Normalize validity date
+        if (obj.validityDate) obj.validityDate = parseCostDate(obj.validityDate);
         // Normalize vatOption
         obj.vatOption = ["true","yes","oui","1"].includes(String(obj.vatOption || "").toLowerCase().trim());
         // Normalize numeric fields
@@ -21906,7 +22119,7 @@ const CostImportModal = ({ onClose, onImport, companies, config }) => {
 
   const doExport = async () => {
     const XLSX = await import("xlsx");
-    const hdrs = [["costName","costCounterparty (name)","contractNumber","executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","analyticalAmount","currency","unitPrice","volume","invoiceReference","vatOption","vatLevel","status","comments"]];
+    const hdrs = [["costName","costCounterparty (name)","contractNumber","validityDate","executionAmount","ourAmount","counterpartyAmount","pnlAmount","financialAmount","analyticalAmount","currency","unitPrice","volume","invoiceReference","vatOption","vatLevel","status","comments"]];
     const ws = XLSX.utils.aoa_to_sheet(hdrs);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Costs");
@@ -21944,6 +22157,7 @@ const CostImportModal = ({ onClose, onImport, companies, config }) => {
                   { f: "costName",            l: "Cost Name", req: true },
                   { f: "costCounterpartyId",  l: "Cost Counterparty" },
                   { f: "contractNumber",      l: "Contract Number" },
+                  { f: "validityDate",        l: "Validity Date", req: true },
                   { f: "executionAmount",     l: "Execution Amount" },
                   { f: "ourAmount",           l: "Our Amount" },
                   { f: "counterpartyAmount",  l: "Counterparty Amount" },
@@ -21974,9 +22188,11 @@ const CostImportModal = ({ onClose, onImport, companies, config }) => {
               {[
                 "⚠ costCounterparty : saisir le nom exact de la société.",
                 "⚠ currency : code devise (ex: EUR, USD, MAD).",
+                "⚠ validityDate : JJ/MM/AAAA ou AAAA-MM-JJ (défaut : aujourd'hui si vide).",
                 "⚠ vatOption : TRUE/FALSE ou OUI/NON.",
                 "⚠ status : idéalement une valeur définie dans Admin Panel → Costs.",
                 "⚠ montants et volume : nombres (le point ou la virgule sont acceptés).",
+                "⚠ chaque ligne du fichier crée un coût avec une occurrence datée — importez plusieurs lignes avec le même nom/contrat pour créer plusieurs coûts distincts (pas des occurrences groupées).",
               ].map((w, i) => <div key={i} style={{ fontSize: 11, color: COLORS.orange, marginTop: i > 0 ? 4 : 0 }}>{w}</div>)}
             </div>
             {/* Actions */}

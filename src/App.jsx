@@ -19656,6 +19656,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
   const [tradeFilter, setTradeFilter] = useState("");
+  const [priceTypeFilter, setPriceTypeFilter] = useState(""); // "" | "flat" | "prime"
   const dataLoaded = useRef(true); // already loaded by parent
   const [, startTransition] = useTransition();
 
@@ -19872,6 +19873,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
         });
         if (!linked) return false;
       }
+      if (priceTypeFilter && c.contractPriceType !== priceTypeFilter) return false;
       return true;
     }).sort((a, b) => {
       // Parse dd/mm/yyyy → comparable string yyyymmdd
@@ -19882,7 +19884,7 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
       if (da) return -1;
       return (b.id || 0) - (a.id || 0); // fallback by id
     });
-  }, [contracts, deferredSearch, deferredTradeFilter, trades, companies]);
+  }, [contracts, deferredSearch, deferredTradeFilter, priceTypeFilter, trades, companies]);
 
   // ── Table columns ── (static — memoized once so identity never changes across renders)
   const COLS = useMemo(() => [
@@ -20124,6 +20126,16 @@ const Contracts = ({ companies = [], contracts = [], setContracts, trades = [], 
           <input value={tradeFilter} onChange={e => setTradeFilter(e.target.value)} placeholder="Filtrer par trade…"
             style={{ background: "transparent", border: "none", color: tradeFilter ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", width: 180 }} />
           {tradeFilter && <span onClick={() => setTradeFilter("")} style={{ cursor: "pointer", color: COLORS.textMuted, fontSize: 14, lineHeight: 1 }}>✕</span>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.card, border: `1px solid ${priceTypeFilter ? COLORS.accent + "80" : COLORS.border}`, borderRadius: 10, padding: "6px 12px", transition: "border-color 0.2s" }}>
+          <span style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600, whiteSpace: "nowrap" }}>PRICE</span>
+          <select value={priceTypeFilter} onChange={e => setPriceTypeFilter(e.target.value)}
+            style={{ background: "transparent", border: "none", color: priceTypeFilter ? COLORS.text : COLORS.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
+            <option value="" style={{ background: COLORS.card, color: COLORS.text }}>ALL</option>
+            <option value="flat" style={{ background: COLORS.card, color: COLORS.text }}>FLAT</option>
+            <option value="prime" style={{ background: COLORS.card, color: COLORS.text }}>PREMIUM</option>
+          </select>
+          {priceTypeFilter && <span onClick={() => setPriceTypeFilter("")} style={{ cursor: "pointer", color: COLORS.textMuted, fontSize: 14, lineHeight: 1 }}>✕</span>}
         </div>
         <XlButton onImport={() => setShowImport(true)} onExport={() => setShowExport(true)} />
         <Btn onClick={openNew}>+ NEW CONTRACT</Btn>
